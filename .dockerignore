@@ -1,0 +1,18 @@
+# Fora da imagem: dependências (o Dockerfile instala), dados, builds locais, segredos, testes e documentação.
+**/node_modules
+**/dist
+data
+**/data
+.git
+.gitignore
+.gitattributes
+.env
+.env.*
+!.env.example
+*.log
+docs
+server/test
+server/scripts
+web/scripts
+Dockerfile
+.dockerignore

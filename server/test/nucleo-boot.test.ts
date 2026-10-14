@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from '
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { CSP, criarApp } from '../src/app.ts'
+import { CSP, caminhoParaLog, criarApp } from '../src/app.ts'
 import { configurar, type Config } from '../src/config.ts'
 import { abrir, migrar, novoId, rodar, todos, um } from '../src/db.ts'
 import { criarAdminInicial } from '../src/primeiro-boot.ts'
@@ -14,7 +14,7 @@ import { carregarTarefas, executarTarefa, tarefasDevidas, type Tarefa } from '..
 import { fazerBackup } from '../src/tarefas/nucleo-backup.ts'
 import { apagarIpsAntigos } from '../src/tarefas/nucleo-ip.ts'
 import { servirWeb } from '../src/web.ts'
-import { ambiente } from './ajuda.ts'
+import { ambiente, clienteHttp, SENHA_TESTE } from './ajuda.ts'
 
 let restaurar: Config | null = null
 afterEach(() => {
@@ -133,6 +133,29 @@ describe('front em produção (web/dist)', () => {
     const saude = await app.request('/api/saude')
     assert.equal(saude.headers.get('cache-control'), 'no-store')
     assert.equal(saude.headers.get('x-content-type-options'), 'nosniff')
+  })
+
+  test('log: caminhos com token mascarados e nada do corpo das rotas de auth', async (t) => {
+    assert.equal(caminhoParaLog('/a/tok3n-secreto'), '/a/***')
+    assert.equal(caminhoParaLog('/a/tok3n/qualquer'), '/a/***')
+    assert.equal(caminhoParaLog('/api/publico/a/tok3n/decisao'), '/api/publico/***')
+    assert.equal(caminhoParaLog('/api/publico/arquivos/id-do-arquivo'), '/api/publico/***')
+    assert.equal(caminhoParaLog('/api/auth/convite/consultar'), '/api/auth/convite***')
+    assert.equal(caminhoParaLog('/api/auth/redefinicao'), '/api/auth/redefinicao***')
+    assert.equal(caminhoParaLog('/api/auth/login'), '/api/auth/login')
+    assert.equal(caminhoParaLog('/api/demandas/12'), '/api/demandas/12')
+
+    const a = await ambiente()
+    restaurar = configurar({ log: true })
+    const linhas: string[] = []
+    t.mock.method(console, 'log', (...partes: unknown[]) => { linhas.push(partes.join(' ')) })
+    const r = await clienteHttp(a.app, '').post('/api/auth/login', { email: 'am@melt.test', senha: SENHA_TESTE })
+    assert.equal(r.status, 200)
+    await clienteHttp(a.app, '').post('/api/auth/convite/consultar', { token: 'token-de-convite-qualquer' })
+    assert.equal(linhas.length, 2)
+    assert.match(linhas[0]!, /^POST \/api\/auth\/login 200 \d+ms t=/)
+    assert.ok(linhas[1]!.startsWith('POST /api/auth/convite*** 410 '), linhas[1])
+    assert.ok(linhas.every((l) => !l.includes(SENHA_TESTE) && !l.includes('am@melt.test') && !l.includes('token-de-convite')))
   })
 
   test('em desenvolvimento não manda CSP (o Vite injeta scripts)', async () => {

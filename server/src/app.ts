@@ -44,12 +44,15 @@ export const LIMITE_JSON = 1024 * 1024
 const MUTACOES = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 const TRACE = /^[A-Za-z0-9-]{8,64}$/
 
-/** Caminho para o log: sem query; tokens de /a/* e /api/publico/a/* mascarados (API.md §1). */
+/**
+ * Caminho para o log (API.md §1): sem query; /a/*, /api/publico/*, /api/auth/convite* e /api/auth/redefinicao* saem
+ * mascarados (token de link público e de acesso nunca vai ao log).
+ */
 export function caminhoParaLog(caminho: string): string {
   return caminho
-    .replace(/^\/a\/[^/]+/, '/a/***')
-    .replace(/^\/api\/publico\/a\/[^/]+/, '/api/publico/a/***')
-    .replace(/^\/api\/publico\/arquivos\/[^/]+/, '/api/publico/arquivos/***')
+    .replace(/^\/a\/.*/, '/a/***')
+    .replace(/^\/api\/publico\/.*/, '/api/publico/***')
+    .replace(/^\/api\/auth\/(convite|redefinicao).*/, '/api/auth/$1***')
 }
 
 /** Páginas e rotas com Referrer-Policy no-referrer (os tokens não podem vazar pelo Referer). */

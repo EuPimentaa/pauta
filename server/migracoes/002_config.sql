@@ -1,6 +1,6 @@
--- 002_config.sql: seed de CONFIGURAÇÃO (ADAPTACOES: nada de pessoas, clientes ou demandas).
--- Ids estáveis e legíveis (prefixos fl-, eq-, et-, tp-, tc-, vs-) para seeds, testes e docs.
--- Revisão humana pendente: SLAs e campos dos tipos (o card "S L A" da Criação é imagem; ver docs/PLANO.md, dúvidas).
+-- 002_config.sql: seed de CONFIGURAÇÃO (ADAPTACOES: nenhum quadro, pessoa, cliente ou demanda).
+-- Ids estáveis e legíveis (prefixos eq-, mq-, mqc-, md-, mdi-) para seeds, testes e docs.
+-- Os quadros nascem nos Primeiros passos do admin (modelo sugerido por equipe) ou em "Novo quadro".
 
 -- ───────────── configuração da aplicação (valores em JSON) ─────────────
 INSERT INTO configuracao (chave, valor) VALUES
@@ -8,6 +8,8 @@ INSERT INTO configuracao (chave, valor) VALUES
   ('prazo.hora_padrao',             '"18:00"'),  -- prazo sem hora
   ('parado.limite_dias_uteis',      '2'),        -- "parado há" em destaque acima disto
   ('cliente.parado_dias_uteis',     '2'),        -- Início: "Com o cliente há mais de N dias úteis"
+  ('retorno.prazo_dias_uteis',      '2'),        -- prazo de retorno padrão do cliente no envio
+  ('ajuste.prazo_dias_uteis',       '1'),        -- prazo padrão da rodada de ajuste
   ('link_publico.validade_dias',    '30'),
   ('link_publico.arquivo_minutos',  '10'),       -- URL assinada de arquivo na página pública
   ('convite.validade_dias',         '7'),
@@ -17,244 +19,308 @@ INSERT INTO configuracao (chave, valor) VALUES
   ('upload.limite_bytes',           '10485760'),
   ('arquivo.lixo_dias',             '30'),
   ('backup.manter',                 '14'),
-  ('quadro.entregue_dias',          '7'),        -- coluna Entregue mostra só os últimos N dias; depois, só no Arquivo
-  ('passos.tipos_revisados_em',     'null');     -- Primeiros passos: botão "Revisei os tipos" grava o instante
+  ('quadro.concluidas_dias',        '7'),        -- concluídas saem do quadro depois de N dias (ficam no Arquivo)
+  ('cronometro.limite_horas',       '10'),       -- ao parar, mais que isto vira o limite + aviso para conferir
+  ('passos.modelos_revisados_em',   'null');     -- Primeiros passos: botão "Revisei os modelos" grava o instante
 
--- ───────────── fluxo ─────────────
-INSERT INTO fluxo (id, nome, padrao) VALUES ('fl-padrao', 'Padrão', 1);
+-- ───────────── modelos de quadro ("Novo quadro") ─────────────
+INSERT INTO modelo_quadro (id, nome, descricao, pos) VALUES
+  ('mq-kanban',     'Kanban simples', 'A fazer, Fazendo, Revisão, Com o cliente e Concluído. Serve para quase toda equipe.', 1024),
+  ('mq-por-pessoa', 'Por pessoa',     'A Fila de entrada e uma coluna por pessoa da equipe, como no Trello de hoje.',      2048),
+  ('mq-semana',     'Semana',         'Uma coluna por dia útil e Concluído. Bom para a pauta da semana.',                  3072),
+  ('mq-branco',     'Em branco',      'Sem colunas. Você cria as suas.',                                                   4096);
 
--- ───────────── equipes (sem pessoas: aprovador e distribuidor ficam nulos até o admin definir) ─────────────
-INSERT INTO equipe (id, nome, slug, cor, fluxo_id, executora, pos) VALUES
-  ('eq-atendimento', 'Atendimento', 'atendimento', 'ambar',     'fl-padrao', 0, 1024),
-  ('eq-criacao',     'Criação',     'criacao',     'rosa',      'fl-padrao', 1, 2048),
-  ('eq-social',      'Social',      'social',      'roxo',      'fl-padrao', 1, 3072),
-  ('eq-web',         'Web',         'web',         'azul',      'fl-padrao', 1, 4096),
-  ('eq-trafego',     'Tráfego',     'trafego',     'verde',     'fl-padrao', 1, 5120),
-  ('eq-gestao',      'Gestão',      'gestao',      'grafite',   'fl-padrao', 0, 6144);
+-- cor nula = coluna sem cor. por_membro = 1 vira uma coluna por membro ativo da equipe do quadro.
+INSERT INTO modelo_quadro_coluna (id, modelo_id, nome, cor, papel, por_membro, pos) VALUES
+  ('mqc-kanban-a-fazer',  'mq-kanban',     'A fazer',       'grafite', 'normal',             0, 1024),
+  ('mqc-kanban-fazendo',  'mq-kanban',     'Fazendo',       'azul',    'normal',             0, 2048),
+  ('mqc-kanban-revisao',  'mq-kanban',     'Revisão',       'roxo',    'normal',             0, 3072),
+  ('mqc-kanban-cliente',  'mq-kanban',     'Com o cliente', 'amarelo', 'aguardando_cliente', 0, 4096),
+  ('mqc-kanban-concluido','mq-kanban',     'Concluído',     'verde',   'concluida',          0, 5120),
+  ('mqc-pessoa-fila',     'mq-por-pessoa', 'Fila',          'grafite', 'normal',             0, 1024),
+  ('mqc-pessoa-membros',  'mq-por-pessoa', 'Uma por pessoa', NULL,     'normal',             1, 2048),
+  ('mqc-semana-seg',      'mq-semana',     'Segunda',       NULL,      'normal',             0, 1024),
+  ('mqc-semana-ter',      'mq-semana',     'Terça',         NULL,      'normal',             0, 2048),
+  ('mqc-semana-qua',      'mq-semana',     'Quarta',        NULL,      'normal',             0, 3072),
+  ('mqc-semana-qui',      'mq-semana',     'Quinta',        NULL,      'normal',             0, 4096),
+  ('mqc-semana-sex',      'mq-semana',     'Sexta',         NULL,      'normal',             0, 5120),
+  ('mqc-semana-concluido','mq-semana',     'Concluído',     'verde',   'concluida',          0, 6144);
 
--- ───────────── etapas (SPEC §2.3). A ordem das colunas segue a SPEC §5.1: Ajustes antes de Revisão. ─────────────
-INSERT INTO etapa (id, fluxo_id, nome, categoria, bola, pausa_sla, aplica_se, responsavel_regra, cor, pos) VALUES
-  ('et-triagem',  'fl-padrao', 'Triagem',       'triagem',    'agencia', 0, 'sempre',            NULL,                'grafite',  1024),
-  ('et-fila',     'fl-padrao', 'Na fila',       'fila',       'agencia', 0, 'sempre',            NULL,                'grafite',  2048),
-  ('et-producao', 'fl-padrao', 'Em produção',   'producao',   'agencia', 0, 'sempre',            NULL,                'grafite',  3072),
-  ('et-ajuste',   'fl-padrao', 'Ajustes',       'ajuste',     'agencia', 0, 'sempre',            NULL,                'warning',  4096),
-  ('et-revisao',  'fl-padrao', 'Revisão',       'revisao',    'agencia', 0, 'sempre',            NULL,                'roxo',     5120),
-  ('et-cliente',  'fl-padrao', 'Com o cliente', 'cliente',    'cliente', 1, 'aprovacao_cliente', NULL,                'info',     6144),
-  ('et-aprovado', 'fl-padrao', 'Aprovado',      'aprovado',   'agencia', 0, 'aprovacao_cliente', NULL,                'success',  7168),
-  ('et-agendar',  'fl-padrao', 'Agendar',       'publicacao', 'agencia', 0, 'publicacao',        'social_do_cliente', 'turquesa', 8192),
-  ('et-entregue', 'fl-padrao', 'Entregue',      'concluido',  'agencia', 0, 'sempre',            NULL,                'success',  9216),
-  ('et-cancelada','fl-padrao', 'Cancelada',     'cancelado',  'agencia', 0, 'sempre',            NULL,                'danger',  10240);
+-- ───────────── equipes (sem pessoas; o modelo é só a sugestão dos Primeiros passos) ─────────────
+INSERT INTO equipe (id, nome, slug, cor, modelo_quadro_id, pos) VALUES
+  ('eq-atendimento', 'Atendimento', 'atendimento', 'ambar',    'mq-kanban',     1024),
+  ('eq-criacao',     'Criação',     'criacao',     'rosa',     'mq-por-pessoa', 2048),
+  ('eq-social',      'Social',      'social',      'roxo',     'mq-por-pessoa', 3072),
+  ('eq-web',         'Web',         'web',         'azul',     'mq-kanban',     4096),
+  ('eq-trafego',     'Tráfego',     'trafego',     'verde',    'mq-kanban',     5120),
+  ('eq-producao',    'Produção',    'producao',    'turquesa', 'mq-kanban',     6144);
 
--- ───────────── transições (SPEC §7.1) ─────────────
--- quem:   admin | atendimento (papel) | responsavel | aprovador (relações com a demanda, incluindo quem cobre) | cliente (link)
--- requer: ver RequisitoTransicao em shared/tipos/config.ts. Admin pode tudo o que a linha permite a qualquer papel interno.
--- Acréscimos à SPEC (marcados com +): fila→revisao (entregar direto da fila), producao→fila (largar),
--- aprovado/publicacao→cliente (desfazer "Aprovado pelo WhatsApp").
-INSERT INTO transicao (de_categoria, para_categoria, quem, requer, negado) VALUES
-  ('triagem',   'fila',       '["atendimento","admin","aprovador"]',             '["cliente_e_tipo"]',
-     'Só o atendimento ou o aprovador da equipe aceita da triagem.'),
-  ('triagem',   'cancelado',  '["atendimento","admin","aprovador"]',             '["motivo"]',
-     'Só o atendimento ou o aprovador da equipe recusa da triagem.'),
-  ('fila',      'producao',   '["responsavel","atendimento","admin"]',           '[]',
-     'Pegue a demanda antes de começar.'),
-  ('fila',      'revisao',    '["responsavel","atendimento","admin"]',           '["versao_nova"]',            -- +
-     'Só o responsável entrega versão.'),
-  ('producao',  'fila',       '["responsavel","atendimento","admin"]',           '[]',                         -- +
-     'Só o responsável ou o atendimento devolve para a fila.'),
-  ('producao',  'revisao',    '["responsavel","atendimento","admin"]',           '["versao_nova"]',
-     'Só o responsável entrega versão.'),
-  ('ajuste',    'revisao',    '["responsavel","atendimento","admin"]',           '["versao_nova"]',
-     'Só o responsável entrega versão.'),
-  ('ajuste',    'producao',   '["responsavel","admin"]',                         '[]',
-     'Só o responsável volta a demanda para produção.'),
-  ('revisao',   'ajuste',     '["aprovador","atendimento","admin"]',             '["rodada"]',
-     'Só o aprovador ou o atendimento devolve para ajuste.'),
-  ('revisao',   'cliente',    '["atendimento","admin"]',                         '["envio","com_aprovacao_cliente"]',
-     'Só o atendimento envia ao cliente.'),
-  ('revisao',   'concluido',  '["aprovador","atendimento","admin"]',             '["sem_aprovacao_cliente"]',
-     'Só o aprovador ou o atendimento conclui.'),
-  ('cliente',   'ajuste',     '["atendimento","admin","cliente"]',               '["retorno"]',
-     'Só o atendimento registra o retorno do cliente.'),
-  -- sem 'sem_publicacao': soltar um Post em Aprovado (ou "." em Com o cliente) abre "Registrar retorno";
-  -- registrarRetorno() decide entre Aprovado e Agendar pelo tipo.
-  ('cliente',   'aprovado',   '["atendimento","admin","cliente"]',               '["retorno"]',
-     'Só o atendimento registra o retorno do cliente.'),
-  ('cliente',   'publicacao', '["atendimento","admin","cliente"]',               '["retorno","com_publicacao"]',
-     'Só o atendimento registra o retorno do cliente.'),
-  ('cliente',   'concluido',  '["atendimento","admin"]',                         '["confirmacao"]',
-     'Só o atendimento entrega sem aprovação registrada.'),
-  ('aprovado',  'publicacao', '["atendimento","admin"]',                         '["com_publicacao"]',
-     'Só o atendimento manda para Agendar.'),
-  ('aprovado',  'concluido',  '["atendimento","admin"]',                         '[]',
-     'Só o atendimento marca como entregue.'),
-  ('publicacao','concluido',  '["atendimento","admin","responsavel"]',           '[]',
-     'Só o responsável pelo agendamento ou o atendimento marca como entregue.'),
-  ('aprovado',  'cliente',    '["atendimento","admin"]',                         '["anular_aprovacao"]',       -- +
-     'Só o atendimento desfaz uma aprovação.'),
-  ('publicacao','cliente',    '["atendimento","admin"]',                         '["anular_aprovacao"]',       -- +
-     'Só o atendimento desfaz uma aprovação.'),
-  ('*',         'cancelado',  '["atendimento","admin"]',                         '["motivo"]',
-     'Só o atendimento cancela uma demanda.'),
-  ('concluido', 'anterior',   '["atendimento","admin"]',                         '[]',
-     'Só o atendimento reabre uma demanda entregue.'),
-  ('cancelado', 'anterior',   '["atendimento","admin"]',                         '[]',
-     'Só o atendimento reabre uma demanda cancelada.');
+-- ───────────── modelos de demanda globais (aparecem em todos os quadros) ─────────────
+-- briefing_md vira a descrição da demanda; prazo em dias úteis a partir da criação; rodadas nulas = as do cliente.
+INSERT INTO modelo_demanda (id, quadro_id, nome, descricao, icone, briefing_md, prazo_dias_uteis, prioridade, estimativa_min,
+                            rodadas_inclusas, pos) VALUES
+  ('md-post', NULL, 'Post', 'Arte única para o feed ou para os stories.', 'image',
+'## Objetivo
+O que o post precisa comunicar e para quem.
 
--- ───────────── tipos de peça: 12 + Outro (SPEC §4.6) ─────────────
--- SLA em dias úteis. folga = dias úteis entre o prazo interno e a publicação/entrega ao cliente.
-INSERT INTO tipo_peca (id, nome, slug, equipe_id, aprovacao_cliente, publicacao, com_horario,
-                       sla_dias_uteis, sla_ajuste_dias_uteis, folga_aprovacao_dias, estimativa_min, checklist_padrao, pos) VALUES
-  ('tp-post',         'Post',                 'post',         'eq-criacao', 1, 1, 0,  2, 1, 1,   60, '[]', 1024),
-  ('tp-carrossel',    'Carrossel',            'carrossel',    'eq-criacao', 1, 1, 0,  3, 1, 1,  120, '[]', 2048),
-  ('tp-reels',        'Reels',                'reels',        'eq-criacao', 1, 1, 0,  3, 2, 2,  180, '[]', 3072),
-  ('tp-anuncio-meta', 'Anúncio Meta',         'anuncio-meta', 'eq-criacao', 1, 0, 0,  2, 1, 1,   90,
-     '["Exportar um arquivo por formato"]', 4096),
-  ('tp-peca-grafica', 'Peça gráfica',         'peca-grafica', 'eq-criacao', 1, 0, 0,  3, 1, 2,  120,
-     '["Conferir medida e sangria","Exportar PDF para impressão"]', 5120),
-  ('tp-video',        'Vídeo',                'video',        'eq-criacao', 1, 0, 0,  5, 2, 2,  480, '[]', 6144),
-  ('tp-gravacao',     'Gravação',             'gravacao',     'eq-criacao', 0, 0, 1,  2, 1, 0,  240,
-     '["Confirmar local e horário com o cliente","Separar equipamento"]', 7168),
-  ('tp-relatorio',    'Relatório',            'relatorio',    'eq-social',  0, 0, 0,  3, 1, 1,  120, '[]', 8192),
-  ('tp-site',         'Site ou landing page', 'site',         'eq-web',     1, 0, 0, 10, 3, 3, 2400, '[]', 9216),
-  ('tp-ajuste-site',  'Ajuste de site',       'ajuste-site',  'eq-web',     0, 0, 0,  3, 1, 1,  120, '[]', 10240),
-  ('tp-auditoria',    'Auditoria de site',    'auditoria',    'eq-web',     0, 0, 0,  5, 2, 0,  240, '[]', 11264),
-  ('tp-op-trafego',   'OP de tráfego',        'op-trafego',   'eq-trafego', 0, 0, 0,  2, 1, 0,   60, '[]', 12288),
-  ('tp-outro',        'Outro',                'outro',        NULL,         1, 0, 0,  2, 1, 1, NULL, '[]', 65536);
+## Rede e formato
+- Rede: Instagram, Facebook, LinkedIn ou TikTok
+- Formato: Feed 4:5 (1080×1350), Feed 1:1 (1080×1080) ou Stories 9:16 (1080×1920)
 
--- Campos: no máximo 2 obrigatórios por tipo no seed (a API aceita até 3), sempre com ajuda.
-INSERT INTO tipo_peca_campo (id, tipo_peca_id, chave, rotulo, tipo, opcoes, obrigatorio, ajuda, pos) VALUES
-  ('tc-post-formato',      'tp-post', 'formato', 'Formato', 'selecao',
-     '["Feed 4:5 (1080×1350)","Feed 1:1 (1080×1080)","Stories 9:16 (1080×1920)"]', 1,
-     'Formato final da arte. Na dúvida, Feed 4:5.', 1024),
-  ('tc-post-rede',         'tp-post', 'rede', 'Rede', 'multipla',
-     '["Instagram","Facebook","LinkedIn","TikTok"]', 1,
-     'Onde o post vai sair. Muda o formato e o tom.', 2048),
-  ('tc-post-texto',        'tp-post', 'texto_arte', 'Texto da arte', 'texto_longo', NULL, 0,
-     'Só o texto que vai na arte. A legenda fica com o Social.', 3072),
+## Texto da arte
+Só o texto que vai na imagem. A legenda fica com o Social.
 
-  ('tc-carrossel-laminas', 'tp-carrossel', 'laminas', 'Lâminas', 'numero', NULL, 1,
-     'Quantidade de lâminas, contando capa e fechamento.', 1024),
-  ('tc-carrossel-roteiro', 'tp-carrossel', 'roteiro', 'Roteiro', 'texto_longo', NULL, 1,
-     'O texto de cada lâmina, uma por linha. Sem roteiro, a Criação devolve.', 2048),
-  ('tc-carrossel-rede',    'tp-carrossel', 'rede', 'Rede', 'multipla',
-     '["Instagram","Facebook","LinkedIn"]', 0, 'Onde o carrossel vai sair.', 3072),
+## Referências
+Links do Drive, posts de que o cliente gostou, fotos e materiais da marca.
 
-  ('tc-reels-duracao',     'tp-reels', 'duracao', 'Duração', 'selecao',
-     '["até 15 s","até 30 s","até 60 s","até 90 s"]', 1, 'Duração final do vídeo.', 1024),
-  ('tc-reels-material',    'tp-reels', 'material', 'Material', 'selecao',
-     '["Vamos gravar","O cliente envia","Banco de imagens"]', 1,
-     'De onde vêm as imagens. Se for gravar, crie também a demanda de Gravação.', 2048),
-  ('tc-reels-roteiro',     'tp-reels', 'roteiro', 'Roteiro', 'texto_longo', NULL, 0,
-     'Cenas e falas, se já existirem.', 3072),
+## Publicação
+Data e horário previstos, se já houver.', 2, NULL, 60, NULL, 1024),
 
-  ('tc-anuncio-formatos',  'tp-anuncio-meta', 'formatos', 'Formatos', 'multipla',
-     '["Feed 1:1","Feed 4:5","Stories e Reels 9:16"]', 1,
-     'Siga o MODELO PARA ADS - META: cada formato vira um arquivo.', 1024),
-  ('tc-anuncio-objetivo',  'tp-anuncio-meta', 'objetivo', 'Objetivo', 'selecao',
-     '["Tráfego","Engajamento","Mensagens","Conversões","Reconhecimento"]', 1,
-     'Objetivo da campanha. Muda a chamada e o texto.', 2048),
-  ('tc-anuncio-chamada',   'tp-anuncio-meta', 'chamada', 'Botão', 'texto', NULL, 0,
-     'Texto do botão: Saiba mais, Fale conosco, Comprar.', 3072),
+  ('md-carrossel', NULL, 'Carrossel', 'Várias lâminas com roteiro.', 'gallery-horizontal',
+'## Objetivo
+O que o carrossel precisa ensinar ou convencer.
 
-  ('tc-grafica-medida',    'tp-peca-grafica', 'medida', 'Medida', 'texto', NULL, 1,
-     'Largura × altura em cm, ex.: 90 × 50. Para banner, informe também a sangria.', 1024),
-  ('tc-grafica-material',  'tp-peca-grafica', 'material', 'Material e acabamento', 'texto', NULL, 0,
-     'Ex.: lona fosca, adesivo vinil, couché 300 g com laminação.', 2048),
-  ('tc-grafica-qtd',       'tp-peca-grafica', 'quantidade', 'Quantidade', 'numero', NULL, 0,
-     'Quantidade a imprimir, se já souber.', 3072),
+## Lâminas
+Quantidade de lâminas, contando capa e fechamento.
 
-  ('tc-video-duracao',     'tp-video', 'duracao', 'Duração', 'texto', NULL, 1,
-     'Duração final aproximada, ex.: 30 s, 2 min.', 1024),
-  ('tc-video-bruto',       'tp-video', 'material_bruto', 'Material bruto', 'url', NULL, 1,
-     'Link da pasta do Drive com o material gravado.', 2048),
-  ('tc-video-formato',     'tp-video', 'formato', 'Formato', 'selecao',
-     '["Horizontal 16:9","Vertical 9:16","Quadrado 1:1"]', 0, 'Proporção do vídeo final.', 3072),
+## Roteiro
+Uma linha por lâmina, na ordem. Sem roteiro, a Criação devolve.
 
-  ('tc-gravacao-captacao', 'tp-gravacao', 'captacao', 'Captação', 'selecao',
-     '["Foto","Vídeo","Foto e vídeo"]', 1, 'O que a equipe vai captar. Local e horário ficam nos campos da demanda.', 1024),
-  ('tc-gravacao-roteiro',  'tp-gravacao', 'roteiro', 'Roteiro ou lista de cenas', 'texto_longo', NULL, 0,
-     'Cenas, falas e quem aparece.', 2048),
-  ('tc-gravacao-contato',  'tp-gravacao', 'contato_local', 'Contato no local', 'texto', NULL, 0,
-     'Quem recebe a equipe e o telefone.', 3072),
+## Rede e formato
+- Rede: Instagram, LinkedIn ou Facebook
+- Formato: 4:5 (1080×1350) ou 1:1 (1080×1080)
 
-  ('tc-relatorio-periodo', 'tp-relatorio', 'periodo', 'Período', 'texto', NULL, 1,
-     'EXPLICAÇÃO PARA RELATÓRIOS: informe o período (ex.: setembro de 2026) e o que o cliente quer acompanhar.', 1024),
-  ('tc-relatorio-redes',   'tp-relatorio', 'redes', 'Redes', 'multipla',
-     '["Instagram","Facebook","LinkedIn","TikTok","YouTube","Google Meu Negócio"]', 1,
-     'Quais perfis entram no relatório.', 2048),
-  ('tc-relatorio-kpis',    'tp-relatorio', 'kpis', 'Indicadores', 'texto_longo', NULL, 0,
-     'Indicadores pedidos pelo cliente, se houver algum fora do padrão.', 3072),
+## Referências
+Links do Drive e carrosséis de referência.', 3, NULL, 120, NULL, 2048),
 
-  ('tc-site-escopo',       'tp-site', 'escopo', 'Escopo', 'selecao',
-     '["Landing page","Site institucional","E-commerce","Protótipo no Figma"]', 1,
-     'Prazos de referência: Figma da home 5 dias, LP 10, institucional 15, e-commerce 45.', 1024),
-  ('tc-site-objetivo',     'tp-site', 'objetivo', 'Objetivo e páginas', 'texto_longo', NULL, 1,
-     'Para que serve e quais páginas ou seções entram.', 2048),
-  ('tc-site-dominio',      'tp-site', 'dominio', 'Domínio', 'url', NULL, 0,
-     'Endereço onde o site vai ficar, se já existir.', 3072),
+  ('md-reels', NULL, 'Reels', 'Vídeo curto vertical.', 'clapperboard',
+'## Objetivo
+O que o vídeo precisa provocar em quem assiste.
 
-  ('tc-ajuste-site-url',   'tp-ajuste-site', 'pagina', 'Página', 'url', NULL, 1,
-     'Endereço exato da página que vai mudar.', 1024),
-  ('tc-ajuste-site-compl', 'tp-ajuste-site', 'complexidade', 'Complexidade', 'selecao',
-     '["Simples (até 3 dias)","Complexo (7 a 15 dias)"]', 1,
-     'Troca de texto e imagem é simples. Nova seção ou integração é complexo.', 2048),
+## Duração
+Até 15 s, 30 s, 60 s ou 90 s.
 
-  ('tc-auditoria-site',    'tp-auditoria', 'site', 'Site', 'url', NULL, 1,
-     'Endereço do site auditado.', 1024),
-  ('tc-auditoria-plat',    'tp-auditoria', 'plataforma', 'Plataforma', 'selecao',
-     '["WordPress","Shopify","Wix","Outra"]', 0, 'Onde o site roda.', 2048),
+## Material
+Vamos gravar, o cliente envia ou banco de imagens. Se for gravar, crie também a demanda da gravação.
 
-  ('tc-op-plataforma',     'tp-op-trafego', 'plataforma', 'Plataforma', 'multipla',
-     '["Meta","Google","TikTok","LinkedIn"]', 1, 'Onde a OP será executada.', 1024),
-  ('tc-op-verba',          'tp-op-trafego', 'verba', 'Verba e período', 'texto', NULL, 0,
-     'Ex.: R$ 1.500 de 20/10 a 31/10. Nunca escreva senhas aqui: use o cofre.', 2048);
+## Roteiro
+Cenas, falas e textos na tela.
+
+## Trilha e legendas
+Música de referência e se precisa de legenda na tela.
+
+## Referências
+Reels de referência e a pasta do material.', 3, NULL, 180, NULL, 3072),
+
+  ('md-stories', NULL, 'Stories', 'Sequência de telas 9:16.', 'smartphone',
+'## Objetivo
+O que a sequência precisa comunicar.
+
+## Sequência
+Quantidade de telas e o que vai em cada uma, uma por linha.
+
+## Interação
+Enquete, caixa de perguntas, link ou nenhuma.
+
+## Referências
+Links do Drive e stories de referência.', 1, NULL, 30, NULL, 4096),
+
+  ('md-video', NULL, 'Vídeo', 'Edição de vídeo institucional, campanha ou evento.', 'video',
+'## Objetivo
+Onde o vídeo vai passar e o que precisa provocar.
+
+## Duração e formato
+Duração aproximada e proporção: horizontal 16:9, vertical 9:16 ou quadrado 1:1.
+
+## Material bruto
+Link da pasta do Drive com o material gravado.
+
+## Roteiro
+Cenas, falas, letterings e a chamada final.
+
+## Trilha e locução
+Música de referência e se tem locução.
+
+## Referências
+Vídeos de referência.', 5, NULL, 480, NULL, 5120),
+
+  ('md-site', NULL, 'Site ou landing page', 'Site novo, landing page, e-commerce ou protótipo.', 'globe',
+'## Objetivo
+Para que serve o site e qual ação o visitante deve tomar.
+
+## Escopo
+Landing page, site institucional, e-commerce ou protótipo no Figma.
+Prazos de referência: Figma da home 5 dias úteis, landing page 10, institucional 15, e-commerce 45.
+
+## Páginas e seções
+Uma por linha.
+
+## Conteúdo
+Textos, fotos e onde estão (pasta do Drive).
+
+## Domínio e hospedagem
+Endereço e onde fica hospedado. Senhas nunca aqui: use o link Acessos do cliente (cofre).
+
+## Referências
+Sites de referência.', 10, NULL, 2400, 3, 6144),
+
+  ('md-ajuste-site', NULL, 'Ajuste de site', 'Mudança pontual num site que já existe.', 'wrench',
+'## Página
+Endereço exato da página que vai mudar.
+
+## O que muda
+Um ajuste por linha.
+
+## Complexidade
+Simples (troca de texto ou imagem, até 3 dias úteis) ou complexo (nova seção ou integração, 7 a 15 dias úteis).
+
+## Acessos
+Use o link Acessos do cliente (cofre). Nunca escreva senha aqui.', 3, NULL, 120, NULL, 7168),
+
+  ('md-relatorio', NULL, 'Relatório', 'Relatório mensal de redes ou de anúncios.', 'chart-column',
+'## Período
+Ex.: setembro de 2026.
+
+## Redes e canais
+Instagram, Facebook, LinkedIn, TikTok, YouTube, Google Meu Negócio ou anúncios.
+
+## Indicadores
+Os de sempre (alcance, engajamento, seguidores, cliques) e os que o cliente pediu fora do padrão.
+
+## O que o cliente quer acompanhar
+Metas e perguntas do mês.
+
+## O que aconteceu no mês
+Ações que explicam os números: campanha, evento, post que foi muito bem.', 3, NULL, 120, NULL, 8192),
+
+  ('md-anuncio', NULL, 'Campanha de anúncio', 'Campanha paga no Meta, Google, TikTok ou LinkedIn.', 'megaphone',
+'## Objetivo
+Tráfego, engajamento, mensagens, conversões ou reconhecimento.
+
+## Plataformas
+Meta, Google, TikTok ou LinkedIn.
+
+## Público
+Região, idade, interesses e públicos personalizados.
+
+## Verba e período
+Ex.: R$ 1.500 de 20/10 a 31/10.
+
+## Criativos
+Formatos: Feed 1:1, Feed 4:5, Stories e Reels 9:16. Cada formato vira um arquivo.
+
+## Textos e chamada
+Texto principal, título e botão (Saiba mais, Fale conosco, Comprar).
+
+## Destino
+Link, WhatsApp ou formulário.', 3, NULL, 180, NULL, 9216),
+
+  ('md-grafico', NULL, 'Material gráfico', 'Peça para impressão: banner, folder, cartão, adesivo.', 'printer',
+'## Peça
+O que é: banner, folder, cartão, adesivo, placa, uniforme.
+
+## Medida
+Largura × altura em cm, com sangria.
+
+## Material e acabamento
+Ex.: lona fosca, adesivo vinil, couché 300 g com laminação.
+
+## Quantidade
+Quantas unidades, se já souber.
+
+## Texto
+Todo o texto da peça.
+
+## Entrega
+Data e endereço de entrega, se a agência cuida da produção.', 3, NULL, 120, NULL, 10240),
+
+  ('md-outro', NULL, 'Outro', 'Qualquer pedido que não se encaixa nos outros.', 'file-text',
+'## O que precisa ser feito
+
+## Para quando e por quê
+
+## Referências', NULL, NULL, NULL, NULL, 65536);
+
+INSERT INTO modelo_demanda_item (id, modelo_id, checklist, texto, pos) VALUES
+  ('mdi-post-1',       'md-post',        'Checklist', 'Conferir a marca e as cores do cliente',                 1024),
+  ('mdi-post-2',       'md-post',        'Checklist', 'Revisar o texto da arte',                                2048),
+  ('mdi-post-3',       'md-post',        'Checklist', 'Exportar no formato da rede',                            3072),
+  ('mdi-post-4',       'md-post',        'Checklist', 'Salvar na pasta SAÍDA do cliente',                       4096),
+  ('mdi-carrossel-1',  'md-carrossel',   'Checklist', 'Conferir a ordem das lâminas com o roteiro',             1024),
+  ('mdi-carrossel-2',  'md-carrossel',   'Checklist', 'Revisar os textos de todas as lâminas',                  2048),
+  ('mdi-carrossel-3',  'md-carrossel',   'Checklist', 'Capa convida a arrastar',                                3072),
+  ('mdi-carrossel-4',  'md-carrossel',   'Checklist', 'Exportar as lâminas numeradas',                          4096),
+  ('mdi-carrossel-5',  'md-carrossel',   'Checklist', 'Salvar na pasta SAÍDA do cliente',                       5120),
+  ('mdi-reels-1',      'md-reels',       'Checklist', 'Conferir a duração',                                     1024),
+  ('mdi-reels-2',      'md-reels',       'Checklist', 'Revisar as legendas',                                    2048),
+  ('mdi-reels-3',      'md-reels',       'Checklist', 'Trilha com licença de uso',                              3072),
+  ('mdi-reels-4',      'md-reels',       'Checklist', 'Capa do Reels',                                          4096),
+  ('mdi-reels-5',      'md-reels',       'Checklist', 'Exportar em 9:16 (1080×1920)',                           5120),
+  ('mdi-reels-6',      'md-reels',       'Checklist', 'Salvar na pasta SAÍDA do cliente',                       6144),
+  ('mdi-stories-1',    'md-stories',     'Checklist', 'Respeitar a área segura do topo e do rodapé',            1024),
+  ('mdi-stories-2',    'md-stories',     'Checklist', 'Revisar os textos',                                      2048),
+  ('mdi-stories-3',    'md-stories',     'Checklist', 'Exportar em 9:16 (1080×1920)',                           3072),
+  ('mdi-video-1',      'md-video',       'Checklist', 'Conferir o material bruto',                              1024),
+  ('mdi-video-2',      'md-video',       'Checklist', 'Primeiro corte',                                         2048),
+  ('mdi-video-3',      'md-video',       'Checklist', 'Cor e áudio',                                            3072),
+  ('mdi-video-4',      'md-video',       'Checklist', 'Revisar as legendas',                                    4096),
+  ('mdi-video-5',      'md-video',       'Checklist', 'Exportar no formato pedido',                             5120),
+  ('mdi-video-6',      'md-video',       'Checklist', 'Salvar na pasta SAÍDA do cliente',                       6144),
+  ('mdi-site-1',       'md-site',        'Checklist', 'Briefing aprovado com o cliente',                        1024),
+  ('mdi-site-2',       'md-site',        'Checklist', 'Layout no Figma',                                        2048),
+  ('mdi-site-3',       'md-site',        'Checklist', 'Desenvolvimento',                                        3072),
+  ('mdi-site-4',       'md-site',        'Checklist', 'Testar no celular e no computador',                      4096),
+  ('mdi-site-5',       'md-site',        'Checklist', 'Testar formulários e integrações',                       5120),
+  ('mdi-site-6',       'md-site',        'Checklist', 'SEO básico: título, descrição e imagem de compartilhamento', 6144),
+  ('mdi-site-7',       'md-site',        'Checklist', 'Publicar com SSL',                                       7168),
+  ('mdi-ajuste-1',     'md-ajuste-site', 'Checklist', 'Fazer backup antes de mexer',                            1024),
+  ('mdi-ajuste-2',     'md-ajuste-site', 'Checklist', 'Aplicar os ajustes',                                     2048),
+  ('mdi-ajuste-3',     'md-ajuste-site', 'Checklist', 'Testar no celular e no computador',                      3072),
+  ('mdi-ajuste-4',     'md-ajuste-site', 'Checklist', 'Avisar o atendimento com o link da página',              4096),
+  ('mdi-relatorio-1',  'md-relatorio',   'Checklist', 'Coletar os números de cada rede',                        1024),
+  ('mdi-relatorio-2',  'md-relatorio',   'Checklist', 'Comparar com o mês anterior',                            2048),
+  ('mdi-relatorio-3',  'md-relatorio',   'Checklist', 'Escrever destaques e recomendações',                     3072),
+  ('mdi-relatorio-4',  'md-relatorio',   'Checklist', 'Revisão do atendimento',                                 4096),
+  ('mdi-relatorio-5',  'md-relatorio',   'Checklist', 'Exportar em PDF',                                        5120),
+  ('mdi-anuncio-1',    'md-anuncio',     'Checklist', 'Criativos aprovados pelo cliente',                       1024),
+  ('mdi-anuncio-2',    'md-anuncio',     'Checklist', 'Conferir pixel e eventos',                               2048),
+  ('mdi-anuncio-3',    'md-anuncio',     'Checklist', 'Criar os públicos',                                      3072),
+  ('mdi-anuncio-4',    'md-anuncio',     'Checklist', 'Configurar e revisar a campanha',                        4096),
+  ('mdi-anuncio-5',    'md-anuncio',     'Checklist', 'Campanha no ar',                                         5120),
+  ('mdi-anuncio-6',    'md-anuncio',     'Checklist', 'Primeiro acompanhamento em 48 h',                        6144),
+  ('mdi-grafico-1',    'md-grafico',     'Checklist', 'Conferir medida e sangria',                              1024),
+  ('mdi-grafico-2',    'md-grafico',     'Checklist', 'Revisar os textos',                                      2048),
+  ('mdi-grafico-3',    'md-grafico',     'Checklist', 'Converter as fontes em curvas',                          3072),
+  ('mdi-grafico-4',    'md-grafico',     'Checklist', 'Exportar PDF para impressão',                            4096),
+  ('mdi-grafico-5',    'md-grafico',     'Checklist', 'Enviar a prova ao cliente',                              5120);
 
 -- ───────────── feriados nacionais 2026 e 2027 ─────────────
--- Todo dia desta tabela é não útil no cálculo de prazo. Os facultativos (Carnaval, Corpus Christi) entram
--- porque a agência costuma parar; o admin remove em Configurações se a casa trabalhar. Municipais: cadastrar.
+-- Todo dia desta tabela é não útil. Os facultativos (Carnaval, Corpus Christi) entram porque a agência costuma
+-- parar; o admin remove em Configurações se a casa trabalhar. Municipais: cadastrar.
 INSERT INTO feriado (data, nome, tipo) VALUES
-  ('2026-01-01', 'Confraternização Universal',            'nacional'),
-  ('2026-02-16', 'Carnaval',                              'facultativo'),
-  ('2026-02-17', 'Carnaval',                              'facultativo'),
-  ('2026-04-03', 'Sexta-feira Santa',                     'nacional'),
-  ('2026-04-21', 'Tiradentes',                            'nacional'),
-  ('2026-05-01', 'Dia do Trabalho',                       'nacional'),
-  ('2026-06-04', 'Corpus Christi',                        'facultativo'),
-  ('2026-09-07', 'Independência do Brasil',               'nacional'),
-  ('2026-10-12', 'Nossa Senhora Aparecida',               'nacional'),
-  ('2026-11-02', 'Finados',                               'nacional'),
-  ('2026-11-15', 'Proclamação da República',              'nacional'),
+  ('2026-01-01', 'Confraternização Universal',                   'nacional'),
+  ('2026-02-16', 'Carnaval',                                     'facultativo'),
+  ('2026-02-17', 'Carnaval',                                     'facultativo'),
+  ('2026-04-03', 'Sexta-feira Santa',                            'nacional'),
+  ('2026-04-21', 'Tiradentes',                                   'nacional'),
+  ('2026-05-01', 'Dia do Trabalho',                              'nacional'),
+  ('2026-06-04', 'Corpus Christi',                               'facultativo'),
+  ('2026-09-07', 'Independência do Brasil',                      'nacional'),
+  ('2026-10-12', 'Nossa Senhora Aparecida',                      'nacional'),
+  ('2026-11-02', 'Finados',                                      'nacional'),
+  ('2026-11-15', 'Proclamação da República',                     'nacional'),
   ('2026-11-20', 'Dia Nacional de Zumbi e da Consciência Negra', 'nacional'),
-  ('2026-12-25', 'Natal',                                 'nacional'),
-  ('2027-01-01', 'Confraternização Universal',            'nacional'),
-  ('2027-02-08', 'Carnaval',                              'facultativo'),
-  ('2027-02-09', 'Carnaval',                              'facultativo'),
-  ('2027-03-26', 'Sexta-feira Santa',                     'nacional'),
-  ('2027-04-21', 'Tiradentes',                            'nacional'),
-  ('2027-05-01', 'Dia do Trabalho',                       'nacional'),
-  ('2027-05-27', 'Corpus Christi',                        'facultativo'),
-  ('2027-09-07', 'Independência do Brasil',               'nacional'),
-  ('2027-10-12', 'Nossa Senhora Aparecida',               'nacional'),
-  ('2027-11-02', 'Finados',                               'nacional'),
-  ('2027-11-15', 'Proclamação da República',              'nacional'),
+  ('2026-12-25', 'Natal',                                        'nacional'),
+  ('2027-01-01', 'Confraternização Universal',                   'nacional'),
+  ('2027-02-08', 'Carnaval',                                     'facultativo'),
+  ('2027-02-09', 'Carnaval',                                     'facultativo'),
+  ('2027-03-26', 'Sexta-feira Santa',                            'nacional'),
+  ('2027-04-21', 'Tiradentes',                                   'nacional'),
+  ('2027-05-01', 'Dia do Trabalho',                              'nacional'),
+  ('2027-05-27', 'Corpus Christi',                               'facultativo'),
+  ('2027-09-07', 'Independência do Brasil',                      'nacional'),
+  ('2027-10-12', 'Nossa Senhora Aparecida',                      'nacional'),
+  ('2027-11-02', 'Finados',                                      'nacional'),
+  ('2027-11-15', 'Proclamação da República',                     'nacional'),
   ('2027-11-20', 'Dia Nacional de Zumbi e da Consciência Negra', 'nacional'),
-  ('2027-12-25', 'Natal',                                 'nacional');
-
--- ───────────── visões semeadas (SPEC §5.1) ─────────────
--- filtros: FiltrosVisao (shared/tipos/config.ts). recolhidas: categorias recolhidas por padrão.
--- A Triagem nunca aparece numa visão (aplicarFiltros a exclui sempre; ela tem tela própria).
--- Social: "ou" traz o Agendar de qualquer equipe (o Post da Criação continua com equipe_id = eq-criacao).
-INSERT INTO visao (id, nome, slug, equipe_id, layout, agrupar_por, filtros, recolhidas, icone, pos) VALUES
-  ('vs-criacao',       'Criação',      'criacao',       'eq-criacao', 'quadro', 'responsavel',
-     '{"equipes":["eq-criacao"],"categorias":["fila","producao","ajuste","revisao"]}', '[]', 'palette', 1024),
-  ('vs-social',        'Social',       'social',        'eq-social',  'quadro', 'responsavel',
-     '{"equipes":["eq-social"],"categorias":["fila","producao","ajuste","revisao","publicacao"],"ou":[{"categorias":["publicacao"]}]}',
-     '[]', 'megaphone', 2048),
-  ('vs-web',           'Web',          'web',           'eq-web',     'quadro', 'responsavel',
-     '{"equipes":["eq-web"],"categorias":["fila","producao","ajuste","revisao"]}', '[]', 'globe', 3072),
-  ('vs-trafego',       'Tráfego',      'trafego',       'eq-trafego', 'quadro', 'responsavel',
-     '{"equipes":["eq-trafego"],"categorias":["fila","producao","ajuste","revisao"]}', '[]', 'trending-up', 4096),
-  ('vs-meus-clientes', 'Meus clientes','meus-clientes', NULL,         'quadro', 'etapa',
-     '{"atendimento":"eu"}', '["fila","producao"]', 'briefcase', 5120),
-  ('vs-geral',         'Geral',        'geral',         NULL,         'quadro', 'etapa',
-     '{}', '["concluido"]', 'layout-grid', 6144);
+  ('2027-12-25', 'Natal',                                        'nacional');

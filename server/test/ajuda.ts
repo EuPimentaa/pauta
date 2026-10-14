@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import type {
   Cliente, Coluna, CriarDemandaEntrada, Demanda, Instante, QuadroCompleto, Usuario,
 } from '../../shared/tipos/index.ts'
+import { completarAte } from '../scripts/ciclo-sql.ts'
 import { criarApp } from '../src/app.ts'
 import { atorDe, hashSenha, nomeCookie, type App, type Ator } from '../src/auth.ts'
 import { configurar } from '../src/config.ts'
@@ -227,7 +228,7 @@ export async function ambiente(): Promise<Ambiente> {
       colunaId: resto.colunaId ?? (resto.quadroId ? undefined : coluna(quadroIds.criacao, 'Fila').id),
     }
     const { demanda } = tx(db, () => criarDemandaServico(db, entrada, atorDe(quem)))
-    if (ate) tx(db, () => completarAte(db, demanda.id, ate, pessoas))
+    if (ate) tx(db, () => completarAte(db, demanda.id, ate, { autorId: pessoas.design.id, atendimentoId: pessoas.am.id }))
     return carregarDemanda(db, demanda.id)
   }
 
@@ -237,45 +238,6 @@ export async function ambiente(): Promise<Ambiente> {
     coluna: (quadro, nome) => coluna(quadroIds[quadro], nome),
     relogio: (instante) => fixarRelogio(instante),
   }
-}
-
-/**
- * Leva a demanda até `ate` por INSERT/UPDATE (PLANO §1.1.1), com agora() em todos os instantes:
- * entregue (V1 + item do Drive), enviada (por fora, WhatsApp, contato padrão), aprovada (manual), anulada.
- */
-function completarAte(db: Db, demandaId: string, ate: 'entregue' | 'enviada' | 'aprovada' | 'anulada',
-  pessoas: Record<NomePessoa, Usuario>): void {
-  const instante = agora()
-  const rodada = um<{ id: string }>(db, 'SELECT id FROM rodada WHERE demanda_id = ? AND numero = 1', demandaId)!.id
-  const versao = novoId()
-  rodar(db, 'INSERT INTO versao (id, demanda_id, numero, rodada_id, criada_por, criada_em) VALUES (?, ?, 1, ?, ?, ?)',
-    versao, demandaId, rodada, pessoas.design.id, instante)
-  rodar(db, `INSERT INTO versao_item (id, versao_id, demanda_id, tipo, nome, url, provedor, drive_status, drive_testado_em, pos, criado_em)
-             VALUES (?, ?, ?, 'link', 'Arte final', 'https://drive.google.com/file/d/arte-v1/view', 'drive', 'publico', ?, 1024, ?)`,
-    novoId(), versao, demandaId, instante, instante)
-  if (ate === 'entregue') return
-
-  const d = um<{ quadro_id: string; coluna_id: string; cliente_id: string }>(db, 'SELECT quadro_id, coluna_id, cliente_id FROM demanda WHERE id = ?', demandaId)!
-  const contato = um<{ id: string }>(db, 'SELECT id FROM cliente_contato WHERE cliente_id = ? AND padrao = 1', d.cliente_id)?.id ?? null
-  rodar(db, "UPDATE versao SET enviada_cliente_em = ?, enviada_via = 'fora' WHERE id = ?", instante, versao)
-  rodar(db, `INSERT INTO envio (id, demanda_id, quadro_id, versao_id, via, canal, contato_id, enviado_por, enviado_em)
-             VALUES (?, ?, ?, ?, 'fora', 'whatsapp', ?, ?, ?)`, novoId(), demandaId, d.quadro_id, versao, contato, pessoas.am.id, instante)
-  rodar(db, 'UPDATE demanda SET envio_pendente_em = ?, atualizado_por = ?, atualizado_em = ? WHERE id = ?', instante, pessoas.am.id, instante, demandaId)
-  if (ate === 'enviada') return
-
-  const aprovacao = novoId()
-  rodar(db, `INSERT INTO aprovacao (id, demanda_id, versao_id, decisao, via, canal, contato_id, registrado_por, quadro_antes_id,
-               coluna_antes_id, criado_em) VALUES (?, ?, ?, 'aprovado', 'manual', 'whatsapp', ?, ?, ?, ?, ?)`,
-    aprovacao, demandaId, versao, contato, pessoas.am.id, d.quadro_id, d.coluna_id, instante)
-  rodar(db, `UPDATE demanda SET aprovada_em = ?, aprovada_versao_id = ?, envio_pendente_em = NULL, retorno_em = ?, atualizado_por = ?,
-               atualizado_em = ? WHERE id = ?`, instante, versao, instante, pessoas.am.id, instante, demandaId)
-  rodar(db, 'UPDATE rodada SET fechada_em = ? WHERE id = ?', instante, rodada)
-  if (ate === 'aprovada') return
-
-  rodar(db, 'UPDATE aprovacao SET anulada_em = ?, anulada_por = ? WHERE id = ?', instante, pessoas.am.id, aprovacao)
-  rodar(db, `UPDATE demanda SET aprovada_em = NULL, aprovada_versao_id = NULL, retorno_em = NULL, envio_pendente_em = ?, atualizado_por = ?,
-               atualizado_em = ? WHERE id = ?`, instante, pessoas.am.id, instante, demandaId)
-  rodar(db, 'UPDATE rodada SET fechada_em = NULL WHERE id = ?', rodada)
 }
 
 // ─────────────────────────────── utilidades dos testes ───────────────────────────────

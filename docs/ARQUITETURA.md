@@ -45,14 +45,15 @@ server/
   src/rotas/*.ts          cada arquivo exporta `export function registrar(app: App): void` (descoberto automaticamente)
   migracoes/NNN_nome.sql  aplicadas em ordem numérica, cada uma numa transação, registradas em `_migracoes`
   scripts/                verificar-migracoes.ts, seed-demo.ts (+ demo/*.ts, só desenvolvimento)
-  test/*.test.ts          test/ajuda.ts monta o ambiente (app + :memory: + pessoas e clientes de teste)
+  test/*.test.ts          test/ajuda.ts monta o ambiente (app + :memory: + pessoas, clientes, criarDemanda, relogio);
+                          cada funcionalidade pode ter test/<prefixo>-ajuda.ts
 shared/
   tipos/<area>.ts         tipos de domínio, DTOs da API e eventos de tempo real (um arquivo por área; index.ts reexporta)
   tipos/ext/<func>.ts     tipos acrescentados por uma funcionalidade (importados direto)
   logica/*.ts             funções puras usadas pelo servidor e pelo front (dias úteis, prazo, transições, bola,
                           permissões, filtros, criação rápida...)
 web/src/
-  main.tsx, App.tsx       providers + roteador (rotas de telas/**/rota.tsx)
+  main.tsx, App.tsx       providers + roteador (rotas de telas/**/rota.tsx) + componentes de extensoes/global
   api/cliente.ts          fetch com credenciais, erro tipado, X-Trace-Id, If-Match
   api/<area>.ts           hooks TanStack Query (chaves em api/chaves.ts)
   tempo-real/             cliente SSE (EventSource) com reconexão e aplicação de eventos no cache
@@ -61,15 +62,16 @@ web/src/
   estilos/tokens.css      tokens claro/escuro (marca Melt)
   quadro/ demanda/ visoes/ paleta/ dialogos/ teclado/   núcleo do front (quadro, modal, visão, Cmd+K, diálogos, atalhos)
   funcionalidades/<nome>/ código de cada funcionalidade da Onda 3
-  telas/<area>/rota.tsx   cada tela exporta `rota: ExtensaoRota` (descoberta via import.meta.glob)
-  extensoes/              tipos.ts (contrato), registro.ts (carregadores) e uma pasta por ponto de extensão
+  telas/<area>/rota.tsx   cada tela exporta `rota: ExtensaoRota` (metadados + `carregar` lazy; descoberta via import.meta.glob)
+  extensoes/              tipos.ts (contrato), registro.ts (carregadores) e uma pasta por ponto de extensão (global/ incluso)
 docs/pedidos/<agente>.md  pedidos de mudança de contrato durante as ondas
 ```
 
 ## Pontos de extensão (para trabalho em paralelo sem conflito)
 
 Ninguém edita um arquivo central para "registrar" algo. Cada área cria arquivos novos que são descobertos.
-Nome do arquivo com o prefixo da funcionalidade (`ciclo-envio.ts`); o núcleo usa `nucleo-`.
+Nome do arquivo com o prefixo da funcionalidade (`ciclo.ts` ou `ciclo-envio.ts`; dono pelo glob `<f>{,-*}.{ts,tsx}`);
+o núcleo usa `nucleo`.
 
 - **Rotas da API**: `server/src/rotas/*.ts` exportando `registrar(app)`.
 - **Jobs diários**: `server/src/tarefas/*.ts` exportando `tarefa: { nome, horario, executar(db) }`.
@@ -77,30 +79,42 @@ Nome do arquivo com o prefixo da funcionalidade (`ciclo-envio.ts`); o núcleo us
 - **Migrações**: `server/migracoes/NNN_*.sql` com faixa de números reservada por área (`docs/PLANO.md` §3):
   001–002 contrato, 003–019 núcleo, 020–079 funcionalidades (10 por funcionalidade), 090–099 integração.
   Migração de funcionalidade só acrescenta (tabela, coluna anulável, índice).
-- **Front**: 20 pontos com contrato em `web/src/extensoes/tipos.ts` e carregadores em `web/src/extensoes/registro.ts`:
-  telas (`telas/**/rota.tsx` → `rota: { caminho, Componente, acesso, layout }`), menu lateral, barra superior, menu
-  do avatar, abas do celular, seções/ações/menu ··· do modal, interceptadores de mover (arrastar que abre diálogo),
-  diálogos globais (`abrirDialogo(id, params)`), comandos e fontes de busca da paleta, atalhos, tratadores de eventos,
-  layouts e cabeçalho da visão, menu e criação rápida da coluna, seções do Início e de Configurações.
+- **Front**: 21 pontos com contrato em `web/src/extensoes/tipos.ts` e carregadores em `web/src/extensoes/registro.ts`
+  (todas as pastas aceitam `.ts` e `.tsx`): telas (`telas/**/rota.tsx` → `rota: { caminho, carregar, acesso, layout }`,
+  com `React.lazy`), componentes globais (`extensoes/global`: SSE, host de diálogos, paleta, teclado, montados uma vez
+  pelo App.tsx, só nas rotas autenticadas quando `escopo: 'autenticada'`), menu lateral, barra superior, menu do avatar,
+  abas do celular, seções/ações/menu ··· do modal, interceptadores de mover (arrastar que abre diálogo), diálogos
+  globais (`abrirDialogo(id, params)`), comandos e fontes de busca da paleta, atalhos, tratadores de eventos, layouts e
+  cabeçalho da visão, menu e criação rápida da coluna, seções do Início e de Configurações. A API interna do
+  núcleo-web (hooks e utilitários de cache que as funcionalidades usam) está no `docs/PLANO.md` §2.2.
 - **Tipos compartilhados**: `shared/tipos/<area>.ts`; `shared/tipos/index.ts` só reexporta. Tipos novos de uma
-  funcionalidade vão em `shared/tipos/ext/<funcionalidade>.ts`.
+  funcionalidade vão em `shared/tipos/ext/<funcionalidade>.ts`. Dentro de `shared/**`, imports só por caminho relativo
+  com `.ts` (o servidor não tem o alias `@shared`, que é só do web).
 
 ## Convenções do servidor
 
 - Toda rota sob `/api`. JSON em `camelCase`; tabelas e colunas em `snake_case`. Ids: texto (`crypto.randomUUID()`).
 - Erro: `{ erro: { codigo: string, mensagem: string } }` com status HTTP adequado. Validação com zod → 400.
 - Mutação = transação (`BEGIN IMMEDIATE`) + atividade + linha em `evento`; o barramento entrega depois do commit.
-- Datas: ISO 8601 UTC em texto. Prazos "só dia" guardados como `YYYY-MM-DD` em coluna própria.
+- Datas: ISO 8601 UTC em texto. Prazos "só dia" guardados como `YYYY-MM-DD` em coluna própria. Todo instante gravado
+  pelo app vem de `agora()` (`src/db.ts`), inclusive `criado_em`/`atualizado_em`, para os testes fixarem o relógio
+  (`relogio()` do `test/ajuda.ts`); os `DEFAULT now` do SQLite são só rede de segurança.
 - Ordenação: demandas têm `posicao REAL` **global** (o navegador manda `depoisDeId`/`antesDeId` e o servidor calcula;
   assim os cards escondidos por filtro mantêm o lugar); listas curtas por pai (checklist, itens, anexos, campos,
   avisos, etapas) têm `pos REAL`. Inserir entre vizinhos = média; fim = último + 1024; se a folga ficar < 1e-6,
   renormalizar o escopo inteiro (passo 1024) e publicar os eventos.
 - Banco: tabelas `STRICT`; booleanos 0/1; JSON em TEXT com `json_valid`; gatilhos só de integridade (imutabilidade
-  das trilhas, contadores `n_*`, histórico de etapa, `rev`, `atualizado_em`, FTS). Toda UPDATE em `demanda` grava
-  `atualizado_por`. Regra de negócio fica em `src/servicos/` (ex.: `mover()` é o único caminho de troca de etapa).
-- Concorrência: `PATCH /api/demandas/:id` exige `If-Match: <rev>`; decisão pública exige `Idempotency-Key`.
-- Exclusão: arquivar (`arquivado_em`) por padrão; exclusão definitiva só por admin.
-- Segurança: cookie de sessão `sid` httpOnly, SameSite=Lax, `Secure` quando `NODE_ENV=production`; mutações exigem o header `X-Trace-Id` e Origin igual a `APP_URL` (anti-CSRF); limite de tentativas de login por IP+e-mail; uploads com limite de tamanho, nome sanitizado, servidos com `X-Content-Type-Options: nosniff` e `Content-Disposition: attachment` exceto imagens.
+  das trilhas, contadores `n_*`, histórico de etapa, `rev`, `atualizado_em`, FTS, identidade na trilha, arquivo em
+  uso). Toda UPDATE em `demanda` grava `atualizado_por` e `atualizado_em`. Regra de negócio fica em `src/servicos/`
+  (ex.: `mover()` é o único caminho de troca de etapa).
+- Concorrência: `PATCH /api/demandas/:id` exige `If-Match: <rev>`; decisão pública exige `Idempotency-Key` (por link).
+- Exclusão: arquivar (`arquivado_em`) por padrão; exclusão definitiva (anonimizar) só por admin e só sem versão,
+  envio ou aprovação.
+- Segurança (detalhes em `docs/API.md` §1): cookie `__Host-sid` em produção (`sid` em dev), httpOnly, SameSite=Lax,
+  Secure; tokens de 32 bytes guardados como sha256; mutações exigem `X-Trace-Id` e Origin igual a `APP_URL`
+  (anti-CSRF); IP real pelo `X-Forwarded-For` com `TRUST_PROXY_HOPS`; limites de login por e-mail+IP, e-mail e IP;
+  `bodyLimit` antes do parse (10 MiB no upload, 1 MiB no resto); CSP fixa (API §1); uploads com magic number, servidos
+  com `X-Content-Type-Options: nosniff` e `Content-Disposition: attachment` exceto imagens.
 
 ## Convenções do front
 
@@ -129,6 +143,7 @@ VPS da agência com EasyPanel (Ubuntu 24.04), domínio `demandas.meltcomunicacao
 - **Mount** (volume) em `/app/data` → `DATA_DIR=/app/data` (banco + anexos). Sem o volume, os dados somem a cada deploy.
 - Porta do container: `7300`. O EasyPanel (Traefik) termina o HTTPS; o SSE precisa de `Cache-Control: no-cache` e `X-Accel-Buffering: no`.
 - Variáveis: `APP_NOME`, `SEGREDO` (32+ bytes, assina links), `NODE_ENV=production`, `DATA_DIR=/app/data`, `APP_URL=https://demandas.meltcomunicacao.com.br`,
+  `TRUST_PROXY_HOPS=1` (o Traefik é o único proxy; com Cloudflare na frente, 2),
   `ADMIN_EMAIL` e `ADMIN_SENHA` (só no primeiro boot, para criar o admin; depois remova).
 - Health check: `GET /api/saude`.
 - Backup: `VACUUM INTO` diário dentro de `/app/data/backups` (mantém 14), feito pelo próprio servidor.

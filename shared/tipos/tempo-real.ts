@@ -5,7 +5,9 @@
  *   id: <seq>\nevent: d\ndata: <JSON de EventoTempoReal>\n\n
  *   event: resync\ndata: {"motivo":"..."}\n\n      → recarregar /api/bootstrap
  *   event: ping\ndata: {"seq":<seq atual>}\n\n      → a cada 25 s (revalida a sessão)
- * Reconexão: o navegador manda Last-Event-ID; se for menor que o menor seq guardado (7 dias), vem resync.
+ * Reconexão (API.md §3; igual em /api/sync): atual = seq em sqlite_sequence. desde > atual → resync
+ * 'servidor_reiniciado'; desde < atual e (tabela vazia ou desde < menor seq − 1) → resync 'historico_podado'; senão
+ * reenvia seq > desde. A poda nunca apaga o último evento.
  * O cliente ignora eventos cujo `t` (trace) seja de uma mutação que ele mesmo fez.
  */
 import type { Anexo, Checklist, ChecklistItem, Comentario, Demanda } from './demandas.ts'
@@ -22,9 +24,10 @@ import type { Ausencia, Equipe, Eu, UsuarioResumo } from './pessoas.ts'
  * Entidade do evento → objeto. Público de cada uma (SPEC §7.3):
  * - interno (todos os usuários ativos): demanda, checklist, checklist_item, comentario, anexo, rodada, versao, envio,
  *   aprovacao, cliente, cliente_contato, cliente_link, usuario, equipe, ausencia, tipo_peca, etapa, visao, feriado, aviso
- * - interno, mas só atendimento e admin aplicam: link_publico (os outros recebem e descartam)
+ * - gestao (atendimento e admin; filtrado no servidor): link_publico
  * - usuario (só o destinatário): notificacao
- * - usuario_admin (o dono + admins): apontamento (os outros só veem demanda.minutosRegistrados)
+ * - usuario_admin (o dono + admins): apontamento. Os outros só veem demanda.minutosRegistrados, num evento com
+ *   `a` e `t` nulos (não revela quem lançou)
  */
 export interface MapaEntidades {
   demanda: Demanda
@@ -60,7 +63,8 @@ export const ENTIDADES = [
   'etapa', 'visao', 'feriado', 'aviso', 'notificacao', 'apontamento',
 ] as const satisfies readonly Entidade[]
 
-export const PUBLICOS_EVENTO = ['interno', 'usuario', 'usuario_admin', 'admin'] as const
+/** interno = todos; gestao = atendimento + admin; usuario = só usuario_id; usuario_admin = usuario_id + admins; admin. */
+export const PUBLICOS_EVENTO = ['interno', 'gestao', 'usuario', 'usuario_admin', 'admin'] as const
 export type PublicoEvento = (typeof PUBLICOS_EVENTO)[number]
 
 /** Campos comuns. Nomes curtos porque trafegam muito. */
@@ -78,9 +82,13 @@ interface EventoBase<E extends Entidade> {
   a: Id | null
 }
 
+/**
+ * `c` nulo = objeto inteiro: na criação e sempre que uma demanda ENTRA no conjunto do bootstrap (restaurar, reabrir de
+ * Entregue/Cancelada), porque as outras janelas não a têm. Patch parcial de id desconhecido é ignorado pelo tratador.
+ */
 export interface EventoUpsert<E extends Entidade> extends EventoBase<E> {
   op: 'upsert'
-  /** Objeto inteiro quando `c` é nulo (criação); senão só os campos de `c`. */
+  /** Objeto inteiro quando `c` é nulo; senão só os campos de `c`. */
   p: Partial<MapaEntidades[E]>
   c: (keyof MapaEntidades[E])[] | null
 }
@@ -96,6 +104,7 @@ export type EventoDe<E extends Entidade> = EventoUpsert<E> | EventoDelete<E>
 /** União discriminada por `e` (e depois por `op`). */
 export type EventoTempoReal = { [E in Entidade]: EventoDe<E> }[Entidade]
 
+/** servidor_reiniciado: o `desde` do cliente é maior que o seq atual (backup restaurado, banco novo). */
 export interface EventoResync {
   motivo: 'historico_podado' | 'papel_alterado' | 'servidor_reiniciado' | 'importacao'
 }

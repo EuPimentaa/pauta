@@ -79,7 +79,11 @@ export interface Ausencia {
   criadoEm: Instante
 }
 
-/** Link de uso único que o admin copia e manda (WhatsApp). */
+/**
+ * Link de uso único que o admin copia e manda (WhatsApp). O token vai no FRAGMENTO, que o navegador não envia ao
+ * servidor nem grava em log: `${APP_URL}/convite#<token>` ou `${APP_URL}/redefinir#<token>`.
+ * Token = randomBytes(32) em base64url; o banco guarda o sha256.
+ */
 export interface LinkAcesso {
   url: string
   expiraEm: Instante
@@ -92,14 +96,21 @@ export interface LoginEntrada {
   senha: string
 }
 
-/** GET /api/auth/convite/:token e /api/auth/redefinicao/:token. */
+/** POST /api/auth/convite/consultar e /api/auth/redefinicao/consultar (o token lido do fragmento da URL). */
+export interface TokenEntrada {
+  token: string
+}
+
+/** Resposta de .../consultar. Não consome o token. */
 export interface TokenAcessoInfo {
   nome: string
   email: string
   expiraEm: Instante
 }
 
+/** POST /api/auth/convite e /api/auth/redefinicao. */
 export interface DefinirSenhaEntrada {
+  token: string
   senha: string
 }
 
@@ -139,7 +150,7 @@ export interface EditarPessoaEntrada {
   papel?: Exclude<Papel, 'agente'>
   cor?: Cor
   horasSemana?: number
-  /** false revoga as sessões e fecha o SSE da pessoa. */
+  /** false revoga as sessões, os convites e redefinições pendentes e fecha o SSE da pessoa (trocar o e-mail também revoga os tokens). */
   ativo?: boolean
   equipes?: { equipeId: Id; funcao?: string | null; principal?: boolean }[]
 }

@@ -9,7 +9,9 @@
 -- * Nada se apaga: usuário, cliente e demanda não têm DELETE (gatilhos abaixo); arquivar/desativar/anonimizar.
 -- * Regras de negócio (mover, bola, prazo, rodadas, notificações) ficam em server/src/servicos.
 --   Gatilhos aqui só fazem integridade: imutabilidade, contadores, histórico de etapa, rev, atualizado_em e busca.
--- * Toda UPDATE em demanda feita pelo app grava atualizado_por (o histórico de etapa usa esse valor).
+-- * Toda UPDATE em demanda feita pelo app grava atualizado_por e atualizado_em = agora() (o histórico de etapa usa os dois).
+-- * Instantes gravados pelo app vêm sempre de agora() (src/db.ts), para os testes controlarem o relógio. Os DEFAULT
+--   strftime('now') e o 'now' dos gatilhos são só rede de segurança.
 -- * _migracoes é criada pelo runner (server/src/db.ts), não por esta migração.
 
 -- ═════════════════════════════ configuração da aplicação ═════════════════════════════
@@ -50,7 +52,7 @@ CREATE UNIQUE INDEX usuario_trello_uk  ON usuario (origem_trello_id) WHERE orige
 CREATE TABLE sessao (
   id            TEXT PRIMARY KEY,
   usuario_id    TEXT NOT NULL REFERENCES usuario(id),
-  token_hash    TEXT NOT NULL UNIQUE,                    -- sha256 hex do valor do cookie sid
+  token_hash    TEXT NOT NULL UNIQUE,                    -- sha256 hex do valor do cookie (randomBytes(32) em base64url)
   criada_em     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   expira_em     TEXT NOT NULL,                           -- deslizante: 30 dias a partir do último uso
   ultimo_uso_em TEXT,
@@ -64,23 +66,28 @@ CREATE TABLE token_acesso (                              -- convite (7 dias) e r
   id          TEXT PRIMARY KEY,
   usuario_id  TEXT NOT NULL REFERENCES usuario(id),
   finalidade  TEXT NOT NULL CHECK (finalidade IN ('convite','redefinicao')),
-  token_hash  TEXT NOT NULL UNIQUE,                      -- sha256 hex do token da URL
+  token_hash  TEXT NOT NULL UNIQUE,                      -- sha256 hex do token (randomBytes(32) em base64url, no fragmento #)
   expira_em   TEXT NOT NULL,
-  usado_em    TEXT,
-  revogado_em TEXT,                                      -- gerar outro do mesmo tipo revoga o anterior
+  usado_em    TEXT,                                      -- consumir: UPDATE ... WHERE usado_em IS NULL AND revogado_em IS NULL
+  revogado_em TEXT,                                      --   AND expira_em > agora, exigindo changes = 1
+                                                         -- gerar outro do mesmo tipo, desativar a pessoa ou trocar o e-mail revoga
   criado_por  TEXT REFERENCES usuario(id),
   criado_em   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 ) STRICT;
-CREATE INDEX token_acesso_usuario_ix ON token_acesso (usuario_id, finalidade) WHERE usado_em IS NULL AND revogado_em IS NULL;
+-- no máximo um token pendente por pessoa e finalidade (o expirado também conta: gerar outro revoga o anterior)
+CREATE UNIQUE INDEX token_acesso_pendente_uk ON token_acesso (usuario_id, finalidade) WHERE usado_em IS NULL AND revogado_em IS NULL;
 
-CREATE TABLE login_tentativa (                           -- limite: 5 falhas em 15 min por e-mail+IP
-  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE login_tentativa (                           -- limites somados (API.md §4.2): e-mail+IP 5/15 min,
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,           -- e-mail 20/h, IP 50/15 min; troca de senha: 5/15 min por pessoa
+  tipo      TEXT NOT NULL DEFAULT 'login' CHECK (tipo IN ('login','senha')),
   email     TEXT NOT NULL,
-  ip        TEXT NOT NULL,
+  ip        TEXT NOT NULL,                               -- IP real: X-Forwarded-For conforme TRUST_PROXY_HOPS (API.md §1)
   ok        INTEGER NOT NULL CHECK (ok IN (0,1)),
   criado_em TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 ) STRICT;
-CREATE INDEX login_tentativa_ix ON login_tentativa (email, ip, criado_em);
+CREATE INDEX login_tentativa_ix       ON login_tentativa (email, ip, criado_em);
+CREATE INDEX login_tentativa_email_ix ON login_tentativa (email, criado_em);
+CREATE INDEX login_tentativa_ip_ix    ON login_tentativa (ip, criado_em);
 
 -- ═════════════════════════════ fluxo, etapas e transições ═════════════════════════════
 
@@ -173,8 +180,7 @@ CREATE TABLE cliente (
   nivel            INTEGER CHECK (nivel IS NULL OR nivel BETWEEN 1 AND 3),
   cor              TEXT NOT NULL DEFAULT 'azul'
                    CHECK (cor IN ('ambar','amarelo','rosa','magenta','roxo','berinjela','verde','turquesa','azul','grafite')),
-  logo_url         TEXT CHECK (logo_url IS NULL OR logo_url LIKE 'https://%'),
-  logo_arquivo_id  TEXT REFERENCES arquivo(id),
+  logo_arquivo_id  TEXT REFERENCES arquivo(id),           -- logo só por upload (a CSP não aceita imagem de host qualquer)
   atendimento_id   TEXT REFERENCES usuario(id),            -- AM dono da conta
   criativo_id      TEXT REFERENCES usuario(id),
   social_id        TEXT REFERENCES usuario(id),            -- recebe a etapa Agendar
@@ -210,7 +216,8 @@ CREATE TABLE cliente_contato (                            -- quem aprova do lado
   ativo         INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0,1)),
   criado_em     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   atualizado_em TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  CHECK (padrao = 0 OR (ativo = 1 AND aprova = 1))
+  CHECK (padrao = 0 OR (ativo = 1 AND aprova = 1)),
+  UNIQUE (id, cliente_id)                                  -- alvo das FKs (contato_id, cliente_id)
 ) STRICT;
 CREATE INDEX cliente_contato_cliente_ix ON cliente_contato (cliente_id);
 CREATE UNIQUE INDEX cliente_contato_padrao_uk ON cliente_contato (cliente_id) WHERE padrao = 1;
@@ -294,6 +301,8 @@ CREATE TABLE demanda (
   equipe_id               TEXT REFERENCES equipe(id),
   fluxo_id                TEXT NOT NULL REFERENCES fluxo(id),
   etapa_id                TEXT NOT NULL,
+  etapa_anterior_id       TEXT REFERENCES etapa(id),       -- etapa de onde veio na última troca (reabrir = "anterior");
+                                                           -- mover() grava; o gatilho demanda_etapa_anterior confere
   status                  TEXT NOT NULL CHECK (status IN
                           ('triagem','fila','producao','revisao','cliente','ajuste','aprovado','publicacao','concluido','cancelado')),
                                                            -- = etapa.categoria (gatilho confere)
@@ -307,12 +316,15 @@ CREATE TABLE demanda (
   responsavel_sugerido_id TEXT REFERENCES usuario(id),
   atendimento_id          TEXT REFERENCES usuario(id),     -- padrão: cliente.atendimento_id
   aprovador_id            TEXT REFERENCES usuario(id),     -- padrão: equipe.aprovador_padrao_id; nulo = o AM aprova
+  revisao_ok_por          TEXT REFERENCES usuario(id),     -- "Liberar para envio": o aprovador deu o ok interno em Revisão;
+  revisao_ok_em           TEXT,                            -- a bola passa ao AM ("pronta para enviar"). Limpos ao entrar em revisao
   solicitante_id          TEXT NOT NULL REFERENCES usuario(id),
   criado_por              TEXT NOT NULL REFERENCES usuario(id),
   atualizado_por          TEXT REFERENCES usuario(id),     -- quem fez a última UPDATE (o app sempre grava)
   briefing_md             TEXT NOT NULL DEFAULT '' CHECK (length(briefing_md) <= 100000),
   briefing_campos         TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(briefing_campos) AND json_type(briefing_campos) = 'object'),
   briefing_completo       INTEGER NOT NULL DEFAULT 0 CHECK (briefing_completo IN (0,1)),
+  briefing_atualizado_em  TEXT,                            -- muda com briefing_md/briefing_campos: no SSE, avisa para recarregar o detalhe
   prioridade              INTEGER NOT NULL DEFAULT 0 CHECK (prioridade IN (0,1,2)),   -- normal, urgente, fura-pauta
   prioridade_motivo       TEXT,
   prazo                   TEXT CHECK (prazo IS NULL OR prazo GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]'),  -- prazo interno
@@ -345,7 +357,8 @@ CREATE TABLE demanda (
   cancelada_motivo        TEXT,
   arquivado_em            TEXT,
   arquivado_por           TEXT REFERENCES usuario(id),
-  excluido_em             TEXT,                            -- "excluir" = anonimizar título e briefing (admin, sem aprovação)
+  excluido_em             TEXT,                            -- "excluir" = anonimizar (admin; bloqueado com versão, envio ou
+                                                           -- aprovação; lista do que se limpa em API.md §4.8)
   origem_trello_id        TEXT,
   origem_trello_url       TEXT,
   rev                     INTEGER NOT NULL DEFAULT 1,      -- If-Match; gatilho sobe com campos editados por pessoas
@@ -362,6 +375,7 @@ CREATE TABLE demanda (
   CHECK (agendada_fim IS NULL OR (agendada_inicio IS NOT NULL AND agendada_fim > agendada_inicio)),
   CHECK ((bloqueio IS NULL) = (bloqueio_desde IS NULL)),
   CHECK ((aprovada_em IS NULL) = (aprovada_versao_id IS NULL)),
+  CHECK ((revisao_ok_em IS NULL) = (revisao_ok_por IS NULL)),
   CHECK (status <> 'concluido' OR concluida_em IS NOT NULL)
 ) STRICT;
 CREATE UNIQUE INDEX demanda_trello_uk ON demanda (origem_trello_id) WHERE origem_trello_id IS NOT NULL;
@@ -376,8 +390,12 @@ CREATE INDEX demanda_cli_ix      ON demanda (cliente_id, criado_em);
 CREATE INDEX demanda_prazo_ix    ON demanda (prazo)                       WHERE arquivado_em IS NULL AND status NOT IN ('concluido','cancelado');
 CREATE INDEX demanda_semana_ix   ON demanda (responsavel_id, coalesce(planejada_para, prazo)) WHERE arquivado_em IS NULL;
 CREATE INDEX demanda_agenda_ix   ON demanda (agendada_inicio)             WHERE agendada_inicio IS NOT NULL;
-CREATE INDEX demanda_arquivo_ix  ON demanda (cliente_id, arquivado_em)    WHERE arquivado_em IS NOT NULL;
-CREATE INDEX demanda_arquivo_mes_ix ON demanda (arquivado_em)             WHERE arquivado_em IS NOT NULL;
+-- Arquivo (API.md §4.15): arquivadas + entregues/canceladas que já saíram do quadro, pela data coalesce(...).
+-- A consulta repete o WHERE destes índices (o SQLite só usa índice parcial quando o termo aparece na consulta).
+CREATE INDEX demanda_arquivo_ix     ON demanda (coalesce(arquivado_em, concluida_em, status_desde))
+  WHERE excluido_em IS NULL AND (arquivado_em IS NOT NULL OR status IN ('concluido','cancelado'));
+CREATE INDEX demanda_arquivo_cli_ix ON demanda (cliente_id, coalesce(arquivado_em, concluida_em, status_desde))
+  WHERE excluido_em IS NULL AND (arquivado_em IS NOT NULL OR status IN ('concluido','cancelado'));
 CREATE INDEX demanda_triagem_ix  ON demanda (equipe_id, criado_em)        WHERE status = 'triagem' AND arquivado_em IS NULL;
 
 CREATE TABLE demanda_etapa_hist (                          -- tempo por etapa, bola e pessoa (gatilhos)
@@ -475,13 +493,14 @@ CREATE TABLE versao_item (                                 -- o que foi entregue
       OR (tipo = 'arquivo' AND arquivo_id IS NOT NULL))
 ) STRICT;
 CREATE INDEX versao_item_ix ON versao_item (versao_id, pos);
+CREATE INDEX versao_item_arquivo_ix ON versao_item (arquivo_id) WHERE arquivo_id IS NOT NULL;
 
 CREATE TABLE link_publico (                                -- /a/:token (cliente aprova sem login)
   id               TEXT PRIMARY KEY,
   token_hash       TEXT NOT NULL UNIQUE,                    -- sha256 hex de 32 bytes aleatórios (base64url na URL)
   token_cifrado    TEXT NOT NULL,                           -- AES-256-GCM (chave derivada de SEGREDO): reexibir o link ao AM
   cliente_id       TEXT NOT NULL REFERENCES cliente(id),
-  contato_id       TEXT REFERENCES cliente_contato(id),     -- "Você é Fulana?"
+  contato_id       TEXT,                                    -- "Você é Fulana?": contato do mesmo cliente (FK composta abaixo)
   titulo           TEXT,
   expira_em        TEXT NOT NULL,                           -- 30 dias
   revogado_em      TEXT,
@@ -490,6 +509,7 @@ CREATE TABLE link_publico (                                -- /a/:token (cliente
   criado_em        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   ultimo_acesso_em TEXT,                                    -- só por POST /visto (o GET não tem efeito)
   acessos          INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (contato_id, cliente_id) REFERENCES cliente_contato (id, cliente_id),
   CHECK ((revogado_em IS NULL) = (revogado_por IS NULL))
 ) STRICT;
 CREATE INDEX link_publico_cliente_ix ON link_publico (cliente_id);
@@ -536,7 +556,9 @@ CREATE TABLE aprovacao (                                   -- decisão do client
                      ('cliente_mudou','briefing_incompleto','erro_execucao','erro_atendimento','outro')),
   rodada_aberta_id   TEXT REFERENCES rodada(id),
   evidencia_anexo_id TEXT REFERENCES anexo(id),              -- print do WhatsApp (opcional)
-  idempotency_key    TEXT UNIQUE,
+  responsavel_anterior_id TEXT REFERENCES usuario(id),       -- responsável antes da decisão: anular a aprovação o restaura
+  idempotency_key    TEXT,                                   -- só via link; única por link (aprovacao_idem_uk)
+  idempotency_hash   TEXT,                                   -- sha256 de demandaId|versaoId|decisao|linhas|contatoId|nomeInformado
   ip_hmac            TEXT,                                   -- HMAC com SEGREDO; apagado após 12 meses
   user_agent         TEXT,
   criado_em          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
@@ -546,9 +568,12 @@ CREATE TABLE aprovacao (                                   -- decisão do client
   CHECK (decisao = 'aprovado' OR comentario IS NOT NULL),
   CHECK (via = 'link' OR registrado_por IS NOT NULL),
   CHECK (via = 'manual' OR link_id IS NOT NULL),
+  CHECK (via = 'manual' OR contato_id IS NOT NULL OR nome_informado IS NOT NULL),   -- pelo link, sempre se identifica
+  CHECK ((idempotency_key IS NULL) = (idempotency_hash IS NULL)),
   CHECK ((anulada_em IS NULL) = (anulada_por IS NULL))
 ) STRICT;
 CREATE UNIQUE INDEX aprovacao_uma_por_versao ON aprovacao (versao_id) WHERE anulada_em IS NULL;
+CREATE UNIQUE INDEX aprovacao_idem_uk ON aprovacao (link_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX aprovacao_demanda_ix ON aprovacao (demanda_id, criado_em);
 
 -- ═════════════════════════════ checklists, comentários, anexos ═════════════════════════════
@@ -590,14 +615,15 @@ CREATE TABLE comentario (
   autor_externo   TEXT,                                      -- nome informado pelo cliente (texto puro)
   link_id         TEXT REFERENCES link_publico(id),
   versao_id       TEXT,
-  corpo_md        TEXT NOT NULL CHECK (length(corpo_md) BETWEEN 1 AND 20000),
-  visivel_cliente INTEGER NOT NULL DEFAULT 0 CHECK (visivel_cliente IN (0,1)),
+  corpo_md        TEXT NOT NULL CHECK (length(corpo_md) <= 20000),   -- vazio só quando excluído (CHECK abaixo)
+  visivel_cliente INTEGER NOT NULL DEFAULT 0 CHECK (visivel_cliente IN (0,1)),   -- só atendimento/admin/quem cobre o AM liga
   editado_em      TEXT,
   excluido_em     TEXT,
   criado_em       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   origem_trello_id TEXT,
   FOREIGN KEY (versao_id, demanda_id) REFERENCES versao (id, demanda_id),
-  CHECK (autor_id IS NOT NULL OR autor_externo IS NOT NULL)
+  CHECK (autor_id IS NOT NULL OR autor_externo IS NOT NULL),
+  CHECK (excluido_em IS NOT NULL OR length(corpo_md) >= 1)
 ) STRICT;
 CREATE INDEX comentario_demanda_ix ON comentario (demanda_id, criado_em);
 CREATE UNIQUE INDEX comentario_trello_uk ON comentario (origem_trello_id) WHERE origem_trello_id IS NOT NULL;
@@ -628,10 +654,12 @@ CREATE TABLE anexo (                                       -- links e arquivos d
   criado_em        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   excluido_em      TEXT,
   origem_trello_id TEXT,
-  CHECK ((tipo = 'link' AND url IS NOT NULL) OR (tipo = 'caminho' AND caminho IS NOT NULL)
+  CHECK (excluido_em IS NOT NULL                         -- excluir a demanda limpa url/caminho/arquivo do anexo
+      OR (tipo = 'link' AND url IS NOT NULL) OR (tipo = 'caminho' AND caminho IS NOT NULL)
       OR (tipo = 'arquivo' AND arquivo_id IS NOT NULL))
 ) STRICT;
 CREATE INDEX anexo_demanda_ix ON anexo (demanda_id, pos);
+CREATE INDEX anexo_arquivo_ix ON anexo (arquivo_id) WHERE arquivo_id IS NOT NULL;
 CREATE INDEX anexo_comentario_ix ON anexo (comentario_id) WHERE comentario_id IS NOT NULL;
 CREATE UNIQUE INDEX anexo_trello_uk ON anexo (origem_trello_id) WHERE origem_trello_id IS NOT NULL;
 
@@ -737,15 +765,17 @@ CREATE TABLE evento (                                      -- fonte do SSE: grav
   op          TEXT NOT NULL CHECK (op IN ('upsert','delete')),
   patch       TEXT CHECK (patch IS NULL OR json_valid(patch)),     -- camelCase; objeto inteiro quando campos é nulo
   campos      TEXT CHECK (campos IS NULL OR (json_valid(campos) AND json_type(campos) = 'array')),
-  publico     TEXT NOT NULL DEFAULT 'interno' CHECK (publico IN ('interno','usuario','usuario_admin','admin')),
+  publico     TEXT NOT NULL DEFAULT 'interno'            -- gestao = atendimento + admin (link_publico)
+              CHECK (publico IN ('interno','gestao','usuario','usuario_admin','admin')),
   usuario_id  TEXT,
   trace_id    TEXT,
   ator_id     TEXT,
   criado_em   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  CHECK (publico IN ('interno','admin') OR usuario_id IS NOT NULL),
+  CHECK (publico IN ('interno','gestao','admin') OR usuario_id IS NOT NULL),
   CHECK (op = 'delete' OR patch IS NOT NULL)
 ) STRICT;
-CREATE INDEX evento_tempo_ix ON evento (criado_em);        -- poda diária: guarda 7 dias
+CREATE INDEX evento_tempo_ix ON evento (criado_em);        -- poda diária: guarda 7 dias e nunca apaga o último evento
+-- seq atual = SELECT seq FROM sqlite_sequence WHERE name = 'evento' (sobrevive à poda; regras de retomada em API.md §3)
 
 CREATE TABLE tarefa_execucao (                             -- jobs diários (backup, poda, lixo, prazo): última execução
   nome    TEXT PRIMARY KEY,
@@ -831,14 +861,16 @@ BEGIN SELECT RAISE(ABORT, 'demanda_status_diferente_da_categoria_da_etapa'); END
 -- rev sobe só com campos editados por pessoas (contadores, posição e minutos não contam).
 -- Se o serviço já subiu o rev na mesma UPDATE, o gatilho não sobe de novo.
 CREATE TRIGGER demanda_rev AFTER UPDATE OF
-  titulo, cliente_id, tipo_peca_id, equipe_id, etapa_id, bloqueio, bloqueio_motivo, responsavel_id, atendimento_id,
-  aprovador_id, briefing_md, briefing_campos, prioridade, prioridade_motivo, prazo, prazo_hora, publicacao_data,
-  publicacao_hora, planejada_para, agendada_inicio, agendada_fim, local, estimativa_min, rodadas_inclusas, arquivado_em
+  titulo, cliente_id, tipo_peca_id, equipe_id, etapa_id, bloqueio, bloqueio_motivo, responsavel_id, responsavel_sugerido_id,
+  atendimento_id, aprovador_id, briefing_md, briefing_campos, prioridade, prioridade_motivo, prazo, prazo_hora, prazo_manual,
+  publicacao_data, publicacao_hora, planejada_para, agendada_inicio, agendada_fim, local, estimativa_min, rodadas_inclusas,
+  arquivado_em
 ON demanda
 WHEN NEW.rev = OLD.rev AND (
      NEW.titulo IS NOT OLD.titulo OR NEW.cliente_id IS NOT OLD.cliente_id OR NEW.tipo_peca_id IS NOT OLD.tipo_peca_id
   OR NEW.equipe_id IS NOT OLD.equipe_id OR NEW.etapa_id IS NOT OLD.etapa_id OR NEW.bloqueio IS NOT OLD.bloqueio
   OR NEW.bloqueio_motivo IS NOT OLD.bloqueio_motivo OR NEW.responsavel_id IS NOT OLD.responsavel_id
+  OR NEW.responsavel_sugerido_id IS NOT OLD.responsavel_sugerido_id OR NEW.prazo_manual IS NOT OLD.prazo_manual
   OR NEW.atendimento_id IS NOT OLD.atendimento_id OR NEW.aprovador_id IS NOT OLD.aprovador_id
   OR NEW.briefing_md IS NOT OLD.briefing_md OR NEW.briefing_campos IS NOT OLD.briefing_campos
   OR NEW.prioridade IS NOT OLD.prioridade OR NEW.prioridade_motivo IS NOT OLD.prioridade_motivo
@@ -848,6 +880,16 @@ WHEN NEW.rev = OLD.rev AND (
   OR NEW.local IS NOT OLD.local OR NEW.estimativa_min IS NOT OLD.estimativa_min
   OR NEW.rodadas_inclusas IS NOT OLD.rodadas_inclusas OR NEW.arquivado_em IS NOT OLD.arquivado_em)
 BEGIN UPDATE demanda SET rev = OLD.rev + 1 WHERE id = NEW.id; END;
+
+-- toda troca de etapa grava de onde veio (reabrir = voltar para etapa_anterior_id; o front usa para a linha 'anterior')
+CREATE TRIGGER demanda_etapa_anterior BEFORE UPDATE OF etapa_id ON demanda
+WHEN NEW.etapa_id IS NOT OLD.etapa_id AND NEW.etapa_anterior_id IS NOT OLD.etapa_id
+BEGIN SELECT RAISE(ABORT, 'demanda_etapa_anterior: grave etapa_anterior_id = etapa de saida'); END;
+
+-- o ok interno ("Liberar para envio") vale para uma entrega só: entrar em Revisão exige limpá-lo
+CREATE TRIGGER demanda_revisao_ok_limpo BEFORE UPDATE OF status ON demanda
+WHEN NEW.status = 'revisao' AND OLD.status IS NOT 'revisao' AND NEW.revisao_ok_em IS NOT NULL
+BEGIN SELECT RAISE(ABORT, 'demanda_revisao_ok: limpe revisao_ok_em ao entrar em revisao'); END;
 
 -- histórico de etapa, bola e pessoa
 CREATE TRIGGER demanda_hist_ai AFTER INSERT ON demanda
@@ -861,11 +903,17 @@ CREATE TRIGGER demanda_hist_au AFTER UPDATE OF etapa_id, bola, com_quem_id, resp
 WHEN NEW.etapa_id IS NOT OLD.etapa_id OR NEW.bola IS NOT OLD.bola OR NEW.com_quem_id IS NOT OLD.com_quem_id
   OR NEW.responsavel_id IS NOT OLD.responsavel_id OR NEW.bloqueio IS NOT OLD.bloqueio
 BEGIN
-  UPDATE demanda_etapa_hist SET saiu_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE demanda_id = NEW.id AND saiu_em IS NULL;
+  -- instante = atualizado_em gravado pelo app (agora(), relógio dos testes); sem ele, o 'now' do SQLite
+  UPDATE demanda_etapa_hist
+     SET saiu_em = CASE WHEN NEW.atualizado_em IS NOT OLD.atualizado_em THEN NEW.atualizado_em
+                        ELSE strftime('%Y-%m-%dT%H:%M:%fZ','now') END
+   WHERE demanda_id = NEW.id AND saiu_em IS NULL;
   INSERT INTO demanda_etapa_hist (demanda_id, etapa_id, status, bola, com_quem_id, responsavel_id, bloqueio, pausa_sla, entrou_em, por)
   VALUES (NEW.id, NEW.etapa_id, NEW.status, NEW.bola, NEW.com_quem_id, NEW.responsavel_id, NEW.bloqueio,
           CASE WHEN NEW.bloqueio = 'cliente' THEN 1 ELSE (SELECT pausa_sla FROM etapa WHERE id = NEW.etapa_id) END,
-          strftime('%Y-%m-%dT%H:%M:%fZ','now'), NEW.atualizado_por);
+          CASE WHEN NEW.atualizado_em IS NOT OLD.atualizado_em THEN NEW.atualizado_em
+               ELSE strftime('%Y-%m-%dT%H:%M:%fZ','now') END,
+          NEW.atualizado_por);
 END;
 
 -- busca (FTS5, conteúdo externo, rowid = numero)
@@ -1003,8 +1051,32 @@ WHEN NEW.id IS NOT OLD.id OR NEW.demanda_id IS NOT OLD.demanda_id OR NEW.versao_
   OR NEW.link_id IS NOT OLD.link_id OR NEW.contato_id IS NOT OLD.contato_id OR NEW.nome_informado IS NOT OLD.nome_informado
   OR NEW.registrado_por IS NOT OLD.registrado_por OR NEW.comentario IS NOT OLD.comentario OR NEW.motivo IS NOT OLD.motivo
   OR NEW.rodada_aberta_id IS NOT OLD.rodada_aberta_id OR NEW.evidencia_anexo_id IS NOT OLD.evidencia_anexo_id
-  OR NEW.idempotency_key IS NOT OLD.idempotency_key OR NEW.criado_em IS NOT OLD.criado_em
+  OR NEW.responsavel_anterior_id IS NOT OLD.responsavel_anterior_id
+  OR NEW.idempotency_key IS NOT OLD.idempotency_key OR NEW.idempotency_hash IS NOT OLD.idempotency_hash
+  OR NEW.criado_em IS NOT OLD.criado_em
   OR (NEW.ip_hmac IS NOT OLD.ip_hmac AND NEW.ip_hmac IS NOT NULL)
   OR (NEW.user_agent IS NOT OLD.user_agent AND NEW.user_agent IS NOT NULL)
   OR (OLD.anulada_em IS NOT NULL AND NEW.anulada_em IS NOT OLD.anulada_em)
 BEGIN SELECT RAISE(ABORT, 'aprovacao_imutavel: so anular uma vez e apagar ip/user-agent'); END;
+
+-- ═════════════════════════════ gatilhos: identidade na trilha e arquivos em uso ═════════════════════════════
+
+-- o contato de uma decisão ou de um envio é do cliente da demanda (a trilha "Aprovado V2 por Fulana" não é forjável)
+CREATE TRIGGER aprovacao_contato_do_cliente BEFORE INSERT ON aprovacao
+WHEN NEW.contato_id IS NOT NULL
+  AND (SELECT cliente_id FROM cliente_contato WHERE id = NEW.contato_id)
+      IS NOT (SELECT cliente_id FROM demanda WHERE id = NEW.demanda_id)
+BEGIN SELECT RAISE(ABORT, 'contato_de_outro_cliente'); END;
+CREATE TRIGGER envio_contato_do_cliente BEFORE INSERT ON envio
+WHEN NEW.contato_id IS NOT NULL
+  AND (SELECT cliente_id FROM cliente_contato WHERE id = NEW.contato_id)
+      IS NOT (SELECT cliente_id FROM demanda WHERE id = NEW.demanda_id)
+BEGIN SELECT RAISE(ABORT, 'contato_de_outro_cliente'); END;
+
+-- arquivo usado por versão, logo ou anexo ativo não vai para o lixo (o job de órfãos usa a mesma lista)
+CREATE TRIGGER arquivo_em_uso BEFORE UPDATE OF excluido_em ON arquivo
+WHEN NEW.excluido_em IS NOT NULL AND OLD.excluido_em IS NULL AND (
+     EXISTS (SELECT 1 FROM versao_item WHERE arquivo_id = NEW.id)
+  OR EXISTS (SELECT 1 FROM cliente WHERE logo_arquivo_id = NEW.id)
+  OR EXISTS (SELECT 1 FROM anexo WHERE arquivo_id = NEW.id AND excluido_em IS NULL))
+BEGIN SELECT RAISE(ABORT, 'arquivo_em_uso'); END;

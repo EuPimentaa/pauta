@@ -1,13 +1,17 @@
 /**
- * Contrato dos pontos de extensão do front (docs/PLANO.md §3).
+ * Contrato dos pontos de extensão do front (docs/PLANO.md §3 e §4).
  *
  * Cada funcionalidade cria ARQUIVOS NOVOS nas pastas abaixo; web/src/extensoes/registro.ts (DESIGN-SYSTEM-WEB) os
- * descobre com import.meta.glob(..., { eager: true }) e ordena por `ordem`. Ninguém edita arquivo central para
- * "registrar" algo. Nome do arquivo: `<funcionalidade>-<coisa>.ts(x)` (ex.: extensoes/demanda/ciclo-versoes.tsx).
+ * descobre com import.meta.glob('./<pasta>/*.{ts,tsx}', { eager: true }) (TODAS as pastas aceitam .ts e .tsx) e ordena
+ * por `ordem` (números combinados no PLANO §4). Ninguém edita arquivo central para "registrar" algo.
+ * Nome do arquivo: `<funcionalidade>.ts(x)` ou `<funcionalidade>-<coisa>.ts(x)` (ex.: extensoes/demanda/ciclo-versoes.tsx,
+ * extensoes/mover/ciclo.ts); o núcleo usa `nucleo`. Dono de cada arquivo: glob `extensoes/*\/<f>{,-*}.{ts,tsx}`.
+ * Vários módulos podem registrar a mesma entidade, tecla etc.; ids repetidos são erro no console em dev.
  *
  * | Pasta (web/src/...)            | Export obrigatório                         | Quem consome                 |
  * |--------------------------------|--------------------------------------------|------------------------------|
- * | telas/**\/rota.tsx              | rota: ExtensaoRota  (ou rotas: [])         | App.tsx (roteador)           |
+ * | telas/**\/rota.tsx              | rota: ExtensaoRota  (ou rotas: [])         | App.tsx (roteador, lazy)     |
+ * | extensoes/global/*.tsx         | global: ExtensaoGlobal                     | App.tsx (montados uma vez)   |
  * | extensoes/menu/*.tsx           | menu: ExtensaoMenu                         | casca: menu lateral          |
  * | extensoes/topo/*.tsx           | topo: ExtensaoTopo                         | casca: barra superior        |
  * | extensoes/avatar/*.tsx         | avatar: ExtensaoAvatar                     | casca: menu do avatar        |
@@ -15,25 +19,28 @@
  * | extensoes/demanda/*.tsx        | secao: ExtensaoSecaoDemanda                | modal da demanda             |
  * | extensoes/demanda-acoes/*.tsx  | acoes: ExtensaoAcaoDemanda[]               | modal: topo                  |
  * | extensoes/demanda-menu/*.tsx   | itens: ExtensaoMenuDemanda[]               | modal: menu ···              |
- * | extensoes/mover/*.ts           | interceptador: InterceptadorMover          | mover() do front             |
+ * | extensoes/mover/*.ts(x)        | interceptador: InterceptadorMover          | mover() do front             |
  * | extensoes/dialogos/*.tsx       | dialogo: ExtensaoDialogo<'id'>             | host de diálogos             |
- * | extensoes/comandos/*.ts        | comandos: Comando[]                        | paleta Cmd+K                 |
- * | extensoes/busca/*.ts           | fonte: FontePaleta                         | paleta Cmd+K                 |
- * | extensoes/atalhos/*.ts         | atalhos: Atalho[]                          | despachante de teclado       |
- * | extensoes/eventos/*.ts         | tratador: TratadorEventos                  | cliente SSE                  |
+ * | extensoes/comandos/*.ts(x)     | comandos: Comando[]                        | paleta Cmd+K                 |
+ * | extensoes/busca/*.ts(x)        | fonte: FontePaleta                         | paleta Cmd+K                 |
+ * | extensoes/atalhos/*.ts(x)      | atalhos: Atalho[]                          | despachante de teclado       |
+ * | extensoes/eventos/*.ts(x)      | tratador: TratadorEventos                  | cliente SSE                  |
  * | extensoes/layouts/*.tsx        | layout: ExtensaoLayout                     | página da visão              |
  * | extensoes/visao-cabecalho/*.tsx| item: ExtensaoCabecalhoVisao               | página da visão              |
  * | extensoes/coluna-menu/*.tsx    | itens: ExtensaoMenuColuna[]                | quadro: menu da coluna       |
  * | extensoes/coluna-entrada/*.tsx | entrada: ExtensaoEntradaColuna             | quadro: "N" / "+ Adicionar"  |
  * | extensoes/inicio/*.tsx         | secao: ExtensaoSecaoInicio                 | tela Início                  |
  * | extensoes/config/*.tsx         | secao: ExtensaoSecaoConfig                 | tela Configurações           |
+ *
+ * Componentes de extensão não recebem utilitários por props (exceto onde o tipo diz): usam os hooks do núcleo-web
+ * (useContextoAcao, useAbrirDialogo, useEscopoAtalho, useFocoDemanda, useMover...; assinaturas no PLANO §2.2).
  */
 import type { ComponentType } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import type { LucideIcon } from 'lucide-react'
 import type {
   AgruparPor, Demanda, DemandaDetalhe, DialogoTransicao, Entidade, Etapa, Eu, EventoTempoReal, FiltrosVisao, Id,
-  MoverEntrada, Papel, RelacaoDemanda, TipoPeca, Transicao, Visao,
+  ModeloWhatsapp, MoverEntrada, Papel, RelacaoDemanda, TipoPeca, Transicao, Visao,
 } from '@shared/tipos/index.ts'
 
 export type Icone = LucideIcon
@@ -51,21 +58,40 @@ export interface ContextoAcao {
   eu: Eu
   navegar(caminho: string, opcoes?: { novaAba?: boolean }): void
   abrirDialogo: AbrirDialogo
-  /** Card com foco no quadro, ou a demanda aberta no modal. */
+  /** Card com foco (quadro, Início, Semana: quem desenha o card chama useFocoDemanda), ou a demanda aberta no modal. */
   demandaEmFoco: Demanda | null
 }
 
 // ─────────────────────────────── telas ───────────────────────────────
 
 export interface ExtensaoRota {
-  /** Padrão do react-router: '/inicio', '/v/:slug', '/d/:numero', '/a/:token'. */
+  /** Padrão do react-router: '/inicio', '/v/:slug', '/d/:numero', '/a/:token', '/convite' (token no fragmento #). */
   caminho: string
-  Componente: ComponentType
+  /**
+   * Carrega a tela sob demanda (o roteador usa React.lazy): `carregar: () => import('./Tela.tsx')`. O rota.tsx fica
+   * leve (só metadados), então cada tela vira um chunk e a página pública não baixa o app inteiro.
+   */
+  carregar: () => Promise<{ default: ComponentType }>
+  /** 'publica': sem sessão; nada de bootstrap, SSE nem redirecionamento para /entrar (ex.: /a/:token, /convite). */
   acesso: 'publica' | 'autenticada' | 'admin'
   /** casca = com menu e barra; vazio = tela cheia (login, página pública); sobreposta = por cima da tela atual (/d/:numero). */
   layout: 'casca' | 'vazio' | 'sobreposta'
   /** Título da aba: "<titulo> · <APP_NOME>". */
   titulo?: string
+}
+
+// ─────────────────────────────── componentes globais ───────────────────────────────
+
+/**
+ * Componente montado uma vez pelo App.tsx (DESIGN-SYSTEM-WEB), dentro do QueryClientProvider e do Router: cliente SSE,
+ * host de diálogos, paleta Cmd+K, despachante de atalhos. `autenticada` = só nas rotas com `acesso !== 'publica'`
+ * (a página /a/:token não abre SSE nem chama o bootstrap); `raiz` = em todas as rotas. Renderiza null se não desenha nada.
+ */
+export interface ExtensaoGlobal {
+  id: string
+  ordem: number
+  escopo: 'raiz' | 'autenticada'
+  Componente: ComponentType
 }
 
 // ─────────────────────────────── casca ───────────────────────────────
@@ -213,6 +239,8 @@ export interface MapaDialogos {
   'atalhos': Record<string, never>
   'confirmar': { titulo: string; mensagem: string; confirmar: string; perigo?: boolean }
   'motivo': { titulo: string; rotulo: string; confirmar: string; obrigatorio?: boolean }
+  /** Ciclo (F2): mostra o texto de GET /api/demandas/:id/whatsapp?modelo= e copia. Usado pelo Início (lembrete). */
+  'copiar-whatsapp': { demandaId: Id; modelo: ModeloWhatsapp }
 }
 
 export interface MapaResultadosDialogos {
@@ -228,6 +256,7 @@ export interface MapaResultadosDialogos {
   'atalhos': { fechado: true }
   'confirmar': { confirmado: true }
   'motivo': { motivo: string }
+  'copiar-whatsapp': { copiado: true }
 }
 
 export interface PropsDialogo<K extends keyof MapaDialogos> {
@@ -277,6 +306,7 @@ export interface FontePaleta {
   buscar(termo: string, sinal: AbortSignal): ResultadoPaleta[] | Promise<ResultadoPaleta[]>
 }
 
+/** Escopos ativos: 'global' sempre; os outros enquanto a tela que os usa chama useEscopoAtalho(escopo) (PLANO §2.2). */
 export type EscopoAtalho = 'global' | 'quadro' | 'card' | 'modal' | 'triagem' | 'semana'
 
 export interface ContextoAtalho extends ContextoAcao {
@@ -300,7 +330,12 @@ export interface Atalho {
 
 // ─────────────────────────────── tempo real ───────────────────────────────
 
-/** Recebe só eventos das entidades listadas, já sem o próprio eco (trace). Deve ser idempotente. */
+/**
+ * Recebe só eventos das entidades listadas, já sem o próprio eco (trace). Deve ser idempotente.
+ * Vários tratadores podem assinar a mesma entidade: todos são chamados, em ordem de `id`.
+ * Patch parcial (`c` não nulo) de uma demanda que não está no cache é ignorado (o objeto inteiro chega quando ela
+ * entra no conjunto do bootstrap: criação, restaurar, reabrir).
+ */
 export interface TratadorEventos {
   id: string
   entidades: Entidade[]
@@ -313,7 +348,7 @@ export interface PropsLayout {
   visao: Visao
   agruparPor: AgruparPor
   filtros: FiltrosVisao
-  /** Já filtradas e sem arquivadas. */
+  /** Já filtradas, sem arquivadas e sem triagem (aplicarFiltros). */
   demandas: Demanda[]
   abrir(numero: number): void
   /** Largura abaixo de 768 px: o quadro vira a Lista agrupada com barra de chips (SPEC §5.15). */
@@ -347,6 +382,8 @@ export interface ExtensaoCabecalhoVisao {
 export interface ContextoColuna {
   visao: Visao
   agruparPor: AgruparPor
+  /** Filtros ATIVOS (visão + chips da URL `?f=`): a criação rápida herda cliente/tipo de um filtro de um só valor. */
+  filtros: FiltrosVisao
   /** Id da etapa, do responsável ('nenhum' = sem responsável), do cliente ou a data. */
   chave: string
   etapa: Etapa | null
@@ -363,12 +400,15 @@ export interface ExtensaoMenuColuna {
 }
 
 /**
- * Campo de criação rápida que o quadro abre no topo da coluna (tecla N ou "+ Adicionar"). Um só é usado: o de menor
- * `ordem`. Sem nenhum registrado, a coluna não mostra o "+".
+ * Campo de criação rápida que o quadro abre no topo da coluna. A tecla N e o "+ Adicionar" são do NÚCLEO-WEB (abrem a
+ * entrada da coluna em foco); a extensão só desenha o campo. Um só é usado: o de menor `ordem`. Sem nenhum registrado,
+ * ou com `visivel` falso para a coluna, a coluna não mostra o "+" e N não faz nada nela.
  */
 export interface ExtensaoEntradaColuna {
   id: string
   ordem: number
+  /** Ex.: agrupado por etapa, só Na fila; executor, só na própria coluna (agrupado por responsável). */
+  visivel?(ctx: ContextoColuna, eu: Eu): boolean
   Componente: ComponentType<{ ctx: ContextoColuna; fechar(): void }>
 }
 
@@ -395,6 +435,7 @@ export interface ExtensaoSecaoConfig {
 /** Formato de cada módulo descoberto (para tipar o import.meta.glob em registro.ts). */
 export interface ModulosExtensao {
   rota: { rota?: ExtensaoRota; rotas?: ExtensaoRota[] }
+  global: { global: ExtensaoGlobal }
   menu: { menu: ExtensaoMenu }
   topo: { topo: ExtensaoTopo }
   avatar: { avatar: ExtensaoAvatar }

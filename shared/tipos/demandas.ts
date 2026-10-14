@@ -22,6 +22,11 @@ export interface Demanda {
   equipeId: Id | null
   fluxoId: Id
   etapaId: Id
+  /**
+   * Etapa de onde veio na última troca (mover() grava a cada troca). Reabrir (Entregue/Cancelada → 'anterior') volta
+   * para ela: o front trata `para.id === etapaAnteriorId` como a linha `anterior` da tabela de transições.
+   */
+  etapaAnteriorId: Id | null
   /** = categoria da etapa. */
   status: Categoria
   /** Última troca de etapa: base do "parado há X dias úteis". */
@@ -35,9 +40,17 @@ export interface Demanda {
   responsavelSugeridoId: Id | null
   atendimentoId: Id | null
   aprovadorId: Id | null
+  /**
+   * "Liberar para envio" (POST /api/demandas/:id/liberar-envio): o aprovador deu o ok interno em Revisão. Com ele, a
+   * bola passa ao AM e o card mostra "pronta para enviar" (API.md §5.1.1). Limpos ao entrar em Revisão de novo.
+   */
+  revisaoOkEm: Instante | null
+  revisaoOkPor: Id | null
   solicitanteId: Id
   criadoPor: Id
   briefingCompleto: boolean
+  /** Muda com briefingMd/briefingCampos. Patch com este campo no SSE = recarregar o detalhe (['demanda', numero]). */
+  briefingAtualizadoEm: Instante | null
   prioridade: Prioridade
   prioridadeMotivo: string | null
   prazo: DataLocal | null
@@ -88,6 +101,14 @@ export interface RelacaoDemanda {
   /** Id de quem eu cubro quando a relação vem da ausência ("cobrindo Samara"). */
   cobrindoId: Id | null
 }
+
+export const ESTADOS_PRAZO = ['atrasada', 'hoje', 'em_dia', 'sem_prazo', 'pausado', 'concluida'] as const
+/**
+ * Estado do prazo (estadoPrazo() em shared/logica/prazo.ts; API.md §5.2). Vale para o card, o Início, os contadores do
+ * cliente e o filtro `prazo`. Triagem, fila, produção e ajuste comparam prazo + prazoHora; publicação compara a data de
+ * publicação; revisão, cliente e aprovado são `pausado` (nunca atrasada); entregue e cancelada são `concluida`.
+ */
+export type EstadoPrazo = (typeof ESTADOS_PRAZO)[number]
 
 /** Valor de um campo do briefing (por tipo de campo: texto/url/data → string; numero; sim_nao; multipla → string[]). */
 export type ValorCampo = string | number | boolean | string[] | null
@@ -175,9 +196,10 @@ export const TIPOS_ATIVIDADE = [
   'demanda.criada', 'demanda.editada', 'demanda.etapa_alterada', 'demanda.responsavel_alterado',
   'demanda.prazo_alterado', 'demanda.prioridade_alterada', 'demanda.bloqueio_alterado', 'demanda.equipe_alterada',
   'demanda.arquivada', 'demanda.restaurada', 'demanda.excluida', 'demanda.repetida', 'demanda.pegada',
+  'demanda.liberada',
   'triagem.aceita', 'triagem.recusada',
   'rodada.aberta', 'rodada.extra_marcada', 'rodada.extra_desmarcada',
-  'versao.entregue', 'versao.enviada', 'link.gerado', 'link.revogado', 'link.visto',
+  'versao.entregue', 'versao.itens_adicionados', 'versao.enviada', 'link.gerado', 'link.revogado', 'link.visto',
   'retorno.registrado', 'aprovacao.anulada',
   'comentario.criado', 'comentario.editado', 'comentario.excluido',
   'anexo.adicionado', 'anexo.removido',
@@ -202,12 +224,15 @@ export interface MapaDadosAtividade {
   'demanda.excluida': Record<string, never>
   'demanda.repetida': { novaId: Id; novaNumero: number } | { origemId: Id; origemNumero: number }
   'demanda.pegada': Record<string, never>
+  /** "Liberar para envio": ok interno do aprovador sobre a versão em Revisão. */
+  'demanda.liberada': { versaoId: Id | null; versaoNumero: number | null }
   'triagem.aceita': { equipeId: Id | null }
   'triagem.recusada': { motivo: string }
   'rodada.aberta': { rodadaId: Id; numero: number; origem: 'cliente' | 'interna'; motivo: string; prazo: DataLocal; itens: number; extra: boolean }
   'rodada.extra_marcada': { rodadaId: Id; numero: number }
   'rodada.extra_desmarcada': { rodadaId: Id; numero: number }
   'versao.entregue': { versaoId: Id; numero: number; itens: number }
+  'versao.itens_adicionados': { versaoId: Id; numero: number; itens: number }
   'versao.enviada': { versaoId: Id; numero: number; via: 'link' | 'fora'; canal: string | null; contatoId: Id | null }
   'link.gerado': { linkId: Id }
   'link.revogado': { linkId: Id }
@@ -223,6 +248,7 @@ export interface MapaDadosAtividade {
   'checklist.removido': { checklistId: Id; titulo: string }
   'checklist.item_feito': { itemId: Id; texto: string }
   'checklist.item_desfeito': { itemId: Id; texto: string }
+  /** O histórico só mostra esta linha ao próprio ator e ao admin (horas individuais, SPEC §7.1). */
   'tempo.lancado': { apontamentoId: Id; minutos: number }
   'cliente.criado': { clienteId: Id; sigla: string }
   'cliente.editado': { clienteId: Id; campos: string[] }
@@ -264,7 +290,10 @@ export interface CriarDemandaEntrada {
   agendadaInicio?: Instante | null
   agendadaFim?: Instante | null
   local?: string | null
-  /** Padrões: SPEC §5.8 (AM do cliente; criativo/social do cliente como sugerido). */
+  /**
+   * Padrões: SPEC §5.8 (AM do cliente; criativo/social do cliente como sugerido). Executor: `responsavelId` só nulo ou
+   * ele mesmo; CAMPOS_CRIACAO_SO_ATENDIMENTO e `prioridade` ≠ 0 → 403 campo_nao_permitido (API.md §4.8).
+   */
   responsavelId?: Id | null
   atendimentoId?: Id | null
   aprovadorId?: Id | null
@@ -277,6 +306,13 @@ export interface CriarDemandaEntrada {
   destino?: 'auto' | 'triagem'
   posicao?: PosicaoRelativa
 }
+
+/**
+ * Campos que o executor não manda ao criar (POST /api/demandas, /repetir, /entrada/rapida): 403 campo_nao_permitido.
+ * Também: `prioridade` ≠ 0 e `responsavelId` de outra pessoa. O servidor preenche os padrões (AM do cliente, aprovador
+ * da equipe), então o executor nunca vira o próprio aprovador.
+ */
+export const CAMPOS_CRIACAO_SO_ATENDIMENTO = ['atendimentoId', 'aprovadorId'] as const satisfies readonly (keyof CriarDemandaEntrada)[]
 
 export const AVISOS_CRIACAO = ['prazo_curto', 'briefing_incompleto', 'senha_detectada', 'sem_responsavel'] as const
 export type AvisoCriacao = (typeof AVISOS_CRIACAO)[number]
@@ -328,6 +364,16 @@ export const CAMPOS_EDITAVEIS_EXECUTOR = [
 export interface EditarDemandaSaida {
   demanda: Demanda
   avisos: AvisoCriacao[]
+}
+
+/**
+ * `detalhes.atual` do 409 conflito_rev (PATCH /api/demandas/:id e POST /mover com rev). Traz o briefing, que não está
+ * em Demanda, para o navegador mesclar campo a campo (SPEC §7.3) sem sobrescrever o texto de outra pessoa.
+ */
+export interface ConflitoRevDetalhes {
+  demanda: Demanda
+  briefingMd: string
+  briefingCampos: Record<string, ValorCampo>
 }
 
 /**
@@ -385,9 +431,14 @@ export interface RepetirEntrada {
   titulo?: string
 }
 
+/**
+ * POST /api/triagem/:id/aceitar. O executor só aceita se for o aprovador padrão da equipe do tipo (tipo.equipeId, ou
+ * demanda.equipeId se o tipo não tiver equipe), nunca pela `equipeId` deste corpo; e `responsavelId` só nulo ou ele.
+ */
 export interface AceitarTriagemEntrada {
   clienteId: Id
   tipoPecaId: Id
+  /** Atendimento e admin escolhem; executor: igual à resolvida ou omitida (senão 403 campo_nao_permitido). */
   equipeId?: Id | null
   responsavelId?: Id | null
   titulo?: string
@@ -404,9 +455,16 @@ export interface ExcluirDemandaEntrada {
 
 // ─────────────────────────────── DTOs: criação rápida e colar do WhatsApp ───────────────────────────────
 
-/** Contexto da coluna onde a pessoa digitou (N). */
+/**
+ * Contexto da coluna onde a pessoa digitou (N), montado pelo front com a coluna e os filtros ativos (ContextoColuna).
+ * Não há etapa: o destino segue a regra de POST /api/demandas (Na fila ou Triagem).
+ * - `responsavelId`: coluna de uma pessoa (agrupado por responsável);
+ * - `clienteId`: coluna de um cliente, ou filtro `clientes` com um só cliente;
+ * - `tipoPecaId`: filtro `tipos` com um só tipo;
+ * - `equipeId`: equipe da visão (visao.equipeId);
+ * - `planejadaPara`: coluna de um dia.
+ */
 export interface ContextoRapida {
-  etapaId?: Id
   responsavelId?: Id | null
   clienteId?: Id
   tipoPecaId?: Id
@@ -434,11 +492,19 @@ export interface AnaliseRapida {
   clienteId: Id | null
   responsavelId: Id | null
   tipoPecaId: Id | null
+  /** contexto.equipeId ?? tipo.equipeId ?? equipe principal (executora) do @responsável. */
+  equipeId: Id | null
   marcadores: MarcadorRapida[]
+  /**
+   * Sigla no formato de marcador (`XYZ:`, `[XYZ]`, `XYZ -`; 1 a 12 de A–Z e 0–9) que não casa nenhum apelido: a
+   * interface oferece "Criar cliente XYZ" (POST /api/clientes) sem sair do campo. O texto continua no título.
+   */
+  siglaNova: string | null
   /** Linha de prévia: "HE · Carrossel · Rafa · sex, 17/10, 18h". */
   previa: string
   /** Para onde vai se criar agora. */
   destino: 'fila' | 'triagem'
+  /** 'tipo' também quando o tipo (Outro) não tem equipe e nada no contexto a define: vai para a Triagem, nunca 400. */
   falta: ('cliente' | 'tipo')[]
 }
 
@@ -456,6 +522,8 @@ export interface AnaliseTexto {
   autor: string | null
   recebidoEm: Instante | null
   clientes: { id: Id; confianca: number; casou: string }[]
+  /** Sigla em maiúsculas que parece um cliente mas não casa nenhum apelido: oferecer "Criar cliente XYZ". */
+  siglaNova: string | null
   tipos: { id: Id; confianca: number; casou: string }[]
   responsavelSugeridoId: Id | null
   /** true quando cliente e tipo foram reconhecidos com confiança ≥ 0,9: cria direto em Na fila. */
@@ -489,6 +557,10 @@ export interface EditarItemEntrada {
 
 export interface CriarComentarioEntrada {
   corpoMd: string
+  /**
+   * true só para atendimento, admin ou quem cobre o AM da demanda hoje (vale também no PATCH). Executor:
+   * 403 campo_nao_permitido com detalhes.campo = 'visivelCliente'.
+   */
   visivelCliente?: boolean
   versaoId?: Id | null
   /** Anexos já criados com POST /api/demandas/:id/anexos (ficam presos ao comentário). */
@@ -536,9 +608,13 @@ export interface BuscaSaida {
   demandas: ResultadoBuscaDemanda[]
 }
 
+/**
+ * GET /api/arquivo: arquivadas + entregues/canceladas que já saíram do quadro (há mais de quadroEntregueDias),
+ * arquivadas ou não (API.md §4.15).
+ */
 export interface ListarArquivoConsulta {
   clienteId?: Id
-  /** Mês de arquivamento "YYYY-MM". */
+  /** "YYYY-MM" de coalesce(arquivadoEm, concluidaEm, statusDesde). */
   mes?: string
   tipoPecaId?: Id
   q?: string

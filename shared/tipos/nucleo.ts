@@ -85,19 +85,21 @@ export const CODIGOS_ERRO = [
   'sem_permissao',          // 403 papel/relação não permite; mensagem diz o motivo
   'campo_nao_permitido',    // 403 PATCH com campo fora da lista do papel; detalhes.campo
   'nao_encontrado',         // 404
-  'conflito_rev',           // 409 If-Match diferente do rev atual; detalhes.atual (objeto atual)
+  'conflito_rev',           // 409 If-Match diferente do rev atual; detalhes.atual: ConflitoRevDetalhes
   'requer_dialogo',         // 409 a transição precisa de um diálogo; detalhes: DetalhesRequerDialogo
   'versao_desatualizada',   // 409 chegou versão nova (link público ou retorno); detalhes.versaoAtual
   'ja_decidida',            // 409 a versão já tem decisão válida
   'conflito',               // 409 outro conflito de estado (ex.: sigla repetida, ausência sobreposta)
   'link_inativo',           // 410 link público expirado ou revogado
-  'token_invalido',         // 410 convite/redefinição usado, expirado ou inexistente
-  'arquivo_grande',         // 413 acima de 10 MB
+  'token_invalido',         // 410 convite/redefinição usado, revogado, expirado, inexistente ou de pessoa inativa
+  'arquivo_grande',         // 413 upload acima de 10 MB (recusado pelo Content-Length, sem ler o corpo)
+  'corpo_grande',           // 413 corpo JSON acima de 1 MiB
   'tipo_arquivo',           // 415 magic number fora da allowlist
   'transicao_invalida',     // 422 não existe transição de → para, ou a etapa não se aplica ao tipo
   'senha_fraca',            // 422 menos de 10 caracteres ou senha óbvia
   'drive_privado',          // 422 envio por link bloqueado: item do Drive não está público
-  'muitas_tentativas',      // 429 limite de login ou da página pública; detalhes.tenteEmSegundos
+  'idempotencia',           // 422 a mesma Idempotency-Key veio com outro pedido (hash diferente)
+  'muitas_tentativas',      // 429 limite de login, troca de senha ou página pública; detalhes.tenteEmSegundos
   'interno',                // 500
 ] as const
 export type CodigoErro = (typeof CODIGOS_ERRO)[number]

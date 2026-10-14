@@ -1,6 +1,6 @@
 /** Configuração: fluxo, etapas, transições, tipos de peça, feriados, visões e parâmetros da aplicação. */
 import type {
-  Bloqueio, Bola, Categoria, Cor, CorEtapa, DataLocal, HoraLocal, Id, Prioridade,
+  Bloqueio, Bola, Categoria, Cor, CorEtapa, DataLocal, HoraLocal, Id, Instante, Prioridade,
 } from './nucleo.ts'
 
 export interface Fluxo {
@@ -50,7 +50,10 @@ export const REQUISITOS_TRANSICAO = [
 ] as const
 export type RequisitoTransicao = (typeof REQUISITOS_TRANSICAO)[number]
 
-/** Linha da tabela `transicao`. `de: '*'` = qualquer; `para: 'anterior'` = etapa anterior no histórico. */
+/**
+ * Linha da tabela `transicao`. `de: '*'` = qualquer; `para: 'anterior'` = Demanda.etapaAnteriorId.
+ * A linha com `de` exato tem precedência sobre a de `*` (ex.: triagem → cancelado); as duas nunca se combinam.
+ */
 export interface Transicao {
   de: Categoria | '*'
   para: Categoria | 'anterior'
@@ -121,6 +124,10 @@ export type FiltroPrazo = (typeof FILTROS_PRAZO)[number]
 /**
  * Filtros de uma visão (JSON em visao.filtros) e da URL (`?f=` = base64url do JSON).
  * Todos os campos são E entre si; listas são OU dentro do campo. 'eu' resolve para mim + quem eu cubro.
+ * `ou`: a demanda também passa se casar com algum dos filtros da lista (um nível só; `ou` dentro de `ou` é ignorado).
+ *   Ex.: Social = equipe Social nas etapas da equipe, OU qualquer demanda em Agendar.
+ * Visão na tela = escopo(visao.filtros, com `ou`) E chips da URL (`?f=`, sem `ou`).
+ * aplicarFiltros (shared/logica/filtros.ts) exclui SEMPRE o status triagem: a Triagem tem tela própria (SPEC §5.1).
  */
 export interface FiltrosVisao {
   equipes?: Id[]
@@ -131,6 +138,7 @@ export interface FiltrosVisao {
   atendimento?: 'eu' | Id[]
   tipos?: Id[]
   prioridades?: Prioridade[]
+  /** Pelo estadoPrazo() (API.md §5.2): 'atrasado' = estado 'atrasada'; peça com o cliente nunca é atrasada. */
   prazo?: FiltroPrazo
   /** 'comigo' = bola com eu (ou quem eu cubro). */
   bola?: Bola[] | 'comigo'
@@ -138,6 +146,8 @@ export interface FiltrosVisao {
   texto?: string
   /** "Só as minhas" (Q): responsável, atendimento ou bola = eu. */
   soMinhas?: boolean
+  /** Alternativas em OU com o resto do filtro (só em visao.filtros; a URL não usa). */
+  ou?: FiltrosVisao[]
 }
 
 export interface Visao {
@@ -173,6 +183,8 @@ export interface ConfigApp {
   arquivoLixoDias: number
   backupManter: number
   quadroEntregueDias: number
+  /** Primeiros passos: quando o admin apertou "Revisei os tipos" (nulo = ainda não). */
+  tiposRevisadosEm: Instante | null
 }
 
 /** Mapa chave do banco → campo de ConfigApp (o servidor converte nos dois sentidos). */
@@ -191,6 +203,30 @@ export const CHAVES_CONFIG: Record<keyof ConfigApp, string> = {
   arquivoLixoDias: 'arquivo.lixo_dias',
   backupManter: 'backup.manter',
   quadroEntregueDias: 'quadro.entregue_dias',
+  tiposRevisadosEm: 'passos.tipos_revisados_em',
+}
+
+/** Parâmetros numéricos de ConfigApp. */
+export type ParametroNumerico = Exclude<keyof ConfigApp, 'prazoHoraPadrao' | 'tiposRevisadosEm'>
+
+/**
+ * Faixas aceitas no PATCH /api/config/app (zod; fora delas, 400 validacao). Os de segurança têm teto curto.
+ * `demandaNumeroInicial` também precisa ser maior que o maior número existente.
+ */
+export const FAIXAS_CONFIG: Record<ParametroNumerico, readonly [min: number, max: number]> = {
+  demandaNumeroInicial: [1, 1_000_000_000],
+  paradoLimiteDiasUteis: [1, 30],
+  clienteParadoDiasUteis: [1, 30],
+  linkPublicoValidadeDias: [1, 90],
+  linkPublicoArquivoMinutos: [1, 15],
+  conviteValidadeDias: [1, 14],
+  redefinicaoValidadeHoras: [1, 24],
+  sessaoValidadeDias: [1, 30],
+  eventoRetencaoDias: [7, 90],
+  uploadLimiteBytes: [1, 10_485_760],
+  arquivoLixoDias: [1, 365],
+  backupManter: [1, 60],
+  quadroEntregueDias: [1, 60],
 }
 
 /** Nome e ambiente vindos do servidor (env). */
@@ -251,7 +287,13 @@ export interface EditarVisaoEntrada {
   posicao?: { depoisDeId?: Id | null }
 }
 
-export type EditarConfigAppEntrada = Partial<ConfigApp>
+/**
+ * PATCH /api/config/app (admin). Números dentro de FAIXAS_CONFIG; `prazoHoraPadrao` em HH:MM.
+ * `tiposRevisados: true` grava tiposRevisadosEm = agora (botão "Revisei os tipos" dos Primeiros passos).
+ */
+export type EditarConfigAppEntrada = Partial<Pick<ConfigApp, ParametroNumerico | 'prazoHoraPadrao'>> & {
+  tiposRevisados?: true
+}
 
 /** GET/PATCH /api/config/app */
 export interface ConfigAppSaida {
@@ -264,7 +306,15 @@ export const PASSOS_INICIAIS = [
 ] as const
 export type PassoInicial = (typeof PASSOS_INICIAIS)[number]
 
-/** "Primeiros passos do admin" no Início enquanto faltar algo (ADAPTACOES). */
+/**
+ * "Primeiros passos do admin" no Início enquanto faltar algo (ADAPTACOES). Critério de `feito` (API.md §4.13):
+ * - convidar_equipe: pelo menos 2 usuários ativos (o admin e mais alguém);
+ * - cadastrar_clientes: pelo menos 1 cliente fora de 'ex' e nenhum deles com a pendência sem_am;
+ * - revisar_tipos: ConfigApp.tiposRevisadosEm preenchido (botão "Revisei os tipos");
+ * - aprovadores_distribuidores: toda equipe ativa e executora com distribuidor. O aprovador é opcional
+ *   (sem aprovador, o AM da demanda aprova; com aprovador, ele usa "Liberar para envio").
+ * `concluido` = todos feitos; aí o Início devolve primeirosPassos = null.
+ */
 export interface PrimeirosPassos {
   itens: { id: PassoInicial; rotulo: string; caminho: string; feito: boolean }[]
   concluido: boolean

@@ -8,6 +8,13 @@ export const TIPOS_LINK_CLIENTE = ['drive', 'marca', 'acessos', 'site', 'redes',
 /** `acessos` aponta para o cofre de senhas. Nunca a senha. */
 export type TipoLinkCliente = (typeof TIPOS_LINK_CLIENTE)[number]
 
+export const PENDENCIAS_CLIENTE = ['sem_am', 'sem_social', 'sem_criativo', 'sem_contato_padrao'] as const
+/**
+ * Cadastro incompleto ("Criar cliente HE" na hora e completar depois). Calculado na leitura; a lista de clientes e o
+ * cabeçalho do cliente mostram "Completar cadastro". `sem_am` também conta nos Primeiros passos do admin.
+ */
+export type PendenciaCliente = (typeof PENDENCIAS_CLIENTE)[number]
+
 /** Bootstrap e listas. `apelidos` são normalizados (minúsculo, sem acento) e incluem a sigla. */
 export interface ClienteResumo {
   id: Id
@@ -17,7 +24,7 @@ export interface ClienteResumo {
   status: StatusCliente
   nivel: 1 | 2 | 3 | null
   cor: Cor
-  /** https externo ou /api/arquivos/:id do logo enviado. */
+  /** Logo só por upload: /api/arquivos/:id?inline=1 (na página pública vem como URL assinada). Nulo = sem logo. */
   logoUrl: string | null
   atendimentoId: Id | null
   criativoId: Id | null
@@ -25,6 +32,7 @@ export interface ClienteResumo {
   rodadasInclusas: number
   pastaSaida: string | null
   apelidos: string[]
+  pendencias: PendenciaCliente[]
 }
 
 export interface ClienteContato {
@@ -72,7 +80,7 @@ export interface ClienteNaLista extends ClienteResumo {
 
 // ─────────────────────────────── DTOs ───────────────────────────────
 
-/** Também usado pelo "Criar cliente HE" dentro da Nova demanda (só sigla + nome). */
+/** Também usado pelo "Criar cliente HE" dentro da Nova demanda e da criação rápida (só sigla + nome). */
 export interface CriarClienteEntrada {
   sigla: string
   nome: string
@@ -80,8 +88,9 @@ export interface CriarClienteEntrada {
   status?: StatusCliente
   nivel?: 1 | 2 | 3 | null
   cor?: Cor
-  logoUrl?: string | null
+  /** Imagem já enviada por POST /api/arquivos (jpg, png, webp). Não há logo por URL externa. */
   logoArquivoId?: Id | null
+  /** Padrão: o ator, se o papel dele for atendimento (o cliente criado na hora já nasce com AM). */
   atendimentoId?: Id | null
   criativoId?: Id | null
   socialId?: Id | null

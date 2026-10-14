@@ -17,7 +17,8 @@ INSERT INTO configuracao (chave, valor) VALUES
   ('upload.limite_bytes',           '10485760'),
   ('arquivo.lixo_dias',             '30'),
   ('backup.manter',                 '14'),
-  ('quadro.entregue_dias',          '7');        -- coluna Entregue mostra só os últimos N dias
+  ('quadro.entregue_dias',          '7'),        -- coluna Entregue mostra só os últimos N dias; depois, só no Arquivo
+  ('passos.tipos_revisados_em',     'null');     -- Primeiros passos: botão "Revisei os tipos" grava o instante
 
 -- ───────────── fluxo ─────────────
 INSERT INTO fluxo (id, nome, padrao) VALUES ('fl-padrao', 'Padrão', 1);
@@ -74,7 +75,9 @@ INSERT INTO transicao (de_categoria, para_categoria, quem, requer, negado) VALUE
      'Só o aprovador ou o atendimento conclui.'),
   ('cliente',   'ajuste',     '["atendimento","admin","cliente"]',               '["retorno"]',
      'Só o atendimento registra o retorno do cliente.'),
-  ('cliente',   'aprovado',   '["atendimento","admin","cliente"]',               '["retorno","sem_publicacao"]',
+  -- sem 'sem_publicacao': soltar um Post em Aprovado (ou "." em Com o cliente) abre "Registrar retorno";
+  -- registrarRetorno() decide entre Aprovado e Agendar pelo tipo.
+  ('cliente',   'aprovado',   '["atendimento","admin","cliente"]',               '["retorno"]',
      'Só o atendimento registra o retorno do cliente.'),
   ('cliente',   'publicacao', '["atendimento","admin","cliente"]',               '["retorno","com_publicacao"]',
      'Só o atendimento registra o retorno do cliente.'),
@@ -239,11 +242,14 @@ INSERT INTO feriado (data, nome, tipo) VALUES
 
 -- ───────────── visões semeadas (SPEC §5.1) ─────────────
 -- filtros: FiltrosVisao (shared/tipos/config.ts). recolhidas: categorias recolhidas por padrão.
+-- A Triagem nunca aparece numa visão (aplicarFiltros a exclui sempre; ela tem tela própria).
+-- Social: "ou" traz o Agendar de qualquer equipe (o Post da Criação continua com equipe_id = eq-criacao).
 INSERT INTO visao (id, nome, slug, equipe_id, layout, agrupar_por, filtros, recolhidas, icone, pos) VALUES
   ('vs-criacao',       'Criação',      'criacao',       'eq-criacao', 'quadro', 'responsavel',
      '{"equipes":["eq-criacao"],"categorias":["fila","producao","ajuste","revisao"]}', '[]', 'palette', 1024),
   ('vs-social',        'Social',       'social',        'eq-social',  'quadro', 'responsavel',
-     '{"equipes":["eq-social"],"categorias":["fila","producao","ajuste","revisao","publicacao"]}', '[]', 'megaphone', 2048),
+     '{"equipes":["eq-social"],"categorias":["fila","producao","ajuste","revisao","publicacao"],"ou":[{"categorias":["publicacao"]}]}',
+     '[]', 'megaphone', 2048),
   ('vs-web',           'Web',          'web',           'eq-web',     'quadro', 'responsavel',
      '{"equipes":["eq-web"],"categorias":["fila","producao","ajuste","revisao"]}', '[]', 'globe', 3072),
   ('vs-trafego',       'Tráfego',      'trafego',       'eq-trafego', 'quadro', 'responsavel',

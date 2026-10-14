@@ -37,10 +37,13 @@ Backup: `VACUUM INTO` diário em `DATA_DIR/backups` (mantém 14) feito pelo pró
 - **Primeiro boot:** se não houver nenhum usuário e existirem `ADMIN_EMAIL` e `ADMIN_SENHA`, cria o admin.
 - **Convite:** o admin cadastra a pessoa (nome, apelido, e-mail, papel, equipes) e o sistema gera um **link de convite**
   de uso único, válido por 7 dias, que o admin copia e manda (WhatsApp). A pessoa abre, define a senha e entra.
+  O token vai no fragmento do link (`/convite#...`), que não chega a logs nem ao `Referer`.
 - **Esqueci a senha:** o admin gera um link de redefinição de uso único (1 h). Sem SMTP nesta construção.
-- Sessão por cookie `sid` (httpOnly, SameSite=Lax, Secure em produção), 30 dias deslizantes, hash no banco.
-  Desativar a pessoa ou mudar o papel revoga as sessões e fecha o SSE dela.
-- Limite de tentativas: 5 falhas em 15 min por e-mail+IP → espera progressiva.
+- Sessão por cookie (`__Host-sid` em produção, `sid` em desenvolvimento; httpOnly, SameSite=Lax, Secure em produção),
+  30 dias deslizantes, hash no banco. Desativar a pessoa ou mudar o papel revoga as sessões e fecha o SSE dela;
+  desativar também revoga convites e redefinições pendentes.
+- Limite de tentativas (falhas somadas): 5 em 15 min por e-mail+IP, 20 por hora por e-mail, 50 em 15 min por IP →
+  espera progressiva. O IP real vem do `X-Forwarded-For` que o Traefik acrescenta (`TRUST_PROXY_HOPS`, `docs/API.md` §1).
 - Anti-CSRF: mutações exigem `X-Trace-Id` (a SPEC usa esse header também para o eco do tempo real) e `Origin` igual
   a `APP_URL`.
 
@@ -51,6 +54,7 @@ Backup: `VACUUM INTO` diário em `DATA_DIR/backups` (mantém 14) feito pelo pró
 - Download interno: `GET /api/arquivos/:id` autenticado, `X-Content-Type-Options: nosniff`, `Content-Disposition:
   attachment` exceto imagens.
 - Página pública de aprovação: URL assinada com HMAC e validade de 10 min (`/api/publico/arquivos/:id?exp=&sig=`).
+- Logo do cliente só por upload (vai à página pública por URL assinada); não há logo por URL externa.
 - Exclusão: marca `excluido_em`; o job diário apaga do disco depois de 30 dias.
 - O teste de "Drive público" (SPEC §5.3) é feito pelo servidor com `fetch` sem credenciais.
 

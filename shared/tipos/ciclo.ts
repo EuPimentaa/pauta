@@ -95,6 +95,8 @@ export interface Aprovacao {
   motivo: MotivoRodada | null
   rodadaAbertaId: Id | null
   evidenciaAnexoId: Id | null
+  /** Responsável antes da decisão (o aprovado de um tipo com publicação troca pelo social). Anular restaura. */
+  responsavelAnteriorId: Id | null
   criadoEm: Instante
   anuladaEm: Instante | null
   anuladaPor: Id | null
@@ -118,6 +120,15 @@ export interface EditarVersaoEntrada {
   nota?: string | null
 }
 
+/**
+ * POST /api/versoes/:id/itens: acrescenta itens a uma versão ainda não enviada (ex.: "Enviar arquivo (até 10 MB)"
+ * quando o Drive está privado, no diálogo de envio). Autor da versão, atendimento e admin. Resposta: VersaoComItens.
+ */
+export interface AdicionarItensEntrada {
+  /** Pelo menos um. */
+  itens: NovoItem[]
+}
+
 /** POST /api/versoes/:id/testar-drive */
 export interface TestarVersaoSaida {
   itens: { itemId: Id; status: DriveStatus | 'nao_drive'; previaUrl: string | null }[]
@@ -132,7 +143,7 @@ export interface EnviarAoClienteEntrada {
   via: 'link' | 'fora'
   /** Obrigatório com via 'fora'. */
   canal?: Canal
-  /** Padrão: contato padrão do cliente. */
+  /** Padrão: contato padrão do cliente. Precisa ser contato ativo do cliente da demanda (400 validacao). */
   contatoId?: Id | null
   /** Padrão: hoje + 2 dias úteis, limitado à véspera útil da publicação. */
   prazoRetorno?: DataLocal | null
@@ -160,7 +171,7 @@ export interface RegistrarRetornoEntrada {
   /** Ajuste: padrão hoje + tipo.slaAjusteDiasUteis. Vale para a rodada e para a demanda. */
   prazo?: DataLocal
   prazoHora?: HoraLocal | null
-  /** Padrão: contato padrão. */
+  /** Padrão: contato padrão. Precisa ser contato ativo do cliente da demanda (400 validacao). */
   contatoId?: Id | null
   nomeInformado?: string | null
   canal?: Canal

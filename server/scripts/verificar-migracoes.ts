@@ -12,8 +12,8 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  AGRUPAMENTOS, CATEGORIAS, CHAVES_CONFIG, CORES, CORES_ETAPA, LAYOUTS, QUEM_TRANSICAO, REQUISITOS_TRANSICAO,
-  TIPOS_CAMPO,
+  AGRUPAMENTOS, CATEGORIAS, CHAVES_CONFIG, CORES, CORES_ETAPA, FAIXAS_CONFIG, LAYOUTS, PUBLICOS_EVENTO, QUEM_TRANSICAO,
+  REQUISITOS_TRANSICAO, TIPOS_CAMPO,
 } from '../../shared/tipos/index.ts'
 
 type Linha = Record<string, unknown>
@@ -135,6 +135,11 @@ for (const [de, para] of [
   ['cliente', 'publicacao'], ['cliente', 'concluido'], ['aprovado', 'publicacao'], ['aprovado', 'concluido'],
   ['publicacao', 'concluido'], ['*', 'cancelado'], ['concluido', 'anterior'], ['cancelado', 'anterior'],
 ] as const) conferir(temTransicao(de, para), `transição ${de}→${para} (SPEC §7.1)`)
+const requerDe = (de: string, para: string) =>
+  JSON.parse(String(transicoes.find((t) => t.de_categoria === de && t.para_categoria === para)?.requer ?? '[]')) as string[]
+conferir(JSON.stringify(requerDe('cliente', 'aprovado')) === '["retorno"]',
+  'cliente→aprovado requer só retorno (soltar um Post em Aprovado abre Registrar retorno, sem 422)')
+conferir(requerDe('cliente', 'publicacao').includes('retorno'), 'cliente→publicacao requer retorno')
 
 const tipos = todos(db, 'SELECT * FROM tipo_peca')
 conferir(tipos.length <= 13, 'no máximo 12 tipos + Outro')
@@ -185,21 +190,43 @@ conferir(
     JSON.stringify(['criacao', 'social', 'web', 'trafego', 'meus-clientes', 'geral']),
   '6 visões semeadas (SPEC §5.1)',
 )
+type FiltroSeed = { categorias?: string[]; equipes?: string[]; ou?: FiltroSeed[] }
 for (const v of visoes) {
-  const f = JSON.parse(v.filtros as string) as { categorias?: string[]; equipes?: string[] }
+  const f = JSON.parse(v.filtros as string) as FiltroSeed
   const rec = JSON.parse(v.recolhidas as string) as string[]
   conferir((LAYOUTS as readonly string[]).includes(v.layout as string), `layout em ${v.slug}`)
   conferir((AGRUPAMENTOS as readonly string[]).includes(v.agrupar_por as string), `agrupamento em ${v.slug}`)
-  conferir((f.categorias ?? []).every((c) => (CATEGORIAS as readonly string[]).includes(c)), `categorias do filtro em ${v.slug}`)
+  for (const g of [f, ...(f.ou ?? [])]) {
+    conferir((g.categorias ?? []).every((c) => (CATEGORIAS as readonly string[]).includes(c)), `categorias do filtro em ${v.slug}`)
+    conferir(!(g.categorias ?? []).includes('triagem'), `${v.slug}: a Triagem não aparece em visão`)
+    for (const eq of g.equipes ?? []) conferir(equipes.some((e) => e.id === eq), `equipe ${eq} do filtro existe`)
+    conferir(g === f || g.ou === undefined, `${v.slug}: "ou" tem um nível só`)
+  }
   conferir(rec.every((c) => (CATEGORIAS as readonly string[]).includes(c)), `recolhidas em ${v.slug}`)
-  for (const eq of f.equipes ?? []) conferir(equipes.some((e) => e.id === eq), `equipe ${eq} do filtro existe`)
 }
+const social = JSON.parse(String(visoes.find((v) => v.slug === 'social')?.filtros ?? '{}')) as FiltroSeed
+conferir((social.ou ?? []).some((g) => g.equipes === undefined && (g.categorias ?? []).includes('publicacao')),
+  'visão Social traz o Agendar de qualquer equipe ("ou")')
 
 const chavesBanco = todos(db, 'SELECT chave, valor FROM configuracao')
 for (const chave of Object.values(CHAVES_CONFIG)) {
   conferir(chavesBanco.some((c) => c.chave === chave), `configuracao tem ${chave} (ConfigApp)`)
 }
 conferir(chavesBanco.length === Object.keys(CHAVES_CONFIG).length, 'configuracao e ConfigApp têm as mesmas chaves')
+const valorConfig = (chave: string) => JSON.parse(String(chavesBanco.find((c) => c.chave === chave)?.valor ?? 'null')) as unknown
+for (const [campo, [min, max]] of Object.entries(FAIXAS_CONFIG)) {
+  const v = valorConfig(CHAVES_CONFIG[campo as keyof typeof CHAVES_CONFIG]) as number
+  conferir(typeof v === 'number' && v >= min && v <= max, `seed de ${campo} dentro da faixa [${min}, ${max}]: ${v}`)
+}
+conferir(valorConfig('passos.tipos_revisados_em') === null, 'tipos ainda não revisados no seed')
+
+const indices = todos(db, "SELECT name FROM sqlite_master WHERE type = 'index'").map((i) => i.name as string)
+for (const nome of ['demanda_arquivo_ix', 'demanda_arquivo_cli_ix', 'token_acesso_pendente_uk', 'aprovacao_idem_uk',
+  'login_tentativa_email_ix', 'login_tentativa_ip_ix']) conferir(indices.includes(nome), `índice ${nome}`)
+const plano = todos(db, `EXPLAIN QUERY PLAN SELECT id FROM demanda
+  WHERE excluido_em IS NULL AND (arquivado_em IS NOT NULL OR status IN ('concluido','cancelado'))
+    AND coalesce(arquivado_em, concluida_em, status_desde) >= '2026-10-01'`).map((l) => String(l.detail)).join(' | ')
+conferir(plano.includes('demanda_arquivo'), `consulta do Arquivo usa o índice parcial (${plano})`)
 
 // ─────────────────────────── 4. fumaça dos gatilhos (desfeita no fim) ───────────────────────────
 db.exec('BEGIN')
@@ -222,16 +249,30 @@ deveFalhar(db, ins, ['d3', 3, 'X', null, 'et-fila', 'fila', agora(), null, 3072,
 conferir(um(db, "SELECT count(*) n FROM demanda_etapa_hist WHERE demanda_id = 'd1' AND saiu_em IS NULL")!.n === 1,
   'insert abre a linha do histórico de etapa')
 
-rodar(db, "UPDATE demanda SET etapa_id = 'et-fila', status = 'fila', status_desde = ?, com_quem_id = 'u-rafa', responsavel_id = 'u-rafa', atualizado_por = 'u-am' WHERE id = 'd1'", agora())
+deveFalhar(db, "UPDATE demanda SET etapa_id = 'et-fila', status = 'fila', atualizado_por = 'u-am' WHERE id = 'd1'", [],
+  'demanda_etapa_anterior', 'trocar de etapa sem gravar etapa_anterior_id é recusado')
+const instanteMover = '2030-01-02T12:00:00.000Z'   // como o relógio fixo dos testes: o histórico usa o atualizado_em do app
+rodar(db, "UPDATE demanda SET etapa_id = 'et-fila', etapa_anterior_id = 'et-triagem', status = 'fila', status_desde = ?, atualizado_em = ?, com_quem_id = 'u-rafa', responsavel_id = 'u-rafa', atualizado_por = 'u-am' WHERE id = 'd1'",
+  instanteMover, instanteMover)
 const hist = todos(db, "SELECT * FROM demanda_etapa_hist WHERE demanda_id = 'd1' ORDER BY id")
 conferir(hist.length === 2 && hist[0]!.saiu_em !== null && hist[1]!.saiu_em === null && hist[1]!.por === 'u-am',
   'mover fecha o histórico anterior e abre outro com o ator')
+conferir(hist[0]!.saiu_em === instanteMover && hist[1]!.entrou_em === instanteMover,
+  `histórico usa o atualizado_em gravado pelo app (${hist[0]!.saiu_em}, ${hist[1]!.entrou_em})`)
 const rev1 = um(db, "SELECT rev FROM demanda WHERE id = 'd1'")!.rev as number
 conferir(rev1 === 2, `trocar etapa sobe o rev (rev=${rev1})`)
 rodar(db, "UPDATE demanda SET posicao = 99, atualizado_por = 'u-am' WHERE id = 'd1'")
 conferir(um(db, "SELECT rev FROM demanda WHERE id = 'd1'")!.rev === rev1, 'mudar só a posição não sobe o rev')
 rodar(db, "UPDATE demanda SET titulo = 'Carrossel Outubro Rosa v2', rev = rev + 1, atualizado_por = 'u-am' WHERE id = 'd1'")
 conferir(um(db, "SELECT rev FROM demanda WHERE id = 'd1'")!.rev === rev1 + 1, 'rev subido pelo serviço não sobe de novo')
+rodar(db, "UPDATE demanda SET responsavel_sugerido_id = 'u-rafa', atualizado_por = 'u-am' WHERE id = 'd1'")
+conferir(um(db, "SELECT rev FROM demanda WHERE id = 'd1'")!.rev === rev1 + 2, 'responsável sugerido sobe o rev (PATCH aceita)')
+rodar(db, "UPDATE demanda SET prazo_manual = 1, atualizado_por = 'u-am' WHERE id = 'd1'")
+conferir(um(db, "SELECT rev FROM demanda WHERE id = 'd1'")!.rev === rev1 + 3, 'prazo manual sobe o rev (PATCH aceita)')
+deveFalhar(db, "UPDATE demanda SET revisao_ok_em = ?, atualizado_por = 'u-am' WHERE id = 'd1'", [agora()], 'CHECK',
+  'ok de revisão exige quem deu')
+deveFalhar(db, "UPDATE demanda SET etapa_id = 'et-revisao', etapa_anterior_id = 'et-fila', status = 'revisao', revisao_ok_em = ?, revisao_ok_por = 'u-am', atualizado_por = 'u-am' WHERE id = 'd1'",
+  [agora()], 'demanda_revisao_ok', 'entrar em Revisão com o ok da entrega anterior é recusado')
 
 conferir(todos(db, "SELECT rowid FROM demanda_fts WHERE demanda_fts MATCH 'acao'").length === 1, 'busca ignora acento')
 conferir(todos(db, "SELECT rowid FROM demanda_fts WHERE demanda_fts MATCH 'outub*'").length === 1, 'busca por prefixo')
@@ -263,6 +304,22 @@ rodar(db, "UPDATE anexo SET excluido_em = ? WHERE id = 'ax2'", agora())
 conferir(um(db, "SELECT n_anexos n FROM demanda WHERE id = 'd1'")!.n === 1, 'n_anexos ignora excluídos')
 deveFalhar(db, "INSERT INTO anexo (id, demanda_id, tipo, nome, url, pos) VALUES ('ax3','d1','link','x','http://x',3)", [],
   'CHECK', 'link sem https é recusado')
+deveFalhar(db, "INSERT INTO anexo (id, demanda_id, tipo, nome, pos) VALUES ('ax4','d1','link','x',4)", [], 'CHECK',
+  'anexo ativo sem url é recusado')
+rodar(db, "INSERT INTO anexo (id, demanda_id, tipo, nome, pos, excluido_em) VALUES ('ax5','d1','link','Anexo removido',5,?)", agora())
+conferir(um(db, "SELECT url FROM anexo WHERE id = 'ax5'")!.url === null, 'anexo excluído (demanda anonimizada) fica sem url')
+
+// arquivos em uso não vão para o lixo
+deveFalhar(db, "UPDATE arquivo SET excluido_em = ? WHERE id = 'a1'", [agora()], 'arquivo_em_uso', 'arquivo de anexo ativo não vai para o lixo')
+rodar(db, "INSERT INTO arquivo (id, nome, mime, bytes, sha256, enviado_por) VALUES ('a3','logo.png','image/png',10,'z','u-am')")
+rodar(db, "UPDATE cliente SET logo_arquivo_id = 'a3' WHERE id = 'c-he'")
+deveFalhar(db, "UPDATE arquivo SET excluido_em = ? WHERE id = 'a3'", [agora()], 'arquivo_em_uso', 'logo do cliente não vai para o lixo')
+
+// comentários
+deveFalhar(db, "INSERT INTO comentario (id, demanda_id, autor_id, corpo_md) VALUES ('cm1','d1','u-am','')", [], 'CHECK',
+  'comentário vazio é recusado')
+rodar(db, "INSERT INTO comentario (id, demanda_id, autor_id, corpo_md, excluido_em) VALUES ('cm2','d1','u-am','',?)", agora())
+conferir(um(db, "SELECT corpo_md c FROM comentario WHERE id = 'cm2'")!.c === '', 'comentário excluído fica com o corpo vazio')
 
 // rodadas, versões, envio, aprovação
 rodar(db, "INSERT INTO rodada (id, demanda_id, numero, origem, prazo, prazo_original) VALUES ('r1','d1',1,'inicial','2026-10-16','2026-10-16')")
@@ -284,7 +341,9 @@ deveFalhar(db, "UPDATE envio SET canal = 'email' WHERE id = 'e1'", [], 'envio_im
 rodar(db, "INSERT INTO cliente_contato (id, cliente_id, nome, padrao) VALUES ('ct1','c-he','Fulana',1)")
 deveFalhar(db, "INSERT INTO cliente_contato (id, cliente_id, nome, padrao) VALUES ('ct2','c-he','Beltrana',1)", [], 'UNIQUE',
   'um só contato padrão por cliente')
-rodar(db, "INSERT INTO aprovacao (id, demanda_id, versao_id, decisao, via, canal, contato_id, registrado_por, idempotency_key) VALUES ('ap1','d1','v1','aprovado','manual','whatsapp','ct1','u-am','k1')")
+rodar(db, "INSERT INTO aprovacao (id, demanda_id, versao_id, decisao, via, canal, contato_id, registrado_por, responsavel_anterior_id) VALUES ('ap1','d1','v1','aprovado','manual','whatsapp','ct1','u-am','u-rafa')")
+deveFalhar(db, "UPDATE aprovacao SET responsavel_anterior_id = 'u-am' WHERE id = 'ap1'", [], 'aprovacao_imutavel',
+  'responsável anterior é imutável (anular restaura dele)')
 deveFalhar(db, "INSERT INTO aprovacao (id, demanda_id, versao_id, decisao, via, registrado_por) VALUES ('ap2','d1','v1','aprovado','manual','u-am')",
   [], 'UNIQUE', 'uma decisão válida por versão')
 deveFalhar(db, "INSERT INTO aprovacao (id, demanda_id, versao_id, decisao, via, registrado_por) VALUES ('ap3','d1','v1','ajuste','manual','u-am')",
@@ -297,6 +356,50 @@ deveFalhar(db, "UPDATE demanda SET aprovada_em = ? WHERE id = 'd1'", [agora()], 
 rodar(db, "UPDATE demanda SET aprovada_em = ?, aprovada_versao_id = 'v1', atualizado_por = 'u-am' WHERE id = 'd1'", agora())
 deveFalhar(db, "UPDATE demanda SET aprovada_versao_id = 'v-inexistente', atualizado_por = 'u-am' WHERE id = 'd1'", [],
   'FOREIGN KEY', 'versão aprovada precisa ser da mesma demanda')
+
+// identidade na trilha: contato do cliente da demanda; link e idempotência
+rodar(db, "INSERT INTO cliente (id, nome, sigla) VALUES ('c-icc','ICC','ICC')")
+rodar(db, "INSERT INTO cliente_contato (id, cliente_id, nome) VALUES ('ct9','c-icc','Beltrana')")
+const insLink = 'INSERT INTO link_publico (id, token_hash, token_cifrado, cliente_id, contato_id, expira_em, criado_por) VALUES (?, ?, ?, ?, ?, ?, ?)'
+deveFalhar(db, insLink, ['l9', 'h9', 'c9', 'c-he', 'ct9', '2030-01-01', 'u-am'], 'FOREIGN KEY', 'link com contato de outro cliente é recusado')
+rodar(db, insLink, 'l1', 'h1', 'c1', 'c-he', 'ct1', '2030-01-01', 'u-am')
+rodar(db, insLink, 'l2', 'h2', 'c2', 'c-he', null, '2030-01-01', 'u-am')
+deveFalhar(db, "INSERT INTO envio (id, demanda_id, versao_id, via, canal, contato_id, enviado_por) VALUES ('e9','d1','v1','fora','whatsapp','ct9','u-am')",
+  [], 'contato_de_outro_cliente', 'envio para contato de outro cliente é recusado')
+rodar(db, "INSERT INTO versao (id, demanda_id, numero, rodada_id, criada_por) VALUES ('v2','d1',2,'r1','u-rafa')")
+rodar(db, "INSERT INTO envio (id, demanda_id, versao_id, via, link_id, contato_id, enviado_por) VALUES ('e2','d1','v2','link','l1','ct1','u-am')")
+const insAprLink = `INSERT INTO aprovacao (id, demanda_id, versao_id, decisao, via, link_id, contato_id, nome_informado,
+  idempotency_key, idempotency_hash) VALUES (?, 'd1', 'v2', 'aprovado', 'link', ?, ?, ?, ?, ?)`
+deveFalhar(db, insAprLink, ['ap9', 'l1', 'ct9', null, 'k9', 'h'], 'contato_de_outro_cliente', 'decisão com contato de outro cliente é recusada')
+deveFalhar(db, insAprLink, ['ap5', 'l1', null, null, 'k1', 'h'], 'CHECK', 'decisão pelo link sem contato e sem nome é recusada')
+deveFalhar(db, insAprLink, ['ap5', 'l1', 'ct1', null, 'k1', null], 'CHECK', 'chave de idempotência exige o hash do pedido')
+rodar(db, insAprLink, 'ap6', 'l1', 'ct1', null, 'k1', 'h')
+rodar(db, "UPDATE aprovacao SET anulada_em = ?, anulada_por = 'u-am' WHERE id = 'ap6'", agora())
+deveFalhar(db, insAprLink, ['ap7', 'l1', 'ct1', null, 'k1', 'h'], 'UNIQUE', 'a mesma chave não se repete no mesmo link')
+rodar(db, insAprLink, 'ap8', 'l2', null, 'Fulano da Silva', 'k1', 'h')
+conferir(um(db, "SELECT count(*) n FROM aprovacao WHERE idempotency_key = 'k1'")!.n === 2, 'a chave vale por link (outro link aceita)')
+
+rodar(db, "INSERT INTO arquivo (id, nome, mime, bytes, sha256, enviado_por) VALUES ('a2','arte.png','image/png',10,'y','u-rafa')")
+rodar(db, "INSERT INTO versao_item (id, versao_id, demanda_id, tipo, nome, arquivo_id, pos) VALUES ('vi2','v2','d1','arquivo','arte.png','a2',2)")
+deveFalhar(db, "UPDATE arquivo SET excluido_em = ? WHERE id = 'a2'", [agora()], 'arquivo_em_uso', 'arquivo de versão não vai para o lixo')
+rodar(db, "UPDATE anexo SET excluido_em = ? WHERE id = 'ax1'", agora())
+rodar(db, "UPDATE arquivo SET excluido_em = ? WHERE id = 'a1'", agora())
+conferir(um(db, "SELECT excluido_em e FROM arquivo WHERE id = 'a1'")!.e !== null, 'arquivo sem uso vai para o lixo')
+
+// convite/redefinição: um pendente por pessoa e finalidade
+const insToken = "INSERT INTO token_acesso (id, usuario_id, finalidade, token_hash, expira_em) VALUES (?, 'u-rafa', ?, ?, '2030-01-01')"
+rodar(db, insToken, 'tk1', 'convite', 'th1')
+deveFalhar(db, insToken, ['tk2', 'convite', 'th2'], 'UNIQUE', 'dois convites pendentes para a mesma pessoa são recusados')
+rodar(db, insToken, 'tk3', 'redefinicao', 'th3')
+rodar(db, "UPDATE token_acesso SET revogado_em = ? WHERE id = 'tk1'", agora())
+rodar(db, insToken, 'tk2', 'convite', 'th2')
+conferir(um(db, "SELECT count(*) n FROM token_acesso WHERE usuario_id = 'u-rafa' AND usado_em IS NULL AND revogado_em IS NULL")!.n === 2,
+  'revogar o anterior libera um novo convite')
+rodar(db, "INSERT INTO login_tentativa (tipo, email, ip, ok) VALUES ('senha', 'rafa@x.com', '203.0.113.9', 0)")
+deveFalhar(db, "INSERT INTO login_tentativa (tipo, email, ip, ok) VALUES ('outro', 'x@x.com', '1.1.1.1', 0)", [], 'CHECK',
+  'tentativa só de login ou de troca de senha')
+const colunasCliente = todos(db, 'PRAGMA table_info(cliente)').map((c) => c.name as string)
+conferir(!colunasCliente.includes('logo_url'), 'cliente sem logo por URL externa (CSP)')
 
 // apontamentos
 rodar(db, "INSERT INTO apontamento (id, usuario_id, demanda_id, cliente_id, data, minutos) VALUES ('t1','u-rafa','d1','c-he','2026-10-14',90),('t2','u-am','d1','c-he','2026-10-14',30)")
@@ -322,6 +425,12 @@ deveFalhar(db, "INSERT INTO ausencia (id, usuario_id, de, ate, substituto_id, cr
 rodar(db, "INSERT INTO evento (entidade, entidade_id, demanda_id, op, patch, campos) VALUES ('demanda','d1','d1','upsert','{\"titulo\":\"x\"}','[\"titulo\"]')")
 deveFalhar(db, "INSERT INTO evento (entidade, entidade_id, op, patch, publico) VALUES ('notificacao','1','upsert','{}','usuario')", [],
   'CHECK', 'evento para um usuário exige usuario_id')
+for (const p of PUBLICOS_EVENTO) {
+  rodar(db, "INSERT INTO evento (entidade, entidade_id, op, patch, publico, usuario_id) VALUES ('link_publico','l1','upsert','{}',?,'u-am')", p)
+}
+conferir(um(db, "SELECT count(*) n FROM evento WHERE publico = 'gestao'")!.n === 1, 'público gestao (link_publico) aceito')
+deveFalhar(db, "INSERT INTO evento (entidade, entidade_id, op, patch, publico) VALUES ('demanda','d1','upsert','{}','todos')", [],
+  'CHECK', 'público fora de PUBLICOS_EVENTO é recusado')
 conferir((um(db, "SELECT seq FROM sqlite_sequence WHERE name = 'evento'")?.seq as number) >= 1, 'seq do evento em sqlite_sequence')
 
 integridade('dentro da fumaça')

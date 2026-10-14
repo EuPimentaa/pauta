@@ -218,4 +218,29 @@ describe('mover', () => {
     assert.equal(ev.campos, null)
     assert.equal(ev.patch!.concluidaEm, null)
   })
+
+  test('sem folga entre os vizinhos: renormaliza a coluna com passo 1024 (como sistema) e publica um evento por card', async () => {
+    const a = await ambiente()
+    const d1 = await a.criarDemanda()
+    const d2 = await a.criarDemanda()
+    const d3 = await a.criarDemanda()
+    a.db.prepare('UPDATE demanda SET posicao = ? WHERE id = ?').run(1, d1.id)
+    a.db.prepare('UPDATE demanda SET posicao = ? WHERE id = ?').run(1 + 1e-7, d2.id)
+    a.db.prepare('UPDATE demanda SET posicao = ? WHERE id = ?').run(5, d3.id)
+    const seq = ultimoSeq(a.db)
+    const fila = a.coluna('criacao', 'Fila').id
+    const r = await a.como(a.pessoas.design).post(`/api/demandas/${d3.id}/mover`, { colunaId: fila, posicao: { depoisDeId: d1.id } })
+    assert.equal(r.status, 200)
+    const ordem = todos<{ id: string; posicao: number; atualizado_por: string | null }>(a.db,
+      'SELECT id, posicao, atualizado_por FROM demanda WHERE coluna_id = ? ORDER BY posicao', fila)
+    assert.deepEqual(ordem.map((l) => [l.id, l.posicao]), [[d1.id, 1024], [d3.id, 1536], [d2.id, 2048]])
+    assert.equal(ordem.find((l) => l.id === d2.id)!.atualizado_por, null)          // renormalizar é do sistema
+    assert.equal(ordem.find((l) => l.id === d3.id)!.atualizado_por, a.pessoas.design.id)
+    const evs = eventos(a.db, seq).filter((e) => e.entidade === 'demanda')
+    const doSistema = evs.filter((e) => e.ator_id === null)
+    assert.deepEqual(new Set(doSistema.map((e) => e.entidade_id)), new Set([d1.id, d2.id, d3.id]))
+    assert.ok(doSistema.every((e) => JSON.stringify(e.campos) === '["posicao"]'))
+    assert.equal(evs.at(-1)!.ator_id, a.pessoas.design.id)
+    assert.equal(evs.at(-1)!.patch!.posicao, 1536)
+  })
 })

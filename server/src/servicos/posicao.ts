@@ -6,7 +6,7 @@
 import type { Entidade, PosicaoRelativa } from '../../../shared/tipos/index.ts'
 import { entre, PASSO_POSICAO, precisaRenormalizar } from '../../../shared/logica/posicao.ts'
 import { atorSistema } from '../auth.ts'
-import { rodar, todos, um, type Db } from '../db.ts'
+import { agora, rodar, todos, um, type Db } from '../db.ts'
 import { validacao } from '../erros.ts'
 import { emitir } from './eventos.ts'
 
@@ -49,7 +49,9 @@ export function renormalizar(db: Db, alvo: AlvoPosicao): void {
   linhas.forEach((l, i) => {
     const nova = (i + 1) * PASSO_POSICAO
     if (nova === l.pos) return
-    rodar(db, `UPDATE ${alvo.tabela} SET ${alvo.coluna} = ? WHERE id = ?`, nova, l.id)
+    // demanda: toda UPDATE grava atualizado_por (NULL = sistema) e atualizado_em
+    if (alvo.tabela === 'demanda') rodar(db, 'UPDATE demanda SET posicao = ?, atualizado_por = NULL, atualizado_em = ? WHERE id = ?', nova, agora(), l.id)
+    else rodar(db, `UPDATE ${alvo.tabela} SET ${alvo.coluna} = ? WHERE id = ?`, nova, l.id)
     const info = ENTIDADES[alvo.tabela]
     if (info) {
       const demandaId = alvo.tabela === 'demanda' ? l.id : (l.demanda_id ?? null)

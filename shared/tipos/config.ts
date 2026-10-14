@@ -253,6 +253,12 @@ export interface EditarVisaoEntrada {
 
 export type EditarConfigAppEntrada = Partial<ConfigApp>
 
+/** GET/PATCH /api/config/app */
+export interface ConfigAppSaida {
+  info: InfoApp
+  config: ConfigApp
+}
+
 export const PASSOS_INICIAIS = [
   'convidar_equipe', 'cadastrar_clientes', 'revisar_tipos', 'aprovadores_distribuidores',
 ] as const

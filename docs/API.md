@@ -1,8 +1,9 @@
 # API
 
-Contrato HTTP do servidor. Tipos citados (`MoverEntrada`, `Demanda`...) estão em `shared/tipos/` e são a fonte da
-verdade dos formatos; este documento diz **quem pode, o que acontece, que erro sai e que evento é emitido**.
-Banco: `server/migracoes/001_base.sql`. Plano de construção e donos de cada rota: `docs/PLANO.md`.
+Contrato HTTP do servidor para o **modelo de quadros separados por equipe** (`docs/ADAPTACOES.md`, decisões 4 e 5).
+Tipos citados (`MoverEntrada`, `Demanda`...) estão em `shared/tipos/` e são a fonte da verdade dos formatos; este
+documento diz **quem pode, o que acontece, que erro sai e que evento é emitido**. Banco: `server/migracoes/001_base.sql`.
+Plano de construção e donos de cada rota: `docs/PLANO.md`.
 
 Sumário: [1 Convenções](#1-convenções) · [2 Permissões](#2-permissões) · [3 Tempo real](#3-tempo-real) ·
 [4 Endpoints](#4-endpoints) · [5 Regras transversais](#5-regras-transversais) · [6 Textos para WhatsApp](#6-textos-para-whatsapp)
@@ -37,70 +38,67 @@ Sumário: [1 Convenções](#1-convenções) · [2 Permissões](#2-permissões) �
 - **Logs:** caminhos `/a/*`, `/api/publico/*`, `/api/auth/convite*` e `/api/auth/redefinicao*` saem mascarados; corpo de
   rota de auth nunca vai ao log.
 - **Concorrência:** `PATCH /api/demandas/:id` exige `If-Match: <rev>`. Diferente do atual: `409 conflito_rev` com
-  `detalhes.atual: ConflitoRevDetalhes` (demanda + briefing, para mesclar campo a campo). O `rev` sobe só com campos
-  editados por pessoas (gatilho `demanda_rev`), então um comentário de outra pessoa não gera conflito em quem edita o
-  título. `POST /mover` aceita `rev` opcional no corpo com a mesma regra.
+  `detalhes.atual: ConflitoRevDetalhes` (demanda + descrição, para mesclar campo a campo). O `rev` sobe só com os
+  campos do PATCH (gatilho `demanda_rev`): arrastar, concluir, membros, etiquetas, comentários e contadores **não**
+  geram conflito em quem está editando o título. `POST /mover` aceita `rev` opcional com a mesma regra. Membros e
+  etiquetas são conjuntos (adicionar/tirar um por vez), sem perda entre duas pessoas.
 - **Idempotência:** `POST /api/publico/a/:token/decisao` exige `Idempotency-Key` (uuid). A chave vale **por link**
   (`aprovacao_idem_uk`) e é procurada antes de qualquer validação: mesma chave e mesmo pedido → `200` com o estado
-  atual, sem efeito novo; mesma chave com outro pedido → `422 idempotencia` (detalhe em §4.12).
+  atual, sem efeito novo; mesma chave com outro pedido → `422 idempotencia` (§4.17).
 - **Transação:** toda mutação roda em `BEGIN IMMEDIATE ... COMMIT`, grava `atividade` e as linhas de `evento` na mesma
   transação; o barramento entrega aos SSE abertos depois do commit. Instantes gravados vêm de `agora()` (`src/db.ts`).
 - **Respostas de mutação** trazem o objeto atualizado (o navegador aplica sem esperar o SSE).
 - **Datas:** instantes em ISO 8601 UTC (`Instante`); datas e horas locais de São Paulo em `YYYY-MM-DD` e `HH:MM`.
-  Prazo sem hora = 18:00. A semana começa na segunda.
+  Prazo sem hora = 18:00 (`prazoHoraPadrao`). A semana começa na segunda.
 - **Listas paginadas:** `?cursor=&limite=` (padrão 50, máximo 200) e resposta `Pagina<T>` (`proximo` opaco).
 - **Erro:** sempre `ErroApi` = `{ "erro": { "codigo", "mensagem", "detalhes"? } }`. A `mensagem` é em português,
-  pronta para o aviso ("Você não tem acesso a esta ação." + o motivo).
+  pronta para o aviso ("Você não tem acesso a esta ação." + o motivo). Erros de gatilho do SQLite viram o código da
+  tabela abaixo (ex.: `coluna_com_demandas` → `409 conflito`, `destino_arquivado` → `422 estado_invalido`), nunca 500.
 
 | Status | `codigo` | Quando |
 |---|---|---|
-| 400 | `validacao` | zod recusou corpo ou consulta; `detalhes.campos: { caminho: mensagem }` |
+| 400 | `validacao` | zod recusou corpo ou consulta; ids de outro quadro; `detalhes.campos: { caminho: mensagem }` |
 | 401 | `nao_autenticado`, `credenciais_invalidas` | sem sessão; login errado (sem dizer qual dos dois) |
-| 403 | `csrf`, `sem_permissao`, `campo_nao_permitido` | ver acima; papel/relação; PATCH com campo fora da lista (`detalhes.campo`) |
+| 403 | `csrf`, `sem_permissao`, `campo_nao_permitido` | ver acima; o papel não permite; campo só do atendimento (`detalhes.campo`) |
 | 404 | `nao_encontrado` | não existe ou foi excluída (anonimizada) |
-| 409 | `conflito_rev`, `requer_dialogo`, `versao_desatualizada`, `ja_decidida`, `conflito` | ver cada rota |
+| 409 | `conflito_rev`, `versao_desatualizada`, `ja_decidida`, `conflito` | ver cada rota |
 | 410 | `link_inativo`, `token_invalido` | link público expirado/revogado; convite ou redefinição usado/revogado/expirado ou de pessoa inativa |
 | 413 / 415 | `arquivo_grande`, `corpo_grande` / `tipo_arquivo` | upload acima de 10 MB, JSON acima de 1 MiB / magic number fora da lista |
-| 422 | `transicao_invalida`, `senha_fraca`, `drive_privado`, `idempotencia` | regra de negócio recusou; chave de idempotência repetida com outro pedido |
-| 429 | `muitas_tentativas` | login e troca de senha (§4.2), página pública (§4.12); `detalhes.tenteEmSegundos` |
+| 422 | `estado_invalido`, `senha_fraca`, `drive_privado`, `idempotencia` | a ação não vale no estado atual; senha fraca; Drive privado; chave repetida com outro pedido |
+| 429 | `muitas_tentativas` | login e troca de senha (§4.2), página pública (§4.17); `detalhes.tenteEmSegundos` |
 | 500 | `interno` | registrado no log com o trace |
 
 Notação usada nas rotas: **SSE** lista os eventos gravados (`entidade` e público: *interno* = todos os usuários
-ativos; *gestão* = atendimento e admin; *usuário* = só o destinatário; *dono+admin*). **Atividade** é o `tipo` gravado em `atividade`.
-**Notifica** são as linhas de `notificacao` criadas (sempre já resolvidas para o substituto, §5.3).
+ativos; *gestão* = atendimento e admin; *usuário* = só o dono; *dono+admin*). **Atividade** é o `tipo` gravado em
+`atividade`. **Notifica** são as linhas de `notificacao` criadas (§5.9). O **dono** de cada rota (agente do
+`docs/PLANO.md`) vem no título da seção: núcleo, modal (F1), ciclo (F2), painéis (F3), entrada (F4), cadastros (F5).
 
 ## 2. Permissões
 
-Papéis: `admin`, `atendimento`, `executor` (`agente` fica para a v1). **Admin pode tudo** o que qualquer papel interno
-pode. Relações com uma demanda (calculadas por `relacaoCom()` em `shared/logica/permissoes.ts`, **incluindo quem eu
-cubro hoje**):
+Papéis: `admin`, `atendimento`, `equipe` (`shared/tipos/nucleo.ts`). **Admin pode tudo.** Todo mundo da agência
+**vê** todos os quadros, demandas e clientes (transparência); o cliente vê só o que foi enviado pelo link.
 
-| Relação | Verdadeira quando |
-|---|---|
-| responsável | `responsavelId` = eu ou alguém que eu cubro |
-| aprovador | `aprovadorId` = eu/coberto; se `aprovadorId` for nulo, o AM da demanda é o aprovador. **Na Triagem** (aceitar, recusar, `/mover` triagem → fila/cancelado): o `aprovadorPadraoId` da equipe do tipo (`tipo.equipeId`, ou `demanda.equipeId` se o tipo não tiver equipe), nunca uma equipe vinda do corpo |
-| AM da demanda | `atendimentoId` = eu/coberto (não confundir com o papel `atendimento`) |
-| com a bola | `bola = 'agencia'` e `comQuemId` = eu/coberto |
+| Ação | admin | atendimento | equipe |
+|---|---|---|---|
+| Pessoas e convites, equipes, feriados, configuração da aplicação | sim | não | não |
+| Quadro: criar, renomear, mudar slug/equipe/fundo, arquivar, restaurar, excluir | sim | não | não |
+| Colunas (criar, renomear, cor, papel, limite WIP, ordenar, arrastar, arquivar, mover/arquivar todos os cards) | sim | sim | sim |
+| Etiquetas do quadro (criar, editar, excluir); modelos de demanda **do quadro** | sim | sim | sim |
+| Modelos de demanda **globais** | sim | não | não |
+| Automações do quadro | sim | sim | não |
+| Estrela e Seguir (para si) | sim | sim | sim |
+| Demandas: criar, editar, mover (inclusive entre quadros), membros, etiquetas, concluir, copiar, arquivar, restaurar, checklists, anexos, comentários, cronômetro e lançar tempo | sim | sim | sim |
+| Campos `atendimentoId` e `rodadasInclusas` (`CAMPOS_SO_ATENDIMENTO`) ao criar, editar e copiar | sim | sim | `403 campo_nao_permitido` |
+| Entregar versão | sim | sim | só sendo membro (ou o AM) da demanda |
+| Enviar ao cliente, registrar retorno, aprovado pelo WhatsApp, anular aprovação, ajuste interno, marcar extra, links públicos, texto para WhatsApp | sim | sim | não |
+| Comentário "Visível ao cliente" | sim | sim | não |
+| Clientes: criar | sim | sim | não |
+| Clientes: editar (dados, apelidos, responsáveis, contatos, links) | todos | os da carteira (`atendimentoId` = eu) e os sem AM | não |
+| Horas de outra pessoa | sim | não (só o total por cliente) | não |
+| Excluir (anonimizar) demanda | sim | não | não |
 
-`relacaoCom(d, eu, { equipes, tipos })` (`shared/logica/permissoes.ts`) recebe as equipes e os tipos para resolver o
-aprovador da Triagem.
-
-Regras gerais (SPEC §7.1): todo usuário interno **vê** todas as demandas; o cliente vê só o que foi enviado pelo link;
-horas individuais só o dono e o admin. Transições de etapa seguem a tabela `transicao` (§5.1).
-
-**Executor criando** (`POST /api/demandas`, `/repetir`, `/entrada/rapida`) ou aceitando da Triagem: `responsavelId` só
-nulo ou ele mesmo; `atendimentoId`, `aprovadorId` (`CAMPOS_CRIACAO_SO_ATENDIMENTO`) e `prioridade ≠ 0` →
-`403 campo_nao_permitido` (`detalhes.campo`). Os padrões do servidor (AM do cliente, aprovador da equipe) valem
-sempre, então o executor nunca vira o aprovador da própria peça. Teste: executor cria Relatório com `aprovadorId` = ele → 403.
-
-PATCH da demanda:
-
-| Papel | Campos permitidos |
-|---|---|
-| admin, atendimento | todos de `EditarDemandaEntrada` (prioridade 1 e 2 exigem motivo) |
-| executor sendo responsável | `CAMPOS_EDITAVEIS_EXECUTOR`: briefingMd, briefingCampos, estimativaMin, planejadaPara, bloqueio, bloqueioMotivo |
-| executor com a bola (não responsável) | só bloqueio e bloqueioMotivo |
-| outro executor | nenhum (`403 campo_nao_permitido` com o primeiro campo) |
+Toda regra de papel fica em `server/src/servicos/permissoes.ts` (usa `shared/logica/permissoes.ts`, que o front usa
+para esconder o que não pode). Negado: `403 sem_permissao` com o motivo ("Só o atendimento envia ao cliente.").
 
 ## 3. Tempo real
 
@@ -117,13 +115,17 @@ PATCH da demanda:
   servidor revalida a sessão: sessão revogada ou pessoa desativada → fecha; papel mudou → `event: resync`
   (`motivo: 'papel_alterado'`).
 - **Filtro de público** (igual em `/api/eventos`, `/api/sync` e `/api/bootstrap`): `interno` → todos; `gestao` →
-  atendimento e admin; `usuario` → só `usuario_id`; `usuario_admin` → `usuario_id` e admins; `admin` → admins.
+  atendimento e admin (`link_publico`); `usuario` → só `usuario_id` (`notificacao`, `quadro_usuario`);
+  `usuario_admin` → `usuario_id` e admins (`apontamento`); `admin` → admins.
 - **Patch:** `p` traz o objeto inteiro quando `c` é nulo e só os campos de `c` numa alteração. `d` = demanda dona.
   O navegador aplica por `e`/`op` no cache do TanStack Query (os tratadores ficam em `web/src/extensoes/eventos`).
-  - **Objeto inteiro também quando a demanda entra no conjunto do bootstrap** (criação, restaurar, reabrir de
-    Entregue/Cancelada): as outras janelas não a têm. O tratador ignora patch parcial de id desconhecido.
-  - Mudança de briefing sai como patch de `briefingAtualizadoEm`: o tratador invalida `['demanda', numero]` (o texto
+  - **Objeto inteiro também quando a demanda entra no conjunto do bootstrap** (criação, restaurar, desmarcar uma
+    concluída antiga): as outras janelas não a têm. O tratador ignora patch parcial de id desconhecido.
+  - Mudança de descrição sai como patch de `descricaoAtualizadaEm`: o tratador invalida `['demanda', numero]` (o texto
     não viaja no evento).
+  - Membros e etiquetas viajam como `membroIds` e `etiquetaIds` da `demanda` (a lista inteira).
+  - **Quadro arquivado** (`quadro` com `arquivadoEm` preenchido): o navegador tira do cache as colunas, etiquetas e
+    demandas dele. **Quadro restaurado** (`arquivadoEm` volta a nulo): o tratador recarrega o bootstrap.
 
 ### `GET /api/sync?desde=N` · núcleo
 Alternativa ao SSE (polling 5 s → 60 s com backoff). Resposta `SyncSaida`: até 500 eventos `seq > N` com o mesmo filtro;
@@ -132,19 +134,19 @@ Alternativa ao SSE (polling 5 s → 60 s com backoff). Resposta `SyncSaida`: at�
 ### `GET /api/bootstrap` · núcleo
 - **Quem:** usuário com sessão. **Resposta:** `Bootstrap`.
 - `seq` é lido **antes** das consultas (na mesma transação de leitura), então nada se perde entre o bootstrap e o SSE.
-- Demandas: `arquivado_em IS NULL AND excluido_em IS NULL AND (status NOT IN ('concluido','cancelado') OR
-  coalesce(concluida_em, status_desde) > agora − quadroEntregueDias)`. Tipos de peça: todos (inclusive inativos, para
-  exibir demandas antigas). Feriados: ano corrente e o próximo. Ausências: vigentes e futuras.
-- Meta: menos de 1 s com 500 demandas.
+- Quadros ativos com as colunas ativas, as etiquetas e as automações; modelos de quadro; modelos de demanda ativos
+  (globais e dos quadros ativos); `eu.favoritos`, `eu.seguindo` e `eu.cronometro`. Demandas: `excluido_em IS NULL AND
+  arquivado_em IS NULL AND quadro ativo AND (concluida_em IS NULL OR concluida_em > agora − quadroConcluidasDias)`.
+  Feriados: ano corrente e o próximo.
+- Meta: menos de 1 s com 500 demandas em 8 quadros.
 
 ## 4. Endpoints
 
-Cada rota diz o **dono** (agente do `docs/PLANO.md` que a implementa). `:id` é sempre o id (uuid ou slug do seed);
-`:numero` é o número humano da demanda.
+`:id` é sempre o id (uuid ou slug do seed); `:numero` é o número humano da demanda (#123).
 
-### 4.1 Saúde
+### 4.1 Saúde · núcleo
 
-#### `GET /api/saude` · núcleo
+#### `GET /api/saude`
 Público. `200 { ok: true, versao }`. Usado pelo health check do EasyPanel.
 
 ### 4.2 Autenticação e sessão · núcleo
@@ -154,8 +156,7 @@ Público. `200 { ok: true, versao }`. Usado pelo health check do EasyPanel.
 - **Erros:** `401 credenciais_invalidas` (e-mail inexistente, senha errada, pessoa sem senha ou inativa: mesma
   mensagem e mesmo tempo, porque sem usuário o scrypt roda contra um hash fictício), `429 muitas_tentativas`.
 - **Limites** (falhas em `login_tentativa` com `tipo='login'`, somados; o primeiro que estourar responde 429 com espera
-  progressiva): e-mail+IP 5 em 15 min; e-mail 20 em 1 h; IP 50 em 15 min. IP conforme §1 (`TRUST_PROXY_HOPS`).
-  Atualiza `usuario.ultimo_acesso_em`.
+  progressiva): e-mail+IP 5 em 15 min; e-mail 20 em 1 h; IP 50 em 15 min. Atualiza `usuario.ultimo_acesso_em`.
 
 #### `POST /api/auth/logout`
 Revoga a sessão atual e apaga o cookie. `204`.
@@ -177,11 +178,11 @@ navegador não o envia ao servidor nem ao `Referer`, e ele não cai em log. A te
 com `history.replaceState` e manda o token no corpo.
 
 #### `POST /api/auth/convite/consultar` e `POST /api/auth/redefinicao/consultar`
-Público. **Corpo:** `TokenEntrada`. `200 TokenAcessoInfo`. Não consome o token. `410 token_invalido` se usado,
-revogado, expirado ou de pessoa inativa (`usuario.ativo = 0`). Limite: o do login por IP.
+Públicos. **Corpo:** `TokenEntrada`. `200 TokenAcessoInfo`. Não consomem o token. `410 token_invalido` se usado,
+revogado, expirado ou de pessoa inativa. Limite: o do login por IP.
 
 #### `POST /api/auth/convite` e `POST /api/auth/redefinicao`
-- Público. **Corpo:** `DefinirSenhaEntrada` (`token` + `senha`). **Resposta:** `200 Eu` + cookie (já entra).
+- Públicos. **Corpo:** `DefinirSenhaEntrada`. **Resposta:** `200 Eu` + cookie (já entra).
 - Consome numa transação: `UPDATE token_acesso SET usado_em = ? WHERE token_hash = ? AND finalidade = ? AND usado_em IS
   NULL AND revogado_em IS NULL AND expira_em > ?`, exigindo `changes = 1` e `usuario.ativo = 1`; grava `senha_hash`
   (scrypt) e `senha_definida_em`. A redefinição revoga todas as sessões anteriores.
@@ -190,223 +191,332 @@ revogado, expirado ou de pessoa inativa (`usuario.ativo = 0`). Limite: o do logi
 ### 4.3 Pessoas · núcleo (telas em cadastros)
 
 #### `GET /api/pessoas`
-- **Quem:** admin. **Resposta:** `Usuario[]` (com e-mail e convite pendente). Os outros papéis usam `bootstrap.usuarios`.
+Admin. `200 Usuario[]` (com e-mail e convite pendente). Os outros papéis usam `bootstrap.usuarios`.
 
 #### `POST /api/pessoas`
 - **Quem:** admin. **Corpo:** `CriarPessoaEntrada`. **Resposta:** `201 CriarPessoaSaida` (com o link de convite, 7 dias).
-- **Erros:** `409 conflito` e-mail ou apelido já usado. **SSE:** `usuario`, `equipe` das equipes afetadas (interno).
+- Entrar numa equipe faz a pessoa **seguir os quadros ativos da equipe** (`quadro_usuario.seguindo = 1`).
+- **Erros:** `409 conflito` e-mail ou apelido já usado. **SSE:** `usuario`, `equipe` (interno); `quadro_usuario` (usuário).
 
 #### `PATCH /api/pessoas/:id`
-- **Quem:** admin. **Corpo:** `EditarPessoaEntrada` (`equipes` substitui as participações). **Resposta:** `200 Usuario`.
+- **Quem:** admin. **Corpo:** `EditarPessoaEntrada` (`equipes` substitui as participações; equipe nova = segue os
+  quadros dela; sair da equipe não deixa de seguir). **Resposta:** `200 Usuario`.
 - Mudar `papel` ou `ativo=false` revoga as sessões, fecha o SSE da pessoa e manda `resync` aos SSE dela. Desativar
-  ou trocar o `email` também marca `revogado_em` em todos os tokens pendentes (convite e redefinição), na mesma
-  transação. Desativar não mexe nas demandas: elas continuam com a pessoa até alguém reatribuir.
-- **Erros:** `409 conflito` (e-mail/apelido repetido, ou desativar/rebaixar o último admin).
-- **SSE:** `usuario`, `equipe` (interno).
+  ou trocar o `email` também marca `revogado_em` em todos os tokens pendentes, na mesma transação. Desativar para o
+  cronômetro dela (gravando os minutos) e não mexe nas demandas: ela continua membro até alguém tirar.
+- **Erros:** `409 conflito` (e-mail/apelido repetido, ou desativar/rebaixar o último admin). **SSE:** `usuario`, `equipe`.
 
 #### `POST /api/pessoas/:id/convite`
 - **Quem:** admin. Só para quem ainda não definiu senha e está ativo (`409 conflito` se já tem senha ou está inativo).
-  Revoga o convite anterior na mesma transação (índice `token_acesso_pendente_uk`: um pendente por pessoa e finalidade).
-- **Resposta:** `200 LinkAcesso` (`url` com o token no fragmento).
+  Revoga o convite anterior na mesma transação (`token_acesso_pendente_uk`). **Resposta:** `200 LinkAcesso`.
 
 #### `POST /api/pessoas/:id/redefinicao`
-- **Quem:** admin. Gera link de redefinição de 1 h (revoga o anterior). Pessoa inativa → `409 conflito`.
-  **Resposta:** `200 LinkAcesso`.
+- **Quem:** admin. Link de redefinição de 1 h (revoga o anterior). Pessoa inativa → `409 conflito`. **Resposta:** `200 LinkAcesso`.
 
 ### 4.4 Equipes · núcleo
 
 #### `GET /api/equipes`
 Qualquer usuário. `200 Equipe[]` (também vem no bootstrap).
 
-#### `POST /api/equipes` / `PATCH /api/equipes/:id`
+#### `POST /api/equipes` · `PATCH /api/equipes/:id`
 - **Quem:** admin. **Corpo:** `CriarEquipeEntrada` / `EditarEquipeEntrada`. **Resposta:** `201`/`200 Equipe`.
-- Aprovador e distribuidor precisam ser membros ativos (`400 validacao`). Mudar o aprovador padrão **não** altera
-  demandas existentes. **Erros:** `409 conflito` nome/slug. **SSE:** `equipe` (interno).
+- `modeloQuadroId` é só a sugestão dos Primeiros passos. **Erros:** `409 conflito` nome/slug. **SSE:** `equipe`.
 
 #### `PUT /api/equipes/:id/membros`
 - **Quem:** admin. **Corpo:** `DefinirMembrosEntrada` (substitui). **Resposta:** `200 Equipe`.
-- **SSE:** `equipe`, `usuario` de quem entrou ou saiu (interno).
+- Quem entra passa a seguir os quadros ativos da equipe. **SSE:** `equipe`, `usuario` de quem entrou ou saiu
+  (interno); `quadro_usuario` (usuário).
 
-### 4.5 Ausências · núcleo (tela em painéis)
+### 4.5 Quadros · núcleo
 
-#### `GET /api/ausencias`
-Qualquer usuário. **Consulta:** `ListarAusenciasConsulta`. `200 Ausencia[]`.
+#### `GET /api/quadros?arquivados=1`
+Qualquer usuário. `200 Quadro[]`: sem o parâmetro, os ativos (que também vêm no bootstrap); com `arquivados=1`, só os
+arquivados (Configurações → "Quadros arquivados").
 
-#### `POST /api/ausencias`
-- **Quem:** a própria pessoa; para outra pessoa, admin. **Corpo:** `CriarAusenciaEntrada`. **Resposta:** `201 Ausencia`.
-- Substituto ativo e diferente da pessoa. Se começar hoje, notifica o substituto (`cobertura`).
-- **Erros:** `409 conflito` sobreposta (gatilho `ausencia_sobreposta`). **SSE:** `ausencia` (interno).
+#### `GET /api/quadros/:id`
+Qualquer usuário. `200 QuadroCompleto` (inclusive de quadro arquivado; colunas arquivadas com `arquivadaEm`).
 
-#### `PATCH /api/ausencias/:id` / `DELETE /api/ausencias/:id`
-- **Quem:** a pessoa ou admin. `DELETE` marca `cancelada_em` (`204`). **SSE:** `ausencia` (upsert ou delete, interno).
+#### `POST /api/quadros`
+- **Quem:** admin. **Corpo:** `CriarQuadroEntrada`. **Resposta:** `201 QuadroCompleto`.
+- Slug: o enviado ou gerado do nome (minúsculo, sem acento, hífens; `-2`, `-3` se repetir). Colunas (§5.10 para as
+  posições): `colunas` se vier; senão as do `modeloQuadroId`, com a coluna `porMembro` virando uma coluna por membro
+  ativo da equipe (principal primeiro, depois por nome; nome = apelido ou primeiro nome, cor = cor da pessoa); sem
+  modelo nem colunas, o quadro nasce vazio. Com equipe e `membrosDaEquipeSeguem !== false`, os membros ativos da
+  equipe passam a seguir. É assim que os **Primeiros passos** criam os quadros das equipes (uma chamada por equipe,
+  com as colunas sugeridas que o admin desmarcou ou renomeou).
+- **Erros:** `409 conflito` nome de quadro ativo ou slug repetido; `400 validacao` modelo ou equipe inexistentes.
+- **SSE:** `quadro`, `coluna` (cada), `quadro_usuario` (usuário, cada seguidor).
 
-### 4.6 Clientes · núcleo (+ trilha em cadastros)
+#### `PATCH /api/quadros/:id`
+- **Quem:** admin. **Corpo:** `EditarQuadroEntrada` (nome, slug, descrição, cor, fundo, equipe, posição no menu).
+  **Resposta:** `200 Quadro`. Mudar o slug quebra links antigos (a tela avisa). **Erros:** `409 conflito`. **SSE:** `quadro`.
 
-Quem edita: admin em todos; atendimento nos clientes da própria carteira (`atendimentoId` = eu) e nos sem AM;
-qualquer atendimento **cria** (inclusive o "Criar cliente HE" dentro da Nova demanda e da criação rápida). Executor só lê.
+#### `POST /api/quadros/:id/arquivar` · `POST /api/quadros/:id/restaurar`
+- **Quem:** admin. **Resposta:** `200 Quadro` / `200 QuadroCompleto`.
+- Arquivar não mexe nas demandas: elas saem do bootstrap, do Início, da Agenda e da busca padrão junto com o quadro e
+  voltam ao restaurar. Arquivar **desliga** (`ativa = 0`) as automações de outros quadros que apontam para ele.
+  Cronômetros ligados em demandas dele são parados. Restaurar com nome igual ao de um quadro ativo → `409 conflito`.
+- **SSE:** `quadro` (o navegador limpa ou recarrega, §3), `automacao` (as desligadas).
 
-- **Pendências** (`ClienteResumo.pendencias`, calculadas na leitura): `sem_am`, `sem_social`, `sem_criativo`,
-  `sem_contato_padrao`. A lista e o cabeçalho do cliente mostram "Completar cadastro". Toda mutação que muda uma delas
-  (AM, social, criativo, contato padrão) emite também `cliente` com `pendencias`.
-- **Logo:** só por upload (`logoArquivoId`, imagem jpg/png/webp). No app, `logoUrl` = `/api/arquivos/:id?inline=1`; na
-  página pública, URL assinada (§4.12). Não há logo por URL externa (a CSP não aceita imagem de host qualquer).
+#### `DELETE /api/quadros/:id`
+- **Quem:** admin. **Resposta:** `204`. Só se o quadro **nunca teve demanda** (nem arquivada, nem de passagem: gatilho
+  `quadro_com_historico` → `409 conflito` "Este quadro já teve demandas. Arquive em vez de excluir."). Leva junto
+  colunas, etiquetas, estrelas, automações (as dele e as que apontavam para ele) e modelos do quadro.
+- **SSE:** `quadro`, `coluna`, `etiqueta`, `automacao`, `modelo_demanda` (delete, interno).
+
+#### `PUT /api/quadros/:id/favorito` · `PUT /api/quadros/:id/seguir`
+- **Quem:** qualquer usuário, para si. **Corpo:** `FavoritoEntrada` (estrela e ordem entre os favoritos; arrastar no
+  menu) / `SeguirEntrada`. **Resposta:** `200 QuadroUsuario`. Sem estrela e sem seguir, a linha é apagada.
+- **SSE:** `quadro_usuario` (usuário).
+
+### 4.6 Colunas · núcleo
+
+#### `POST /api/quadros/:id/colunas`
+- **Quem:** qualquer usuário. **Corpo:** `CriarColunaEntrada` (padrão: no fim). **Resposta:** `201 Coluna`.
+- **Erros:** `422 estado_invalido` quadro arquivado. **SSE:** `coluna`.
+
+#### `PATCH /api/colunas/:id`
+- **Quem:** qualquer usuário. **Corpo:** `EditarColunaEntrada` (nome, cor, papel, limite WIP, posição = arrastar
+  coluna). **Resposta:** `200 EditarColunaSaida`.
+- Virar `concluida` conclui na mesma transação as demandas abertas da coluna, **sem** criar repetições
+  (`concluidas` na resposta; atividade `demanda.concluida` com `via: 'papel'`). Deixar de ser `concluida` não
+  desmarca ninguém.
+- **SSE:** `coluna`; `demanda` (`concluidaEm`, `concluidaPor`) das concluídas.
+
+#### `POST /api/colunas/:id/arquivar` · `POST /api/colunas/:id/restaurar`
+- **Quem:** qualquer usuário. **Resposta:** `200 ArquivarColunaSaida` / `200 Coluna` (restaurada no fim do quadro).
+- Arquivar só vazia: com card ativo → `409 conflito` "Mova ou arquive os cards antes" (gatilho `coluna_arquivar_vazia`).
+  Desliga as automações que apontam para ela (`automacoesDesligadas`). Restaurar em quadro arquivado → `422`.
+- **SSE:** `coluna`, `automacao`.
+
+#### `POST /api/colunas/:id/mover-cards`
+- **Quem:** qualquer usuário. **Corpo:** `MoverCardsEntrada` (destino em qualquer quadro ativo). **Resposta:** `200
+  MoverCardsSaida`. Cada card passa por `mover()` (§5.1) na ordem atual, para o fim do destino, com `via: 'coluna'`.
+- **SSE/Atividade/Notifica:** os de `mover()`, um por demanda.
+
+#### `POST /api/colunas/:id/arquivar-cards`
+- **Quem:** qualquer usuário. **Resposta:** `200 ArquivarCardsSaida`. Como `POST /api/demandas/:id/arquivar`, um por card.
+
+#### `POST /api/colunas/:id/ordenar`
+- **Quem:** qualquer usuário. **Corpo:** `OrdenarColunaEntrada` (`prazo`: sem prazo por último; `prioridade`: urgente
+  primeiro; `criacao`; `titulo`; `cliente`: sigla). Grava as posições de uma vez (passo 1024), como o "Ordenar por"
+  do Trello. **Resposta:** `200 OrdenarColunaSaida`. **SSE:** `demanda` (`posicao`) de cada card.
+
+### 4.7 Etiquetas · núcleo
+
+#### `POST /api/quadros/:id/etiquetas` · `PATCH /api/etiquetas/:id`
+- **Quem:** qualquer usuário. **Corpo:** `CriarEtiquetaEntrada` / `EditarEtiquetaEntrada`. **Resposta:** `201`/`200 Etiqueta`.
+- Nome é opcional (etiqueta só de cor). **Erros:** `409 conflito` nome repetido no quadro (sem caixa). **SSE:** `etiqueta`.
+
+#### `DELETE /api/etiquetas/:id`
+- **Quem:** qualquer usuário. **Resposta:** `204`. Sai de todas as demandas (cascade). Modelos com etiqueta padrão de
+  mesmo nome continuam (recriam a etiqueta na próxima aplicação). **SSE:** `etiqueta` (delete); `demanda`
+  (`etiquetaIds`) de cada demanda afetada.
+
+### 4.8 Automações do quadro · ciclo
+
+#### `PUT /api/quadros/:id/automacoes/:gatilho`
+- **Quem:** admin, atendimento. `:gatilho` ∈ `GATILHOS_AUTOMACAO`. **Corpo:** `DefinirAutomacaoEntrada`.
+  **Resposta:** `200 AutomacaoQuadro`. O destino é uma coluna ativa de qualquer quadro ativo (o quadro de destino é o
+  dela); senão `400 validacao`. Execução: §5.5.
+- **SSE:** `automacao` (interno).
+
+#### `DELETE /api/quadros/:id/automacoes/:gatilho`
+- **Quem:** admin, atendimento. **Resposta:** `204`. **SSE:** `automacao` (delete).
+
+### 4.9 Modelos de demanda · entrada
+
+#### `GET /api/modelos-demanda?inativos=1`
+Qualquer usuário. `200 ModeloDemanda[]` (com `inativos=1`, inclusive os desativados, para a tela de modelos). Os
+ativos também vêm no bootstrap.
+
+#### `POST /api/modelos-demanda` · `PATCH /api/modelos-demanda/:id`
+- **Quem:** global (`quadroId` nulo): admin; de um quadro: qualquer usuário. **Corpo:** `CriarModeloDemandaEntrada` /
+  `EditarModeloDemandaEntrada` (`itens` e `etiquetas` substituem as listas). "Excluir" = `ativo: false` (as demandas
+  criadas com ele continuam com `modeloId`). **Resposta:** `201`/`200 ModeloDemanda`.
+- **Erros:** `409 conflito` nome repetido no mesmo escopo; `422 estado_invalido` quadro arquivado. **SSE:** `modelo_demanda`.
+
+### 4.10 Clientes · núcleo (+ trilha em cadastros)
+
+Quem edita: §2. **Pendências** (`ClienteResumo.pendencias`, calculadas na leitura): `sem_am`, `sem_contato_padrao`.
+A lista e o cabeçalho do cliente mostram "Completar cadastro"; toda mutação que muda uma delas emite `cliente` com
+`pendencias`. **Logo:** só por upload (`logoArquivoId`, jpg/png/webp); no app, `logoUrl` = `/api/arquivos/:id?inline=1`;
+na página pública, URL assinada (§4.17).
 
 #### `GET /api/clientes`
-Qualquer usuário. `200 ClienteNaLista[]` com contadores (abertas, com o cliente, atrasadas pelo `estadoPrazo`, §5.2).
+Qualquer usuário. `200 ClienteNaLista[]` com contadores (abertas, com o cliente, atrasadas pelo `estadoPrazo`, §5.2;
+só demandas de quadros ativos).
 
 #### `GET /api/clientes/:sigla`
-Qualquer usuário. `200 Cliente` (contatos, links, apelidos, contadores). `404` se a sigla não existe.
+Qualquer usuário. `200 Cliente` (contatos, links, apelidos, responsáveis, contadores). `404` se a sigla não existe.
 
 #### `POST /api/clientes`
-- **Corpo:** `CriarClienteEntrada` (sigla em maiúsculas, A–Z e 0–9, até 12). **Resposta:** `201 Cliente`.
-- `atendimentoId` padrão = o ator, se o papel dele for atendimento (o cliente criado na hora já nasce com AM).
-- Cria o apelido da sigla (`origem='sigla'`) e os `apelidos` normalizados (minúsculo, sem acento).
-- **Erros:** `409 conflito` sigla ou apelido já usado por outro cliente (`detalhes.clienteId`).
-- **Atividade:** `cliente.criado`. **SSE:** `cliente` (interno).
+- **Quem:** atendimento, admin. **Corpo:** `CriarClienteEntrada` (sigla em maiúsculas, A–Z e 0–9, até 12).
+  **Resposta:** `201 Cliente`. Usado também pelo "Criar cliente HE" da Nova demanda e da criação rápida.
+- `atendimentoId` padrão = o ator, se o papel dele for atendimento. Cria o apelido da sigla (`origem='sigla'`) e os
+  `apelidos` normalizados (minúsculo, sem acento).
+- **Erros:** `409 conflito` sigla ou apelido de outro cliente (`detalhes.clienteId`). **Atividade:** `cliente.criado`.
+  **SSE:** `cliente`.
 
 #### `PATCH /api/clientes/:id`
 - **Corpo:** `EditarClienteEntrada`. Mudar a sigla troca também o apelido de origem `sigla`. **Resposta:** `200 Cliente`.
-- Mudar o AM **não** reatribui demandas abertas. **Atividade:** `cliente.editado`. **SSE:** `cliente` (interno).
+- Mudar o AM **não** muda o AM das demandas existentes. **Atividade:** `cliente.editado`. **SSE:** `cliente`.
 
 #### `PUT /api/clientes/:id/apelidos`
 - **Corpo:** `DefinirApelidosEntrada` (substitui; a sigla fica). **Resposta:** `200 Cliente`.
-- **Erros:** `409 conflito` apelido de outro cliente. **SSE:** `cliente` (interno; `apelidos` no patch).
+- **Erros:** `409 conflito` apelido de outro cliente. **SSE:** `cliente` (`apelidos`).
 
-#### `POST /api/clientes/:id/contatos` / `PATCH /api/clientes/:id/contatos/:contatoId`
+#### `PUT /api/clientes/:id/responsaveis`
+- **Corpo:** `DefinirResponsaveisEntrada` (uma pessoa ativa por equipe; substitui). **Resposta:** `200 Cliente`.
+- Só sugere: a Nova demanda, a criação rápida e o "Mover para" oferecem o responsável da equipe do quadro de destino
+  como membro; o servidor nunca o adiciona sozinho. **SSE:** `cliente` (`responsaveis`).
+
+#### `POST /api/clientes/:id/contatos` · `PATCH /api/clientes/:id/contatos/:contatoId`
 - **Corpo:** `CriarContatoEntrada` / `EditarContatoEntrada`. `padrao: true` desmarca o anterior (mesma transação).
-  "Excluir" = `ativo: false`. **Resposta:** `201`/`200 ClienteContato`. **SSE:** `cliente_contato` (interno).
+  "Excluir" = `ativo: false`. **Resposta:** `201`/`200 ClienteContato`. **SSE:** `cliente_contato`, `cliente` (pendências).
 
 #### `POST /api/clientes/:id/links` · `PATCH /api/clientes/:id/links/:linkId` · `DELETE /api/clientes/:id/links/:linkId`
 - **Corpo:** `CriarLinkClienteEntrada` / `EditarLinkClienteEntrada` (só https). `DELETE` apaga de fato (`204`).
-- **SSE:** `cliente_link` (upsert/delete, interno).
+  **SSE:** `cliente_link` (upsert/delete).
 
 #### `GET /api/clientes/:id/aprovacoes` · cadastros
 Qualquer usuário. `200 ItemTrilhaCliente[]` (mais novas primeiro), inclusive anuladas.
 
-### 4.7 Configuração · cadastros (visões em lista)
-
-#### `POST /api/config/tipos-peca` / `PATCH /api/config/tipos-peca/:id`
-- **Quem:** admin. **Corpo:** `CriarTipoPecaEntrada` / `EditarTipoPecaEntrada`. **Resposta:** `201`/`200 TipoPeca`.
-- "Excluir" = `ativo: false` (some da grade da Nova demanda; demandas existentes continuam). Mudar SLA/folga **não**
-  recalcula prazos existentes. **Erros:** `409 conflito` nome/slug. **SSE:** `tipo_peca` (interno).
-
-#### `PUT /api/config/tipos-peca/:id/campos`
-- **Quem:** admin. **Corpo:** `DefinirCamposEntrada` (lista completa, na ordem). **Resposta:** `200 TipoPeca`.
-- Até 3 obrigatórios (`400 validacao`; o gatilho também recusa). `selecao`/`multipla` exigem `opcoes`. Remover um campo
-  não apaga valores já gravados em `briefing_campos`. **SSE:** `tipo_peca` (interno, objeto inteiro).
+### 4.11 Configuração · cadastros
 
 #### `GET /api/config/feriados?ano=2027` · `POST /api/config/feriados` · `DELETE /api/config/feriados/:data`
-- **Quem:** GET qualquer usuário; POST/DELETE admin. **Corpo:** `CriarFeriadoEntrada`. **Resposta:** `Feriado[]`, `201 Feriado`, `204`.
-- Prazos calculados (`prazoManual = false`) de demandas abertas com prazo depois da data são **recalculados** na mesma
-  transação, e a rodada 1 junto quando ainda é a atual (§5.4). **Erros:** `409 conflito` data repetida.
-  **SSE:** `feriado` (interno) + `demanda` e `rodada` das recalculadas.
+- **Quem:** GET qualquer usuário; POST/DELETE admin. **Corpo:** `CriarFeriadoEntrada`. **Resposta:** `Feriado[]`,
+  `201 Feriado`, `204`. Feriado não recalcula prazos já gravados (não há prazo automático depois da criação); vale
+  para os próximos cálculos (prazo do modelo, repetição, rodadas, "parado há"). **Erros:** `409 conflito` data
+  repetida. **SSE:** `feriado`.
 
 #### `GET /api/config/app` · `PATCH /api/config/app`
 - **Quem:** GET qualquer usuário; PATCH admin. **Resposta:** `200 ConfigAppSaida`.
-- **Corpo:** `EditarConfigAppEntrada`: só os parâmetros listados, cada número dentro de `FAIXAS_CONFIG`
-  (`shared/tipos/config.ts`; ex.: upload 1..10485760, URL assinada 1..15 min, convite 1..14 d, redefinição 1..24 h,
-  sessão 1..30 d, link 1..90 d, retenção de evento ≥ 7 d); fora da faixa, `400 validacao`. `demandaNumeroInicial` só
-  aceita valor maior que o maior número existente. `tiposRevisados: true` grava `tiposRevisadosEm = agora` (botão
-  "Revisei os tipos" dos Primeiros passos).
+- **Corpo:** `EditarConfigAppEntrada`: cada número dentro de `FAIXAS_CONFIG` (fora: `400 validacao`).
+  `demandaNumeroInicial` só aceita valor maior que o maior número existente. `modelosRevisados: true` grava
+  `modelosRevisadosEm = agora` (botão "Revisei os modelos" dos Primeiros passos).
 
-#### `PATCH /api/visoes/:id` · lista
-- **Quem:** admin (no MVP não existe "Salvar visão" pessoal). **Corpo:** `EditarVisaoEntrada`. **Resposta:** `200 Visao`.
-- **SSE:** `visao` (interno).
-
-### 4.8 Demandas: núcleo
+### 4.12 Demandas · núcleo
 
 #### `GET /api/demandas/:numero`
-- **Quem:** qualquer usuário. **Resposta:** `200 DemandaDetalhe` (uma ida: briefing, checklists, rodadas, versões com
-  itens, envios, aprovações, anexos, tempo; `linksPublicos` só para atendimento/admin). Arquivada também abre.
-- **Erros:** `404` inexistente ou excluída. Meta: menos de 100 ms.
+- **Quem:** qualquer usuário. **Resposta:** `200 DemandaDetalhe` (uma ida: descrição, checklists, rodadas, versões com
+  itens, envios, aprovações, anexos, movimentos, tempo; `linksPublicos` só para atendimento/admin). Arquivada e de
+  quadro arquivado também abrem. **Erros:** `404` inexistente ou excluída. Meta: menos de 100 ms.
 
 #### `POST /api/demandas`
-- **Quem:** qualquer usuário; executor com as restrições de §2 ("Executor criando"). **Corpo:** `CriarDemandaEntrada`.
+- **Quem:** qualquer usuário (`CAMPOS_SO_ATENDIMENTO` só atendimento/admin). **Corpo:** `CriarDemandaEntrada`.
   **Resposta:** `201 CriarDemandaSaida`.
-- **Destino:** com `destino: 'triagem'`, ou sem cliente ou sem tipo → Triagem. Com cliente e tipo → Na fila (o
-  executor vira solicitante). Atendimento, admin e executor seguem a mesma regra (SPEC §7.1).
-- **Padrões** (§5 de cada campo, SPEC §5.8): `equipeId` = tipo.equipeId (fila sem equipe → `400 validacao`
-  "Escolha a equipe"; a criação rápida nunca dá 400, §4.14); `atendimentoId` = cliente.atendimentoId, senão eu se meu
-  papel for atendimento;
-  `aprovadorId` = equipe.aprovadorPadraoId; `responsavelSugeridoId` = criativo do cliente (equipe Criação) ou social
-  do cliente (equipe Social); `rodadasInclusas` = tipo ?? cliente ?? 2; prazo calculado (§5.2) se `prazo` não vier;
-  `numero` = max + 1 (ou `demanda.numero_inicial`); `posicao` = fim da lista global, ou a `posicao` relativa pedida.
-- **Também cria:** rodada 1 (`inicial`, prazo = prazo da demanda); checklist "Checklist" com `tipo.checklistPadrao`
-  (se houver); anexos dos `links`; menções do briefing.
-- **`briefingCampos`** validados pelo tipo (§5.5).
-- **Avisos:** `prazo_curto`, `briefing_incompleto`, `senha_detectada` (não bloqueiam).
-- **Erros:** `400 validacao`; `403 campo_nao_permitido` (executor: §2); `404` cliente/tipo inexistentes.
-- **Atividade:** `demanda.criada`. **SSE:** `demanda` (interno, objeto inteiro), `rodada`, `checklist`,
-  `checklist_item`, `anexo`. **Notifica:** distribuidor da equipe (`fila_sem_responsavel`) se entrou em Na fila sem
-  responsável; responsável (`atribuida`) se veio preenchido e não é o ator; se foi para a Triagem, o AM do cliente
-  (`triagem`) e, sem AM (sem cliente ou cliente sem AM), **todos os usuários ativos de papel atendimento**, cada um
-  resolvido para o substituto, sem repetir.
+- **Lugar:** `quadroId` ativo (`422 estado_invalido`); `colunaId` desse quadro e ativa (`400 validacao`), padrão =
+  **coluna de entrada** (a primeira coluna ativa de papel `normal`; sem nenhuma, a primeira ativa; quadro sem colunas →
+  `422` "Crie uma coluna antes"); `posicao` padrão = fim da coluna. `numero` = max + 1 (ou `demandaNumeroInicial`).
+- **Com modelo** (`modeloId` global ou do mesmo quadro, ativo): o que o corpo não trouxer sai do modelo: `descricaoMd`
+  = `briefingMd`; prazo = hoje + `prazoDiasUteis` dias úteis (sem hora); prioridade; estimativa; rodadas inclusas;
+  um checklist por nome de `itens`; etiquetas padrão casadas **por nome** com as do quadro (sem caixa e sem acento) e,
+  sem par, **criadas** no quadro com a cor do modelo (o admin decidiu o modelo; isto não vale para mover, §5.6).
+- **Padrões:** `atendimentoId` = AM do cliente, senão eu se meu papel for atendimento; `rodadasInclusas` = corpo ??
+  modelo ?? cliente ?? 2; prioridade `media`. `membroIds` (ativos) e `etiquetaIds` (do quadro) validados (`400`).
+- **Também cria:** rodada 1 (`inicial`, prazo = prazo da demanda), anexos dos `links`, menções da descrição. Coluna de
+  papel `concluida` → nasce concluída.
+- **Avisos:** `senha_detectada`, `limite_wip` (não bloqueiam).
+- **Atividade:** `demanda.criada`. **SSE:** `demanda` (objeto inteiro), `rodada`, `checklist`, `checklist_item`,
+  `anexo`, `etiqueta` (criadas pelo modelo). **Notifica:** `membro` a cada membro; `chegou` aos seguidores do quadro
+  que não receberam `membro`; `mencao` às menções da descrição (§5.9).
 
 #### `PATCH /api/demandas/:id`
-- **Quem:** §2 (tabela de campos). Header `If-Match: <rev>` obrigatório (`400 validacao` se faltar).
-- **Corpo:** `EditarDemandaEntrada` (etapa não muda por aqui). **Resposta:** `200 EditarDemandaSaida`.
-- **Efeitos:** responsável/aprovador/AM/bloqueio recalculam `bola` e `comQuemId` (§5.1.1); briefing recalcula
-  `briefingCompleto`, as menções e `briefingAtualizadoEm` (§3); `briefingCampos` validados pelo tipo (§5.5); publicação
-  ou tipo recalculam o prazo se `prazoManual = false`; `prazo` enviado torna `prazoManual = true`; `prazoManual: false`
-  volta ao cálculo; a rodada acompanha o prazo pela regra de §5.4; `equipeId` troca `aprovadorId` para o aprovador
-  padrão da nova equipe; `bloqueio` grava `bloqueioDesde`. Mudar o tipo para um sem aprovação do cliente com a demanda
-  em Com o cliente/Aprovado: `409 conflito` ("Mova a demanda antes de trocar o tipo").
-- **Erros:** `403 campo_nao_permitido`, `409 conflito_rev` (`detalhes.atual: ConflitoRevDetalhes`), `400 validacao`
-  (prioridade sem motivo, campo do briefing inválido).
-- **Atividade:** `demanda.editada` (campos) e as específicas: `demanda.responsavel_alterado`, `demanda.prazo_alterado`,
-  `demanda.prioridade_alterada`, `demanda.bloqueio_alterado`, `demanda.equipe_alterada`, com `antes`.
-- **SSE:** `demanda` (interno, campos alterados, incluindo `rev`). **Notifica:** `atribuida` ao novo responsável;
-  `voltou` a quem passou a ter a bola; `mencao` às menções novas do briefing.
+- **Quem:** qualquer usuário (`CAMPOS_SO_ATENDIMENTO`: §2). Header `If-Match: <rev>` obrigatório (`400 validacao` se faltar).
+- **Corpo:** `EditarDemandaEntrada`. **Resposta:** `200 EditarDemandaSaida`.
+- **Efeitos:** descrição → menções novas e `descricaoAtualizadaEm` (§3); trocar o cliente troca o AM pelo AM do novo
+  cliente quando o AM atual era o do cliente antigo (ou nulo); prazo acompanha a rodada (§5.7); `capaAnexoId` (anexo
+  ativo de imagem desta demanda) limpa `capaCor` e vice-versa; `repetir` sem prazo → `400`; `inicio` depois do prazo → `400`.
+- **Erros:** `403 campo_nao_permitido`, `409 conflito_rev` (`detalhes.atual: ConflitoRevDetalhes`), `400 validacao`.
+- **Atividade:** `demanda.editada` (campos, com `antes`). **SSE:** `demanda` (campos alterados, incluindo `rev`).
+  **Notifica:** `mencao` às menções novas da descrição.
 
 #### `POST /api/demandas/:id/mover`
-O único caminho para trocar de etapa (arrastar, pílula, `,`/`.`); também reatribui e reordena na mesma transação.
-- **Quem:** pela tabela `transicao` (§5.1). Reatribuir (`responsavelId`) segue §2: executor só para si mesmo e só se a
-  demanda estiver sem responsável ou já for dele. `planejadaPara`: responsável, atendimento, admin.
-- **Corpo:** `MoverEntrada`. **Resposta:** `200 MoverSaida`.
-- **Erros:** `403 sem_permissao` (`mensagem` = `transicao.negado`); `409 requer_dialogo` (`DetalhesRequerDialogo`)
-  quando a transição só acontece por um diálogo (versão nova, envio, retorno, rodada interna, anular aprovação) ou
-  falta `motivo`/`confirmar`; `422 transicao_invalida` (sem linha na tabela, etapa que não se aplica ao tipo, falta
-  cliente e tipo para sair da triagem); `409 conflito_rev` se `rev` veio e não bate.
-- **Atividade:** `demanda.etapa_alterada` (+ `demanda.responsavel_alterado`). **SSE:** `demanda` (interno).
-  **Notifica:** `voltou`/`atribuida` para a nova bola; `fila_sem_responsavel` ao entrar em Na fila sem responsável.
+- **Quem:** qualquer usuário. Arrastar no quadro (inclusive na Lista), "Mover para…", "Enviar para <quadro>", teclas
+  `,` e `.` (coluna anterior/próxima), "Mover todos os cards".
+- **Corpo:** `MoverEntrada`. **Resposta:** `200 MoverSaida`. Regras e efeitos: §5.1 (lugar e posição), §5.3
+  (concluir/repetir ao entrar ou sair de coluna `concluida`), §5.6 (etiquetas entre quadros).
+- **Erros:** `400 validacao` coluna inexistente ou `etiquetaIds` de outro quadro; `422 estado_invalido` coluna ou
+  quadro de destino arquivados, demanda arquivada; `409 conflito_rev` se `rev` veio e não bate.
+- **Atividade:** `demanda.movida` (`via: 'manual'`; e `demanda.concluida`/`demanda.reaberta` quando for o caso).
+  **SSE:** `demanda` (`quadroId`, `colunaId`, `posicao`, `statusDesde`, `etiquetaIds`, `concluidaEm`...; objeto
+  inteiro quando ela entra no conjunto do bootstrap), `etiqueta` (criadas). **Notifica:** `chegou` aos seguidores do
+  quadro de destino quando muda de quadro.
 
-#### `POST /api/demandas/:id/pegar`
-- **Quem:** qualquer usuário; executor só se a demanda estiver sem responsável (ou já for dele) e em fila ou produção.
-  Atendimento e admin pegam qualquer uma.
-- **Efeito:** `responsavelId` = eu; não muda a etapa. **Resposta:** `200 MoverSaida`.
-- **Erros:** `409 conflito` ("Já está com Rafa"). **Atividade:** `demanda.pegada`. **SSE:** `demanda` (interno).
+#### `POST /api/demandas/:id/concluir`
+- **Quem:** qualquer usuário. **Corpo:** `ConcluirEntrada`. **Resposta:** `200 ConcluirSaida`. Regras: §5.3.
+- **Atividade:** `demanda.concluida` (`via: 'checkbox'`) ou `demanda.reaberta`; `demanda.repetida` nas duas
+  demandas; `demanda.movida` (`via: 'automacao'`). **SSE:** `demanda` (as duas, a nova inteira).
+
+#### `POST /api/demandas/:id/membros` · `DELETE /api/demandas/:id/membros/:usuarioId`
+- **Quem:** qualquer usuário ("Entrar" = eu mesmo, tecla Espaço). **Corpo:** `AdicionarMembroEntrada`.
+  **Resposta:** `200 DemandaSaida`. Idempotentes (já membro / já fora: `200` sem efeito). Pessoa inativa → `400`.
+- **Atividade:** `demanda.membro_adicionado` / `demanda.membro_removido`. **SSE:** `demanda` (`membroIds`).
+  **Notifica:** `membro` a quem entrou, se não foi ela mesma.
+
+#### `POST /api/demandas/:id/etiquetas` · `DELETE /api/demandas/:id/etiquetas/:etiquetaId`
+- **Quem:** qualquer usuário. **Corpo:** `AdicionarEtiquetaEntrada` (etiqueta do quadro da demanda; outra → `400`).
+  **Resposta:** `200 DemandaSaida`. Idempotentes. **Atividade:** `demanda.etiqueta_adicionada` / `_removida`.
+  **SSE:** `demanda` (`etiquetaIds`).
 
 #### `POST /api/demandas/:id/arquivar` · `POST /api/demandas/:id/restaurar`
-- **Quem:** atendimento, admin. Arquivar não muda a etapa (restaurar devolve à mesma etapa). **Resposta:** `200 MoverSaida`.
+- **Quem:** qualquer usuário. **Corpo** do restaurar: `RestaurarEntrada`. **Resposta:** `200 DemandaSaida`.
+- Arquivar não muda coluna nem quadro; para os cronômetros ligados nela (gravando os minutos); o link público continua
+  ativo, mas a página o ignora enquanto ela estiver arquivada (§4.17).
+- Restaurar: quadro arquivado → `422` "Restaure o quadro antes"; coluna = `colunaId` ?? a de antes, se ativa ?? a
+  coluna de entrada; se for de papel `concluida` e a demanda não estiver concluída, ela é concluída (sem repetição).
 - **Erros:** `409 conflito` já arquivada / não arquivada. **Atividade:** `demanda.arquivada` / `demanda.restaurada`.
-  **SSE:** arquivar: `demanda` (interno, `arquivadoEm`); restaurar: `demanda` (interno, **objeto inteiro**, §3).
-
-#### `POST /api/demandas/arquivar-entregues`
-- **Quem:** atendimento, admin. **Corpo:** `ArquivarEntreguesEntrada`. Só demandas em Entregue ou Cancelada.
-- **Resposta:** `200 ArquivarEntreguesSaida`. **Atividade/SSE:** como arquivar, uma por demanda.
+  **SSE:** arquivar: `demanda` (`arquivadoEm`); restaurar: `demanda` (**objeto inteiro**, §3).
 
 #### `POST /api/demandas/:id/excluir`
 - **Quem:** admin. **Corpo:** `ExcluirDemandaEntrada` (o número confere). **Resposta:** `204`.
 - **Bloqueado** (`409 conflito`) se houver qualquer versão, envio ou `aprovacao`: a trilha e os itens de versão são
-  imutáveis. Nesses casos, cancele ou arquive.
-- Anonimiza numa transação: título "Demanda excluída"; `briefing_md`, `briefing_campos`, `origem_texto`, `local`,
-  `prioridade_motivo`, `bloqueio_motivo`, `cancelada_motivo` vazios; comentários com corpo vazio e `excluido_em`
-  (e menções apagadas); textos de checklist e itens = "—"; anexos com `excluido_em`, nome "Anexo removido" e
-  url/caminho/arquivo nulos (o arquivo vai para o lixo se ninguém mais usar, §4.9); `rodada.motivo_texto` e
-  `apontamento.nota` nulos;
-  `atividade.dados = '{}'` e `antes` nulo; `notificacao.resumo = 'Demanda excluída'`; `evento.patch = '{}'` dos eventos
-  guardados da demanda. Revoga os links públicos ativos. Arquiva.
-- Depois: detalhe, comentários e histórico → `404`. **Atividade:** `demanda.excluida`. **SSE:** `demanda` (delete, interno).
+  imutáveis. Nesses casos, arquive.
+- Anonimiza numa transação: título "Demanda excluída"; `descricao_md`, `origem_texto` vazios; capa nula; comentários
+  com corpo vazio e `excluido_em` (e menções apagadas); textos de checklist e itens = "—"; anexos com `excluido_em`,
+  nome "Anexo removido" e url/caminho/arquivo nulos (o arquivo vai para o lixo se ninguém mais usar, §4.14);
+  `rodada.motivo_texto` e `apontamento.nota` nulos; `atividade.dados = '{}'` e `antes` nulo;
+  `notificacao.resumo = 'Demanda excluída'`; `evento.patch = '{}'` dos eventos guardados da demanda. Revoga os links
+  públicos ativos. Arquiva. Depois: detalhe, comentários e histórico → `404`.
+- **Atividade:** `demanda.excluida`. **SSE:** `demanda` (delete).
 
-### 4.9 Arquivos · núcleo
+### 4.13 Criação rápida, Colar do WhatsApp e busca · entrada
+
+#### `POST /api/demandas/rapida/previa`
+Qualquer usuário. **Corpo:** `CriarRapidaEntrada`. `200 AnaliseRapida`. Sem efeito (a prévia ao vivo pode ser
+calculada no front com `shared/logica/rapida.ts`; esta rota confere).
+
+#### `POST /api/demandas/rapida`
+- **Quem:** qualquer usuário. **Corpo:** `CriarRapidaEntrada` (uma linha = uma demanda, na coluna onde a pessoa
+  digitou; Enter cria e mantém o campo aberto, como no Trello). **Resposta:** `201 CriarRapidaSaida`.
+- Marcadores com casamento **exato**: `HE:`, `[HE]`, `HE -` (apelido em `cliente_alias`) = cliente; `@rafa` (apelido
+  de usuário ativo) = membro (vários). O que não casar continua no título. Sigla no formato de marcador que não casa
+  (1 a 12 de A–Z/0–9) → `siglaNova` (a interface oferece "Criar cliente XYZ"; o texto continua no título).
+- Cliente = marcador ?? `clienteId` do contexto; AM pelo cliente; sem modelo; posição padrão = fim da coluna. Nunca
+  `400` por faltar cliente (cliente é opcional). Coluna arquivada → `422`.
+- Atividade, SSE e notificações de `POST /api/demandas` (`origem='rapida'`).
+
+#### `POST /api/entrada/analisar` (Colar do WhatsApp)
+Qualquer usuário. **Corpo:** `AnalisarTextoEntrada` (até 50.000 caracteres). `200 AnaliseTexto`. Sem efeito.
+Reconhece cabeçalhos `[14/10 15:32] Fulana:`; sugere cliente por apelido e modelo por palavras do nome (post,
+carrossel, reels, stories, vídeo, site, relatório, anúncio...); sigla desconhecida em maiúsculas vira `siglaNova`.
+A Nova demanda preenche e cria por `POST /api/demandas` com `origem: 'whatsapp'` e `origemTexto`.
+
+#### `GET /api/busca`
+Qualquer usuário. **Consulta:** `BuscaConsulta`. `200 BuscaSaida` (até 20). `#4521`/`4521` → número exato primeiro;
+primeira palavra igual a um apelido de cliente filtra o cliente; o resto vai ao FTS5 (título e descrição) por prefixo,
+sem acento. Arquivadas e de quadros arquivados só com `incluirArquivadas`. Meta: menos de 150 ms com 5 mil demandas.
+
+### 4.14 Arquivos · núcleo
 
 #### `POST /api/arquivos`
 - **Quem:** qualquer usuário. **Corpo:** `multipart/form-data` com o campo `arquivo` (um por chamada).
 - `bodyLimit` recusa pelo `Content-Length` antes do parse (§1). Confere tamanho (`uploadLimiteBytes`, no máximo 10 MB)
   e magic number (jpg, png, webp, gif, pdf, zip); grava em `DATA_DIR/uploads/<2>/<id>` e o sha256. **Resposta:** `201 ArquivoInfo`.
 - **Em uso** = referenciado por `versao_item.arquivo_id`, `cliente.logo_arquivo_id` ou `anexo.arquivo_id` sem
-  `excluido_em` (inclusive o print de evidência). O gatilho `arquivo_em_uso` impede marcar `excluido_em` num arquivo em
-  uso; o job de órfãos (24 h sem uso) e a exclusão de anexo usam a mesma lista.
+  `excluido_em` (inclusive o print de evidência e a capa). O gatilho `arquivo_em_uso` impede marcar `excluido_em`
+  num arquivo em uso; o job de órfãos (24 h sem uso) e a exclusão de anexo usam a mesma lista.
 - **Erros:** `413 arquivo_grande`, `415 tipo_arquivo`, `400 validacao` (sem campo).
 
 #### `GET /api/arquivos/:id`
@@ -414,105 +524,110 @@ O único caminho para trocar de etapa (arrastar, pílula, `,`/`.`); também reat
   `Content-Disposition: attachment; filename*=` (exceto imagem inline), `Cache-Control: private, max-age=3600`.
 - **Erros:** `404` inexistente ou excluído.
 
-### 4.10 Modal da demanda · modal
+### 4.15 Modal da demanda · modal
 
-Regra comum de checklists e anexos: atendimento e admin sempre; executor se for responsável ou estiver com a bola.
+Checklists, anexos e comentários: qualquer usuário interno (o checklist de rodada, "Ajustes R2", só atendimento e
+admin apagam).
 
 #### `GET /api/demandas/:id/comentarios`
 Qualquer usuário. `200 Comentario[]` em ordem de criação (excluídos chegam com `corpoMd` vazio e `excluidoEm`).
 Demanda excluída → `404`.
 
 #### `GET /api/demandas/:id/historico`
-Qualquer usuário. **Consulta:** `ListarHistoricoConsulta`. `200 Pagina<Atividade>` (mais novas primeiro).
-Omite `tempo.lancado` de outra pessoa (só o próprio ator e o admin veem: horas individuais). Demanda excluída → `404`.
+Qualquer usuário. **Consulta:** `ListarHistoricoConsulta`. `200 Pagina<Atividade>` (mais novas primeiro). Omite
+`tempo.lancado` de outra pessoa (só o próprio ator e o admin veem). Demanda excluída → `404`.
+
+#### `POST /api/demandas/:id/comentarios`
+- **Corpo:** `CriarComentarioEntrada`. **Resposta:** `201 ComentarioSaida`.
+- `visivelCliente: true` só atendimento e admin; os outros → `403 campo_nao_permitido` (`detalhes.campo = 'visivelCliente'`).
+- Menções `@[Nome](mencao:<id>)` extraídas e validadas contra usuários ativos (as inválidas viram texto).
+  `anexoIds` precisam ser anexos da mesma demanda sem comentário.
+- **Atividade:** `comentario.criado`. **SSE:** `comentario`, `demanda` (`nComentarios`). **Notifica:** `mencao` aos
+  mencionados; `comentario` aos membros e ao AM que não foram mencionados (nunca ao autor).
+
+#### `PATCH /api/comentarios/:id` · `DELETE /api/comentarios/:id`
+- **Quem:** o autor; `DELETE` também admin. **Corpo:** `EditarComentarioEntrada` (`visivelCliente` com a regra do
+  POST). Editar só notifica menções novas. `DELETE` marca `excluido_em` e esvazia o corpo (`204`).
+- **Atividade:** `comentario.editado` / `comentario.excluido`. **SSE:** `comentario`, `demanda` (`nComentarios`).
 
 #### `POST /api/demandas/:id/checklists`
 - **Corpo:** `CriarChecklistEntrada`. **Resposta:** `201 ChecklistComItens`.
-- **Atividade:** `checklist.criado`. **SSE:** `checklist`, `checklist_item`, `demanda` (contadores; interno).
+- **Atividade:** `checklist.criado`. **SSE:** `checklist`, `checklist_item`, `demanda` (contadores).
 
 #### `PATCH /api/checklists/:id` · `DELETE /api/checklists/:id`
-- **Corpo:** `EditarChecklistEntrada`. `DELETE` apaga com os itens (`204`); checklist de rodada ("Ajustes R2") só
-  atendimento/admin apagam. **Atividade:** `checklist.removido`. **SSE:** `checklist` (upsert/delete), `demanda` (contadores).
+- **Corpo:** `EditarChecklistEntrada`. `DELETE` apaga com os itens (`204`). **Atividade:** `checklist.removido`.
+  **SSE:** `checklist` (upsert/delete), `demanda` (contadores).
 
 #### `POST /api/checklists/:id/itens`
-- **Corpo:** `CriarItensEntrada` (cada texto vira um item, na posição pedida ou no fim). **Resposta:** `201 ChecklistItem[]`.
-- **SSE:** `checklist_item`, `demanda` (contadores).
+- **Corpo:** `CriarItensEntrada` (cada texto vira um item). **Resposta:** `201 ChecklistItem[]`.
+  **SSE:** `checklist_item`, `demanda` (contadores).
 
 #### `PATCH /api/checklist-itens/:id` · `DELETE /api/checklist-itens/:id`
 - **Corpo:** `EditarItemEntrada` (`feito` grava `feitoEm`/`feitoPor`). **Resposta:** `200 ChecklistItem` / `204`.
 - **Atividade:** `checklist.item_feito` / `checklist.item_desfeito`. **SSE:** `checklist_item`, `demanda` (contadores).
-
-#### `POST /api/demandas/:id/comentarios`
-- **Quem:** qualquer usuário. **Corpo:** `CriarComentarioEntrada`. **Resposta:** `201 ComentarioSaida`.
-- `visivelCliente: true` só para atendimento, admin ou quem cobre o AM da demanda hoje; executor →
-  `403 campo_nao_permitido` (`detalhes.campo = 'visivelCliente'`). O executor não fala com o cliente (SPEC §7.1).
-- Menções `@[Nome](mencao:<id>)` extraídas e validadas contra usuários ativos (as inválidas viram texto).
-  `anexoIds` precisam ser anexos da mesma demanda sem comentário.
-- **Atividade:** `comentario.criado`. **SSE:** `comentario` (interno). **Notifica:** `mencao` aos mencionados (menos o autor).
-
-#### `PATCH /api/comentarios/:id` · `DELETE /api/comentarios/:id`
-- **Quem:** o autor; `DELETE` também admin. **Corpo:** `EditarComentarioEntrada` (`visivelCliente` com a mesma regra do
-  POST). Editar só notifica menções novas. `DELETE` marca `excluido_em` e esvazia o corpo (`204`).
-- **Atividade:** `comentario.editado` / `comentario.excluido`. **SSE:** `comentario` (interno).
 
 #### `POST /api/demandas/:id/anexos`
 - **Corpo:** `CriarAnexoEntrada` (link https, caminho de rede ou arquivo já enviado). Provedor detectado pelo host.
   **Resposta:** `201 Anexo`. **Atividade:** `anexo.adicionado`. **SSE:** `anexo`, `demanda` (`nAnexos`).
 
 #### `PATCH /api/anexos/:id` · `DELETE /api/anexos/:id`
-- **Quem:** editar: regra comum; excluir: quem enviou, atendimento, admin. `DELETE` marca `excluido_em` (e o do
-  arquivo, se ninguém mais usar) (`204`). **Atividade:** `anexo.removido`. **SSE:** `anexo`, `demanda` (`nAnexos`).
+- **Quem:** editar: qualquer usuário; excluir: quem enviou, atendimento, admin. `DELETE` marca `excluido_em` (e o do
+  arquivo, se ninguém mais usar); se for a capa, limpa `capaAnexoId` antes, na mesma transação (gatilho
+  `anexo_e_capa`) (`204`). **Atividade:** `anexo.removido`. **SSE:** `anexo`, `demanda` (`nAnexos`, capa).
 
-#### `POST /api/demandas/:id/repetir`
-- **Quem:** quem pode criar demanda. **Corpo:** `RepetirEntrada`. **Resposta:** `201 CriarDemandaSaida`.
-- Copia título, cliente, tipo, equipe, briefing, campos, links e caminhos (anexos de referência não excluídos),
-  checklist padrão do tipo, responsável e AM; `origem='repeticao'`, `repetidaDeId`. Destino pela regra de criação.
-  Executor: só copia o responsável se for ele mesmo; AM e aprovador vêm dos padrões do servidor (§2).
-- **Atividade:** `demanda.repetida` nas duas. **SSE/Notifica:** como `POST /api/demandas`.
+#### `POST /api/demandas/:id/copiar`
+- **Quem:** qualquer usuário (`CAMPOS_SO_ATENDIMENTO` vão junto com os valores da original). **Corpo:**
+  `CopiarDemandaEntrada`. **Resposta:** `201 CriarDemandaSaida`.
+- Copia título (ou o novo), descrição, cliente, AM, prioridade, estimativa, modelo e repetir; com `manter`:
+  checklists (itens desmarcados; o de rodada não vai), etiquetas (mapeadas por nome no destino, §5.6), membros,
+  anexos de referência (link e caminho; arquivo reaproveita o mesmo `arquivo_id`) e datas. Nasce com rodada 1, sem
+  versões, comentários nem histórico; `origem='copia'`, `origemDemandaId`.
+- **Atividade:** `demanda.copiada` nas duas. **SSE/Notifica:** como `POST /api/demandas`.
+
+#### `POST /api/demandas/:id/cronometro` · `POST /api/cronometro/parar`
+- **Quem:** qualquer usuário, para si. **Resposta:** `200 CronometroSaida`.
+- Iniciar: para o meu cronômetro ligado (se houver, em qualquer demanda) e liga um novo nesta (`origem='cronometro'`,
+  `iniciadoEm = agora`, `data` = dia local); demanda arquivada ou de quadro arquivado → `422`. Parar: grava
+  `paradoEm` e `minutos = max(1, arredondado)`; acima de `cronometroLimiteHoras` grava o limite e devolve o aviso
+  `cronometro_longo`. Sem cronômetro ligado, parar devolve `ativo: null, parado: null`.
+- **Atividade:** `tempo.lancado` (`origem: 'cronometro'`, ao parar). **SSE:** `apontamento` (dono+admin);
+  `demanda` (`minutosRegistrados`, interno, com `a` e `t` **nulos**).
 
 #### `GET /api/apontamentos`
 - **Consulta:** `ListarApontamentosConsulta`. **Resposta:** `ListarApontamentosSaida`.
-- Executor: só os próprios. Atendimento: os próprios + `porCliente`. Admin: todos + `porPessoa`.
+- Equipe: só os próprios. Atendimento: os próprios + `porCliente`. Admin: todos + `porPessoa`.
   Pedir `usuarioId` de outra pessoa sem ser admin: `403`.
 
 #### `POST /api/demandas/:id/apontamentos`
 - **Quem:** qualquer usuário (lança para si). **Corpo:** `CriarApontamentoEntrada`. **Resposta:** `201 Apontamento`.
 - `clienteId` copiado da demanda. **Atividade:** `tempo.lancado` (o histórico só a mostra ao ator e ao admin).
-  **SSE:** `apontamento` (dono+admin); `demanda` (`minutosRegistrados`, interno, com `a` e `t` **nulos**, para o total
-  não dizer quem lançou).
+  **SSE:** `apontamento` (dono+admin); `demanda` (`minutosRegistrados`, `a` e `t` nulos).
 
 #### `PATCH /api/apontamentos/:id` · `DELETE /api/apontamentos/:id`
-- **Quem:** o dono ou admin. `DELETE` marca `excluido_em` (`204`). **SSE:** `apontamento` (dono+admin), `demanda`
-  (como no POST, `a` e `t` nulos).
+- **Quem:** o dono ou admin. Cronômetro ligado não se edita (`409`: pare antes). `DELETE` marca `excluido_em` (`204`).
+  **SSE:** `apontamento` (dono+admin), `demanda` (como no POST).
 
-### 4.11 Ciclo da peça · ciclo
+### 4.16 Ciclo da peça · ciclo
+
+Sem etapas fixas: a demanda fica na coluna que a equipe quiser; as **automações do quadro** (§5.5) movem nos 4
+gatilhos. "Com quem está a bola" e o "parado há": §5.4.
 
 #### `POST /api/demandas/:id/versoes` (Entregar versão)
-- **Quem:** responsável, atendimento, admin; a demanda em Na fila, Em produção ou Ajustes.
+- **Quem:** membros da demanda, o AM, atendimento, admin (os outros: `403` "Entre na demanda para entregar").
 - **Corpo:** `EntregarVersaoEntrada` (pelo menos 1 item). **Resposta:** `201 EntregarVersaoSaida`.
-- Cria Vn na rodada atual, com os itens; move para Revisão por `mover()` com `versao_nova` atendido (limpa
-  `revisaoOkEm`). Depois do commit, testa em segundo plano os links do Drive e grava `driveStatus` (emite `versao` de novo).
-- **Erros:** `403`, `422 transicao_invalida` (etapa errada). **Atividade:** `versao.entregue`, `demanda.etapa_alterada`.
-- **SSE:** `versao` (com itens), `demanda` (interno). **Notifica:** `voltou` a quem ficou com a bola (§5.1.1: o
-  aprovador, ou o AM quando não há aprovador próprio).
-
-#### `POST /api/demandas/:id/liberar-envio` ("Liberar para envio")
-- **Quem:** aprovador, atendimento, admin. Só em Revisão e com `tipo.aprovacaoCliente`.
-- Grava `revisaoOkEm`/`revisaoOkPor` (o ok interno sobre a versão entregue). A bola passa ao AM e o card mostra
-  "pronta para enviar" (§5.1.1). Não troca de etapa. **Resposta:** `200 MoverSaida`.
-- Enviar ao cliente **não** exige a liberação (o AM decide); sem ela, o diálogo de envio avisa "Sem o ok de <aprovador>".
-- **Erros:** `403 sem_permissao`, `409 conflito` (já liberada), `422 transicao_invalida` (fora de Revisão ou tipo sem
-  aprovação do cliente). **Atividade:** `demanda.liberada`. **SSE:** `demanda` (interno). **Notifica:** `voltou` ao AM.
+- Cria Vn na rodada atual, com os itens; **não** muda a coluna. Demanda arquivada ou concluída → `422` ("Reabra a
+  demanda"). Depois do commit, testa em segundo plano os links do Drive e grava `driveStatus` (emite `versao` de novo).
+- **Atividade:** `versao.entregue`. **SSE:** `versao` (com itens), `demanda` (`nVersoes`, `versaoAtualId`).
+  **Notifica:** `versao_entregue` ao AM da demanda (se não for o ator).
 
 #### `PATCH /api/versoes/:id`
 Autor da versão, atendimento, admin. **Corpo:** `EditarVersaoEntrada`. `200 VersaoComItens`. **SSE:** `versao`.
 
 #### `POST /api/versoes/:id/itens`
 - **Quem:** autor da versão, atendimento, admin. Só enquanto `enviadaClienteEm` for nulo (`409 conflito` depois).
-- **Corpo:** `AdicionarItensEntrada` (pelo menos 1). **Resposta:** `201 VersaoComItens`. Testa o Drive dos itens novos
-  em segundo plano, como a entrega. Usada pelo "[Enviar arquivo (até 10 MB)]" do diálogo de envio quando o Drive está
-  privado (SPEC §5.3): o arquivo sobe por `POST /api/arquivos` e entra como item da mesma versão.
-- **Atividade:** `versao.itens_adicionados`. **SSE:** `versao` (interno, com itens).
+- **Corpo:** `AdicionarItensEntrada`. **Resposta:** `201 VersaoComItens`. Testa o Drive dos itens novos em segundo
+  plano. Usada pelo "[Enviar arquivo (até 10 MB)]" do diálogo de envio quando o Drive está privado.
+- **Atividade:** `versao.itens_adicionados`. **SSE:** `versao`.
 
 #### `POST /api/versoes/:id/testar-drive`
 - **Quem:** qualquer usuário. Para cada link do Drive, busca `https://drive.google.com/thumbnail?id=<id>&sz=w400` sem
@@ -523,58 +638,59 @@ Autor da versão, atendimento, admin. **Corpo:** `EditarVersaoEntrada`. `200 Ver
 Qualquer usuário. **Corpo:** `TestarDriveEntrada`. **Resposta:** `200 TestarDriveSaida`. Não grava nada.
 
 #### `POST /api/demandas/:id/enviar` (Enviar ao cliente)
-- **Quem:** atendimento, admin (ou quem cobre o AM). Demanda em Revisão; tipo com aprovação do cliente.
-- **Corpo:** `EnviarAoClienteEntrada`. **Resposta:** `200 EnviarAoClienteSaida`.
-- O contato (`contatoId` ou o padrão) precisa ser ativo e do cliente da demanda (`400 validacao`; o gatilho
-  `envio_contato_do_cliente` também recusa).
+- **Quem:** atendimento, admin. **Corpo:** `EnviarAoClienteEntrada`. **Resposta:** `200 EnviarAoClienteSaida`.
+- Exige cliente (`422` "Escolha o cliente antes de enviar") e versão entregue (`422` "Entregue uma versão antes");
+  demanda arquivada → `422`. A versão é a última entregue (pedir outra → `409 versao_desatualizada`). O contato
+  (`contatoId` ou o padrão) precisa ser ativo e do cliente (`400 validacao`; o gatilho `envio_contato_do_cliente`
+  também recusa). Prazo de retorno padrão: hoje + `retornoPrazoDiasUteis`, limitado à véspera útil da publicação.
 - `via: 'link'`: testa o Drive dos itens; algum `privado` → `422 drive_privado` (`detalhes.itens`). Reaproveita o
   link ativo da demanda para o mesmo contato; senão gera token de 32 bytes, grava `token_hash` (sha256) e
-  `token_cifrado` (AES-256-GCM com chave derivada de `SEGREDO`), validade `linkPublicoValidadeDias`, e o `link_publico_item`.
-  `via: 'fora'`: exige `canal`; sem link.
-- Grava `envio`, marca o primeiro envio da versão (`enviadaClienteEm`, `enviadaVia`) e move para Com o cliente.
-- **Erros:** `400 validacao`, `403`, `409 versao_desatualizada` (versão pedida não é a última entregue),
-  `422 transicao_invalida`, `422 drive_privado`. **Atividade:** `versao.enviada` (+ `link.gerado`), `demanda.etapa_alterada`.
-- **SSE:** `envio`, `versao`, `demanda` (interno); `link_publico` (gestão).
+  `token_cifrado` (AES-256-GCM com chave derivada de `SEGREDO`), validade `linkPublicoValidadeDias`, e o
+  `link_publico_item`. `via: 'fora'`: exige `canal`; sem link.
+- Grava `envio`, o primeiro envio da versão (`enviadaClienteEm`, `enviadaVia`), `envioPendenteEm = agora` (a bola vai
+  ao cliente) e roda a automação `enviado_ao_cliente` do quadro (§5.5).
+- **Atividade:** `versao.enviada` (+ `link.gerado`, + `demanda.movida` com `via: 'automacao'`).
+  **SSE:** `envio`, `versao`, `demanda` (interno); `link_publico` (gestão).
 
 #### `POST /api/demandas/:id/retorno` (Registrar retorno, Shift+R)
-- **Quem:** atendimento, admin. Demanda em Com o cliente.
-- **Corpo:** `RegistrarRetornoEntrada`. **Resposta:** `200 RegistrarRetornoSaida`.
-- Mesma função do link (`registrarRetorno()` em `server/src/servicos/ciclo.ts`), com `via='manual'`. O contato
-  (`contatoId` ou o padrão) precisa ser ativo e do cliente da demanda (`400 validacao`). A `aprovacao` grava
-  `responsavel_anterior_id` = o responsável antes da decisão.
-  - **aprovado:** grava `aprovacao`, `aprovadaEm`/`aprovadaVersaoId`, fecha a rodada e move para Agendar (tipo com
-    publicação; responsável = social do cliente, ou nulo + aviso ao distribuidor do Social, §5.1) ou Aprovado;
-  - **ajuste:** grava `aprovacao` (`comentario` = linhas), abre a rodada N+1 (§5.4) com checklist "Ajustes R{N+1}",
-    move para Ajustes; `sugerirExtra` se N+1 passou das inclusas.
+- **Quem:** atendimento, admin. **Corpo:** `RegistrarRetornoEntrada`. **Resposta:** `200 RegistrarRetornoSaida`.
+- Exige envio pendente (`envioPendenteEm`; senão `409 conflito` "Nada aguardando o cliente"). Mesma função do link
+  (`registrarRetorno()` em `server/src/servicos/ciclo.ts`), com `via='manual'`. A versão é a última enviada (`409
+  versao_desatualizada`); decisão válida na versão → `409 ja_decidida`. Contato ativo do cliente (`400`). A
+  `aprovacao` grava `quadroAntesId`/`colunaAntesId` = onde a demanda está agora.
+  - **aprovado:** `aprovadaEm`/`aprovadaVersaoId`, fecha a rodada, limpa `envioPendenteEm` e roda a automação
+    `aprovado` (pode levar a outro quadro, ex.: Social › Agendar);
+  - **ajuste:** `comentario` = linhas, abre a rodada N+1 (§5.7) com checklist "Ajustes R{N+1}", limpa
+    `envioPendenteEm` e roda a automação `ajuste_pedido`; `sugerirExtra` se N+1 passou das inclusas.
   - Print (`evidenciaArquivoId`) vira anexo `evidencia` ligado à aprovação.
-- **Erros:** `409 versao_desatualizada`, `409 ja_decidida` (decisão válida na versão), `409 conflito` (fora de Com o
-  cliente), `400 validacao` (ajuste sem linhas).
-- **Atividade:** `retorno.registrado` (+ `rodada.aberta`, `demanda.etapa_alterada`).
-- **SSE:** `aprovacao`, `demanda`, `rodada`, `checklist`, `checklist_item`, `anexo` (interno).
-  **Notifica:** responsável e AM (menos o ator): `aprovada` ou `ajuste_pedido`.
+- **Erros:** acima e `400 validacao` (ajuste sem linhas).
+- **Atividade:** `retorno.registrado` (+ `rodada.aberta`, `demanda.movida`). **SSE:** `aprovacao`, `demanda`,
+  `rodada`, `checklist`, `checklist_item`, `anexo`. **Notifica:** membros e AM (menos o ator): `aprovada` ou `ajuste_pedido`.
 
 #### `POST /api/demandas/:id/aprovado-whatsapp`
 - **Quem:** atendimento, admin. Atalho de 1 clique = retorno `aprovado`, `canal='whatsapp'`, contato padrão.
-- **Corpo:** `AprovadoWhatsappEntrada`. **Resposta:** `200 RegistrarRetornoSaida`. Erros, atividade, SSE e notificação como o retorno.
-  O aviso "Aprovação registrada · Desfazer" chama a anulação.
+- **Corpo:** `AprovadoWhatsappEntrada`. **Resposta:** `200 RegistrarRetornoSaida`. Erros, atividade, SSE e notificação
+  como o retorno. O aviso "Aprovação registrada · Desfazer" chama a anulação.
 
 #### `POST /api/aprovacoes/:id/anular`
-- **Quem:** atendimento, admin. Só decisão `aprovado` ainda válida, com a demanda em Aprovado ou Agendar.
-- Marca `anuladaEm`/`anuladaPor`, limpa `aprovadaEm`/`aprovadaVersaoId`, reabre a rodada, restaura `responsavelId` =
-  `aprovacao.responsavel_anterior_id` (o "Aprovado pelo WhatsApp" de um Post tinha passado ao social) e volta para Com o
-  cliente (transição com `anular_aprovacao`). **Resposta:** `200 MoverSaida`.
-- **Erros:** `409 conflito` (ajuste, já anulada ou a demanda andou). **Atividade:** `aprovacao.anulada`.
-  **SSE:** `aprovacao`, `demanda`, `rodada` (interno).
+- **Quem:** atendimento, admin. Só decisão `aprovado` ainda válida e a mais recente da demanda.
+- Marca `anuladaEm`/`anuladaPor`, limpa `aprovadaEm`/`aprovadaVersaoId`, reabre a rodada, volta `envioPendenteEm` ao
+  instante do envio daquela versão e, **se a demanda não mudou de coluna desde a decisão** (a passagem aberta em
+  `demanda_movimento` começou no instante da decisão ou antes), devolve-a para `colunaAntesId`, se ativa
+  (`demanda.movida` com `via: 'manual'`). **Resposta:** `200 AnularAprovacaoSaida` (`voltou`).
+- **Erros:** `409 conflito` (ajuste, já anulada ou não é a mais recente). **Atividade:** `aprovacao.anulada`
+  (+ `demanda.movida`). **SSE:** `aprovacao`, `demanda`, `rodada`.
 
-#### `POST /api/demandas/:id/devolver` (rodada interna)
-- **Quem:** aprovador, atendimento, admin. Demanda em Revisão. **Corpo:** `DevolverAjusteEntrada`.
-- Abre a rodada N+1 com `origem='interna'` (§5.4) e move para Ajustes. **Resposta:** `200 DevolverAjusteSaida`.
-- **Atividade:** `rodada.aberta`, `demanda.etapa_alterada`. **SSE:** `rodada`, `checklist`, `checklist_item`, `demanda`.
-  **Notifica:** `voltou` ao responsável.
+#### `POST /api/demandas/:id/ajuste-interno` (Pedir ajuste interno)
+- **Quem:** atendimento, admin. Exige versão entregue na rodada atual (`422` "Nada entregue nesta rodada"); sem
+  envio pendente (`409`: registre o retorno do cliente). **Corpo:** `AjusteInternoEntrada`.
+- Abre a rodada N+1 com `origem='interna'` (§5.7). Não move (não é gatilho de automação). **Resposta:** `200 AjusteInternoSaida`.
+- **Atividade:** `rodada.aberta`. **SSE:** `rodada`, `checklist`, `checklist_item`, `demanda`. **Notifica:**
+  `ajuste_pedido` aos membros.
 
 #### `POST /api/rodadas/:id/extra`
 - **Quem:** atendimento, admin. Só rodada com número > 1. **Corpo:** `MarcarExtraEntrada`. **Resposta:** `200 Rodada`.
-- **Atividade:** `rodada.extra_marcada` / `rodada.extra_desmarcada`. **SSE:** `rodada` (interno).
+- **Atividade:** `rodada.extra_marcada` / `rodada.extra_desmarcada`. **SSE:** `rodada`.
 
 #### `GET /api/demandas/:id/whatsapp?modelo=envio|lembrete|aprovado|ajuste`
 - **Quem:** atendimento, admin. **Resposta:** `200 TextoWhatsappSaida` (§6). O lembrete reusa o mesmo link.
@@ -585,27 +701,24 @@ Atendimento, admin. `200 LinkPublicoComUrl[]` (decifra o token para reexibir o l
 
 #### `POST /api/links-publicos/:id/revogar`
 - **Quem:** atendimento, admin. **Resposta:** `200 LinkPublicoResumo`. **Erros:** `409 conflito` já revogado.
-- **Atividade:** `link.revogado`. **SSE:** `link_publico` (gestão).
-- Também revogam, na mesma transação: cancelar a demanda (§5.1) e excluir (§4.8).
+- **Atividade:** `link.revogado`. **SSE:** `link_publico` (gestão). Excluir a demanda (§4.12) também revoga.
 
-### 4.12 Página pública · ciclo
+### 4.17 Página pública · ciclo
 
 Todas: sem sessão; `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex`, `Cache-Control: no-store` (também no
 HTML de `/a/:token`); `/a/*` e `/api/publico/*` mascarados nos logs. Token: `randomBytes(32)` em base64url (sha256 no banco).
 
 - **Limites** (em memória, janela deslizante; um processo só): 30 por minuto por **IP+token** em
-  `/api/publico/a/:token*` (clientes diferentes atrás do mesmo IP não se somam entre links); 300 por minuto por IP em
-  `/api/publico/arquivos/*` (já protegidas pela HMAC; um carrossel de 10 imagens não estoura). Estouro: `429`.
+  `/api/publico/a/:token*`; 300 por minuto por IP em `/api/publico/arquivos/*`. Estouro: `429`.
 - **"Enviada por este link"** = existe `envio` com aquela `versao_id` e `link_id` = o link. Nenhuma rota pública lê
   `demanda.versao_atual_id` (pode ser trabalho interno ainda não enviado).
-- **Itens ignorados:** demanda excluída ou cancelada (cancelar e excluir também revogam o link). Sem item que sobre:
-  `410 link_inativo`.
+- **Itens ignorados:** demanda arquivada ou excluída (excluir também revoga). Sem item que sobre: `410 link_inativo`.
 
 #### `GET /api/publico/a/:token`
 - **Sem efeito colateral** (o robô de prévia do WhatsApp abre o link). **Resposta:** `200 PaginaAprovacao`.
 - Por item: `versao` = a de maior número enviada por este link; anteriores só as enviadas por este link; comentários
-  com `visivel_cliente = 1` e sem `excluido_em`. Arquivos e o logo do cliente (`logoUrl`) por URL assinada
-  (`urlAssinada(id, linkPublicoArquivoMinutos)`).
+  com `visivel_cliente = 1` e sem `excluido_em`; `modeloNome` = nome do modelo da demanda. Arquivos e o logo do
+  cliente por URL assinada (`urlAssinada(id, linkPublicoArquivoMinutos)`).
 - **Erros:** `404` token desconhecido; `410 link_inativo` expirado, revogado ou sem itens.
 
 #### `POST /api/publico/a/:token/visto`
@@ -619,54 +732,44 @@ Chamado pelo JS da página. Soma `acessos`, grava `ultimoAcessoEm`; `link.visto`
   2. `hash` = sha256 de `demandaId|versaoId|decisao|linhas unidas por \n|contatoId|nomeInformado`; busca
      (`link_id`, chave) **antes de qualquer outra validação**: achou com o mesmo `idempotency_hash` → `200` com o estado
      atual do item, sem efeito; achou com outro hash → `422 idempotencia`;
-  3. a demanda é item do link; status Com o cliente **e** `versao_enviada_id` com envio por este link; senão
-     `409 conflito` "Esta peça não aguarda mais sua decisão" (sem itens nem versão nos detalhes);
+  3. a demanda é item do link, não arquivada; tem **envio pendente** e `versao_enviada_id` foi enviada por este link;
+     senão `409 conflito` "Esta peça não aguarda mais sua decisão" (sem itens nem versão nos detalhes);
   4. `versaoId` = `versao_enviada_id`; senão `409 versao_desatualizada` com `versaoAtual` = a versão de maior número
      enviada por este link (`DetalhesVersaoDesatualizada`: "Chegou a V3");
   5. sem decisão válida na versão (`409 ja_decidida`);
   6. identidade: `contatoId` nulo ou igual a `link_publico.contato_id` (senão `400 validacao`); sem `contatoId`,
      `nomeInformado` obrigatório (1 a 120 caracteres, texto puro); ajuste com pelo menos 1 linha (`400 validacao`);
   7. grava a `aprovacao` com a chave, o hash, `ip_hmac` (HMAC-SHA256 com `SEGREDO`) e `user_agent`, e roda
-     `registrarRetorno()` com `via='link'`, motivo `cliente_mudou` e prazo padrão (hoje + SLA de ajuste).
+     `registrarRetorno()` com `via='link'`, motivo `cliente_mudou` e prazo padrão (hoje + `ajustePrazoDiasUteis`),
+     inclusive a automação do quadro.
 - **Atividade:** `retorno.registrado` (ator_tipo `cliente`). **SSE/Notifica:** como `POST /retorno`.
 
 #### `GET /api/publico/arquivos/:id?exp=&sig=`
 `sig` = HMAC-SHA256(`SEGREDO`, `${id}.${exp}`) em base64url; `exp` em segundos Unix. Inválida ou vencida: `403`.
 Mesmos headers de `GET /api/arquivos/:id`.
 
-### 4.13 Início, semana, triagem e notificações · painéis
+### 4.18 Início, Agenda e notificações · painéis
+
+"Minhas" = sou membro ou o AM (`ehMinha`, `shared/logica/quadro.ts`). Só demandas de quadros ativos e não arquivadas.
 
 #### `GET /api/inicio`
-Qualquer usuário. `200 InicioSaida` (regras das listas: SPEC §5.5 e §6.4; "eu" inclui quem eu cubro; `atrasadas` e o
-resumo pelo `estadoPrazo`, §5.2). `comClienteParado` só para quem tem papel atendimento (as do próprio AM).
-`primeirosPassos` só para admin, nulo quando concluído. Critério de `feito` de cada passo:
-- `convidar_equipe`: pelo menos 2 usuários ativos (o admin e mais alguém);
-- `cadastrar_clientes`: pelo menos 1 cliente fora de `ex` e nenhum deles com a pendência `sem_am`;
-- `revisar_tipos`: `config.tiposRevisadosEm` preenchido (botão "Revisei os tipos", `PATCH /api/config/app`);
-- `aprovadores_distribuidores`: toda equipe ativa e executora com `distribuidorId`. O aprovador é opcional (sem ele,
-  o AM da demanda aprova; com ele, o aprovador usa "Liberar para envio", §4.11). Rótulo: "Defina o distribuidor de
-  cada equipe (e o aprovador, se houver)".
+- Qualquer usuário. `200 InicioSaida`: minhas abertas por prazo (`estadoPrazo` §5.2: atrasadas, hoje, esta semana até
+  domingo, depois, sem prazo; as com o cliente ficam em "depois"/"sem prazo" pelo prazo, nunca em atrasadas);
+  `comClienteParado` só para quem tem papel atendimento (as do próprio atendimento com o cliente há mais de
+  `clienteParadoDiasUteis`, §5.4); `mencoes` (últimas 10 `mencao`); `resumo`; `extras`.
+- `primeirosPassos` só para admin, nulo quando concluído. Critério de `feito`:
+  - `criar_quadros`: pelo menos 1 quadro ativo (o atalho abre "Criar os quadros das equipes": uma linha por equipe
+    ativa sem quadro, com o modelo sugerido e as colunas para desmarcar ou renomear; cada linha é um `POST /api/quadros`);
+  - `convidar_equipe`: pelo menos 2 usuários ativos;
+  - `cadastrar_clientes`: pelo menos 1 cliente fora de `ex` e nenhum deles com a pendência `sem_am`;
+  - `revisar_modelos`: `config.modelosRevisadosEm` preenchido (botão "Revisei os modelos", `PATCH /api/config/app`).
 
-#### `GET /api/semana`
-- **Quem:** qualquer usuário para si; `usuarioId` de outra pessoa: atendimento, admin. **Consulta:** `SemanaConsulta`.
-- **Resposta:** `200 SemanaSaida`. Posição = `coalesce(planejadaPara, prazo)`; horário marcado no dia, no topo.
-  Arrastar entre dias usa `POST /api/demandas/:id/mover` com `planejadaPara`.
-
-#### `GET /api/triagem`
-Qualquer usuário. `200 TriagemSaida` com sugestões (cliente por apelido, tipo pelo texto, equipe e responsável sugeridos).
-
-#### `POST /api/triagem/:id/aceitar`
-- **Quem:** atendimento, admin, ou o executor que é `aprovadorPadraoId` da equipe **do tipo escolhido** (`tipo.equipeId`,
-  ou `demanda.equipeId` se o tipo não tiver equipe), nunca de uma `equipeId` vinda do corpo. **Corpo:** `AceitarTriagemEntrada`.
-- Executor: `responsavelId` só nulo ou ele mesmo, e `equipeId` só omitida ou igual à resolvida
-  (`403 campo_nao_permitido`). O mesmo critério de aprovador vale para `/mover` triagem → fila/cancelado (§2).
-- Grava cliente, tipo, equipe, título e responsável e move Triagem → Na fila por `mover()`. **Resposta:** `200 MoverSaida`.
-- **Atividade:** `triagem.aceita`. **SSE/Notifica:** como `mover`.
-
-#### `POST /api/triagem/:id/recusar`
-- **Quem:** como aceitar (aprovador da equipe do tipo/da demanda). **Corpo:** `RecusarTriagemEntrada`. Move para
-  Cancelada com o motivo.
-- **Atividade:** `triagem.recusada`. **SSE:** `demanda`. **Notifica:** solicitante (`voltou`, com o motivo).
+#### `GET /api/agenda`
+- Qualquer usuário. **Consulta:** `AgendaConsulta` (`de`..`ate` inclusive, até 62 dias; senão `400`). **Resposta:**
+  `200 AgendaSaida`: as demandas de todos os quadros ativos (ou `quadroIds`) com a data pedida (`campos`, padrão
+  prazo) no intervalo, "Só as minhas" opcional, concluídas incluídas por padrão; feriados do intervalo; `extras` =
+  as que não estão no bootstrap (concluídas antigas).
+- Arrastar no calendário muda o **prazo** por `PATCH /api/demandas/:id` (com `If-Match`), mantendo a hora.
 
 #### `GET /api/notificacoes`
 Só as minhas. **Consulta:** `ListarNotificacoesConsulta`. `200 ListarNotificacoesSaida`.
@@ -674,152 +777,133 @@ Só as minhas. **Consulta:** `ListarNotificacoesConsulta`. `200 ListarNotificaco
 #### `POST /api/notificacoes/lidas`
 - **Corpo:** `MarcarLidasEntrada`. `204`. **SSE:** `notificacao` (usuário; patch `lidaEm`) para cada uma marcada.
 
-### 4.14 Entrada rápida e busca · entrada
-
-#### `POST /api/entrada/rapida/previa`
-Qualquer usuário. **Corpo:** `CriarRapidaEntrada`. `200 AnaliseRapida`. Sem efeito (a prévia ao vivo pode calcular no
-front com `shared/logica/rapida.ts`; esta rota existe para conferir e para a v1).
-
-#### `POST /api/entrada/rapida`
-- **Quem:** qualquer usuário; executor com as restrições de §2 (`@outra pessoa` ou coluna de outra pessoa →
-  `403 campo_nao_permitido`; a prévia avisa antes do Enter). **Corpo:** `CriarRapidaEntrada` (uma linha = uma demanda).
-- Marcadores do MVP com casamento exato: `HE:`, `[HE]`, `HE -` (apelido em `cliente_alias`) e `@rafa` (apelido de
-  usuário ativo). Sigla no formato de marcador que não casa (1 a 12 de A–Z/0–9) → `siglaNova` na análise (a interface
-  oferece "Criar cliente XYZ"; o texto continua no título).
-- Contexto (`ContextoRapida`, sem etapa): cliente = marcador ?? `contexto.clienteId`; tipo = `contexto.tipoPecaId` ??
-  Outro (com briefing incompleto); responsável = marcador ?? `contexto.responsavelId`; **equipe** =
-  `contexto.equipeId` ?? `tipo.equipeId` ?? equipe principal (executora, ativa) do responsável.
-- Destino pela regra de `POST /api/demandas`, mas **nunca `400`**: falta cliente → Triagem (`falta: ['cliente']`); sem
-  equipe resolvida (ex.: Outro na visão Meus clientes) → Triagem com `falta: ['tipo']`. O executor vê "Criada na
-  Triagem como #4530".
-- **Resposta:** `201 CriarRapidaSaida`. Atividade, SSE e notificações de `POST /api/demandas` (`origem='rapida'`).
-
-#### `POST /api/entrada/analisar` (Colar do WhatsApp)
-Qualquer usuário. **Corpo:** `AnalisarTextoEntrada` (até 50.000 caracteres). `200 AnaliseTexto`. Sem efeito.
-Reconhece cabeçalhos `[14/10 15:32] Fulana:`; sugere cliente por apelido e tipo por palavras do nome/slug; sigla
-desconhecida em maiúsculas vira `siglaNova`.
-
-#### `GET /api/busca`
-Qualquer usuário. **Consulta:** `BuscaConsulta`. `200 BuscaSaida` (até 20). `#4521`/`4521` → número exato primeiro;
-primeira palavra igual a um apelido de cliente filtra o cliente; o resto vai ao FTS5 por prefixo, sem acento.
-Meta: menos de 150 ms.
-
-### 4.15 Mural e Arquivo · cadastros
-
-#### `GET /api/mural/:slug`
-Qualquer usuário. `:slug` de equipe ou `agencia`. `200 MuralSaida` (fixados primeiro, depois `pos`).
-
-#### `POST /api/mural/:slug/avisos` · `PATCH /api/avisos/:id` · `DELETE /api/avisos/:id`
-- **Quem:** atendimento e admin em qualquer mural; executor no mural da própria equipe (não no da agência).
-- **Corpo:** `CriarAvisoEntrada` / `EditarAvisoEntrada`. **Resposta:** `201`/`200 AvisoSaida` (aviso
-  `senha_detectada` sem bloquear) / `204` (`DELETE` arquiva). **SSE:** `aviso` (interno).
+### 4.19 Arquivo · cadastros
 
 #### `GET /api/arquivo`
-Qualquer usuário. **Consulta:** `ListarArquivoConsulta` (cliente, mês, tipo, texto). `200 Pagina<Demanda>`.
-- Lista tudo o que **saiu do quadro**: `excluido_em IS NULL AND (arquivado_em IS NOT NULL OR (status IN
-  ('concluido','cancelado') AND coalesce(concluida_em, status_desde) <= agora − quadroEntregueDias))`. Assim a entregue
-  sem arquivar (arquivar é manual no MVP) não some: sai da coluna Entregue e aparece aqui ("ver no Arquivo").
-- Mês e ordem (mais recentes primeiro) por `coalesce(arquivado_em, concluida_em, status_desde)`, com os índices
+Qualquer usuário. **Consulta:** `ListarArquivoConsulta` (cliente, quadro, mês, texto). `200 Pagina<Demanda>`.
+- Lista tudo o que **saiu do quadro**: `excluido_em IS NULL AND (arquivado_em IS NOT NULL OR (concluida_em IS NOT
+  NULL AND concluida_em <= agora − quadroConcluidasDias))`. A concluída sem arquivar não some: sai do quadro e aparece
+  aqui ("Concluída · não arquivada", com [Arquivar]).
+- Mês e ordem (mais recentes primeiro) por `coalesce(arquivado_em, concluida_em)`, com os índices
   `demanda_arquivo_ix`/`demanda_arquivo_cli_ix` (a consulta repete o `WHERE` deles).
-- Não arquivadas vêm com `arquivadoEm` nulo: a tela mostra "Entregue · não arquivada" e oferece Arquivar. Restaurar
-  (só arquivadas) usa `POST /api/demandas/:id/restaurar`.
+- Restaurar (só arquivadas) usa `POST /api/demandas/:id/restaurar`; desmarcar uma concluída antiga usa
+  `POST /api/demandas/:id/concluir` com `concluida: false` (ela volta ao quadro, objeto inteiro no SSE).
 
 ## 5. Regras transversais
 
-### 5.1 `mover()` e a tabela de transições (servidor e front usam a mesma lógica)
-1. Destino: `etapaId` (do mesmo fluxo), ou `direcao`: `proxima`/`anterior` andam em `CAMINHO_FELIZ` pulando etapas
-   que não se aplicam ao tipo (`aplicaSe`); de Ajustes, `.` vai para Revisão e `,` para Em produção; de Entregue ou
-   Cancelada, `,` = `anterior`. **De Com o cliente**, `.` (Aprovado) e soltar em Aprovado ou Agendar dão
-   `409 requer_dialogo` `registrar_retorno`: o front abre "Registrar retorno" com a decisão Aprovado (o serviço escolhe
-   Aprovado ou Agendar pelo tipo); soltar em Ajustes abre o mesmo diálogo com Ajuste.
-2. A etapa de destino precisa se aplicar ao tipo (`aprovacao_cliente` → `tipo.aprovacaoCliente`; `publicacao` →
-   `tipo.publicacao`). Senão `422`.
-3. Linha de `transicao` com `de` = status atual e `para` = categoria de destino; só sem ela vale a de `de = '*'`
-   (a linha exata tem precedência e as duas nunca se combinam: triagem → cancelado usa a da Triagem, que aceita o
-   aprovador). Reabrir: `para = 'anterior'` e destino = `etapaAnteriorId` (no front, `para.id === etapaAnteriorId` com
-   status em Entregue/Cancelada é a linha `anterior`). Sem linha: `422 transicao_invalida`.
-4. `quem`: admin ou atendimento pelo papel; responsavel ou aprovador pela relação (§2). Falhou: `403` com `negado`.
-5. `requer`: `cliente_e_tipo` e os de tipo (`com_`/`sem_`) → `422`; `motivo` e `confirmacao` → `409 requer_dialogo`
-   se o corpo não trouxer; `versao_nova`, `envio`, `retorno`, `rodada`, `anular_aprovacao` → sempre `409
-   requer_dialogo` pela rota `/mover` (só os serviços do ciclo os atendem, chamando `mover()` com `atendidos`).
-6. Efeitos: `etapa_id`, `etapa_anterior_id` = etapa de saída (gatilho `demanda_etapa_anterior` confere), `status`,
-   `status_desde = agora`; `bola`/`comQuemId` (§5.1.1); entrar em Revisão limpa `revisaoOkEm`/`revisaoOkPor` (gatilho
-   confere); `responsavel_regra = social_do_cliente` → responsável = `cliente.socialId`; **sem `socialId`**, responsável
-   nulo e o distribuidor da equipe Social (`eq-social`) recebe `fila_sem_responsavel` ("Agendar sem social: <título>");
-   entrar em Entregue grava `concluidaEm` e fecha a rodada; Cancelada grava `canceladaMotivo` e **revoga os links
-   públicos ativos** da demanda (`link.revogado`); sair de Entregue/Cancelada limpa os dois e emite o objeto inteiro (§3).
-7. O histórico de etapa é gravado pelo gatilho (o app sempre grava `atualizado_por` e `atualizado_em = agora()`).
+### 5.1 `mover()`: lugar, posição e efeitos (`server/src/servicos/mover.ts`, único caminho de troca de coluna)
+1. **Destino:** `colunaId` ativa de quadro ativo; o quadro de destino é o da coluna (`422 estado_invalido` se
+   arquivados; o gatilho `demanda_destino_ativo` também recusa). Demanda arquivada não se move (`422`).
+2. **Posição** (§5.10): `posicao` relativa dentro da coluna de destino; padrão = fim. "Enviar para <quadro>" manda a
+   coluna de entrada do quadro e `depoisDeId: null` (topo).
+3. **Mesma coluna:** só reordena (`demanda.movida` não é gravada; só o evento de `posicao`).
+4. **Outra coluna:** grava `coluna_id`, `quadro_id`, `status_desde = agora` (o gatilho `demanda_status_desde` exige),
+   `atualizado_por`, `atualizado_em`; o gatilho fecha a passagem em `demanda_movimento` e abre outra.
+5. **Outro quadro:** etiquetas por §5.6, na mesma transação, antes de trocar o quadro (as FKs compostas exigem).
+   Membros, cliente, AM, número, histórico, comentários e versões vão junto. Notifica `chegou` aos seguidores do
+   quadro de destino.
+6. **Papel da coluna:** entrar numa `concluida` conclui (§5.3, com repetição); sair de uma `concluida` para uma
+   não-`concluida` reabre. `aguardando_cliente` só muda a bola (§5.4).
+7. **Limite WIP:** se a coluna de destino passar do limite, devolve o aviso `limite_wip` (nunca bloqueia).
+8. **Rev:** `rev` opcional no corpo; diferente do atual → `409 conflito_rev`. Mover não sobe o rev.
 
-#### 5.1.1 Bola
-- Bloqueio manda: `cliente` → bola cliente; `fornecedor` → terceiro; `interno` → agência com o responsável (ou o AM).
-- Senão pela categoria (`calcularBola(d, categoria, tipo)` em `shared/logica/bola.ts`):
-  - fila, produção, ajuste e publicação → responsável;
-  - triagem → `coalesce(aprovadorId, atendimentoId)`;
-  - revisão, tipo **sem** aprovação do cliente (ou sem tipo) → `coalesce(aprovadorId, atendimentoId)`: o aprovador
-    conclui ou devolve;
-  - revisão, tipo **com** aprovação do cliente → o aprovador enquanto `revisaoOkEm` for nulo, se houver `aprovadorId`
-    diferente de `atendimentoId`; depois do "Liberar para envio" (ou sem aprovador próprio) → `atendimentoId`, e o card
-    mostra o sinal **"pronta para enviar"** (`prontaParaEnviar(d, tipo)`);
-  - aprovado → `atendimentoId` (só o atendimento move a partir dali);
-  - cliente → bola cliente; entregue e cancelada → agência, `comQuemId` nulo.
-- `comQuemId` guarda a pessoa titular; quem cobre é resolvido na leitura (Início, notificações, relações).
+### 5.2 Prazo e estado do prazo
+- Dias úteis = seg a sex fora de `feriado`. Prazo sem hora = `prazoHoraPadrao` (18:00). Não há prazo automático depois
+  da criação: o modelo sugere `hoje + prazoDiasUteis` na criação e a pessoa muda à vontade.
+- **Estado do prazo** (`estadoPrazo(d, coluna, agora)` em `shared/logica/prazo.ts`; vale para o card, o Início, a
+  Agenda, os contadores do cliente e o filtro `prazo`): concluída → `concluida`; com o cliente (§5.4) → `pausado`
+  (**nunca atrasada**: o card mostra a data sem cor e "com o cliente há N"); sem prazo → `sem_prazo`; senão `prazo` +
+  `prazoHora` contra agora → `atrasada`, `hoje` ou `em_dia`.
+- Funções puras em `shared/logica/datas.ts` e `prazo.ts` (dias úteis, somar, diferença, próximo prazo da repetição).
 
-### 5.2 Prazo
-- Dias úteis = seg a sex fora de `feriado`. `prazoManual = false`: prazo = publicação − `folgaAprovacaoDias` dias
-  úteis; sem publicação, criação + `slaDiasUteis`. Sem hora = 18:00.
-- Recalcula quando mudam publicação, tipo ou feriados (só abertas com `prazoManual = false`).
-- "Prazo curto": prazo a menos de `slaDiasUteis` dias úteis da criação (aviso, não bloqueia).
-- **Estado do prazo** (`estadoPrazo()`; vale para o card, o Início, os contadores do cliente e o filtro `prazo`):
-  - triagem, fila, produção e ajuste (rodada atual ainda sem versão): `prazo` + `prazoHora` (18:00) contra agora →
-    `atrasada`, `hoje` ou `em_dia`; sem prazo → `sem_prazo`;
-  - publicação (Agendar): compara `publicacaoData` + `publicacaoHora` (18:00) do mesmo jeito; sem data → `sem_prazo`;
-  - revisão, cliente e aprovado → `pausado`: **nunca atrasada** (a peça foi entregue; com o cliente o SLA pausa,
-    SPEC §3 item 3). O card mostra a data sem cor; "parado há" continua valendo;
-  - entregue e cancelada → `concluida`.
-- Funções puras em `shared/logica/prazo.ts` (dias úteis, somar, diferença, prazo calculado, prazo curto, estado).
+### 5.3 Concluir e repetir (`server/src/servicos/concluir.ts`)
+- **Marcar** (`POST /concluir` com `true`, checkbox, ou soltar numa coluna `concluida`): `concluida_em = agora`,
+  `concluida_por`; para os cronômetros ligados nela. Já concluída: sem efeito.
+- **Repetir** (`repetir` ≠ `nenhuma`, ao marcar por qualquer caminho, menos a coluna virar `concluida`): cria **uma**
+  próxima (índice `demanda_repeticao_uk`: concluir, reabrir e concluir de novo não duplica), no mesmo quadro, na
+  coluna de entrada, no topo, com `origem='repeticao'`. Prazo seguinte: `diaria` = próximo dia útil; `semanal` = +7
+  dias; `mensal` = mesmo dia do mês seguinte (31 → último dia); se cair em dia não útil, o próximo dia útil. Início
+  e publicação andam o mesmo tanto. Vão junto: título, descrição, cliente, AM, membros, etiquetas, prioridade,
+  estimativa, modelo, `repetir`, capa de cor e os checklists (itens desmarcados; o de rodada não vai). Não vão:
+  anexos, comentários, versões, horas.
+- **Automação `concluida`** (§5.5): só quando a marcação vem do checkbox/ação (`POST /concluir`), nunca ao soltar numa
+  coluna `concluida` (a pessoa já escolheu o lugar).
+- **Desmarcar** (`false`): limpa `concluida_em`/`concluida_por`. Se a demanda estiver numa coluna `concluida`, ela
+  volta para a coluna em que estava antes de entrar nela (última passagem em `demanda_movimento`), se ativa; senão
+  para a coluna de entrada (`demanda.movida` com `via: 'reabrir'`). A repetição já criada fica.
 
-### 5.3 Notificações e ausência
-- Antes de gravar, o destinatário ausente hoje é trocado pelo substituto, com `cobrindoId` = titular.
-- Nunca notifica o próprio ator. Tipos: `TIPOS_NOTIFICACAO` (`shared/tipos/notificacoes.ts`).
-- Jobs diários (8h de São Paulo): `prazo` para quem está com a bola das demandas que vencem hoje; `cobertura` para o
-  substituto no primeiro dia da ausência.
-- Cada notificação gera `evento` `notificacao` com público `usuario`.
+### 5.4 Com quem está a bola e "parado há"
+- `comQuemEsta(d, coluna)` (`shared/logica/quadro.ts`): `concluida` se concluída; `cliente` se a coluna é
+  `aguardando_cliente` **ou** `envioPendenteEm` não é nulo; senão `equipe` (os membros).
+- **Parado há** = dias úteis desde `statusDesde` (última mudança de coluna ou de quadro). Com a bola na equipe e acima
+  de `paradoLimiteDiasUteis`, o card destaca "parado há N dias úteis". Com o cliente, o contador da equipe pausa e o
+  card mostra "com o cliente há N" desde `coalesce(envioPendenteEm, statusDesde)`; acima de `clienteParadoDiasUteis`
+  entra no Início do AM ("Com o cliente há mais de 2 dias úteis", com "Copiar lembrete" e "Registrar retorno").
 
-### 5.4 Rodadas
+### 5.5 Automações do quadro (`server/src/servicos/automacoes.ts`)
+- `executarAutomacao(db, demandaId, gatilho, ator)` procura `automacao_quadro` do **quadro atual da demanda** com o
+  gatilho e `ativa = 1`. Destino ativo → `mover()` para o **topo** da coluna de destino (`via: 'automacao'`, o
+  `gatilho` vai na atividade; mudar de quadro segue §5.6 com etiquetas sem par removidas). Destino arquivado ou a
+  demanda já está lá → nada (sem erro).
+- Gatilhos e quem chama: `enviado_ao_cliente` (enviar, F2), `ajuste_pedido` e `aprovado` (retorno pelo link ou
+  manual, aprovado pelo WhatsApp, F2), `concluida` (`POST /concluir`, núcleo). Automações não disparam umas às
+  outras (mover nunca é gatilho), então não há laço.
+- A resposta da rota que disparou traz `automacao: true` e o navegador mostra "Movida para Social › Agendar · Desfazer".
+
+### 5.6 Etiquetas ao mudar de quadro
+- Cada etiqueta da demanda casa **por nome** (sem caixa e sem acento, `normalizarAlias`) com uma etiqueta do quadro de
+  destino. Etiqueta só de cor casa por cor. As que casam passam a ser as do destino.
+- As sem par: `etiquetasSemPar: 'remover'` (padrão; nomes em `etiquetasRemovidas`, aviso "2 etiquetas ficaram para
+  trás") ou `'criar'` (criadas no destino com o mesmo nome e cor, `etiquetasCriadas`). O diálogo "Mover para…" mostra
+  quais ficam sem par antes de confirmar; automação e "Enviar para" sempre removem.
+- `etiquetaIds` no corpo substitui tudo isso (usado pelo Desfazer, com os ids do quadro original).
+- Ordem na transação: apagar `demanda_etiqueta` da demanda, trocar `quadro_id`/`coluna_id`, inserir as do destino.
+
+### 5.7 Rodadas
 - A rodada 1 (`inicial`) nasce com a demanda (`prazo` e `prazo_original` = prazo da demanda).
-- **Prazo da rodada:** com `rodadaAtual = 1`, toda mudança de `demanda.prazo`/`prazoHora` (manual no PATCH ou
-  recalculada por publicação, tipo ou feriado) atualiza `prazo`/`prazo_hora` da rodada 1 na mesma transação; com
-  `rodadaAtual > 1`, o PATCH de prazo atualiza a rodada atual (renegociação; os recálculos não a tocam, porque o prazo
-  é manual). `prazo_original` nunca muda (gatilho `rodada_imutavel`): é a base do "no prazo por rodada".
-- Abrir a rodada N+1 (retorno de ajuste ou devolução interna): fecha a atual, cria a nova com `prazo` e
-  `prazoOriginal` (padrão: hoje + `tipo.slaAjusteDiasUteis`), `rodadaAtual = N+1`, `demanda.prazo = prazo`,
-  `prazoManual = true`, checklist "Ajustes R{N+1}" com uma linha por item (linhas vazias e marcadores `-`, `•`, `1.`
-  são limpos). Passou de `rodadasInclusas`: a resposta sugere marcar como extra (não marca sozinho).
+- **Prazo da rodada:** com `rodadaAtual = 1`, todo PATCH de `prazo`/`prazoHora` atualiza a rodada 1; com
+  `rodadaAtual > 1`, atualiza a rodada atual (renegociação). `prazo_original` nunca muda (gatilho `rodada_imutavel`).
+- **Abrir a rodada N+1** (retorno de ajuste ou ajuste interno): fecha a atual, cria a nova com `prazo` e
+  `prazoOriginal` (padrão: hoje + `ajustePrazoDiasUteis`), `rodadaAtual = N+1`, `demanda.prazo = prazo`, checklist
+  "Ajustes R{N+1}" com uma linha por item (linhas vazias e marcadores `-`, `•`, `1.` são limpos). Passou de
+  `rodadasInclusas`: a resposta sugere marcar como extra (não marca sozinho).
 
-### 5.5 Texto vindo de fora
-- **Markdown** (componente `Markdown` do design system): markdown-it `{html:false}` + DOMPurify com a allowlist da SPEC
-  §7.2 **mais só** `span[data-mencao]`; `ALLOWED_ATTR` = `href`, `data-mencao`; `ALLOW_DATA_ATTR: false`;
-  `ALLOWED_URI_REGEXP = /^(https:|mailto:)/i`; hook `afterSanitizeAttributes` põe `rel="noopener noreferrer nofollow
-  ugc"` e `target="_blank"` nos links.
+### 5.8 Texto vindo de fora
+- **Markdown** (componente `Markdown` do design system): markdown-it `{html:false}` + DOMPurify com a allowlist
+  p, br, strong, em, s, code, pre, blockquote, ul, ol, li, h1–h3, hr, a **mais só** `span[data-mencao]`;
+  `ALLOWED_ATTR` = `href`, `data-mencao`; `ALLOW_DATA_ATTR: false`; `ALLOWED_URI_REGEXP = /^(https:|mailto:)/i`; hook
+  `afterSanitizeAttributes` põe `rel="noopener noreferrer nofollow ugc"` e `target="_blank"` nos links.
 - **Menção** `@[Nome](mencao:<id>)`: uma regra de renderização do markdown-it, **antes** do DOMPurify, troca o link por
   `<span data-mencao="<id>">@Nome</span>` quando `<id>` casa `^[A-Za-z0-9-]{1,64}$` (nome escapado); senão vira texto.
   Nunca afrouxe a regex de URI para aceitar `mencao:`.
-- **`briefingCampos`** (POST e PATCH da demanda), pelo `tipo_peca_campo` do tipo: `url` → `https://` válida;
-  `selecao` → uma das `opcoes`; `multipla` → subconjunto das `opcoes`; `numero` → finito; `data` → `YYYY-MM-DD` real;
-  `sim_nao` → booleano; `texto` até 2.000 e `texto_longo` até 20.000 caracteres; `null` apaga. Chave que não é campo
-  do tipo → `400 validacao`, exceto a que já estava gravada (campo removido, tipo trocado) e volta com o mesmo valor.
 - `origemTexto`, texto do cliente, `nomeInformado` e `comentario` da aprovação: só texto puro. Detector de senha
-  (`shared/logica/senha.ts`) avisa no briefing, comentário e mural, sem bloquear.
+  (`shared/logica/senha.ts`) avisa na descrição e no comentário, sem bloquear.
 
-### 5.6 Desfazer (aviso "Desfazer")
-Só para mutações sem efeito externo, sempre como a mutação inversa pela API: mover (se a transição inversa existir
-para o ator), responsável e prazo (`PATCH`), arquivar (`restaurar`), aprovação manual (`anular`). Gerar link e enviar
-ao cliente não entram.
+### 5.9 Notificações
+- `notificar()` (`server/src/servicos/notificacoes.ts`) nunca notifica o próprio ator nem repete a mesma pessoa no
+  mesmo fato (quem recebe `mencao` não recebe `comentario`; quem recebe `membro` não recebe `chegou`). Cada
+  notificação gera `evento` `notificacao` com público `usuario`.
+- Tipos (`TIPOS_NOTIFICACAO`): `membro`, `mencao`, `comentario`, `versao_entregue`, `aprovada`, `ajuste_pedido`,
+  `prazo`, `chegou`.
+- Job diário às 8h de São Paulo (painéis): `prazo` para os membros (ou o AM, sem membros) das demandas abertas que
+  vencem hoje, de quadros ativos, sem repetir no mesmo dia (`notificacao_prazo_ix`).
+
+### 5.10 Posição
+- Demandas têm `posicao REAL` **por coluna**; colunas e quadros têm `pos REAL` por quadro e no menu; listas curtas por
+  pai (checklist, itens, anexos, etiquetas, favoritos) também. O navegador manda `depoisDeId`/`antesDeId` e o servidor
+  calcula: entre vizinhos = média; fim = último + 1024; se a folga ficar < 1e-6, renormaliza o escopo (passo 1024) e
+  publica os eventos. Cards escondidos por filtro mantêm o lugar.
+
+### 5.11 Desfazer (aviso "Desfazer")
+Só para mutações sem efeito externo, sempre como a mutação inversa pela API: mover (volta para a coluna e a posição
+de antes; entre quadros, com `etiquetaIds` originais), concluir (desmarcar; a repetição criada é arquivada),
+arquivar (restaurar), membro e etiqueta (tirar/pôr), prazo arrastado na Agenda (PATCH), aprovação manual (anular).
+Gerar link e enviar ao cliente não entram.
 
 ## 6. Textos para WhatsApp
 
 Tom da marca: direto, sem exclamação, com data no formato "qui, 16/10, 18h". `{contato}` = primeiro nome do contato
-(ou "tudo bem" sem contato), `{peca}` = nome do tipo + título, `{v}` = número da versão.
+(ou "tudo bem" sem contato), `{peca}` = nome do modelo (se houver) + título, `{v}` = número da versão.
 
 | Modelo | Texto |
 |---|---|

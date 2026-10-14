@@ -7,7 +7,7 @@ export const TIPOS_NOTIFICACAO = [
   'comentario',      // comentário novo numa demanda em que você é membro ou AM (sem repetir quem foi mencionado)
   'versao_entregue', // versão entregue numa demanda do seu atendimento (AM)
   'aprovada',        // o cliente aprovou (membros e AM)
-  'ajuste_pedido',   // o cliente pediu ajuste (membros e AM)
+  'ajuste_pedido',   // o cliente pediu ajuste, ou o atendimento pediu ajuste interno (membros e AM)
   'prazo',           // vence hoje (job diário, 8h; membros, ou o AM se não houver membros)
   'chegou',          // entrou uma demanda num quadro que você segue (criada ou movida de outro quadro)
 ] as const

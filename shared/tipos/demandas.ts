@@ -436,6 +436,8 @@ export interface ExcluirDemandaEntrada {
 export interface CriarRapidaEntrada {
   texto: string
   colunaId: Id
+  /** Cliente do contexto (filtro de um só cliente no quadro). O marcador `HE:` no texto vence. */
+  clienteId?: Id | null
   /** Padrão: no fim da coluna. */
   posicao?: PosicaoRelativa
 }

@@ -757,12 +757,14 @@ Mesmos headers de `GET /api/arquivos/:id`.
   domingo, depois, sem prazo; as com o cliente ficam em "depois"/"sem prazo" pelo prazo, nunca em atrasadas);
   `comClienteParado` só para quem tem papel atendimento (as do próprio atendimento com o cliente há mais de
   `clienteParadoDiasUteis`, §5.4); `mencoes` (últimas 10 `mencao`); `resumo`; `extras`.
-- `primeirosPassos` só para admin, nulo quando concluído. Critério de `feito`:
-  - `criar_quadros`: pelo menos 1 quadro ativo (o atalho abre "Criar os quadros das equipes": uma linha por equipe
-    ativa sem quadro, com o modelo sugerido e as colunas para desmarcar ou renomear; cada linha é um `POST /api/quadros`);
-  - `convidar_equipe`: pelo menos 2 usuários ativos;
-  - `cadastrar_clientes`: pelo menos 1 cliente fora de `ex` e nenhum deles com a pendência `sem_am`;
-  - `revisar_modelos`: `config.modelosRevisadosEm` preenchido (botão "Revisei os modelos", `PATCH /api/config/app`).
+- `primeirosPassos` só para admin, nulo quando concluído. Critério de `feito` (e o `caminho` de cada item):
+  - `criar_quadros` (`/quadros/novo?equipes=1`): pelo menos 1 quadro ativo. A tela "Criar os quadros das equipes"
+    mostra uma linha por equipe ativa sem quadro, com o modelo sugerido e as colunas para desmarcar ou renomear;
+    cada linha é um `POST /api/quadros`;
+  - `convidar_equipe` (`/config/pessoas`): pelo menos 2 usuários ativos;
+  - `cadastrar_clientes` (`/clientes`): pelo menos 1 cliente fora de `ex` e nenhum deles com a pendência `sem_am`;
+  - `revisar_modelos` (`/config/modelos`): `config.modelosRevisadosEm` preenchido (botão "Revisei os modelos",
+    `PATCH /api/config/app`).
 
 #### `GET /api/agenda`
 - Qualquer usuário. **Consulta:** `AgendaConsulta` (`de`..`ate` inclusive, até 62 dias; senão `400`). **Resposta:**

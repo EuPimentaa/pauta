@@ -44,7 +44,7 @@
   .vidro .meta, .vidro-meta { color: var(--glass-text-3); }
   /* barra e menu: vidro sem a sombra de popover (são camadas da página) */
   .vidro-plano {
-    background: var(--glass-bg);
+    background-color: var(--glass-bg);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
             backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   }

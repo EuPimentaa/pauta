@@ -1,7 +1,8 @@
 /**
  * Seção Quadros do menu lateral (da própria casca, lida de ['bootstrap']): Favoritos (estrela; arrastar para ordenar,
- * com mouse ou teclado), Recentes (localStorage) e os quadros por equipe na ordem `pos`, com o ponto na cor do quadro e
- * a estrela ao passar o mouse. "+ Novo quadro" para o admin abre /quadros/novo por cima da tela.
+ * com mouse ou teclado), Recentes (localStorage) e Por equipe (ordem das equipes, depois `pos`; o nome da equipe só
+ * aparece quando agrupa mais de um quadro ou um quadro de outro nome), com o ponto na cor do quadro e a estrela ao passar
+ * o mouse. Cada subseção recolhe pelo título. "+ Novo quadro" para o admin abre /quadros/novo por cima da tela.
  */
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { NavLink } from 'react-router'
@@ -10,7 +11,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, Clock3, LayoutGrid, Plus, Star } from 'lucide-react'
+import { ChevronDown, Clock3, LayoutGrid, Plus, Star, Users } from 'lucide-react'
 import type { Equipe, Id, Quadro } from '@shared/tipos/index.ts'
 import { useEu } from '../api/auth.ts'
 import { useBootstrap } from '../api/bootstrap.ts'
@@ -23,9 +24,31 @@ import { useQuadrosRecentes } from './estado.ts'
 
 export const caminhoQuadro = (q: Pick<Quadro, 'slug'>) => `/q/${encodeURIComponent(q.slug)}`
 
-interface Grupo { id: string; rotulo: string; quadros: Quadro[] }
+/**
+ * Quadros de uma equipe (na ordem `pos`). `mostrarRotulo` é falso quando a equipe tem um quadro só, com o nome dela
+ * ("Criação" › "Criação" seria ruído): o menu mostra o nome da equipe só quando ele agrupa alguma coisa.
+ */
+export interface GrupoQuadros { id: string; rotulo: string; mostrarRotulo: boolean; quadros: Quadro[] }
 
-/** Organiza os quadros do bootstrap para o menu (puro; o menu do celular e o trilho recolhido usam o mesmo). */
+const mesmoNome = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }) === 0
+
+/** Agrupa os quadros ativos por equipe (ordem das equipes, depois `pos`); os sem equipe vão no fim. Puro. */
+export function agruparPorEquipe(quadros: readonly Quadro[], equipes: readonly Equipe[]): GrupoQuadros[] {
+  const ativas = equipes.filter((e) => e.ativa).sort((a, b) => a.pos - b.pos)
+  const idsEquipes = new Set(ativas.map((e) => e.id))
+  const porPos = (a: Quadro, b: Quadro) => a.pos - b.pos || a.nome.localeCompare(b.nome, 'pt-BR')
+  const grupos: GrupoQuadros[] = ativas
+    .map((e) => {
+      const lista = quadros.filter((q) => q.equipeId === e.id).sort(porPos)
+      return { id: e.id, rotulo: e.nome, mostrarRotulo: !(lista.length === 1 && mesmoNome(lista[0].nome, e.nome)), quadros: lista }
+    })
+    .filter((g) => g.quadros.length > 0)
+  const soltos = quadros.filter((q) => !q.equipeId || !idsEquipes.has(q.equipeId)).sort(porPos)
+  if (soltos.length) grupos.push({ id: 'sem-equipe', rotulo: 'Sem equipe', mostrarRotulo: grupos.length > 0, quadros: soltos })
+  return grupos
+}
+
+/** Organiza os quadros do bootstrap para o menu (o menu do celular e o trilho recolhido usam o mesmo). */
 export function useQuadrosDoMenu() {
   const { data } = useBootstrap()
   const eu = useEu()
@@ -36,14 +59,7 @@ export function useQuadrosDoMenu() {
     const favoritos = eu.favoritos.map((id) => porId.get(id)).filter((q): q is Quadro => !!q)
     const favIds = new Set(favoritos.map((q) => q.id))
     const recentes = recentesIds.map((id) => porId.get(id)).filter((q): q is Quadro => !!q && !favIds.has(q.id)).slice(0, 3)
-    const equipes = (data?.equipes ?? []).filter((e) => e.ativa).sort((a, b) => a.pos - b.pos)
-    const idsEquipes = new Set(equipes.map((e) => e.id))
-    const porPos = (a: Quadro, b: Quadro) => a.pos - b.pos || a.nome.localeCompare(b.nome)
-    const grupos: Grupo[] = equipes
-      .map((e: Equipe) => ({ id: e.id, rotulo: e.nome, quadros: quadros.filter((q) => q.equipeId === e.id).sort(porPos) }))
-      .filter((g) => g.quadros.length > 0)
-    const soltos = quadros.filter((q) => !q.equipeId || !idsEquipes.has(q.equipeId)).sort(porPos)
-    if (soltos.length) grupos.push({ id: 'sem-equipe', rotulo: grupos.length ? 'Outros quadros' : 'Quadros', quadros: soltos })
+    const grupos = agruparPorEquipe(quadros, data?.equipes ?? [])
     return { quadros, favoritos, favIds, recentes, grupos }
   }, [data?.quadros, data?.equipes, eu.favoritos, recentesIds])
 }
@@ -138,14 +154,18 @@ function Favoritos({ favoritos, arrastar }: { favoritos: Quadro[]; arrastar: boo
 
 const nomeDe = (lista: Quadro[], id: string | number) => lista.find((q) => q.id === String(id))?.nome ?? 'Quadro'
 
-function GrupoRecolhivel({ id, rotulo, fechados, alternar, children }: { id: string; rotulo: string; fechados: string[]; alternar(id: string): void; children: ReactNode }) {
+/** Subseção do menu (Favoritos, Recentes, Por equipe) que recolhe pelo título; o estado fica no localStorage. */
+function Subsecao({ id, rotulo, icone: I, fechados, alternar, children }: {
+  id: string; rotulo: string; icone: typeof Star; fechados: string[]; alternar(id: string): void; children: ReactNode
+}) {
   const aberto = !fechados.includes(id)
-  const idLista = `menu-grupo-${id}`
+  const idLista = `menu-sub-${id}`
   return (
-    <div>
-      <button type="button" className="casca-subtitulo w-full border-0 bg-transparent text-left hover:text-fg" aria-expanded={aberto} aria-controls={idLista} onClick={() => alternar(id)}>
-        <ChevronDown aria-hidden="true" style={{ transform: aberto ? undefined : 'rotate(-90deg)', transition: 'transform var(--dur-2) var(--ease)' }} />
-        <span className="flex-1 truncate">{rotulo}</span>
+    <div className="casca-sub" data-aberto={aberto}>
+      <button type="button" className="casca-subtitulo" aria-expanded={aberto} aria-controls={idLista} onClick={() => alternar(id)}>
+        <I aria-hidden="true" />
+        <span className="casca-subtitulo-rotulo">{rotulo}</span>
+        <ChevronDown className="casca-subtitulo-seta" aria-hidden="true" />
       </button>
       <div id={idLista} hidden={!aberto}>{children}</div>
     </div>
@@ -157,7 +177,7 @@ export function SecaoQuadros({ arrastar = true }: { arrastar?: boolean }) {
   const { favoritos, favIds, recentes, grupos, quadros } = useQuadrosDoMenu()
   const favoritar = useFavoritar()
   const abrir = useAbrirSobreposta()
-  const [fechados, setFechados] = useLocal<string[]>('menu-grupos-fechados', [])
+  const [fechados, setFechados] = useLocal<string[]>('menu-secoes-fechadas', [])
   const admin = eu.usuario.papel === 'admin'
   const alternar = (id: string) => setFechados((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]))
   const estrela = (q: Quadro) => () => favoritar(q.id, !favIds.has(q.id))
@@ -179,28 +199,31 @@ export function SecaoQuadros({ arrastar = true }: { arrastar?: boolean }) {
       )}
 
       {favoritos.length > 0 && (
-        <>
-          <div className="casca-subtitulo"><Star aria-hidden="true" /> Favoritos</div>
+        <Subsecao id="favoritos" rotulo="Favoritos" icone={Star} fechados={fechados} alternar={alternar}>
           <Favoritos favoritos={favoritos} arrastar={arrastar} />
-        </>
+        </Subsecao>
       )}
 
       {recentes.length > 0 && (
-        <>
-          <div className="casca-subtitulo"><Clock3 aria-hidden="true" /> Recentes</div>
+        <Subsecao id="recentes" rotulo="Recentes" icone={Clock3} fechados={fechados} alternar={alternar}>
           <ul className="casca-lista">
             {recentes.map((q) => <li key={q.id}><LinhaQuadro q={q} favorito={false} alternarEstrela={estrela(q)} /></li>)}
           </ul>
-        </>
+        </Subsecao>
       )}
 
-      {grupos.map((g) => (
-        <GrupoRecolhivel key={g.id} id={g.id} rotulo={g.rotulo} fechados={fechados} alternar={alternar}>
-          <ul className="casca-lista">
-            {g.quadros.map((q) => <li key={q.id}><LinhaQuadro q={q} favorito={favIds.has(q.id)} alternarEstrela={estrela(q)} /></li>)}
-          </ul>
-        </GrupoRecolhivel>
-      ))}
+      {grupos.length > 0 && (
+        <Subsecao id="equipes" rotulo="Por equipe" icone={Users} fechados={fechados} alternar={alternar}>
+          {grupos.map((g) => (
+            <div key={g.id} className="casca-equipe" data-com-rotulo={g.mostrarRotulo || undefined}>
+              {g.mostrarRotulo && <div className="casca-equipe-rotulo" id={`menu-equipe-${g.id}`}>{g.rotulo}</div>}
+              <ul className="casca-lista" aria-labelledby={g.mostrarRotulo ? `menu-equipe-${g.id}` : undefined}>
+                {g.quadros.map((q) => <li key={q.id}><LinhaQuadro q={q} favorito={favIds.has(q.id)} alternarEstrela={estrela(q)} /></li>)}
+              </ul>
+            </div>
+          ))}
+        </Subsecao>
+      )}
     </section>
   )
 }

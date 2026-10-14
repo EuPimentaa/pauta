@@ -8,9 +8,12 @@
 
   /* ─────────────── barra superior ─────────────── */
   .casca-topo {
+    /* vidro quase opaco: a barra é a âncora escura (sobre o canvas claro, o vidro a 0,82 virava um cinza sem graça) */
+    --glass-bg: var(--glass-bg-topo);
     position: fixed; inset: 0 0 auto 0; z-index: var(--z-topo); height: var(--topo-h);
     display: flex; align-items: center; gap: var(--space-2); padding-right: var(--space-3);
-    color: var(--text); box-shadow: inset 0 -1px 0 rgb(255 255 255 / .07), 0 1px 0 rgb(0 0 0 / .25);
+    color: var(--text); background-image: var(--topo-brilho);
+    box-shadow: inset 0 -1px 0 rgb(255 255 255 / .07), 0 1px 0 rgb(0 0 0 / .18), 0 8px 24px -16px rgb(0 0 0 / .5);
   }
   .casca-marca {
     display: flex; align-items: center; gap: 12px; flex: none; width: var(--menu-atual); height: 100%;
@@ -53,11 +56,34 @@
   button.casca-grupo-titulo:hover { color: var(--text); }
   button.casca-grupo-titulo svg { width: 13px; height: 13px; transition: transform var(--dur-2) var(--ease); }
   button.casca-grupo-titulo[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  /* subseções (Favoritos, Recentes, Por equipe): o título recolhe; a seta aparece no hover e no foco */
+  .casca-sub + .casca-sub { margin-top: var(--space-2); }
   .casca-subtitulo {
-    display: flex; align-items: center; gap: 6px; padding: 8px 10px 4px; font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--glass-text-3);
+    display: flex; align-items: center; gap: 7px; width: 100%; height: 28px; padding: 0 8px 0 11px; border: 0; border-radius: 7px;
+    background: transparent; text-align: left; cursor: pointer;
+    font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--glass-text-3);
+    transition: color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
   }
-  .casca-subtitulo svg { width: 13px; height: 13px; }
+  .casca-subtitulo:hover { color: var(--text); }
+  .casca-subtitulo:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+  .casca-subtitulo svg { width: 13px; height: 13px; flex: none; }
+  .casca-subtitulo-rotulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .casca-subtitulo-seta { opacity: 0; transition: opacity var(--dur-1) var(--ease), transform var(--dur-2) var(--ease); }
+  .casca-subtitulo:hover .casca-subtitulo-seta, .casca-subtitulo:focus-visible .casca-subtitulo-seta,
+  .casca-subtitulo[aria-expanded="false"] .casca-subtitulo-seta { opacity: 1; }
+  .casca-subtitulo[aria-expanded="false"] .casca-subtitulo-seta { transform: rotate(-90deg); }
   .casca-lista { display: flex; flex-direction: column; gap: 1px; }
+
+  /* equipe com mais de um quadro: o nome dela e os quadros recuados, com um fio à esquerda (como uma árvore) */
+  .casca-equipe[data-com-rotulo] { margin: 4px 0 6px; }
+  .casca-equipe-rotulo {
+    display: flex; align-items: center; height: 26px; padding: 0 10px 0 11px;
+    font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--glass-text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .casca-equipe[data-com-rotulo] > .casca-lista { position: relative; margin-left: 14px; }
+  .casca-equipe[data-com-rotulo] > .casca-lista::before {
+    content: ''; position: absolute; left: -2px; top: 6px; bottom: 6px; width: 1px; border-radius: 1px; background: var(--border-strong);
+  }
 
   .casca-item {
     position: relative; display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px;

@@ -20,8 +20,12 @@ export function carregarRegistro(): Promise<ModuloRegistro> {
   return promessa
 }
 
+/**
+ * Sempre use() com a MESMA promessa, nunca condicional: o React exige que a chamada que suspendeu se repita no render
+ * seguinte. Resolvida uma vez, a promessa fica marcada como cumprida e use() devolve na hora, sem suspender.
+ */
 export function useRegistro(): ModuloRegistro {
-  return carregado ?? use(carregarRegistro())
+  return use(carregarRegistro())
 }
 
 export function useRegistroSeCarregado(): ModuloRegistro | null {

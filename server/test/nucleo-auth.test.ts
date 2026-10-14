@@ -1,14 +1,15 @@
 /** Auth e sessão (API.md §1 e §4.2): login, limites, IP real, senha, convite, redefinição, CSRF, corpo e cookie. */
 import { describe, test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { configurar, type Config } from '../src/config.ts'
 import { atorDe } from '../src/auth.ts'
 import { tx, um } from '../src/db.ts'
 import { gerarLinkAcesso } from '../src/servicos/pessoas.ts'
 import { ORIGEM, SENHA_TESTE, ambiente, clienteHttp, sessaoPara } from './ajuda.ts'
 
-const NOVA = 'girafa-azul-no-telhado-42'
+/** Senha nova dos testes: gerada a cada execução, como a SENHA_TESTE (nenhuma senha fica no código). */
+const NOVA = `${randomBytes(12).toString('base64url')}-Nova7`
 
 function login(app: Parameters<typeof clienteHttp>[0], email: string, senha: string, ip?: string) {
   return app.request('/api/auth/login', {

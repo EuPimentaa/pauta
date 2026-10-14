@@ -2,7 +2,7 @@
 import type { ItemBase, NovoItem } from './arquivos.ts'
 import type { Aprovacao, Envio, LinkPublicoResumo, Rodada, VersaoComItens } from './ciclo.ts'
 import type {
-  Bloqueio, Bola, Categoria, DataLocal, HoraLocal, Id, Instante, PosicaoRelativa, Prioridade,
+  Bloqueio, Bola, Categoria, DataLocal, HoraLocal, Id, Instante, Papel, PosicaoRelativa, Prioridade,
 } from './nucleo.ts'
 import type { RequisitoTransicao } from './config.ts'
 
@@ -71,6 +71,22 @@ export interface Demanda {
   rev: number
   criadoEm: Instante
   atualizadoEm: Instante
+}
+
+/**
+ * Relações do usuário com uma demanda, já contando quem ele cobre hoje (ausência).
+ * Calculada por shared/logica/permissoes.ts (relacaoCom) no servidor e no front; base das regras de §7.1.
+ */
+export interface RelacaoDemanda {
+  papel: Papel
+  responsavel: boolean
+  aprovador: boolean
+  /** É o AM (atendimentoId) da demanda. Não confundir com o papel 'atendimento'. */
+  atendimento: boolean
+  comABola: boolean
+  solicitante: boolean
+  /** Id de quem eu cubro quando a relação vem da ausência ("cobrindo Samara"). */
+  cobrindoId: Id | null
 }
 
 /** Valor de um campo do briefing (por tipo de campo: texto/url/data → string; numero; sim_nao; multipla → string[]). */

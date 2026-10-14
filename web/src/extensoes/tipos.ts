@@ -24,6 +24,7 @@
  * | extensoes/layouts/*.tsx        | layout: ExtensaoLayout                     | página da visão              |
  * | extensoes/visao-cabecalho/*.tsx| item: ExtensaoCabecalhoVisao               | página da visão              |
  * | extensoes/coluna-menu/*.tsx    | itens: ExtensaoMenuColuna[]                | quadro: menu da coluna       |
+ * | extensoes/coluna-entrada/*.tsx | entrada: ExtensaoEntradaColuna             | quadro: "N" / "+ Adicionar"  |
  * | extensoes/inicio/*.tsx         | secao: ExtensaoSecaoInicio                 | tela Início                  |
  * | extensoes/config/*.tsx         | secao: ExtensaoSecaoConfig                 | tela Configurações           |
  */
@@ -315,6 +316,8 @@ export interface PropsLayout {
   /** Já filtradas e sem arquivadas. */
   demandas: Demanda[]
   abrir(numero: number): void
+  /** Largura abaixo de 768 px: o quadro vira a Lista agrupada com barra de chips (SPEC §5.15). */
+  celular: boolean
 }
 
 /** Quadro (NÚCLEO-WEB), Lista (LISTA-VISOES), Semana (PAINEIS). */
@@ -359,6 +362,16 @@ export interface ExtensaoMenuColuna {
   executar(ctx: ContextoColuna, acao: ContextoAcao): void | Promise<void>
 }
 
+/**
+ * Campo de criação rápida que o quadro abre no topo da coluna (tecla N ou "+ Adicionar"). Um só é usado: o de menor
+ * `ordem`. Sem nenhum registrado, a coluna não mostra o "+".
+ */
+export interface ExtensaoEntradaColuna {
+  id: string
+  ordem: number
+  Componente: ComponentType<{ ctx: ContextoColuna; fechar(): void }>
+}
+
 // ─────────────────────────────── Início e Configurações ───────────────────────────────
 
 export interface ExtensaoSecaoInicio {
@@ -398,6 +411,7 @@ export interface ModulosExtensao {
   layouts: { layout: ExtensaoLayout }
   visaoCabecalho: { item: ExtensaoCabecalhoVisao }
   colunaMenu: { itens: ExtensaoMenuColuna[] }
+  colunaEntrada: { entrada: ExtensaoEntradaColuna }
   inicio: { secao: ExtensaoSecaoInicio }
   config: { secao: ExtensaoSecaoConfig }
 }

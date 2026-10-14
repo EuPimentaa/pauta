@@ -10,6 +10,7 @@
  * Uma faixa de fora (ex.: "Sem prazo") que também arrasta para os dias: envolva os dois em <CalendarioArrastar> e use
  * <ItemCalendario> nela; a grade dentro do provedor não precisa de `aoSoltar`.
  */
+import '../estilos/calendario.css'
 import { createContext, useContext, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDraggable, useDroppable, useSensor, useSensors,

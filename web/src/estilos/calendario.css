@@ -1,39 +1,5 @@
-/* Conteúdo: Markdown renderizado, menções e a grade do calendário. O CSS do editor (TipTap) fica em editor.css. */
+/* Grade do calendário (viaja com ui/GradeCalendario.tsx). */
 @layer components {
-  /* ─────────────── Markdown (texto longo: ~70ch, linha 1,6; marca §4) ─────────────── */
-  .ui-md { max-width: 70ch; color: var(--text); font: 400 var(--fs-body) / 1.6 var(--font); overflow-wrap: anywhere; }
-  .ui-md > * + * { margin-top: .75em; }
-  .ui-md h1, .ui-md h2, .ui-md h3 { font-weight: 600; letter-spacing: var(--tracking-titulo); line-height: 1.3; margin-top: 1.2em; }
-  .ui-md > :first-child { margin-top: 0; }
-  .ui-md h1 { font-size: var(--fs-h3); }
-  .ui-md h2 { font-size: 16px; }
-  .ui-md h3 { font-size: var(--fs-body); }
-  .ui-md strong { font-weight: 600; }
-  .ui-md s { color: var(--text-2); }
-  .ui-md a { color: var(--accent-ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; border-radius: 2px; }
-  .ui-md a:hover { text-decoration-thickness: 2px; }
-  .ui-md ul, .ui-md ol { padding-left: 1.4em; }
-  .ui-md ul { list-style: disc; }
-  .ui-md ol { list-style: decimal; }
-  .ui-md li + li { margin-top: .25em; }
-  .ui-md li::marker { color: var(--text-3); }
-  .ui-md blockquote { padding: 2px 0 2px 14px; border-left: 3px solid var(--border-strong); color: var(--text-2); }
-  .ui-md code {
-    padding: 1px 5px; border-radius: 5px; background: var(--veu-1);
-    font: 500 .88em / 1.5 ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, monospace;
-  }
-  .ui-md pre { padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface-sunken); overflow-x: auto; }
-  .ui-md pre code { padding: 0; background: none; font-size: 12.5px; }
-  .ui-md hr { border: 0; height: 1px; background: var(--border); margin: 1.2em 0; }
-  .ui-md[data-compacto="true"] { font-size: var(--fs-meta); line-height: 1.5; }
-  .ui-md[data-compacto="true"] > * + * { margin-top: .5em; }
-
-  .ui-mencao {
-    display: inline; padding: 0 4px; border-radius: 5px; white-space: nowrap;
-    background: var(--accent-soft); color: var(--accent-ink); font-weight: 500;
-  }
-  .ui-mencao[data-eu="true"] { background: var(--accent); color: var(--on-accent); }
-
   /* ─────────────── grade do calendário (mês e semana; semana começa na segunda) ─────────────── */
   .ui-cal { display: flex; flex-direction: column; min-width: 0; border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 0 0 1px var(--border), var(--shadow-card); overflow: hidden; }
   .ui-cal-topo { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); }

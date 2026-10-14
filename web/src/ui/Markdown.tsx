@@ -11,6 +11,7 @@
  *   <Markdown texto={demanda.descricaoMd} />
  *   <Markdown texto={comentario.textoMd} compacto euId={eu.usuario.id} />
  */
+import '../estilos/markdown.css'
 import { createElement, Fragment, useMemo, type ReactNode } from 'react'
 import MarkdownIt, { type Token } from 'markdown-it'
 import DOMPurify from 'dompurify'

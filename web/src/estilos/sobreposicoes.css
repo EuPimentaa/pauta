@@ -130,7 +130,8 @@
   /* ─────────────── seletor de data ─────────────── */
   .ui-data { width: 296px; padding: var(--space-3); }
   .ui-data-topo { display: flex; align-items: center; gap: 4px; margin-bottom: var(--space-2); }
-  .ui-data-mes { flex: 1; font: 600 var(--fs-body) / 1 var(--font); text-transform: capitalize; padding-left: 6px; }
+  .ui-data-mes { flex: 1; font: 600 var(--fs-body) / 1 var(--font); padding-left: 6px; }
+  .ui-data-mes::first-letter { text-transform: uppercase; }
   .ui-data-rapidos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space-3); }
   .ui-data-rapido {
     height: 26px; padding: 0 10px; border-radius: var(--radius-full); border: 1px solid var(--border-strong); background: var(--surface);
@@ -139,8 +140,9 @@
   .ui-data-rapido:hover { color: var(--text); background: var(--surface-hover); }
   .ui-data-semana, .ui-data-grade { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
   .ui-data-semana span { text-align: center; font: 700 10px / 22px var(--font); letter-spacing: .08em; text-transform: uppercase; color: var(--glass-text-3); }
+  .ui-data-grade > [role="gridcell"] { display: grid; }
   .ui-data-dia {
-    position: relative; height: 36px; border: 0; border-radius: 9px; background: transparent; color: var(--text);
+    position: relative; width: 100%; height: 36px; border: 0; border-radius: 9px; background: transparent; color: var(--text);
     font: 500 13px / 1 var(--font); font-variant-numeric: tabular-nums;
   }
   .ui-data-dia:hover { background: var(--veu-1); }

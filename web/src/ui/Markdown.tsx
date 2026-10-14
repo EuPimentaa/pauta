@@ -86,14 +86,22 @@ function sanear(html: string): DocumentFragment {
     ALLOWED_ATTR: ['href', 'data-mencao'],
     ALLOW_DATA_ATTR: false,
     ALLOWED_URI_REGEXP: RE_URI,
+    // sem isto o DOMPurify exige que o VALOR de todo atributo fora da lista de URI seguras case o ALLOWED_URI_REGEXP
+    // (e o id da menção não é https:); o hook acima confere o id com RE_ID_MENCAO
+    ADD_URI_SAFE_ATTR: ['data-mencao'],
     RETURN_DOM_FRAGMENT: true,
   })
 }
 
-/** Markdown → HTML saneado (string). Uso interno e testes; para exibir, use <Markdown>. */
+/** Markdown → fragmento de DOM saneado (as verificações de /dev/ui inspecionam). Para exibir, use <Markdown>. */
+export function markdownParaFragmento(texto: string): DocumentFragment {
+  return sanear(md.render(texto))
+}
+
+/** Markdown → HTML saneado (string), para o editor carregar o texto. Para exibir, use <Markdown>. */
 export function markdownParaHtmlSeguro(texto: string): string {
   const div = document.createElement('div')
-  div.appendChild(sanear(md.render(texto)))
+  div.appendChild(markdownParaFragmento(texto))
   return div.innerHTML
 }
 

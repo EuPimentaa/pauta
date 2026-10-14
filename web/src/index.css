@@ -10,7 +10,10 @@
  *   tipo:   text-micro, text-meta, text-rotulo, text-body, text-card, text-col, text-h3, text-h2, text-h1
  *   raio:   rounded-xs/sm/md/lg/xl/full · sombra: shadow-card, shadow-hover, shadow-pop, shadow-drag, shadow-modal
  *   tela:   desk:… vale a partir de 768 px; max-desk:… vale abaixo de 768 px (celular)
+ *   quadro: ui-quadro, ui-coluna, ui-cartao, ui-prazo, ui-sinal (estilos/quadro.css; marcação de cada estado em /dev/ui)
  * Variante dark: tema escuro forçado, sistema escuro sem tema claro forçado e dentro de .chrome-dark.
+ * Fora daqui, cada CSS viaja com quem o usa: casca.css (casca), auth.css (login), markdown.css, calendario.css,
+ * editor.css (componentes pesados) e catalogo.css (/dev/ui).
  */
 @import "tailwindcss";
 @import "./estilos/fontes.css";
@@ -18,6 +21,7 @@
 @import "./estilos/base.css";
 @import "./estilos/componentes.css";
 @import "./estilos/sobreposicoes.css";
+@import "./estilos/quadro.css";
 
 @custom-variant dark {
   &:where([data-theme="dark"], [data-theme="dark"] *, .chrome-dark, .chrome-dark *) { @slot; }

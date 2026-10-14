@@ -1,0 +1,146 @@
+/*
+ * Base visual do quadro (ADAPTACOES "Visual"; marca §7.2): canvas com o fundo do quadro, colunas levemente tingidas
+ * na cor escolhida e cards claros/escuros com sombra suave. Só classes e tokens: quem desenha o quadro, o card e a
+ * Agenda (NÚCLEO-WEB, F3, F6) monta o HTML com estas classes; o catálogo /dev/ui mostra a marcação de cada estado.
+ *
+ *   <div class="ui-quadro" data-fundo="aurora">
+ *     <section class="ui-coluna" data-cor="rosa">                     sem data-cor = --surface-sunken
+ *       <header class="ui-coluna-cabeca">
+ *         <span class="ui-coluna-ponto" /> <h2 class="ui-coluna-titulo">Fazendo</h2> <span class="ui-contador">6/5</span> …
+ *       <div class="ui-coluna-cards"> <article class="ui-cartao" data-prioridade="urgente">…</article> …
+ *       <footer class="ui-coluna-rodape"><button class="ui-coluna-adicionar">+ Adicionar demanda</button>
+ *
+ * Estados do card: data-selecionado, data-arrastando (o fantasma), data-pendente (interceptador decidindo),
+ * data-concluida, data-recebido (pisca --accent-soft quando chega de outra pessoa), data-prioridade="alta|urgente".
+ * Prazo: <span class="ui-prazo" data-estado="atrasada|hoje|em_dia|pausado|concluida">. Sinal: <span class="ui-sinal"
+ * data-tom="perigo|cliente|parado|extra">. Coluna recolhida: data-recolhida (pílula vertical de 44 px).
+ */
+@layer components {
+  /* ─────────────── canvas ─────────────── */
+  .ui-quadro {
+    --coluna-w: 280px;
+    display: flex; align-items: flex-start; gap: var(--space-3); min-height: 100%;
+    padding: var(--space-4) var(--space-5) var(--space-6); overflow-x: auto; overscroll-behavior-x: contain;
+    background: var(--fundo, var(--bg)); background-attachment: local;
+  }
+  @media (max-width: 767.98px) {
+    .ui-quadro { --coluna-w: calc(100vw - 40px); scroll-snap-type: x mandatory; scroll-padding-inline: 16px; padding: var(--space-3) 16px var(--space-5); }
+    .ui-quadro > .ui-coluna { scroll-snap-align: start; }
+  }
+
+  /* ─────────────── coluna ─────────────── */
+  .ui-coluna {
+    position: relative; display: flex; flex-direction: column; flex: none; width: var(--coluna-w); max-height: 100%;
+    border-radius: var(--radius-lg); background: var(--cor-coluna, var(--surface-sunken)); color: var(--text);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--cor, var(--border-strong)) 14%, transparent);
+  }
+  .ui-coluna-cabeca {
+    display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 6px 4px 14px; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+  .ui-coluna-ponto {
+    flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--cor-ponto, var(--border-control));
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--cor-ponto, var(--border-control)) 22%, transparent), inset 0 0 0 1px rgb(0 0 0 / .10);
+  }
+  .ui-coluna-titulo {
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font: 600 var(--fs-col) / var(--lh-col) var(--font); letter-spacing: var(--tracking-titulo); color: var(--text);
+  }
+  .ui-coluna-papel { flex: none; display: grid; place-items: center; width: 20px; height: 20px; color: var(--text-2); }
+  .ui-coluna-papel svg { width: 15px; height: 15px; }
+  .ui-coluna .ui-contador { background: color-mix(in oklab, var(--surface) 72%, transparent); box-shadow: none; color: var(--text-2); }
+  .ui-coluna .ui-contador[data-tom="destaque"] { background: var(--accent-soft); color: var(--accent-ink); box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent); }
+  .ui-coluna-cabeca .ui-botao-icone { --lado: 28px; --icone: 16px; color: var(--text-2); }
+  .ui-coluna-cards {
+    display: flex; flex-direction: column; gap: var(--space-2); min-height: 8px; padding: 4px 8px 4px; overflow-y: auto;
+    overscroll-behavior: contain; scrollbar-gutter: stable;
+  }
+  .ui-coluna-rodape { padding: 4px 8px 8px; }
+  .ui-coluna-adicionar {
+    display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 8px; border: 0; border-radius: var(--radius-sm);
+    background: transparent; color: var(--text-2); font: 500 var(--fs-body) / 1 var(--font); text-align: left;
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+  }
+  .ui-coluna-adicionar svg { width: 16px; height: 16px; }
+  .ui-coluna-adicionar:hover { background: var(--veu-1); color: var(--text); }
+  .ui-coluna-soltar {
+    display: grid; place-items: center; min-height: 64px; border-radius: var(--radius-md);
+    border: 1.5px dashed color-mix(in oklab, var(--cor, var(--text-3)) 45%, var(--border-strong)); color: var(--text-2);
+    font: 500 var(--fs-meta) / 1 var(--font);
+  }
+  .ui-coluna[data-sobre="true"] { box-shadow: inset 0 0 0 2px var(--accent); }
+  .ui-coluna[data-arrastando="true"] { box-shadow: var(--shadow-drag); transform: rotate(1.5deg); }
+  .ui-coluna-pe { padding: 2px 14px 10px; color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .ui-coluna-pe a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+  /* recolhida: pílula vertical de 44 px (nome de lado, contador embaixo) */
+  .ui-coluna[data-recolhida] { width: 44px; min-height: 220px; align-items: center; padding: 12px 0; gap: 10px; cursor: pointer; }
+  .ui-coluna[data-recolhida] .ui-coluna-titulo { writing-mode: vertical-rl; flex: none; max-height: 240px; }
+  .ui-coluna[data-recolhida]:hover { background: color-mix(in oklab, var(--cor-coluna, var(--surface-sunken)), var(--text) 4%); }
+
+  /* ─────────────── card ─────────────── */
+  .ui-cartao {
+    position: relative; display: flex; flex-direction: column; gap: var(--space-2); min-width: 0;
+    padding: 10px 12px 11px; border-radius: var(--radius-md); overflow: hidden;
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    box-shadow: var(--shadow-card); cursor: pointer; text-align: left;
+    transition: box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--ease), background-color var(--dur-2) var(--ease);
+  }
+  .ui-cartao:hover { box-shadow: var(--shadow-hover); border-color: var(--border-strong); }
+  .ui-cartao:focus-visible { box-shadow: var(--focus-ring), var(--shadow-hover); }
+  .ui-cartao[data-selecionado="true"] { background: var(--accent-soft); border-color: var(--accent); }
+  .ui-cartao[data-arrastando="true"] { box-shadow: var(--shadow-drag); border-color: var(--border-strong); transform: rotate(2deg); cursor: grabbing; }
+  .ui-cartao[data-fantasma="true"] { opacity: .35; box-shadow: none; }
+  .ui-cartao[data-pendente="true"] { opacity: .6; border-style: dashed; border-color: var(--border-control); }
+  .ui-cartao[data-recebido="true"] { animation: ui-cartao-recebido 1.2s var(--ease); }
+  @keyframes ui-cartao-recebido { 0%, 35% { background: var(--accent-soft); } }
+  @media (prefers-reduced-motion: reduce) { .ui-cartao[data-recebido="true"] { animation: none; } }
+  /* prioridade alta e urgente: faixa de 3 px à esquerda */
+  .ui-cartao[data-prioridade="alta"]::before, .ui-cartao[data-prioridade="urgente"]::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--label-ambar);
+  }
+  .ui-cartao[data-prioridade="urgente"]::before { background: var(--danger); }
+
+  .ui-cartao-capa { margin: -10px -12px 0; height: 32px; background: var(--cor, var(--border-strong)); }
+  .ui-cartao-capa[data-imagem] { height: auto; aspect-ratio: 16 / 9; max-height: 160px; background: var(--surface-sunken); }
+  .ui-cartao-capa img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .ui-cartao-etiquetas { display: flex; flex-wrap: wrap; gap: 4px; }
+  .ui-cartao-titulo {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere;
+    font: 500 var(--fs-card) / var(--lh-card) var(--font); color: var(--text);
+  }
+  .ui-cartao[data-concluida="true"] .ui-cartao-titulo { color: var(--text-2); }
+  .ui-cartao-topo { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .ui-cartao-numero { font: 500 var(--fs-meta) / 1 var(--font); color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .ui-cartao-feita {
+    display: inline-grid; place-items: center; flex: none; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--success); color: var(--on-accent);
+  }
+  .ui-cartao-feita svg { width: 11px; height: 11px; stroke-width: 3; }
+  .ui-cartao-rodape { display: flex; align-items: center; gap: 6px; min-height: 22px; }
+  .ui-cartao-metas { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; flex: 1; min-width: 0; }
+  .ui-cartao-meta {
+    display: inline-flex; align-items: center; gap: 4px; color: var(--text-3);
+    font: 500 var(--fs-meta) / 1 var(--font); font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .ui-cartao-meta svg { width: 13px; height: 13px; }
+  .ui-cartao-meta[data-completo="true"] { color: var(--success-ink); }
+  .ui-cartao .ui-pilha { --pilha-borda: var(--surface); margin-left: auto; }
+  .ui-cartao[data-selecionado="true"] .ui-pilha { --pilha-borda: var(--accent-soft); }
+
+  /* ─────────────── prazo e sinal ─────────────── */
+  .ui-prazo, .ui-sinal {
+    display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: var(--radius-xs);
+    font: 500 var(--fs-meta) / 1 var(--font); font-variant-numeric: tabular-nums; white-space: nowrap;
+    background: transparent; color: var(--text-3);
+  }
+  .ui-prazo svg, .ui-sinal svg { width: 13px; height: 13px; flex: none; }
+  .ui-prazo[data-estado="em_dia"] { padding: 0; }
+  .ui-prazo[data-estado="hoje"] { background: var(--warning-bg); color: var(--warning-ink); }
+  .ui-prazo[data-estado="atrasada"] { background: var(--danger-bg); color: var(--danger-ink); }
+  .ui-prazo[data-estado="concluida"] { background: var(--success-bg); color: var(--success-ink); }
+  .ui-prazo[data-estado="pausado"] { background: var(--info-bg); color: var(--info-ink); }
+  .ui-sinal { background: var(--veu-1); color: var(--text-2); }
+  .ui-sinal[data-tom="perigo"] { background: var(--danger-bg); color: var(--danger-ink); }
+  .ui-sinal[data-tom="cliente"] { background: var(--info-bg); color: var(--info-ink); }
+  .ui-sinal[data-tom="extra"] { background: var(--label-roxo-bg); color: var(--label-roxo-ink); }
+}

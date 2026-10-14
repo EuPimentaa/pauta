@@ -1,6 +1,6 @@
 /**
  * Marcas da Melt por máscara CSS sobre os PNG oficiais (marca §3): a cor sai exata do token e acompanha o tema
- * (--logo-color: laranja no claro, #EDECEA no escuro e dentro de .chrome-dark).
+ * (--logo-color: laranja no claro, o branco quente do logo no escuro e dentro de .chrome-dark).
  *   <Logo altura={20} />       wordmark
  *   <MarcaE altura={22} />     "e" (menu recolhido, celular)
  *   <BarraAssinatura />        arco-íris de 3 px: só login, convite e redefinição

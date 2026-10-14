@@ -3,7 +3,8 @@
   /* ─────────────── grade do calendário (mês e semana; semana começa na segunda) ─────────────── */
   .ui-cal { display: flex; flex-direction: column; min-width: 0; border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 0 0 1px var(--border), var(--shadow-card); overflow: hidden; }
   .ui-cal-topo { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); }
-  .ui-cal-titulo { font: 600 var(--fs-col) / var(--lh-col) var(--font); text-transform: capitalize; margin-right: auto; }
+  .ui-cal-titulo { font: 600 var(--fs-col) / var(--lh-col) var(--font); margin-right: auto; }
+  .ui-cal-titulo::first-letter { text-transform: uppercase; }
   .ui-cal-semana { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--border); background: var(--surface-sunken); }
   .ui-cal-semana > div { padding: 8px 10px; font: 700 var(--fs-micro) / var(--lh-micro) var(--font); letter-spacing: var(--tracking-micro); text-transform: uppercase; color: var(--text-2); }
   .ui-cal-grade { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-auto-rows: minmax(var(--altura-dia, 116px), auto); }

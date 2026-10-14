@@ -20,9 +20,9 @@ export interface Aba<T extends string = string> {
 }
 
 export interface PropsAbas<T extends string> {
-  abas: Aba<T>[]
+  abas: readonly Aba<T>[]
   ativa: T
-  aoMudar(id: T): void
+  aoMudar(id: NoInfer<T>): void
   rotulo: string
   variante?: 'segmento' | 'linha'
   /** Prefixo dos ids (para ligar com painelAba). Padrão: gerado. */
@@ -30,7 +30,7 @@ export interface PropsAbas<T extends string> {
   className?: string
 }
 
-export function Abas<T extends string>({ abas, ativa, aoMudar, rotulo, variante = 'segmento', idBase, className }: PropsAbas<T>) {
+export function Abas<const T extends string>({ abas, ativa, aoMudar, rotulo, variante = 'segmento', idBase, className }: PropsAbas<T>) {
   const gerado = useId()
   const base = idBase ?? gerado
   const lista = useRef<HTMLDivElement>(null)

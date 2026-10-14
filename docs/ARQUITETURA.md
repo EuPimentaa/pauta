@@ -17,7 +17,7 @@ Produto: `docs/pesquisa/SPEC.md`. Ajustes que valem sobre a SPEC: `docs/ADAPTACO
 | Senhas | `node:crypto` scrypt (N=2^15, r=8, p=1, sal 16 B), comparação com `timingSafeEqual` |
 | Front | React 19 + Vite 8 + TypeScript + Tailwind 4 (`@tailwindcss/vite`) |
 | Rotas web | react-router 8 |
-| Dados web | TanStack Query 5 (cache é a fonte da verdade; eventos do WebSocket atualizam o cache) |
+| Dados web | TanStack Query 5 (cache é a fonte da verdade; eventos do SSE atualizam o cache) |
 | Arrastar | `@dnd-kit/core` + `@dnd-kit/sortable` |
 | Texto rico | Markdown. Edição com TipTap 3 (StarterKit + Mention) ou textarea com @; exibição com markdown-it (`html:false`) + DOMPurify |
 | Paleta Cmd+K | `cmdk` |
@@ -31,7 +31,7 @@ Não adicione dependências sem necessidade. Se precisar, justifique no commit.
 
 ```
 server/
-  src/index.ts            boot: abre banco, roda migrações, monta app, sobe HTTP + WS, serve web/dist em produção
+  src/index.ts            boot: abre banco, roda migrações, monta app, sobe HTTP + SSE, serve web/dist em produção
   src/app.ts              criarApp(db) -> Hono (usado pelo index e pelos testes)
   src/db.ts               abrir(), migrar(), helpers tx/one/all/run
   src/auth.ts             hash/verify, sessões, middleware exigirUsuario / exigirPapel

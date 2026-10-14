@@ -1,23 +1,29 @@
--- 001_base.sql: esquema completo do MVP em SQLite (node:sqlite).
--- Referências: docs/ADAPTACOES.md (vale sobre a SPEC), docs/pesquisa/SPEC.md §6, docs/API.md.
+-- 001_base.sql: esquema completo do MVP em SQLite (node:sqlite), modelo de QUADROS SEPARADOS POR EQUIPE.
+-- Referências: docs/ADAPTACOES.md ("Modelo de quadros" substitui o fluxo único da SPEC), docs/API.md, shared/tipos.
 --
 -- Convenções
--- * Tabelas STRICT. Ids TEXT (crypto.randomUUID(); nos seeds de configuração, slugs estáveis como 'et-fila').
--- * Instante: TEXT ISO 8601 UTC com ms ('2026-10-14T17:03:00.000Z'), gravado com new Date().toISOString().
+-- * Tabelas STRICT. Ids TEXT (crypto.randomUUID(); nos seeds de configuração, slugs estáveis como 'mq-kanban').
+-- * Instante: TEXT ISO 8601 UTC com ms ('2026-10-14T17:03:00.000Z'), gravado com agora() (server/src/db.ts).
 -- * Data local (America/Sao_Paulo): TEXT 'YYYY-MM-DD'. Hora local: TEXT 'HH:MM'. Prazo sem hora = 18:00.
 -- * Booleano: INTEGER 0/1. JSON: TEXT com json_valid. URL: só https.
--- * Nada se apaga: usuário, cliente e demanda não têm DELETE (gatilhos abaixo); arquivar/desativar/anonimizar.
--- * Regras de negócio (mover, bola, prazo, rodadas, notificações) ficam em server/src/servicos.
---   Gatilhos aqui só fazem integridade: imutabilidade, contadores, histórico de etapa, rev, atualizado_em e busca.
--- * Toda UPDATE em demanda feita pelo app grava atualizado_por e atualizado_em = agora() (o histórico de etapa usa os dois).
--- * Instantes gravados pelo app vêm sempre de agora() (src/db.ts), para os testes controlarem o relógio. Os DEFAULT
---   strftime('now') e o 'now' dos gatilhos são só rede de segurança.
+-- * Nada se apaga: usuário, cliente e demanda não têm DELETE (gatilhos); arquivar, desativar ou anonimizar.
+--   Quadro só se apaga se nunca teve demanda (senão, arquivar).
+-- * Integridade de quadro: a coluna é do quadro da demanda (FK composta), a etiqueta é do quadro da demanda
+--   (FK composta em demanda_etiqueta). Mudar a demanda de quadro exige tirar antes as etiquetas do quadro antigo
+--   (o serviço mapeia por nome; API.md §5.6).
+-- * Regras de negócio (mover, concluir, repetir, automações, ciclo, notificações) ficam em server/src/servicos.
+--   Gatilhos aqui só fazem integridade: imutabilidade, contadores, histórico de movimentação, rev, atualizado_em, busca.
+-- * Toda UPDATE em demanda feita pelo app grava atualizado_por e atualizado_em = agora(); mudar de coluna grava
+--   status_desde = agora() (o gatilho demanda_status_desde confere; o histórico usa esse instante).
+-- * Os DEFAULT strftime('now') e o 'now' dos gatilhos são só rede de segurança (os testes fixam o relógio do app).
 -- * _migracoes é criada pelo runner (server/src/db.ts), não por esta migração.
+-- * Cores (CORES em shared/tipos/nucleo.ts): ambar, amarelo, rosa, magenta, roxo, berinjela, verde, turquesa, azul,
+--   grafite. O laranja da marca nunca é cor de etiqueta, coluna ou quadro.
 
 -- ═════════════════════════════ configuração da aplicação ═════════════════════════════
 
 CREATE TABLE configuracao (
-  chave          TEXT PRIMARY KEY,                       -- 'prazo.hora_padrao', 'demanda.numero_inicial', ...
+  chave          TEXT PRIMARY KEY,                       -- 'prazo.hora_padrao', 'quadro.concluidas_dias', ...
   valor          TEXT NOT NULL CHECK (json_valid(valor)),
   atualizado_por TEXT REFERENCES usuario(id),
   atualizado_em  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -32,10 +38,9 @@ CREATE TABLE usuario (
   email             TEXT NOT NULL CHECK (email LIKE '%_@_%' AND email = lower(trim(email))),
   senha_hash        TEXT,                                -- 'scrypt$N$r$p$sal_b64$hash_b64'; nulo até aceitar o convite
   senha_definida_em TEXT,
-  papel             TEXT NOT NULL DEFAULT 'executor' CHECK (papel IN ('admin','atendimento','executor','agente')),
+  papel             TEXT NOT NULL DEFAULT 'equipe' CHECK (papel IN ('admin','atendimento','equipe')),
   cor               TEXT NOT NULL DEFAULT 'azul'
                     CHECK (cor IN ('ambar','amarelo','rosa','magenta','roxo','berinjela','verde','turquesa','azul','grafite')),
-  horas_semana      REAL NOT NULL DEFAULT 40 CHECK (horas_semana BETWEEN 0 AND 80),
   prefs             TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(prefs) AND json_type(prefs) = 'object'),
   ativo             INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0,1)),
   ultimo_acesso_em  TEXT,
@@ -70,11 +75,10 @@ CREATE TABLE token_acesso (                              -- convite (7 dias) e r
   expira_em   TEXT NOT NULL,
   usado_em    TEXT,                                      -- consumir: UPDATE ... WHERE usado_em IS NULL AND revogado_em IS NULL
   revogado_em TEXT,                                      --   AND expira_em > agora, exigindo changes = 1
-                                                         -- gerar outro do mesmo tipo, desativar a pessoa ou trocar o e-mail revoga
   criado_por  TEXT REFERENCES usuario(id),
   criado_em   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 ) STRICT;
--- no máximo um token pendente por pessoa e finalidade (o expirado também conta: gerar outro revoga o anterior)
+-- no máximo um token pendente por pessoa e finalidade (gerar outro, desativar a pessoa ou trocar o e-mail revoga)
 CREATE UNIQUE INDEX token_acesso_pendente_uk ON token_acesso (usuario_id, finalidade) WHERE usado_em IS NULL AND revogado_em IS NULL;
 
 CREATE TABLE login_tentativa (                           -- limites somados (API.md §4.2): e-mail+IP 5/15 min,
@@ -89,84 +93,132 @@ CREATE INDEX login_tentativa_ix       ON login_tentativa (email, ip, criado_em);
 CREATE INDEX login_tentativa_email_ix ON login_tentativa (email, criado_em);
 CREATE INDEX login_tentativa_ip_ix    ON login_tentativa (ip, criado_em);
 
--- ═════════════════════════════ fluxo, etapas e transições ═════════════════════════════
+-- ═════════════════════════════ modelos de quadro e equipes ═════════════════════════════
 
-CREATE TABLE fluxo (
-  id     TEXT PRIMARY KEY,
-  nome   TEXT NOT NULL UNIQUE,
-  padrao INTEGER NOT NULL DEFAULT 0 CHECK (padrao IN (0,1))
-) STRICT;
-CREATE UNIQUE INDEX fluxo_padrao_uk ON fluxo (padrao) WHERE padrao = 1;
-
-CREATE TABLE etapa (
-  id                TEXT PRIMARY KEY,
-  fluxo_id          TEXT NOT NULL REFERENCES fluxo(id),
-  nome              TEXT NOT NULL,
-  categoria         TEXT NOT NULL CHECK (categoria IN
-                    ('triagem','fila','producao','revisao','cliente','ajuste','aprovado','publicacao','concluido','cancelado')),
-  bola              TEXT NOT NULL DEFAULT 'agencia' CHECK (bola IN ('agencia','cliente','terceiro')),
-  pausa_sla         INTEGER NOT NULL DEFAULT 0 CHECK (pausa_sla IN (0,1)),
-  aplica_se         TEXT NOT NULL DEFAULT 'sempre' CHECK (aplica_se IN ('sempre','aprovacao_cliente','publicacao')),
-  responsavel_regra TEXT CHECK (responsavel_regra IS NULL OR responsavel_regra IN ('social_do_cliente')),
-  cor               TEXT NOT NULL CHECK (cor IN ('grafite','roxo','info','warning','turquesa','success','danger')),
-  pos               REAL NOT NULL,
-  UNIQUE (fluxo_id, nome),
-  UNIQUE (id, fluxo_id)
+CREATE TABLE modelo_quadro (                             -- "Novo quadro": Kanban simples, Por pessoa, Semana, Em branco
+  id        TEXT PRIMARY KEY,
+  nome      TEXT NOT NULL UNIQUE CHECK (length(trim(nome)) BETWEEN 1 AND 60),
+  descricao TEXT NOT NULL DEFAULT '' CHECK (length(descricao) <= 300),
+  pos       REAL NOT NULL
 ) STRICT;
 
-CREATE TABLE transicao (                                  -- única fonte das regras de movimento (SPEC §7.1)
-  de_categoria   TEXT NOT NULL CHECK (de_categoria IN
-                 ('triagem','fila','producao','revisao','cliente','ajuste','aprovado','publicacao','concluido','cancelado','*')),
-  para_categoria TEXT NOT NULL CHECK (para_categoria IN
-                 ('triagem','fila','producao','revisao','cliente','ajuste','aprovado','publicacao','concluido','cancelado','anterior')),
-  quem           TEXT NOT NULL CHECK (json_valid(quem) AND json_type(quem) = 'array'),   -- QuemTransicao[]
-  requer         TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(requer) AND json_type(requer) = 'array'), -- RequisitoTransicao[]
-  negado         TEXT NOT NULL,                            -- motivo exibido a quem não pode ("Só o atendimento envia ao cliente.")
-  PRIMARY KEY (de_categoria, para_categoria)
+CREATE TABLE modelo_quadro_coluna (
+  id         TEXT PRIMARY KEY,
+  modelo_id  TEXT NOT NULL REFERENCES modelo_quadro(id) ON DELETE CASCADE,
+  nome       TEXT NOT NULL CHECK (length(trim(nome)) BETWEEN 1 AND 60),
+  cor        TEXT CHECK (cor IS NULL OR cor IN ('ambar','amarelo','rosa','magenta','roxo','berinjela','verde','turquesa','azul','grafite')),
+  papel      TEXT NOT NULL DEFAULT 'normal' CHECK (papel IN ('normal','aguardando_cliente','concluida')),
+  por_membro INTEGER NOT NULL DEFAULT 0 CHECK (por_membro IN (0,1)),   -- 1 = vira uma coluna por membro ativo da equipe
+  pos        REAL NOT NULL,                                            --     (nome = apelido ou nome, cor = cor da pessoa)
+  CHECK (por_membro = 0 OR papel = 'normal')
 ) STRICT;
-
--- ═════════════════════════════ equipes e ausências ═════════════════════════════
+CREATE INDEX modelo_quadro_coluna_ix ON modelo_quadro_coluna (modelo_id, pos);
+CREATE UNIQUE INDEX modelo_quadro_coluna_membro_uk ON modelo_quadro_coluna (modelo_id) WHERE por_membro = 1;
 
 CREATE TABLE equipe (
-  id                  TEXT PRIMARY KEY,
-  nome                TEXT NOT NULL UNIQUE,
-  slug                TEXT NOT NULL UNIQUE CHECK (slug GLOB '[a-z]*' AND slug NOT GLOB '*[^a-z0-9-]*'),
-  cor                 TEXT NOT NULL DEFAULT 'grafite'
-                      CHECK (cor IN ('ambar','amarelo','rosa','magenta','roxo','berinjela','verde','turquesa','azul','grafite')),
-  fluxo_id            TEXT NOT NULL REFERENCES fluxo(id),
-  executora           INTEGER NOT NULL DEFAULT 1 CHECK (executora IN (0,1)),   -- recebe demandas (fila, visão)
-  aprovador_padrao_id TEXT REFERENCES usuario(id),        -- nulo = o AM da demanda aprova
-  distribuidor_id     TEXT REFERENCES usuario(id),        -- avisado quando chega demanda sem responsável
-  ativa               INTEGER NOT NULL DEFAULT 1 CHECK (ativa IN (0,1)),
-  pos                 REAL NOT NULL,
-  criado_em           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  atualizado_em       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  id               TEXT PRIMARY KEY,
+  nome             TEXT NOT NULL UNIQUE,
+  slug             TEXT NOT NULL UNIQUE CHECK (slug GLOB '[a-z]*' AND slug NOT GLOB '*[^a-z0-9-]*'),
+  cor              TEXT NOT NULL DEFAULT 'grafite'
+                   CHECK (cor IN ('ambar','amarelo','rosa','magenta','roxo','berinjela','verde','turquesa','azul','grafite')),
+  modelo_quadro_id TEXT REFERENCES modelo_quadro(id),     -- sugestão dos Primeiros passos ("criar o quadro da equipe")
+  ativa            INTEGER NOT NULL DEFAULT 1 CHECK (ativa IN (0,1)),
+  pos              REAL NOT NULL,
+  criado_em        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  atualizado_em    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 ) STRICT;
 
 CREATE TABLE equipe_membro (
   equipe_id  TEXT NOT NULL REFERENCES equipe(id),
   usuario_id TEXT NOT NULL REFERENCES usuario(id),
-  funcao     TEXT,                                         -- design, video, redacao, social, dev, trafego, atendimento
+  funcao     TEXT CHECK (funcao IS NULL OR length(funcao) <= 40),   -- design, vídeo, redação, social, dev, tráfego
   principal  INTEGER NOT NULL DEFAULT 0 CHECK (principal IN (0,1)),
   PRIMARY KEY (equipe_id, usuario_id)
 ) STRICT;
 CREATE INDEX equipe_membro_usuario_ix ON equipe_membro (usuario_id);
 
-CREATE TABLE ausencia (                                   -- "ausente de 20/10 a 31/10, substituto Samara"
-  id            TEXT PRIMARY KEY,
-  usuario_id    TEXT NOT NULL REFERENCES usuario(id),
-  de            TEXT NOT NULL CHECK (de  GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]'),
-  ate           TEXT NOT NULL CHECK (ate GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]'),
-  substituto_id TEXT NOT NULL REFERENCES usuario(id),
-  motivo        TEXT,
-  criado_por    TEXT NOT NULL REFERENCES usuario(id),
-  criado_em     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  cancelada_em  TEXT,
-  CHECK (ate >= de),
-  CHECK (substituto_id <> usuario_id)
+-- ═════════════════════════════ quadros, colunas, etiquetas, favoritos, automações ═════════════════════════════
+
+CREATE TABLE quadro (                                    -- /q/:slug. Todos os internos veem e editam; só admin cria,
+  id               TEXT PRIMARY KEY,                     -- renomeia, arquiva e exclui
+  nome             TEXT NOT NULL CHECK (length(trim(nome)) BETWEEN 1 AND 80),
+  slug             TEXT NOT NULL UNIQUE
+                   CHECK (length(slug) BETWEEN 1 AND 60 AND slug GLOB '[a-z0-9]*' AND slug NOT GLOB '*[^a-z0-9-]*'),
+  descricao        TEXT NOT NULL DEFAULT '' CHECK (length(descricao) <= 500),
+  cor              TEXT NOT NULL DEFAULT 'grafite'
+                   CHECK (cor IN ('ambar','amarelo','rosa','magenta','roxo','berinjela','verde','turquesa','azul','grafite')),
+  fundo            TEXT NOT NULL DEFAULT 'liso' CHECK (fundo IN ('liso','grafite','berinjela','cobalto','aurora')),
+  equipe_id        TEXT REFERENCES equipe(id),            -- agrupa no menu; seguidores padrão; responsável do cliente
+  modelo_quadro_id TEXT REFERENCES modelo_quadro(id),     -- de onde vieram as colunas (informativo)
+  pos              REAL NOT NULL,                         -- ordem no menu lateral
+  arquivado_em     TEXT,
+  arquivado_por    TEXT REFERENCES usuario(id),
+  origem_trello_id TEXT,
+  criado_por       TEXT REFERENCES usuario(id),
+  criado_em        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  atualizado_em    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  CHECK (arquivado_por IS NULL OR arquivado_em IS NOT NULL)
 ) STRICT;
-CREATE INDEX ausencia_usuario_ix    ON ausencia (usuario_id, de)    WHERE cancelada_em IS NULL;
-CREATE INDEX ausencia_substituto_ix ON ausencia (substituto_id, de) WHERE cancelada_em IS NULL;
+CREATE UNIQUE INDEX quadro_nome_uk   ON quadro (lower(nome)) WHERE arquivado_em IS NULL;
+CREATE UNIQUE INDEX quadro_trello_uk ON quadro (origem_trello_id) WHERE origem_trello_id IS NOT NULL;
+
+CREATE TABLE quadro_usuario (                            -- estrela (favorito) e "Seguir" por pessoa
+  usuario_id    TEXT NOT NULL REFERENCES usuario(id),
+  quadro_id     TEXT NOT NULL REFERENCES quadro(id) ON DELETE CASCADE,
+  favorito_pos  REAL,                                    -- não nulo = estrela; ordem entre os favoritos da pessoa
+  seguindo      INTEGER NOT NULL DEFAULT 0 CHECK (seguindo IN (0,1)),   -- recebe 'chegou' quando entra demanda
+  atualizado_em TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (usuario_id, quadro_id),
+  CHECK (favorito_pos IS NOT NULL OR seguindo = 1)       -- sem estrela e sem seguir, o serviço apaga a linha
+) STRICT;
+CREATE INDEX quadro_usuario_seguidores_ix ON quadro_usuario (quadro_id) WHERE seguindo = 1;
+
+CREATE TABLE coluna (                                    -- lista do quadro; qualquer interno cria, renomeia, colore,
+  id               TEXT PRIMARY KEY,                     -- reordena e arquiva (recolher é preferência local)
+  quadro_id        TEXT NOT NULL REFERENCES quadro(id) ON DELETE CASCADE,
+  nome             TEXT NOT NULL CHECK (length(trim(nome)) BETWEEN 1 AND 60),
+  cor              TEXT CHECK (cor IS NULL OR cor IN ('ambar','amarelo','rosa','magenta','roxo','berinjela','verde','turquesa','azul','grafite')),
+  papel            TEXT NOT NULL DEFAULT 'normal' CHECK (papel IN ('normal','aguardando_cliente','concluida')),
+                                                         -- aguardando_cliente: bola com o cliente, "parado há" pausado;
+                                                         -- concluida: cards aqui contam como entregues (concluida_em)
+  limite_wip       INTEGER CHECK (limite_wip IS NULL OR limite_wip BETWEEN 1 AND 99),   -- só aviso, não bloqueia
+  pos              REAL NOT NULL,
+  arquivada_em     TEXT,                                 -- só vazia (gatilho coluna_arquivar_vazia)
+  arquivada_por    TEXT REFERENCES usuario(id),
+  origem_trello_id TEXT,
+  criado_em        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  atualizado_em    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE (id, quadro_id),                                -- alvo das FKs (coluna_id, quadro_id)
+  CHECK (arquivada_por IS NULL OR arquivada_em IS NOT NULL)
+) STRICT;
+CREATE INDEX coluna_quadro_ix ON coluna (quadro_id, pos) WHERE arquivada_em IS NULL;
+CREATE UNIQUE INDEX coluna_trello_uk ON coluna (origem_trello_id) WHERE origem_trello_id IS NOT NULL;
+
+CREATE TABLE etiqueta (                                  -- por quadro, como no Trello; várias por card
+  id               TEXT PRIMARY KEY,
+  quadro_id        TEXT NOT NULL REFERENCES quadro(id) ON DELETE CASCADE,
+  nome             TEXT NOT NULL DEFAULT '' CHECK (length(nome) <= 40 AND nome = trim(nome)),   -- '' = só a cor
+  cor              TEXT NOT NULL CHECK (cor IN ('ambar','amarelo','rosa','magenta','roxo','berinjela','verde','turquesa','azul','grafite')),
+  pos              REAL NOT NULL,
+  origem_trello_id TEXT,
+  criado_em        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE (id, quadro_id)                                 -- alvo da FK de demanda_etiqueta
+) STRICT;
+CREATE INDEX etiqueta_quadro_ix ON etiqueta (quadro_id, pos);
+CREATE UNIQUE INDEX etiqueta_nome_uk ON etiqueta (quadro_id, lower(nome)) WHERE nome <> '';
+
+CREATE TABLE automacao_quadro (                          -- 4 gatilhos simples, cada um opcional (sem construtor de regras)
+  quadro_id         TEXT NOT NULL REFERENCES quadro(id) ON DELETE CASCADE,
+  gatilho           TEXT NOT NULL CHECK (gatilho IN ('enviado_ao_cliente','ajuste_pedido','aprovado','concluida')),
+  destino_quadro_id TEXT NOT NULL,                       -- pode ser outro quadro ("aprovado → Social/Agendar")
+  destino_coluna_id TEXT NOT NULL,
+  ativa             INTEGER NOT NULL DEFAULT 1 CHECK (ativa IN (0,1)),
+  atualizado_por    TEXT REFERENCES usuario(id),
+  atualizado_em     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (quadro_id, gatilho),
+  FOREIGN KEY (destino_coluna_id, destino_quadro_id) REFERENCES coluna (id, quadro_id) ON DELETE CASCADE
+) STRICT;
+CREATE INDEX automacao_destino_ix ON automacao_quadro (destino_coluna_id);
 
 -- ═════════════════════════════ clientes ═════════════════════════════
 
@@ -181,9 +233,7 @@ CREATE TABLE cliente (
   cor              TEXT NOT NULL DEFAULT 'azul'
                    CHECK (cor IN ('ambar','amarelo','rosa','magenta','roxo','berinjela','verde','turquesa','azul','grafite')),
   logo_arquivo_id  TEXT REFERENCES arquivo(id),           -- logo só por upload (a CSP não aceita imagem de host qualquer)
-  atendimento_id   TEXT REFERENCES usuario(id),            -- AM dono da conta
-  criativo_id      TEXT REFERENCES usuario(id),
-  social_id        TEXT REFERENCES usuario(id),            -- recebe a etapa Agendar
+  atendimento_id   TEXT REFERENCES usuario(id),            -- AM dono da conta (padrão do atendimento das demandas)
   rodadas_inclusas INTEGER NOT NULL DEFAULT 2 CHECK (rodadas_inclusas BETWEEN 0 AND 20),
   pasta_saida      TEXT,                                   -- M:\...\CLIENTES\<X>\...\SAÍDA: texto com Copiar, nunca href
   observacoes      TEXT,
@@ -203,6 +253,14 @@ CREATE TABLE cliente_alias (                              -- apelidos e grafias;
   criado_em  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 ) STRICT;
 CREATE INDEX cliente_alias_cliente_ix ON cliente_alias (cliente_id);
+
+CREATE TABLE cliente_responsavel (                        -- "na Criação, o HE é do Rafa": membro sugerido ao criar a
+  cliente_id TEXT NOT NULL REFERENCES cliente(id),        -- demanda num quadro da equipe ou ao mover para ele
+  equipe_id  TEXT NOT NULL REFERENCES equipe(id),
+  usuario_id TEXT NOT NULL REFERENCES usuario(id),
+  PRIMARY KEY (cliente_id, equipe_id)
+) STRICT;
+CREATE INDEX cliente_responsavel_usuario_ix ON cliente_responsavel (usuario_id);
 
 CREATE TABLE cliente_contato (                            -- quem aprova do lado do cliente
   id            TEXT PRIMARY KEY,
@@ -233,43 +291,44 @@ CREATE TABLE cliente_link (                               -- Drive, marca, Acess
 ) STRICT;
 CREATE INDEX cliente_link_cliente_ix ON cliente_link (cliente_id, pos);
 
--- ═════════════════════════════ tipos de peça e feriados ═════════════════════════════
+-- ═════════════════════════════ modelos de demanda e feriados ═════════════════════════════
 
-CREATE TABLE tipo_peca (
-  id                    TEXT PRIMARY KEY,
-  nome                  TEXT NOT NULL UNIQUE,
-  slug                  TEXT NOT NULL UNIQUE CHECK (slug GLOB '[a-z]*' AND slug NOT GLOB '*[^a-z0-9-]*'),
-  equipe_id             TEXT REFERENCES equipe(id),        -- equipe executora padrão; nulo = escolher na criação
-  aprovacao_cliente     INTEGER NOT NULL DEFAULT 1 CHECK (aprovacao_cliente IN (0,1)),  -- 0: Revisão → Entregue
-  publicacao            INTEGER NOT NULL DEFAULT 0 CHECK (publicacao IN (0,1)),         -- 1: Aprovado → Agendar
-  com_horario           INTEGER NOT NULL DEFAULT 0 CHECK (com_horario IN (0,1)),        -- gravação, reunião
-  sla_dias_uteis        INTEGER NOT NULL DEFAULT 2 CHECK (sla_dias_uteis BETWEEN 0 AND 120),
-  sla_ajuste_dias_uteis INTEGER NOT NULL DEFAULT 1 CHECK (sla_ajuste_dias_uteis BETWEEN 0 AND 60),
-  folga_aprovacao_dias  INTEGER NOT NULL DEFAULT 1 CHECK (folga_aprovacao_dias BETWEEN 0 AND 30),
-  estimativa_min        INTEGER CHECK (estimativa_min IS NULL OR estimativa_min >= 0),
-  rodadas_inclusas      INTEGER CHECK (rodadas_inclusas IS NULL OR rodadas_inclusas BETWEEN 0 AND 20),  -- nulo = do cliente
-  checklist_padrao      TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(checklist_padrao) AND json_type(checklist_padrao) = 'array'),
-  ativo                 INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0,1)),
-  pos                   REAL NOT NULL,
-  criado_em             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  atualizado_em         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+CREATE TABLE modelo_demanda (                             -- no lugar dos tipos de peça: briefing, checklist e etiquetas
+  id               TEXT PRIMARY KEY,                      -- padrão, prazo padrão em dias úteis
+  quadro_id        TEXT REFERENCES quadro(id) ON DELETE CASCADE,   -- nulo = global (aparece em todos os quadros)
+  nome             TEXT NOT NULL CHECK (length(trim(nome)) BETWEEN 1 AND 60),
+  descricao        TEXT NOT NULL DEFAULT '' CHECK (length(descricao) <= 200),   -- linha de ajuda na grade da Nova demanda
+  icone            TEXT CHECK (icone IS NULL OR (length(icone) BETWEEN 1 AND 40 AND icone NOT GLOB '*[^a-z0-9-]*')),  -- lucide
+  briefing_md      TEXT NOT NULL DEFAULT '' CHECK (length(briefing_md) <= 20000),   -- vira a descrição da demanda
+  prazo_dias_uteis INTEGER CHECK (prazo_dias_uteis IS NULL OR prazo_dias_uteis BETWEEN 0 AND 120),
+  prioridade       TEXT CHECK (prioridade IS NULL OR prioridade IN ('baixa','media','alta','urgente')),
+  estimativa_min   INTEGER CHECK (estimativa_min IS NULL OR estimativa_min BETWEEN 1 AND 100000),
+  rodadas_inclusas INTEGER CHECK (rodadas_inclusas IS NULL OR rodadas_inclusas BETWEEN 0 AND 20),  -- nulo = do cliente
+  ativo            INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0,1)),   -- "excluir" = desativar
+  pos              REAL NOT NULL,
+  criado_por       TEXT REFERENCES usuario(id),
+  criado_em        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  atualizado_em    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+) STRICT;
+CREATE UNIQUE INDEX modelo_demanda_nome_uk ON modelo_demanda (coalesce(quadro_id, ''), lower(nome)) WHERE ativo = 1;
+
+CREATE TABLE modelo_demanda_item (                        -- checklist padrão (agrupado pelo nome do checklist)
+  id        TEXT PRIMARY KEY,
+  modelo_id TEXT NOT NULL REFERENCES modelo_demanda(id) ON DELETE CASCADE,
+  checklist TEXT NOT NULL DEFAULT 'Checklist' CHECK (length(trim(checklist)) BETWEEN 1 AND 200),
+  texto     TEXT NOT NULL CHECK (length(trim(texto)) BETWEEN 1 AND 2000),
+  pos       REAL NOT NULL
+) STRICT;
+CREATE INDEX modelo_demanda_item_ix ON modelo_demanda_item (modelo_id, pos);
+
+CREATE TABLE modelo_demanda_etiqueta (                    -- etiquetas padrão por NOME: ao aplicar, casa com a etiqueta do
+  modelo_id TEXT NOT NULL REFERENCES modelo_demanda(id) ON DELETE CASCADE,   -- quadro de mesmo nome ou cria com esta cor
+  nome      TEXT NOT NULL CHECK (length(trim(nome)) BETWEEN 1 AND 40 AND nome = trim(nome)),
+  cor       TEXT NOT NULL CHECK (cor IN ('ambar','amarelo','rosa','magenta','roxo','berinjela','verde','turquesa','azul','grafite')),
+  PRIMARY KEY (modelo_id, nome)
 ) STRICT;
 
-CREATE TABLE tipo_peca_campo (
-  id           TEXT PRIMARY KEY,
-  tipo_peca_id TEXT NOT NULL REFERENCES tipo_peca(id),
-  chave        TEXT NOT NULL CHECK (chave GLOB '[a-z]*' AND chave NOT GLOB '*[^a-z0-9_]*'),
-  rotulo       TEXT NOT NULL,
-  tipo         TEXT NOT NULL CHECK (tipo IN ('texto','texto_longo','numero','data','selecao','multipla','url','sim_nao')),
-  opcoes       TEXT CHECK (opcoes IS NULL OR (json_valid(opcoes) AND json_type(opcoes) = 'array')),
-  obrigatorio  INTEGER NOT NULL DEFAULT 0 CHECK (obrigatorio IN (0,1)),    -- até 3 por tipo (gatilho)
-  ajuda        TEXT,
-  pos          REAL NOT NULL,
-  UNIQUE (tipo_peca_id, chave),
-  CHECK ((tipo IN ('selecao','multipla')) = (opcoes IS NOT NULL))
-) STRICT;
-
-CREATE TABLE feriado (                                    -- todo dia desta tabela é dia NÃO útil no cálculo de prazo
+CREATE TABLE feriado (                                    -- todo dia desta tabela é dia NÃO útil
   data TEXT PRIMARY KEY CHECK (data GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]'),
   nome TEXT NOT NULL,
   tipo TEXT NOT NULL DEFAULT 'nacional' CHECK (tipo IN ('nacional','estadual','municipal','facultativo'))
@@ -290,140 +349,138 @@ CREATE TABLE arquivo (                                    -- DATA_DIR/uploads/<2
 ) STRICT;
 CREATE INDEX arquivo_lixo_ix ON arquivo (excluido_em) WHERE excluido_em IS NOT NULL AND apagado_em IS NULL;
 
--- ═════════════════════════════ demanda ═════════════════════════════
+-- ═════════════════════════════ demanda (card) ═════════════════════════════
 
 CREATE TABLE demanda (
   id                      TEXT PRIMARY KEY,
-  numero                  INTEGER NOT NULL UNIQUE CHECK (numero > 0),  -- #4521: max+1 dentro do BEGIN IMMEDIATE; nunca muda
+  numero                  INTEGER NOT NULL UNIQUE CHECK (numero > 0),  -- #4521 global: max+1 no BEGIN IMMEDIATE; nunca muda
+  quadro_id               TEXT NOT NULL REFERENCES quadro(id),
+  coluna_id               TEXT NOT NULL,                   -- FK composta abaixo: a coluna é deste quadro
+  posicao                 REAL NOT NULL,                   -- ordem dentro da coluna; o servidor calcula entre vizinhos
   titulo                  TEXT NOT NULL CHECK (length(trim(titulo)) BETWEEN 1 AND 500),
-  cliente_id              TEXT REFERENCES cliente(id),
-  tipo_peca_id            TEXT REFERENCES tipo_peca(id),
-  equipe_id               TEXT REFERENCES equipe(id),
-  fluxo_id                TEXT NOT NULL REFERENCES fluxo(id),
-  etapa_id                TEXT NOT NULL,
-  etapa_anterior_id       TEXT REFERENCES etapa(id),       -- etapa de onde veio na última troca (reabrir = "anterior");
-                                                           -- mover() grava; o gatilho demanda_etapa_anterior confere
-  status                  TEXT NOT NULL CHECK (status IN
-                          ('triagem','fila','producao','revisao','cliente','ajuste','aprovado','publicacao','concluido','cancelado')),
-                                                           -- = etapa.categoria (gatilho confere)
-  status_desde            TEXT NOT NULL,                   -- muda só com a etapa; base do "parado há"
-  bola                    TEXT NOT NULL CHECK (bola IN ('agencia','cliente','terceiro')),
-  com_quem_id             TEXT REFERENCES usuario(id),     -- pessoa com a bola (sem resolver ausência); nulo se cliente/terceiro
-  bloqueio                TEXT CHECK (bloqueio IS NULL OR bloqueio IN ('cliente','interno','fornecedor')),
-  bloqueio_motivo         TEXT,
-  bloqueio_desde          TEXT,
-  responsavel_id          TEXT REFERENCES usuario(id),
-  responsavel_sugerido_id TEXT REFERENCES usuario(id),
-  atendimento_id          TEXT REFERENCES usuario(id),     -- padrão: cliente.atendimento_id
-  aprovador_id            TEXT REFERENCES usuario(id),     -- padrão: equipe.aprovador_padrao_id; nulo = o AM aprova
-  revisao_ok_por          TEXT REFERENCES usuario(id),     -- "Liberar para envio": o aprovador deu o ok interno em Revisão;
-  revisao_ok_em           TEXT,                            -- a bola passa ao AM ("pronta para enviar"). Limpos ao entrar em revisao
-  solicitante_id          TEXT NOT NULL REFERENCES usuario(id),
-  criado_por              TEXT NOT NULL REFERENCES usuario(id),
-  atualizado_por          TEXT REFERENCES usuario(id),     -- quem fez a última UPDATE (o app sempre grava)
-  briefing_md             TEXT NOT NULL DEFAULT '' CHECK (length(briefing_md) <= 100000),
-  briefing_campos         TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(briefing_campos) AND json_type(briefing_campos) = 'object'),
-  briefing_completo       INTEGER NOT NULL DEFAULT 0 CHECK (briefing_completo IN (0,1)),
-  briefing_atualizado_em  TEXT,                            -- muda com briefing_md/briefing_campos: no SSE, avisa para recarregar o detalhe
-  prioridade              INTEGER NOT NULL DEFAULT 0 CHECK (prioridade IN (0,1,2)),   -- normal, urgente, fura-pauta
-  prioridade_motivo       TEXT,
-  prazo                   TEXT CHECK (prazo IS NULL OR prazo GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]'),  -- prazo interno
-  prazo_hora              TEXT CHECK (prazo_hora IS NULL OR prazo_hora GLOB '[0-2][0-9]:[0-5][0-9]'),            -- nulo = 18:00
-  prazo_manual            INTEGER NOT NULL DEFAULT 0 CHECK (prazo_manual IN (0,1)),   -- 0 = calculado pela publicação/SLA
+  descricao_md            TEXT NOT NULL DEFAULT '' CHECK (length(descricao_md) <= 100000),
+  descricao_atualizada_em TEXT,                            -- no SSE, avisa para recarregar o detalhe (o texto não viaja)
+  cliente_id              TEXT REFERENCES cliente(id),     -- opcional, mas sugerido
+  atendimento_id          TEXT REFERENCES usuario(id),     -- AM; padrão: cliente.atendimento_id
+  modelo_id               TEXT REFERENCES modelo_demanda(id),   -- modelo usado na criação (nome na página pública)
+  prioridade              TEXT NOT NULL DEFAULT 'media' CHECK (prioridade IN ('baixa','media','alta','urgente')),
+  inicio                  TEXT CHECK (inicio IS NULL OR inicio GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]'),
+  inicio_hora             TEXT CHECK (inicio_hora IS NULL OR inicio_hora GLOB '[0-2][0-9]:[0-5][0-9]'),
+  prazo                   TEXT CHECK (prazo IS NULL OR prazo GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]'),
+  prazo_hora              TEXT CHECK (prazo_hora IS NULL OR prazo_hora GLOB '[0-2][0-9]:[0-5][0-9]'),   -- nulo = 18:00
   publicacao_data         TEXT CHECK (publicacao_data IS NULL OR publicacao_data GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]'),
   publicacao_hora         TEXT CHECK (publicacao_hora IS NULL OR publicacao_hora GLOB '[0-2][0-9]:[0-5][0-9]'),
-  planejada_para          TEXT CHECK (planejada_para IS NULL OR planejada_para GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]'),
-  agendada_inicio         TEXT CHECK (agendada_inicio IS NULL OR agendada_inicio GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]T*Z'),
-  agendada_fim            TEXT CHECK (agendada_fim IS NULL OR agendada_fim GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]T*Z'),
-  local                   TEXT,
-  estimativa_min          INTEGER CHECK (estimativa_min IS NULL OR estimativa_min >= 0),
-  minutos_registrados     INTEGER NOT NULL DEFAULT 0,      -- gatilho: soma dos apontamentos
+  estimativa_min          INTEGER CHECK (estimativa_min IS NULL OR estimativa_min BETWEEN 1 AND 100000),
+  minutos_registrados     INTEGER NOT NULL DEFAULT 0,      -- gatilho: soma dos apontamentos fechados
+  repetir                 TEXT NOT NULL DEFAULT 'nenhuma' CHECK (repetir IN ('nenhuma','diaria','semanal','mensal')),
+  capa_cor                TEXT CHECK (capa_cor IS NULL OR capa_cor IN ('ambar','amarelo','rosa','magenta','roxo','berinjela','verde','turquesa','azul','grafite')),
+  capa_anexo_id           TEXT,                            -- imagem anexada desta demanda (FK composta + gatilho)
+  concluida_em            TEXT,                            -- "concluída" (checkbox ou coluna de papel concluida)
+  concluida_por           TEXT REFERENCES usuario(id),     -- nulo = sistema
+  status_desde            TEXT NOT NULL,                   -- última mudança de coluna (ou de quadro): base do "parado há"
+  envio_pendente_em       TEXT,                            -- envio ao cliente sem decisão: a bola está com o cliente
   rodada_atual            INTEGER NOT NULL DEFAULT 1 CHECK (rodada_atual >= 1),
-  rodadas_inclusas        INTEGER NOT NULL DEFAULT 2 CHECK (rodadas_inclusas >= 0),
+  rodadas_inclusas        INTEGER NOT NULL DEFAULT 2 CHECK (rodadas_inclusas BETWEEN 0 AND 20),
   aprovada_em             TEXT,
   aprovada_versao_id      TEXT,
   versao_atual_id         TEXT,                            -- gatilho: última versão entregue
   versao_enviada_id       TEXT,                            -- gatilho: última versão enviada ao cliente
   n_versoes               INTEGER NOT NULL DEFAULT 0,
-  posicao                 REAL NOT NULL,                   -- ordem global; o servidor calcula entre vizinhos
-  origem                  TEXT NOT NULL DEFAULT 'manual'
-                          CHECK (origem IN ('manual','rapida','whatsapp','repeticao','agente','importacao','cliente')),
-  origem_texto            TEXT CHECK (origem_texto IS NULL OR length(origem_texto) <= 50000),  -- só texto puro
-  repetida_de_id          TEXT REFERENCES demanda(id),
   n_anexos                INTEGER NOT NULL DEFAULT 0,
   n_check_total           INTEGER NOT NULL DEFAULT 0,
   n_check_feitos          INTEGER NOT NULL DEFAULT 0,
-  concluida_em            TEXT,
-  cancelada_motivo        TEXT,
+  n_comentarios           INTEGER NOT NULL DEFAULT 0,
+  origem                  TEXT NOT NULL DEFAULT 'manual'
+                          CHECK (origem IN ('manual','rapida','whatsapp','copia','repeticao','importacao')),
+  origem_demanda_id       TEXT REFERENCES demanda(id),     -- de quem foi copiada ou repetida
+  origem_texto            TEXT CHECK (origem_texto IS NULL OR length(origem_texto) <= 50000),  -- colado do WhatsApp (texto puro)
+  criado_por              TEXT NOT NULL REFERENCES usuario(id),
+  atualizado_por          TEXT REFERENCES usuario(id),     -- quem fez a última UPDATE (o app sempre grava)
   arquivado_em            TEXT,
   arquivado_por           TEXT REFERENCES usuario(id),
   excluido_em             TEXT,                            -- "excluir" = anonimizar (admin; bloqueado com versão, envio ou
-                                                           -- aprovação; lista do que se limpa em API.md §4.8)
+                                                           -- aprovação; lista do que se limpa em API.md §4.12)
   origem_trello_id        TEXT,
   origem_trello_url       TEXT,
-  rev                     INTEGER NOT NULL DEFAULT 1,      -- If-Match; gatilho sobe com campos editados por pessoas
+  rev                     INTEGER NOT NULL DEFAULT 1,      -- If-Match; gatilho sobe com os campos do PATCH
   criado_em               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   atualizado_em           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  FOREIGN KEY (etapa_id, fluxo_id)          REFERENCES etapa (id, fluxo_id),
-  FOREIGN KEY (aprovada_versao_id, id)      REFERENCES versao (id, demanda_id),
-  FOREIGN KEY (versao_atual_id, id)         REFERENCES versao (id, demanda_id),
-  FOREIGN KEY (versao_enviada_id, id)       REFERENCES versao (id, demanda_id),
-  CHECK (cliente_id IS NOT NULL OR status IN ('triagem','cancelado')),
-  CHECK (prioridade = 0 OR prioridade_motivo IS NOT NULL),
+  UNIQUE (id, quadro_id),                                  -- alvo da FK de demanda_etiqueta
+  FOREIGN KEY (coluna_id, quadro_id)   REFERENCES coluna (id, quadro_id),
+  FOREIGN KEY (capa_anexo_id, id)      REFERENCES anexo (id, demanda_id),
+  FOREIGN KEY (aprovada_versao_id, id) REFERENCES versao (id, demanda_id),
+  FOREIGN KEY (versao_atual_id, id)    REFERENCES versao (id, demanda_id),
+  FOREIGN KEY (versao_enviada_id, id)  REFERENCES versao (id, demanda_id),
+  CHECK (inicio_hora IS NULL OR inicio IS NOT NULL),
   CHECK (prazo_hora IS NULL OR prazo IS NOT NULL),
   CHECK (publicacao_hora IS NULL OR publicacao_data IS NOT NULL),
-  CHECK (agendada_fim IS NULL OR (agendada_inicio IS NOT NULL AND agendada_fim > agendada_inicio)),
-  CHECK ((bloqueio IS NULL) = (bloqueio_desde IS NULL)),
+  CHECK (inicio IS NULL OR prazo IS NULL OR inicio <= prazo),
+  CHECK (repetir = 'nenhuma' OR prazo IS NOT NULL),       -- a próxima nasce com o prazo seguinte
+  CHECK (capa_cor IS NULL OR capa_anexo_id IS NULL),       -- capa: cor OU imagem
+  CHECK (concluida_por IS NULL OR concluida_em IS NOT NULL),
   CHECK ((aprovada_em IS NULL) = (aprovada_versao_id IS NULL)),
-  CHECK ((revisao_ok_em IS NULL) = (revisao_ok_por IS NULL)),
-  CHECK (status <> 'concluido' OR concluida_em IS NOT NULL)
+  CHECK (envio_pendente_em IS NULL OR versao_enviada_id IS NOT NULL),
+  CHECK ((origem IN ('copia','repeticao')) = (origem_demanda_id IS NOT NULL)),
+  CHECK (arquivado_por IS NULL OR arquivado_em IS NOT NULL)
 ) STRICT;
-CREATE UNIQUE INDEX demanda_trello_uk ON demanda (origem_trello_id) WHERE origem_trello_id IS NOT NULL;
-CREATE INDEX demanda_posicao_ix  ON demanda (posicao);
-CREATE INDEX demanda_quadro_ix   ON demanda (etapa_id, posicao)           WHERE arquivado_em IS NULL;
-CREATE INDEX demanda_abertas_ix  ON demanda (status, concluida_em)        WHERE arquivado_em IS NULL AND excluido_em IS NULL;
-CREATE INDEX demanda_equipe_ix   ON demanda (equipe_id, status)           WHERE arquivado_em IS NULL;
-CREATE INDEX demanda_comquem_ix  ON demanda (com_quem_id, status)         WHERE arquivado_em IS NULL;
-CREATE INDEX demanda_resp_ix     ON demanda (responsavel_id, status)      WHERE arquivado_em IS NULL;
-CREATE INDEX demanda_am_ix       ON demanda (atendimento_id, status)      WHERE arquivado_em IS NULL;
-CREATE INDEX demanda_cli_ix      ON demanda (cliente_id, criado_em);
-CREATE INDEX demanda_prazo_ix    ON demanda (prazo)                       WHERE arquivado_em IS NULL AND status NOT IN ('concluido','cancelado');
-CREATE INDEX demanda_semana_ix   ON demanda (responsavel_id, coalesce(planejada_para, prazo)) WHERE arquivado_em IS NULL;
-CREATE INDEX demanda_agenda_ix   ON demanda (agendada_inicio)             WHERE agendada_inicio IS NOT NULL;
--- Arquivo (API.md §4.15): arquivadas + entregues/canceladas que já saíram do quadro, pela data coalesce(...).
+CREATE UNIQUE INDEX demanda_trello_uk     ON demanda (origem_trello_id) WHERE origem_trello_id IS NOT NULL;
+CREATE UNIQUE INDEX demanda_repeticao_uk  ON demanda (origem_demanda_id) WHERE origem = 'repeticao';  -- 1 próxima por demanda
+CREATE INDEX demanda_coluna_ix    ON demanda (coluna_id, posicao)  WHERE arquivado_em IS NULL;
+CREATE INDEX demanda_quadro_ix    ON demanda (quadro_id)           WHERE arquivado_em IS NULL AND excluido_em IS NULL;
+CREATE INDEX demanda_prazo_ix     ON demanda (prazo)               WHERE arquivado_em IS NULL AND excluido_em IS NULL;
+CREATE INDEX demanda_am_ix        ON demanda (atendimento_id)      WHERE arquivado_em IS NULL;
+CREATE INDEX demanda_cli_ix       ON demanda (cliente_id, criado_em);
+CREATE INDEX demanda_pendente_ix  ON demanda (envio_pendente_em)   WHERE envio_pendente_em IS NOT NULL AND arquivado_em IS NULL;
+CREATE INDEX demanda_concluida_ix ON demanda (concluida_em)        WHERE concluida_em IS NOT NULL AND arquivado_em IS NULL;
+-- Arquivo (API.md §4.19): arquivadas + concluídas que já saíram do quadro, pela data coalesce(arquivado_em, concluida_em).
 -- A consulta repete o WHERE destes índices (o SQLite só usa índice parcial quando o termo aparece na consulta).
-CREATE INDEX demanda_arquivo_ix     ON demanda (coalesce(arquivado_em, concluida_em, status_desde))
-  WHERE excluido_em IS NULL AND (arquivado_em IS NOT NULL OR status IN ('concluido','cancelado'));
-CREATE INDEX demanda_arquivo_cli_ix ON demanda (cliente_id, coalesce(arquivado_em, concluida_em, status_desde))
-  WHERE excluido_em IS NULL AND (arquivado_em IS NOT NULL OR status IN ('concluido','cancelado'));
-CREATE INDEX demanda_triagem_ix  ON demanda (equipe_id, criado_em)        WHERE status = 'triagem' AND arquivado_em IS NULL;
+CREATE INDEX demanda_arquivo_ix     ON demanda (coalesce(arquivado_em, concluida_em))
+  WHERE excluido_em IS NULL AND (arquivado_em IS NOT NULL OR concluida_em IS NOT NULL);
+CREATE INDEX demanda_arquivo_cli_ix ON demanda (cliente_id, coalesce(arquivado_em, concluida_em))
+  WHERE excluido_em IS NULL AND (arquivado_em IS NOT NULL OR concluida_em IS NOT NULL);
 
-CREATE TABLE demanda_etapa_hist (                          -- tempo por etapa, bola e pessoa (gatilhos)
-  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE demanda_membro (                              -- "Pessoas" / responsáveis (vários)
   demanda_id     TEXT NOT NULL REFERENCES demanda(id),
-  etapa_id       TEXT NOT NULL REFERENCES etapa(id),
-  status         TEXT NOT NULL,
-  bola           TEXT NOT NULL,
-  com_quem_id    TEXT REFERENCES usuario(id),
-  responsavel_id TEXT REFERENCES usuario(id),
-  bloqueio       TEXT,
-  pausa_sla      INTEGER NOT NULL CHECK (pausa_sla IN (0,1)),   -- copiado no momento
-  entrou_em      TEXT NOT NULL,
-  saiu_em        TEXT,
-  por            TEXT REFERENCES usuario(id),
-  parcial        INTEGER NOT NULL DEFAULT 0 CHECK (parcial IN (0,1))   -- importado sem as ações antigas
+  usuario_id     TEXT NOT NULL REFERENCES usuario(id),
+  adicionado_por TEXT REFERENCES usuario(id),
+  adicionado_em  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (demanda_id, usuario_id)
 ) STRICT;
-CREATE INDEX demanda_etapa_hist_ix ON demanda_etapa_hist (demanda_id, entrou_em);
-CREATE UNIQUE INDEX demanda_etapa_hist_aberta_uk ON demanda_etapa_hist (demanda_id) WHERE saiu_em IS NULL;
+CREATE INDEX demanda_membro_usuario_ix ON demanda_membro (usuario_id);
 
-CREATE TABLE demanda_mencao (                              -- @ no briefing (validada no servidor)
+CREATE TABLE demanda_etiqueta (                            -- etiqueta e demanda do MESMO quadro (as duas FKs compostas)
+  demanda_id  TEXT NOT NULL,
+  etiqueta_id TEXT NOT NULL,
+  quadro_id   TEXT NOT NULL,
+  PRIMARY KEY (demanda_id, etiqueta_id),
+  FOREIGN KEY (demanda_id, quadro_id)  REFERENCES demanda (id, quadro_id),
+  FOREIGN KEY (etiqueta_id, quadro_id) REFERENCES etiqueta (id, quadro_id) ON DELETE CASCADE
+) STRICT;
+CREATE INDEX demanda_etiqueta_etiqueta_ix ON demanda_etiqueta (etiqueta_id);
+
+CREATE TABLE demanda_movimento (                           -- histórico de colunas e quadros (gatilhos); tempo por coluna
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  demanda_id TEXT NOT NULL REFERENCES demanda(id),
+  quadro_id  TEXT NOT NULL,
+  coluna_id  TEXT NOT NULL,
+  papel      TEXT NOT NULL CHECK (papel IN ('normal','aguardando_cliente','concluida')),   -- papel da coluna na entrada
+  entrou_em  TEXT NOT NULL,                                -- = demanda.status_desde gravado pelo app
+  saiu_em    TEXT,
+  por        TEXT REFERENCES usuario(id),                  -- nulo = sistema (automação, repetição)
+  FOREIGN KEY (coluna_id, quadro_id) REFERENCES coluna (id, quadro_id)
+) STRICT;
+CREATE INDEX demanda_movimento_ix ON demanda_movimento (demanda_id, id);
+CREATE INDEX demanda_movimento_quadro_ix ON demanda_movimento (quadro_id);
+CREATE UNIQUE INDEX demanda_movimento_aberto_uk ON demanda_movimento (demanda_id) WHERE saiu_em IS NULL;
+
+CREATE TABLE demanda_mencao (                              -- @ na descrição (validada no servidor; só as novas notificam)
   demanda_id TEXT NOT NULL REFERENCES demanda(id),
   usuario_id TEXT NOT NULL REFERENCES usuario(id),
   PRIMARY KEY (demanda_id, usuario_id)
 ) STRICT;
 
 CREATE VIRTUAL TABLE demanda_fts USING fts5 (
-  titulo, briefing_md,
+  titulo, descricao_md,
   content = 'demanda', content_rowid = 'numero',
   tokenize = 'unicode61 remove_diacritics 2',
   prefix = '2 3'
@@ -447,7 +504,7 @@ CREATE TABLE rodada (
   prazo_original    TEXT,                                    -- gravado na abertura; mostra renegociação
   aberta_em         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   aberta_por        TEXT REFERENCES usuario(id),
-  fechada_em        TEXT,                                    -- ao abrir a próxima, ou ao aprovar/concluir
+  fechada_em        TEXT,                                    -- ao abrir a próxima, ou ao aprovar
   UNIQUE (demanda_id, numero),
   UNIQUE (id, demanda_id),
   CHECK ((origem = 'inicial') = (numero = 1)),
@@ -556,7 +613,8 @@ CREATE TABLE aprovacao (                                   -- decisão do client
                      ('cliente_mudou','briefing_incompleto','erro_execucao','erro_atendimento','outro')),
   rodada_aberta_id   TEXT REFERENCES rodada(id),
   evidencia_anexo_id TEXT REFERENCES anexo(id),              -- print do WhatsApp (opcional)
-  responsavel_anterior_id TEXT REFERENCES usuario(id),       -- responsável antes da decisão: anular a aprovação o restaura
+  quadro_antes_id    TEXT NOT NULL,                          -- onde a demanda estava antes da decisão (e da automação):
+  coluna_antes_id    TEXT NOT NULL,                          -- anular a aprovação devolve para cá (API.md §4.15)
   idempotency_key    TEXT,                                   -- só via link; única por link (aprovacao_idem_uk)
   idempotency_hash   TEXT,                                   -- sha256 de demandaId|versaoId|decisao|linhas|contatoId|nomeInformado
   ip_hmac            TEXT,                                   -- HMAC com SEGREDO; apagado após 12 meses
@@ -565,6 +623,7 @@ CREATE TABLE aprovacao (                                   -- decisão do client
   anulada_em         TEXT,
   anulada_por        TEXT REFERENCES usuario(id),
   FOREIGN KEY (versao_id, demanda_id) REFERENCES versao (id, demanda_id),
+  FOREIGN KEY (coluna_antes_id, quadro_antes_id) REFERENCES coluna (id, quadro_id),
   CHECK (decisao = 'aprovado' OR comentario IS NOT NULL),
   CHECK (via = 'link' OR registrado_por IS NOT NULL),
   CHECK (via = 'manual' OR link_id IS NOT NULL),
@@ -602,24 +661,24 @@ CREATE TABLE checklist_item (
   pos              REAL NOT NULL,
   criado_em        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   origem_trello_id TEXT,
-  FOREIGN KEY (checklist_id, demanda_id) REFERENCES checklist (id, demanda_id) ON DELETE CASCADE,  -- único cascade
+  FOREIGN KEY (checklist_id, demanda_id) REFERENCES checklist (id, demanda_id) ON DELETE CASCADE,
   CHECK ((feito_em IS NULL) = (feito_por IS NULL))
 ) STRICT;
 CREATE INDEX checklist_item_ix ON checklist_item (checklist_id, pos);
 CREATE INDEX checklist_item_demanda_ix ON checklist_item (demanda_id);
 
 CREATE TABLE comentario (
-  id              TEXT PRIMARY KEY,
-  demanda_id      TEXT NOT NULL REFERENCES demanda(id),
-  autor_id        TEXT REFERENCES usuario(id),               -- nulo = cliente pelo link
-  autor_externo   TEXT,                                      -- nome informado pelo cliente (texto puro)
-  link_id         TEXT REFERENCES link_publico(id),
-  versao_id       TEXT,
-  corpo_md        TEXT NOT NULL CHECK (length(corpo_md) <= 20000),   -- vazio só quando excluído (CHECK abaixo)
-  visivel_cliente INTEGER NOT NULL DEFAULT 0 CHECK (visivel_cliente IN (0,1)),   -- só atendimento/admin/quem cobre o AM liga
-  editado_em      TEXT,
-  excluido_em     TEXT,
-  criado_em       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  id               TEXT PRIMARY KEY,
+  demanda_id       TEXT NOT NULL REFERENCES demanda(id),
+  autor_id         TEXT REFERENCES usuario(id),              -- nulo = cliente pelo link
+  autor_externo    TEXT,                                     -- nome informado pelo cliente (texto puro)
+  link_id          TEXT REFERENCES link_publico(id),
+  versao_id        TEXT,
+  corpo_md         TEXT NOT NULL CHECK (length(corpo_md) <= 20000),   -- vazio só quando excluído (CHECK abaixo)
+  visivel_cliente  INTEGER NOT NULL DEFAULT 0 CHECK (visivel_cliente IN (0,1)),   -- só atendimento/admin ligam
+  editado_em       TEXT,
+  excluido_em      TEXT,
+  criado_em        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   origem_trello_id TEXT,
   FOREIGN KEY (versao_id, demanda_id) REFERENCES versao (id, demanda_id),
   CHECK (autor_id IS NOT NULL OR autor_externo IS NOT NULL),
@@ -654,6 +713,7 @@ CREATE TABLE anexo (                                       -- links e arquivos d
   criado_em        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   excluido_em      TEXT,
   origem_trello_id TEXT,
+  UNIQUE (id, demanda_id),                                 -- alvo da FK da capa (capa_anexo_id, id)
   CHECK (excluido_em IS NOT NULL                         -- excluir a demanda limpa url/caminho/arquivo do anexo
       OR (tipo = 'link' AND url IS NOT NULL) OR (tipo = 'caminho' AND caminho IS NOT NULL)
       OR (tipo = 'arquivo' AND arquivo_id IS NOT NULL))
@@ -663,39 +723,42 @@ CREATE INDEX anexo_arquivo_ix ON anexo (arquivo_id) WHERE arquivo_id IS NOT NULL
 CREATE INDEX anexo_comentario_ix ON anexo (comentario_id) WHERE comentario_id IS NOT NULL;
 CREATE UNIQUE INDEX anexo_trello_uk ON anexo (origem_trello_id) WHERE origem_trello_id IS NOT NULL;
 
--- ═════════════════════════════ horas ═════════════════════════════
+-- ═════════════════════════════ horas: lançar tempo e cronômetro ═════════════════════════════
 
-CREATE TABLE apontamento (                                 -- "Lançar tempo" (MVP); timer na v1
-  id            TEXT PRIMARY KEY,
-  usuario_id    TEXT NOT NULL REFERENCES usuario(id),
-  demanda_id    TEXT REFERENCES demanda(id),
-  cliente_id    TEXT REFERENCES cliente(id),               -- copiado da demanda
-  data          TEXT NOT NULL CHECK (data GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]'),
-  minutos       INTEGER CHECK (minutos IS NULL OR minutos BETWEEN 1 AND 1440),
-  inicio        TEXT,                                      -- timer (v1)
-  fim           TEXT,
-  origem        TEXT NOT NULL DEFAULT 'manual' CHECK (origem IN ('manual','timer','importado')),
-  nota          TEXT CHECK (nota IS NULL OR length(nota) <= 500),
-  criado_em     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+CREATE TABLE apontamento (                                 -- "Lançar tempo" (manual) e cronômetro (iniciado_em aberto)
+  id          TEXT PRIMARY KEY,
+  usuario_id  TEXT NOT NULL REFERENCES usuario(id),
+  demanda_id  TEXT REFERENCES demanda(id),
+  cliente_id  TEXT REFERENCES cliente(id),               -- copiado da demanda (horas por cliente)
+  data        TEXT NOT NULL CHECK (data GLOB '[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]'),   -- dia local do início
+  minutos     INTEGER CHECK (minutos IS NULL OR minutos BETWEEN 1 AND 1440),               -- nulo = cronômetro rodando
+  iniciado_em TEXT,
+  parado_em   TEXT,
+  origem      TEXT NOT NULL DEFAULT 'manual' CHECK (origem IN ('manual','cronometro','importado')),
+  nota        TEXT CHECK (nota IS NULL OR length(nota) <= 500),
+  criado_em   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   atualizado_em TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  excluido_em   TEXT,
-  CHECK (minutos IS NOT NULL OR (inicio IS NOT NULL AND fim IS NULL)),
-  CHECK (fim IS NULL OR (inicio IS NOT NULL AND fim > inicio)),
+  excluido_em TEXT,
+  CHECK (origem <> 'cronometro' OR (iniciado_em IS NOT NULL AND demanda_id IS NOT NULL)),
+  CHECK ((minutos IS NULL) = (origem = 'cronometro' AND parado_em IS NULL)),   -- rodando ⇔ sem minutos
+  CHECK (parado_em IS NULL OR (iniciado_em IS NOT NULL AND parado_em > iniciado_em)),
   CHECK (demanda_id IS NOT NULL OR cliente_id IS NOT NULL)
 ) STRICT;
-CREATE UNIQUE INDEX apontamento_um_timer_uk ON apontamento (usuario_id) WHERE minutos IS NULL AND excluido_em IS NULL;
+-- no máximo UM cronômetro ativo por pessoa (iniciar outro para o anterior no serviço, na mesma transação)
+CREATE UNIQUE INDEX apontamento_um_cronometro_uk ON apontamento (usuario_id)
+  WHERE origem = 'cronometro' AND parado_em IS NULL AND excluido_em IS NULL;
 CREATE INDEX apontamento_demanda_ix ON apontamento (demanda_id) WHERE excluido_em IS NULL;
 CREATE INDEX apontamento_cliente_ix ON apontamento (cliente_id, data);
 CREATE INDEX apontamento_usuario_ix ON apontamento (usuario_id, data);
 
--- ═════════════════════════════ histórico, notificações, mural, visões ═════════════════════════════
+-- ═════════════════════════════ histórico e notificações ═════════════════════════════
 
 CREATE TABLE atividade (                                   -- histórico tipado (shared/tipos/demandas.ts: TIPOS_ATIVIDADE)
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   demanda_id TEXT REFERENCES demanda(id),
   cliente_id TEXT REFERENCES cliente(id),
   ator_id    TEXT REFERENCES usuario(id),
-  ator_tipo  TEXT NOT NULL CHECK (ator_tipo IN ('usuario','cliente','sistema','agente','importacao')),
+  ator_tipo  TEXT NOT NULL CHECK (ator_tipo IN ('usuario','cliente','sistema','importacao')),
   tipo       TEXT NOT NULL CHECK (tipo GLOB '[a-z]*.[a-z]*'),
   dados      TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(dados) AND json_type(dados) = 'object'),
   antes      TEXT CHECK (antes IS NULL OR json_valid(antes)),   -- valores anteriores (como o `old` do Trello)
@@ -708,10 +771,9 @@ CREATE INDEX atividade_tipo_ix    ON atividade (tipo, criado_em);
 
 CREATE TABLE notificacao (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  usuario_id   TEXT NOT NULL REFERENCES usuario(id),        -- já resolvido para o substituto, se houver
-  cobrindo_id  TEXT REFERENCES usuario(id),                 -- "cobrindo Samara"
-  tipo         TEXT NOT NULL CHECK (tipo IN ('atribuida','voltou','mencao','aprovada','ajuste_pedido',
-                                             'triagem','fila_sem_responsavel','prazo','cobertura')),
+  usuario_id   TEXT NOT NULL REFERENCES usuario(id),
+  tipo         TEXT NOT NULL CHECK (tipo IN ('membro','mencao','comentario','versao_entregue','aprovada',
+                                             'ajuste_pedido','prazo','chegou')),
   demanda_id   TEXT REFERENCES demanda(id),
   atividade_id INTEGER REFERENCES atividade(id),
   ator_id      TEXT REFERENCES usuario(id),
@@ -722,38 +784,8 @@ CREATE TABLE notificacao (
 CREATE INDEX notificacao_naolida_ix ON notificacao (usuario_id, id DESC) WHERE lida_em IS NULL;
 CREATE INDEX notificacao_usuario_ix ON notificacao (usuario_id, id DESC);
 CREATE INDEX notificacao_demanda_ix ON notificacao (demanda_id);
-
-CREATE TABLE aviso (                                       -- Mural (por equipe; equipe nula = da agência)
-  id               TEXT PRIMARY KEY,
-  equipe_id        TEXT REFERENCES equipe(id),
-  titulo           TEXT NOT NULL CHECK (length(trim(titulo)) BETWEEN 1 AND 200),
-  corpo_md         TEXT NOT NULL DEFAULT '' CHECK (length(corpo_md) <= 50000),
-  fixado           INTEGER NOT NULL DEFAULT 0 CHECK (fixado IN (0,1)),
-  pos              REAL NOT NULL,
-  criado_por       TEXT NOT NULL REFERENCES usuario(id),
-  criado_em        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  atualizado_por   TEXT REFERENCES usuario(id),
-  atualizado_em    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  arquivado_em     TEXT,
-  origem_trello_id TEXT
-) STRICT;
-CREATE INDEX aviso_equipe_ix ON aviso (equipe_id, fixado DESC, pos) WHERE arquivado_em IS NULL;
-
-CREATE TABLE visao (                                       -- semeadas no MVP; pessoais (dono_id) na v1
-  id          TEXT PRIMARY KEY,
-  nome        TEXT NOT NULL,
-  slug        TEXT NOT NULL UNIQUE CHECK (slug GLOB '[a-z]*' AND slug NOT GLOB '*[^a-z0-9-]*'),
-  equipe_id   TEXT REFERENCES equipe(id),                   -- abre por padrão para os membros
-  dono_id     TEXT REFERENCES usuario(id),
-  layout      TEXT NOT NULL DEFAULT 'quadro' CHECK (layout IN ('quadro','lista','semana')),
-  agrupar_por TEXT NOT NULL DEFAULT 'etapa' CHECK (agrupar_por IN ('etapa','responsavel','cliente','dia')),
-  filtros     TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(filtros) AND json_type(filtros) = 'object'),     -- FiltrosVisao
-  recolhidas  TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(recolhidas) AND json_type(recolhidas) = 'array'), -- Categoria[]
-  icone       TEXT,                                          -- nome do ícone lucide
-  pos         REAL NOT NULL,
-  criado_em   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  atualizado_em TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-) STRICT;
+-- job de prazo: consulta este índice para não repetir 'prazo' para a mesma pessoa e demanda no mesmo dia
+CREATE INDEX notificacao_prazo_ix ON notificacao (usuario_id, demanda_id, criado_em) WHERE tipo = 'prazo';
 
 -- ═════════════════════════════ tempo real e tarefas ═════════════════════════════
 
@@ -778,10 +810,10 @@ CREATE INDEX evento_tempo_ix ON evento (criado_em);        -- poda diária: guar
 -- seq atual = SELECT seq FROM sqlite_sequence WHERE name = 'evento' (sobrevive à poda; regras de retomada em API.md §3)
 
 CREATE TABLE tarefa_execucao (                             -- jobs diários (backup, poda, lixo, prazo): última execução
-  nome    TEXT PRIMARY KEY,
+  nome      TEXT PRIMARY KEY,
   ultima_em TEXT NOT NULL,
-  ok      INTEGER NOT NULL CHECK (ok IN (0,1)),
-  detalhe TEXT
+  ok        INTEGER NOT NULL CHECK (ok IN (0,1)),
+  detalhe   TEXT
 ) STRICT;
 
 -- ═════════════════════════════ gatilhos: nada se apaga ═════════════════════════════
@@ -792,6 +824,12 @@ CREATE TRIGGER cliente_sem_delete BEFORE DELETE ON cliente
 BEGIN SELECT RAISE(ABORT, 'cliente_nao_se_apaga: use status ex'); END;
 CREATE TRIGGER demanda_sem_delete BEFORE DELETE ON demanda
 BEGIN SELECT RAISE(ABORT, 'demanda_nao_se_apaga: arquive ou anonimize'); END;
+-- quadro só se apaga se nunca teve demanda (nem arquivada, nem de passagem): senão, arquivar
+CREATE TRIGGER quadro_sem_historico BEFORE DELETE ON quadro
+WHEN EXISTS (SELECT 1 FROM demanda WHERE quadro_id = OLD.id)
+  OR EXISTS (SELECT 1 FROM demanda_movimento WHERE quadro_id = OLD.id)
+  OR EXISTS (SELECT 1 FROM aprovacao WHERE quadro_antes_id = OLD.id)
+BEGIN SELECT RAISE(ABORT, 'quadro_com_historico: arquive o quadro'); END;
 
 -- ═════════════════════════════ gatilhos: atualizado_em ═════════════════════════════
 
@@ -799,16 +837,16 @@ CREATE TRIGGER usuario_atualizado_em AFTER UPDATE ON usuario WHEN NEW.atualizado
 BEGIN UPDATE usuario SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
 CREATE TRIGGER equipe_atualizado_em AFTER UPDATE ON equipe WHEN NEW.atualizado_em IS OLD.atualizado_em
 BEGIN UPDATE equipe SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER quadro_atualizado_em AFTER UPDATE ON quadro WHEN NEW.atualizado_em IS OLD.atualizado_em
+BEGIN UPDATE quadro SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER coluna_atualizado_em AFTER UPDATE ON coluna WHEN NEW.atualizado_em IS OLD.atualizado_em
+BEGIN UPDATE coluna SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
 CREATE TRIGGER cliente_atualizado_em AFTER UPDATE ON cliente WHEN NEW.atualizado_em IS OLD.atualizado_em
 BEGIN UPDATE cliente SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
 CREATE TRIGGER cliente_contato_atualizado_em AFTER UPDATE ON cliente_contato WHEN NEW.atualizado_em IS OLD.atualizado_em
 BEGIN UPDATE cliente_contato SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
-CREATE TRIGGER tipo_peca_atualizado_em AFTER UPDATE ON tipo_peca WHEN NEW.atualizado_em IS OLD.atualizado_em
-BEGIN UPDATE tipo_peca SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
-CREATE TRIGGER visao_atualizado_em AFTER UPDATE ON visao WHEN NEW.atualizado_em IS OLD.atualizado_em
-BEGIN UPDATE visao SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
-CREATE TRIGGER aviso_atualizado_em AFTER UPDATE ON aviso WHEN NEW.atualizado_em IS OLD.atualizado_em
-BEGIN UPDATE aviso SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER modelo_demanda_atualizado_em AFTER UPDATE ON modelo_demanda WHEN NEW.atualizado_em IS OLD.atualizado_em
+BEGIN UPDATE modelo_demanda SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
 CREATE TRIGGER apontamento_atualizado_em AFTER UPDATE ON apontamento WHEN NEW.atualizado_em IS OLD.atualizado_em
 BEGIN UPDATE apontamento SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
 CREATE TRIGGER configuracao_atualizado_em AFTER UPDATE ON configuracao WHEN NEW.atualizado_em IS OLD.atualizado_em
@@ -816,114 +854,108 @@ BEGIN UPDATE configuracao SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now
 CREATE TRIGGER demanda_atualizado_em AFTER UPDATE ON demanda WHEN NEW.atualizado_em IS OLD.atualizado_em
 BEGIN UPDATE demanda SET atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
 
--- ═════════════════════════════ gatilhos: integridade de configuração ═════════════════════════════
+-- ═════════════════════════════ gatilhos: quadro, coluna e etiqueta ═════════════════════════════
 
-CREATE TRIGGER etapa_categoria_fixa BEFORE UPDATE OF categoria ON etapa WHEN NEW.categoria IS NOT OLD.categoria
-BEGIN SELECT RAISE(ABORT, 'etapa_categoria_fixa'); END;
+CREATE TRIGGER coluna_quadro_fixo BEFORE UPDATE OF quadro_id ON coluna WHEN NEW.quadro_id IS NOT OLD.quadro_id
+BEGIN SELECT RAISE(ABORT, 'coluna_quadro_fixo'); END;
+CREATE TRIGGER etiqueta_quadro_fixo BEFORE UPDATE OF quadro_id ON etiqueta WHEN NEW.quadro_id IS NOT OLD.quadro_id
+BEGIN SELECT RAISE(ABORT, 'etiqueta_quadro_fixo'); END;
 
-CREATE TRIGGER tipo_peca_campo_max3_ai AFTER INSERT ON tipo_peca_campo WHEN NEW.obrigatorio = 1
-BEGIN
-  SELECT RAISE(ABORT, 'tipo_peca_max_3_obrigatorios')
-  WHERE (SELECT count(*) FROM tipo_peca_campo WHERE tipo_peca_id = NEW.tipo_peca_id AND obrigatorio = 1) > 3;
-END;
-CREATE TRIGGER tipo_peca_campo_max3_au AFTER UPDATE OF obrigatorio, tipo_peca_id ON tipo_peca_campo WHEN NEW.obrigatorio = 1
-BEGIN
-  SELECT RAISE(ABORT, 'tipo_peca_max_3_obrigatorios')
-  WHERE (SELECT count(*) FROM tipo_peca_campo WHERE tipo_peca_id = NEW.tipo_peca_id AND obrigatorio = 1) > 3;
-END;
+-- coluna só se arquiva vazia (as arquivadas podem continuar apontando para ela; restaurar escolhe outra coluna)
+CREATE TRIGGER coluna_arquivar_vazia BEFORE UPDATE OF arquivada_em ON coluna
+WHEN NEW.arquivada_em IS NOT NULL AND OLD.arquivada_em IS NULL
+  AND EXISTS (SELECT 1 FROM demanda WHERE coluna_id = NEW.id AND arquivado_em IS NULL)
+BEGIN SELECT RAISE(ABORT, 'coluna_com_demandas: mova ou arquive os cards antes'); END;
 
-CREATE TRIGGER ausencia_sem_sobreposicao_ai BEFORE INSERT ON ausencia WHEN NEW.cancelada_em IS NULL
-BEGIN
-  SELECT RAISE(ABORT, 'ausencia_sobreposta')
-  WHERE EXISTS (SELECT 1 FROM ausencia a WHERE a.usuario_id = NEW.usuario_id AND a.cancelada_em IS NULL
-                AND a.de <= NEW.ate AND a.ate >= NEW.de);
-END;
-CREATE TRIGGER ausencia_sem_sobreposicao_au BEFORE UPDATE OF de, ate, usuario_id, cancelada_em ON ausencia
-WHEN NEW.cancelada_em IS NULL
-BEGIN
-  SELECT RAISE(ABORT, 'ausencia_sobreposta')
-  WHERE EXISTS (SELECT 1 FROM ausencia a WHERE a.usuario_id = NEW.usuario_id AND a.cancelada_em IS NULL
-                AND a.id <> NEW.id AND a.de <= NEW.ate AND a.ate >= NEW.de);
-END;
+-- coluna que vira 'concluida' não pode ter demanda ativa sem concluida_em (o serviço conclui antes)
+CREATE TRIGGER coluna_papel_concluida BEFORE UPDATE OF papel ON coluna
+WHEN NEW.papel = 'concluida' AND OLD.papel IS NOT 'concluida'
+  AND EXISTS (SELECT 1 FROM demanda WHERE coluna_id = NEW.id AND arquivado_em IS NULL AND concluida_em IS NULL)
+BEGIN SELECT RAISE(ABORT, 'concluida_sem_data: conclua as demandas da coluna antes'); END;
 
 -- ═════════════════════════════ gatilhos: demanda ═════════════════════════════
 
 CREATE TRIGGER demanda_numero_fixo BEFORE UPDATE OF numero ON demanda WHEN NEW.numero IS NOT OLD.numero
 BEGIN SELECT RAISE(ABORT, 'demanda_numero_fixo'); END;
 
-CREATE TRIGGER demanda_status_confere_ai BEFORE INSERT ON demanda
-WHEN NEW.status IS NOT (SELECT categoria FROM etapa WHERE id = NEW.etapa_id)
-BEGIN SELECT RAISE(ABORT, 'demanda_status_diferente_da_categoria_da_etapa'); END;
-CREATE TRIGGER demanda_status_confere_au BEFORE UPDATE OF etapa_id, status ON demanda
-WHEN NEW.status IS NOT (SELECT categoria FROM etapa WHERE id = NEW.etapa_id)
-BEGIN SELECT RAISE(ABORT, 'demanda_status_diferente_da_categoria_da_etapa'); END;
+-- demanda ativa não entra em coluna nem quadro arquivados (insert, mover, restaurar)
+CREATE TRIGGER demanda_destino_ativo_ai BEFORE INSERT ON demanda
+WHEN NEW.arquivado_em IS NULL AND (
+     (SELECT arquivada_em FROM coluna WHERE id = NEW.coluna_id) IS NOT NULL
+  OR (SELECT arquivado_em FROM quadro WHERE id = NEW.quadro_id) IS NOT NULL)
+BEGIN SELECT RAISE(ABORT, 'destino_arquivado: coluna ou quadro arquivado'); END;
+CREATE TRIGGER demanda_destino_ativo_au BEFORE UPDATE OF coluna_id, quadro_id, arquivado_em ON demanda
+WHEN NEW.arquivado_em IS NULL
+  AND (NEW.coluna_id IS NOT OLD.coluna_id OR NEW.quadro_id IS NOT OLD.quadro_id OR OLD.arquivado_em IS NOT NULL)
+  AND ((SELECT arquivada_em FROM coluna WHERE id = NEW.coluna_id) IS NOT NULL
+    OR (SELECT arquivado_em FROM quadro WHERE id = NEW.quadro_id) IS NOT NULL)
+BEGIN SELECT RAISE(ABORT, 'destino_arquivado: coluna ou quadro arquivado'); END;
 
--- rev sobe só com campos editados por pessoas (contadores, posição e minutos não contam).
+-- mudar de coluna (ou de quadro) grava status_desde: é o instante do histórico e a base do "parado há"
+CREATE TRIGGER demanda_status_desde BEFORE UPDATE OF coluna_id ON demanda
+WHEN NEW.coluna_id IS NOT OLD.coluna_id AND NEW.status_desde IS OLD.status_desde
+BEGIN SELECT RAISE(ABORT, 'demanda_status_desde: grave status_desde ao mudar de coluna'); END;
+
+-- demanda ativa numa coluna de papel 'concluida' está concluída (o serviço marca ao soltar e desmarca ao reabrir)
+CREATE TRIGGER demanda_concluida_coluna_ai BEFORE INSERT ON demanda
+WHEN NEW.concluida_em IS NULL AND NEW.arquivado_em IS NULL
+  AND (SELECT papel FROM coluna WHERE id = NEW.coluna_id) = 'concluida'
+BEGIN SELECT RAISE(ABORT, 'concluida_sem_data: demanda em coluna concluida precisa de concluida_em'); END;
+CREATE TRIGGER demanda_concluida_coluna_au BEFORE UPDATE OF coluna_id, concluida_em, arquivado_em ON demanda
+WHEN NEW.concluida_em IS NULL AND NEW.arquivado_em IS NULL
+  AND (SELECT papel FROM coluna WHERE id = NEW.coluna_id) = 'concluida'
+BEGIN SELECT RAISE(ABORT, 'concluida_sem_data: demanda em coluna concluida precisa de concluida_em'); END;
+
+-- capa por imagem: anexo ativo de arquivo de imagem (a FK composta garante que é desta demanda)
+CREATE TRIGGER demanda_capa_imagem_ai BEFORE INSERT ON demanda WHEN NEW.capa_anexo_id IS NOT NULL
+BEGIN SELECT RAISE(ABORT, 'capa_nao_e_imagem'); END;      -- na criação ainda não há anexo: capa só por cor
+CREATE TRIGGER demanda_capa_imagem_au BEFORE UPDATE OF capa_anexo_id ON demanda
+WHEN NEW.capa_anexo_id IS NOT NULL AND coalesce((
+  SELECT ar.mime FROM anexo a JOIN arquivo ar ON ar.id = a.arquivo_id
+   WHERE a.id = NEW.capa_anexo_id AND a.excluido_em IS NULL), '') NOT LIKE 'image/%'
+BEGIN SELECT RAISE(ABORT, 'capa_nao_e_imagem'); END;
+
+-- rev sobe só com os campos que o PATCH edita (contadores, posição, coluna, concluir e arquivar não contam).
 -- Se o serviço já subiu o rev na mesma UPDATE, o gatilho não sobe de novo.
 CREATE TRIGGER demanda_rev AFTER UPDATE OF
-  titulo, cliente_id, tipo_peca_id, equipe_id, etapa_id, bloqueio, bloqueio_motivo, responsavel_id, responsavel_sugerido_id,
-  atendimento_id, aprovador_id, briefing_md, briefing_campos, prioridade, prioridade_motivo, prazo, prazo_hora, prazo_manual,
-  publicacao_data, publicacao_hora, planejada_para, agendada_inicio, agendada_fim, local, estimativa_min, rodadas_inclusas,
-  arquivado_em
+  titulo, descricao_md, cliente_id, atendimento_id, prioridade, inicio, inicio_hora, prazo, prazo_hora,
+  publicacao_data, publicacao_hora, estimativa_min, repetir, capa_cor, capa_anexo_id, rodadas_inclusas
 ON demanda
 WHEN NEW.rev = OLD.rev AND (
-     NEW.titulo IS NOT OLD.titulo OR NEW.cliente_id IS NOT OLD.cliente_id OR NEW.tipo_peca_id IS NOT OLD.tipo_peca_id
-  OR NEW.equipe_id IS NOT OLD.equipe_id OR NEW.etapa_id IS NOT OLD.etapa_id OR NEW.bloqueio IS NOT OLD.bloqueio
-  OR NEW.bloqueio_motivo IS NOT OLD.bloqueio_motivo OR NEW.responsavel_id IS NOT OLD.responsavel_id
-  OR NEW.responsavel_sugerido_id IS NOT OLD.responsavel_sugerido_id OR NEW.prazo_manual IS NOT OLD.prazo_manual
-  OR NEW.atendimento_id IS NOT OLD.atendimento_id OR NEW.aprovador_id IS NOT OLD.aprovador_id
-  OR NEW.briefing_md IS NOT OLD.briefing_md OR NEW.briefing_campos IS NOT OLD.briefing_campos
-  OR NEW.prioridade IS NOT OLD.prioridade OR NEW.prioridade_motivo IS NOT OLD.prioridade_motivo
-  OR NEW.prazo IS NOT OLD.prazo OR NEW.prazo_hora IS NOT OLD.prazo_hora OR NEW.publicacao_data IS NOT OLD.publicacao_data
-  OR NEW.publicacao_hora IS NOT OLD.publicacao_hora OR NEW.planejada_para IS NOT OLD.planejada_para
-  OR NEW.agendada_inicio IS NOT OLD.agendada_inicio OR NEW.agendada_fim IS NOT OLD.agendada_fim
-  OR NEW.local IS NOT OLD.local OR NEW.estimativa_min IS NOT OLD.estimativa_min
-  OR NEW.rodadas_inclusas IS NOT OLD.rodadas_inclusas OR NEW.arquivado_em IS NOT OLD.arquivado_em)
+     NEW.titulo IS NOT OLD.titulo OR NEW.descricao_md IS NOT OLD.descricao_md OR NEW.cliente_id IS NOT OLD.cliente_id
+  OR NEW.atendimento_id IS NOT OLD.atendimento_id OR NEW.prioridade IS NOT OLD.prioridade
+  OR NEW.inicio IS NOT OLD.inicio OR NEW.inicio_hora IS NOT OLD.inicio_hora
+  OR NEW.prazo IS NOT OLD.prazo OR NEW.prazo_hora IS NOT OLD.prazo_hora
+  OR NEW.publicacao_data IS NOT OLD.publicacao_data OR NEW.publicacao_hora IS NOT OLD.publicacao_hora
+  OR NEW.estimativa_min IS NOT OLD.estimativa_min OR NEW.repetir IS NOT OLD.repetir
+  OR NEW.capa_cor IS NOT OLD.capa_cor OR NEW.capa_anexo_id IS NOT OLD.capa_anexo_id
+  OR NEW.rodadas_inclusas IS NOT OLD.rodadas_inclusas)
 BEGIN UPDATE demanda SET rev = OLD.rev + 1 WHERE id = NEW.id; END;
 
--- toda troca de etapa grava de onde veio (reabrir = voltar para etapa_anterior_id; o front usa para a linha 'anterior')
-CREATE TRIGGER demanda_etapa_anterior BEFORE UPDATE OF etapa_id ON demanda
-WHEN NEW.etapa_id IS NOT OLD.etapa_id AND NEW.etapa_anterior_id IS NOT OLD.etapa_id
-BEGIN SELECT RAISE(ABORT, 'demanda_etapa_anterior: grave etapa_anterior_id = etapa de saida'); END;
-
--- o ok interno ("Liberar para envio") vale para uma entrega só: entrar em Revisão exige limpá-lo
-CREATE TRIGGER demanda_revisao_ok_limpo BEFORE UPDATE OF status ON demanda
-WHEN NEW.status = 'revisao' AND OLD.status IS NOT 'revisao' AND NEW.revisao_ok_em IS NOT NULL
-BEGIN SELECT RAISE(ABORT, 'demanda_revisao_ok: limpe revisao_ok_em ao entrar em revisao'); END;
-
--- histórico de etapa, bola e pessoa
-CREATE TRIGGER demanda_hist_ai AFTER INSERT ON demanda
+-- histórico de movimentação entre colunas e quadros (instante = status_desde gravado pelo app)
+CREATE TRIGGER demanda_mov_ai AFTER INSERT ON demanda
 BEGIN
-  INSERT INTO demanda_etapa_hist (demanda_id, etapa_id, status, bola, com_quem_id, responsavel_id, bloqueio, pausa_sla, entrou_em, por)
-  VALUES (NEW.id, NEW.etapa_id, NEW.status, NEW.bola, NEW.com_quem_id, NEW.responsavel_id, NEW.bloqueio,
-          CASE WHEN NEW.bloqueio = 'cliente' THEN 1 ELSE (SELECT pausa_sla FROM etapa WHERE id = NEW.etapa_id) END,
+  INSERT INTO demanda_movimento (demanda_id, quadro_id, coluna_id, papel, entrou_em, por)
+  VALUES (NEW.id, NEW.quadro_id, NEW.coluna_id, (SELECT papel FROM coluna WHERE id = NEW.coluna_id),
           NEW.status_desde, NEW.criado_por);
 END;
-CREATE TRIGGER demanda_hist_au AFTER UPDATE OF etapa_id, bola, com_quem_id, responsavel_id, bloqueio ON demanda
-WHEN NEW.etapa_id IS NOT OLD.etapa_id OR NEW.bola IS NOT OLD.bola OR NEW.com_quem_id IS NOT OLD.com_quem_id
-  OR NEW.responsavel_id IS NOT OLD.responsavel_id OR NEW.bloqueio IS NOT OLD.bloqueio
+CREATE TRIGGER demanda_mov_au AFTER UPDATE OF coluna_id ON demanda
+WHEN NEW.coluna_id IS NOT OLD.coluna_id
 BEGIN
-  -- instante = atualizado_em gravado pelo app (agora(), relógio dos testes); sem ele, o 'now' do SQLite
-  UPDATE demanda_etapa_hist
-     SET saiu_em = CASE WHEN NEW.atualizado_em IS NOT OLD.atualizado_em THEN NEW.atualizado_em
-                        ELSE strftime('%Y-%m-%dT%H:%M:%fZ','now') END
-   WHERE demanda_id = NEW.id AND saiu_em IS NULL;
-  INSERT INTO demanda_etapa_hist (demanda_id, etapa_id, status, bola, com_quem_id, responsavel_id, bloqueio, pausa_sla, entrou_em, por)
-  VALUES (NEW.id, NEW.etapa_id, NEW.status, NEW.bola, NEW.com_quem_id, NEW.responsavel_id, NEW.bloqueio,
-          CASE WHEN NEW.bloqueio = 'cliente' THEN 1 ELSE (SELECT pausa_sla FROM etapa WHERE id = NEW.etapa_id) END,
-          CASE WHEN NEW.atualizado_em IS NOT OLD.atualizado_em THEN NEW.atualizado_em
-               ELSE strftime('%Y-%m-%dT%H:%M:%fZ','now') END,
-          NEW.atualizado_por);
+  UPDATE demanda_movimento SET saiu_em = NEW.status_desde WHERE demanda_id = NEW.id AND saiu_em IS NULL;
+  INSERT INTO demanda_movimento (demanda_id, quadro_id, coluna_id, papel, entrou_em, por)
+  VALUES (NEW.id, NEW.quadro_id, NEW.coluna_id, (SELECT papel FROM coluna WHERE id = NEW.coluna_id),
+          NEW.status_desde, NEW.atualizado_por);
 END;
 
 -- busca (FTS5, conteúdo externo, rowid = numero)
 CREATE TRIGGER demanda_fts_ai AFTER INSERT ON demanda
-BEGIN INSERT INTO demanda_fts (rowid, titulo, briefing_md) VALUES (NEW.numero, NEW.titulo, NEW.briefing_md); END;
-CREATE TRIGGER demanda_fts_au AFTER UPDATE OF titulo, briefing_md ON demanda
-WHEN NEW.titulo IS NOT OLD.titulo OR NEW.briefing_md IS NOT OLD.briefing_md
+BEGIN INSERT INTO demanda_fts (rowid, titulo, descricao_md) VALUES (NEW.numero, NEW.titulo, NEW.descricao_md); END;
+CREATE TRIGGER demanda_fts_au AFTER UPDATE OF titulo, descricao_md ON demanda
+WHEN NEW.titulo IS NOT OLD.titulo OR NEW.descricao_md IS NOT OLD.descricao_md
 BEGIN
-  INSERT INTO demanda_fts (demanda_fts, rowid, titulo, briefing_md) VALUES ('delete', OLD.numero, OLD.titulo, OLD.briefing_md);
-  INSERT INTO demanda_fts (rowid, titulo, briefing_md) VALUES (NEW.numero, NEW.titulo, NEW.briefing_md);
+  INSERT INTO demanda_fts (demanda_fts, rowid, titulo, descricao_md) VALUES ('delete', OLD.numero, OLD.titulo, OLD.descricao_md);
+  INSERT INTO demanda_fts (rowid, titulo, descricao_md) VALUES (NEW.numero, NEW.titulo, NEW.descricao_md);
 END;
 
 -- ═════════════════════════════ gatilhos: contadores desnormalizados ═════════════════════════════
@@ -953,6 +985,17 @@ CREATE TRIGGER checklist_item_demanda_fixa BEFORE UPDATE OF checklist_id, demand
 WHEN NEW.demanda_id IS NOT OLD.demanda_id
 BEGIN SELECT RAISE(ABORT, 'checklist_item_nao_muda_de_demanda'); END;
 
+CREATE TRIGGER comentario_contar_ai AFTER INSERT ON comentario
+BEGIN
+  UPDATE demanda SET n_comentarios = (SELECT count(*) FROM comentario WHERE demanda_id = NEW.demanda_id AND excluido_em IS NULL)
+  WHERE id = NEW.demanda_id;
+END;
+CREATE TRIGGER comentario_contar_au AFTER UPDATE OF excluido_em ON comentario WHEN NEW.excluido_em IS NOT OLD.excluido_em
+BEGIN
+  UPDATE demanda SET n_comentarios = (SELECT count(*) FROM comentario WHERE demanda_id = NEW.demanda_id AND excluido_em IS NULL)
+  WHERE id = NEW.demanda_id;
+END;
+
 CREATE TRIGGER anexo_contar_ai AFTER INSERT ON anexo
 BEGIN
   UPDATE demanda SET n_anexos = (SELECT count(*) FROM anexo WHERE demanda_id = NEW.demanda_id AND excluido_em IS NULL)
@@ -965,6 +1008,11 @@ BEGIN
 END;
 CREATE TRIGGER anexo_sem_delete BEFORE DELETE ON anexo
 BEGIN SELECT RAISE(ABORT, 'anexo_nao_se_apaga: marque excluido_em'); END;
+-- o anexo que é capa não sai sem antes tirar a capa (o serviço faz os dois na mesma transação)
+CREATE TRIGGER anexo_e_capa BEFORE UPDATE OF excluido_em ON anexo
+WHEN NEW.excluido_em IS NOT NULL AND OLD.excluido_em IS NULL
+  AND EXISTS (SELECT 1 FROM demanda WHERE capa_anexo_id = NEW.id)
+BEGIN SELECT RAISE(ABORT, 'anexo_e_capa: tire a capa antes'); END;
 
 CREATE TRIGGER apontamento_somar_ai AFTER INSERT ON apontamento WHEN NEW.demanda_id IS NOT NULL
 BEGIN
@@ -1004,14 +1052,13 @@ WHEN NEW.id IS NOT OLD.id OR NEW.demanda_id IS NOT OLD.demanda_id OR NEW.cliente
   OR NEW.trace_id IS NOT OLD.trace_id OR NEW.criado_em IS NOT OLD.criado_em
 BEGIN SELECT RAISE(ABORT, 'atividade_imutavel: so dados/antes podem ser anonimizados'); END;
 
-CREATE TRIGGER hist_sem_delete BEFORE DELETE ON demanda_etapa_hist
-BEGIN SELECT RAISE(ABORT, 'demanda_etapa_hist_imutavel'); END;
-CREATE TRIGGER hist_imutavel BEFORE UPDATE ON demanda_etapa_hist
-WHEN NEW.id IS NOT OLD.id OR NEW.demanda_id IS NOT OLD.demanda_id OR NEW.etapa_id IS NOT OLD.etapa_id
-  OR NEW.status IS NOT OLD.status OR NEW.bola IS NOT OLD.bola OR NEW.com_quem_id IS NOT OLD.com_quem_id
-  OR NEW.responsavel_id IS NOT OLD.responsavel_id OR NEW.bloqueio IS NOT OLD.bloqueio OR NEW.pausa_sla IS NOT OLD.pausa_sla
-  OR NEW.entrou_em IS NOT OLD.entrou_em OR NEW.por IS NOT OLD.por OR NEW.parcial IS NOT OLD.parcial
-BEGIN SELECT RAISE(ABORT, 'demanda_etapa_hist_imutavel: so saiu_em'); END;
+CREATE TRIGGER movimento_sem_delete BEFORE DELETE ON demanda_movimento
+BEGIN SELECT RAISE(ABORT, 'demanda_movimento_imutavel'); END;
+CREATE TRIGGER movimento_imutavel BEFORE UPDATE ON demanda_movimento
+WHEN NEW.id IS NOT OLD.id OR NEW.demanda_id IS NOT OLD.demanda_id OR NEW.quadro_id IS NOT OLD.quadro_id
+  OR NEW.coluna_id IS NOT OLD.coluna_id OR NEW.papel IS NOT OLD.papel OR NEW.entrou_em IS NOT OLD.entrou_em
+  OR NEW.por IS NOT OLD.por OR OLD.saiu_em IS NOT NULL
+BEGIN SELECT RAISE(ABORT, 'demanda_movimento_imutavel: so fechar saiu_em uma vez'); END;
 
 CREATE TRIGGER rodada_sem_delete BEFORE DELETE ON rodada
 BEGIN SELECT RAISE(ABORT, 'rodada_imutavel'); END;
@@ -1051,7 +1098,7 @@ WHEN NEW.id IS NOT OLD.id OR NEW.demanda_id IS NOT OLD.demanda_id OR NEW.versao_
   OR NEW.link_id IS NOT OLD.link_id OR NEW.contato_id IS NOT OLD.contato_id OR NEW.nome_informado IS NOT OLD.nome_informado
   OR NEW.registrado_por IS NOT OLD.registrado_por OR NEW.comentario IS NOT OLD.comentario OR NEW.motivo IS NOT OLD.motivo
   OR NEW.rodada_aberta_id IS NOT OLD.rodada_aberta_id OR NEW.evidencia_anexo_id IS NOT OLD.evidencia_anexo_id
-  OR NEW.responsavel_anterior_id IS NOT OLD.responsavel_anterior_id
+  OR NEW.quadro_antes_id IS NOT OLD.quadro_antes_id OR NEW.coluna_antes_id IS NOT OLD.coluna_antes_id
   OR NEW.idempotency_key IS NOT OLD.idempotency_key OR NEW.idempotency_hash IS NOT OLD.idempotency_hash
   OR NEW.criado_em IS NOT OLD.criado_em
   OR (NEW.ip_hmac IS NOT OLD.ip_hmac AND NEW.ip_hmac IS NOT NULL)

@@ -50,8 +50,8 @@ server/
   src/rotas/*.ts          cada arquivo exporta `export function registrar(app: App): void` (descoberto automaticamente)
   migracoes/NNN_nome.sql  aplicadas em ordem numérica, cada uma numa transação, registradas em `_migracoes`
   scripts/                verificar-migracoes.ts, seed-demo.ts (+ demo/*.ts, só desenvolvimento)
-  test/*.test.ts          test/ajuda.ts monta o ambiente (app + :memory: + pessoas, quadros, clientes, criarDemanda, relogio);
-                          cada funcionalidade pode ter test/<prefixo>-ajuda.ts
+  test/*.test.ts          test/ajuda.ts monta o ambiente (app + :memory: + pessoas, quadros, clientes, criarDemanda com
+                          `ate` por SQL, relogio); cada funcionalidade pode ter test/<prefixo>-ajuda.ts
 shared/
   tipos/<area>.ts         tipos de domínio, DTOs da API e eventos de tempo real (um arquivo por área; index.ts reexporta)
   tipos/ext/<func>.ts     tipos acrescentados por uma funcionalidade (importados direto)
@@ -66,10 +66,12 @@ web/src/
                           GradeCalendario, Tooltip, Markdown, ...)
   casca/                  barra superior, menu lateral (com a seção Quadros e os favoritos), abas do celular
   estilos/tokens.css      tokens claro/escuro (marca Melt; tinta das colunas por cor; fundos de quadro; vidro)
-  quadro/ demanda/ paleta/ dialogos/ teclado/   núcleo do front (página do quadro, card, modal, Cmd+K, diálogos, atalhos)
+  quadro/ demanda/ paleta/ dialogos/ teclado/ calendario/   núcleo do front (página do quadro, card, modal, Cmd+K,
+                          diálogos, atalhos, CalendarioDemandas da Agenda e do Calendário do quadro)
   funcionalidades/<nome>/ código de cada funcionalidade da Onda 3
   telas/<area>/rota.tsx   cada tela exporta `rota: ExtensaoRota` (metadados + `carregar` lazy; descoberta via import.meta.glob)
-  extensoes/              tipos.ts (contrato), registro.ts (carregadores) e uma pasta por ponto de extensão (global/ incluso)
+  extensoes/              tipos.ts (contrato), registro-rotas.ts (só telas; o App.tsx importa), registro.ts (o resto;
+                          a casca autenticada importa com import()) e uma pasta por ponto de extensão (global/ incluso)
 docs/pedidos/<agente>.md  pedidos de mudança de contrato durante as ondas
 ```
 
@@ -86,7 +88,9 @@ o núcleo usa `nucleo`.
   001–002 contrato, 003–019 núcleo, 020–079 funcionalidades (10 por funcionalidade), 090–099 integração.
   Migração de funcionalidade só acrescenta (tabela, coluna anulável, índice).
 - **Front**: 23 pontos + telas, com contrato em `web/src/extensoes/tipos.ts` e carregadores em
-  `web/src/extensoes/registro.ts` (todas as pastas aceitam `.ts` e `.tsx`): telas (`telas/**/rota.tsx` → `rota: {
+  `web/src/extensoes/registro-rotas.ts` (telas) e `web/src/extensoes/registro.ts` (o resto, fora da página pública;
+  seções do modal, diálogos, layouts, Início, Configurações e globais entram por `carregar`, com `React.lazy`; funções
+  fora do render recebem `qc` e `acoes`) (todas as pastas aceitam `.ts` e `.tsx`): telas (`telas/**/rota.tsx` → `rota: {
   caminho, carregar, acesso, layout }`, com `React.lazy`), componentes globais (`extensoes/global`: SSE, host de
   diálogos, paleta, teclado), menu lateral (fora a seção Quadros, que é da casca), barra superior, menu do avatar, abas
   do celular, cabeçalho e menu ··· do quadro, layouts do quadro (Quadro | Lista | Calendário), menu e criação rápida
@@ -110,14 +114,17 @@ o núcleo usa `nucleo`.
   calcula; os cards escondidos por filtro mantêm o lugar); colunas por quadro, quadros no menu e listas curtas por pai
   (checklist, itens, anexos, etiquetas, favoritos) têm `pos REAL`. Inserir entre vizinhos = média; fim = último + 1024;
   se a folga ficar < 1e-6, renormalizar o escopo inteiro (passo 1024) e publicar os eventos.
-- Banco: tabelas `STRICT`; booleanos 0/1; JSON em TEXT com `json_valid`; FKs compostas garantem que a coluna e as
-  etiquetas de uma demanda são do quadro dela; gatilhos só de integridade (imutabilidade das trilhas, contadores `n_*`,
-  histórico de movimentação entre colunas e quadros, `rev`, `atualizado_em`, FTS, identidade na trilha, arquivo em uso,
-  coluna `concluida` exige concluída, destino arquivado, capa só de imagem). Toda UPDATE em `demanda` grava
-  `atualizado_por` e `atualizado_em`; mudar de coluna grava `status_desde`. Regra de negócio fica em `src/servicos/`
+- Banco: tabelas `STRICT`; booleanos 0/1; JSON em TEXT com `json_valid`; FKs compostas garantem que a coluna de uma
+  demanda é do quadro dela, que cada etiqueta guardada é do quadro dela (as de outros quadros ficam guardadas e voltam
+  com a demanda) e que evidência, rodada, comentário e link de uma decisão ou envio são da mesma demanda; gatilhos só
+  de integridade (imutabilidade das trilhas, contadores `n_*`, histórico de movimentação entre colunas e quadros, `rev`,
+  `atualizado_em`, FTS, identidade na trilha, cliente fixo depois do envio, horas seguem o cliente, evidência e arquivo
+  em uso não saem, arquivo no lixo não volta, coluna `concluida` exige concluída, destino arquivado, capa só de
+  imagem). Toda UPDATE em `demanda` grava `atualizado_por` (NULL para cliente e sistema) e `atualizado_em`; mudar de
+  coluna grava `status_desde` maior que o anterior (max(agora, anterior + 1 ms)). Regra de negócio fica em `src/servicos/`
   (`mover()` é o único caminho de troca de coluna ou de quadro; `concluir()` cuida da repetição;
-  `executarAutomacao()` dos 4 gatilhos). `verificar-migracoes.ts` confere que as listas fechadas de `shared/tipos`
-  são as mesmas dos CHECK do banco.
+  `executarAutomacao()` dos 4 gatilhos, com o quadro do envio para ajuste e aprovação). `verificar-migracoes.ts`
+  confere que as listas fechadas de `shared/tipos` são as mesmas dos CHECK do banco.
 - Concorrência: `PATCH /api/demandas/:id` exige `If-Match: <rev>`; decisão pública exige `Idempotency-Key` (por link).
 - Exclusão: arquivar (`arquivado_em`) por padrão (demanda, coluna vazia, quadro); demanda: anonimizar só por admin e
   só sem versão, envio ou aprovação; quadro: excluir só se nunca teve demanda.

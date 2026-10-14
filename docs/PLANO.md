@@ -9,7 +9,7 @@ está pronto e é a referência de todos:
 | Banco (todas as tabelas do MVP) | `server/migracoes/001_base.sql`, seed de configuração `002_config.sql` |
 | Verificação do banco | `node server/scripts/verificar-migracoes.ts` (listas de `shared/tipos` = CHECK do banco, seeds, gatilhos) |
 | Tipos, DTOs e eventos | `shared/tipos/*.ts` (reexportados por `shared/tipos/index.ts`) |
-| Rotas HTTP | `docs/API.md` (125 rotas, cada uma com dono) |
+| Rotas HTTP | `docs/API.md` (127 rotas, cada uma com dono) |
 | Pontos de extensão do front | `web/src/extensoes/tipos.ts` (23 pontos + telas) e a API interna do núcleo-web (§2.2) |
 | Stack, pastas e convenções | `docs/ARQUITETURA.md` |
 
@@ -56,9 +56,14 @@ Sumário: [0 Regras](#0-regras-para-todos) · [1 Onda 1](#1-onda-1-núcleo-servi
 10. **`shared/**` só importa por caminho relativo com `.ts`** (`../tipos/index.ts`), nunca `@shared`: o alias existe só
     no web; o servidor roda `shared/` no Node e no `tsc -p server`.
 11. **Datas pelo relógio do app:** serviços gravam todo instante com `agora()` (nunca o `DEFAULT now` do SQLite) e
-    calculam "hoje" com `hojeSP(agora())`, para os testes fixarem o tempo com `relogio()` (§1.1.1).
-12. **Erro de gatilho vira código da API** (`API.md` §1): `coluna_com_demandas`/`quadro_com_historico` → `409 conflito`,
-    `destino_arquivado` → `422 estado_invalido`; o tradutor fica em `server/src/erros.ts` (núcleo).
+    calculam "hoje" com `hojeSP(agora())`, para os testes fixarem o tempo com `relogio()` (§1.1.1). Com o relógio
+    parado, criar e mover acontecem no mesmo instante: toda troca de coluna grava `status_desde = depoisDe(anterior)`
+    (= max(agora, anterior + 1 ms); o gatilho `demanda_status_desde` exige que cresça) e o cronômetro aceita
+    `parado_em = iniciado_em` (minutos = 1).
+12. **Erro de gatilho vira código da API** (`API.md` §1): `coluna_com_demandas`, `quadro_com_historico`,
+    `cliente_fixo_apos_envio`, `anexo_e_evidencia`, `anexo_e_capa` → `409 conflito`; `destino_arquivado`,
+    `concluida_sem_data` → `422 estado_invalido`; `arquivo_no_lixo`, `demanda_de_outro_cliente`,
+    `contato_de_outro_cliente`, `capa_nao_e_imagem` → `400 validacao`; o tradutor fica em `server/src/erros.ts` (núcleo).
 
 ---
 
@@ -74,9 +79,10 @@ funcionalidades), `shared/logica/**` (cria; menos `filtros.ts` e `sinal.ts`, do 
 só para corrigir o contrato e avisa), `package.json` da raiz, `package-lock.json`, `Dockerfile`, `.dockerignore`,
 `.env.example`. Faixa de migração: **003–019**.
 
-**Rotas (66):** as marcadas "núcleo" em `docs/API.md`: tempo real (§3: eventos, sync, bootstrap), saúde, auth (9),
-pessoas (5), equipes (4), quadros (9), colunas (7), etiquetas (3), clientes (11, menos a trilha), demandas (12:
-detalhe, criar, PATCH, mover, concluir, membros ×2, etiquetas ×2, arquivar, restaurar, excluir) e arquivos (2).
+**Rotas (70):** as marcadas "núcleo" em `docs/API.md`: tempo real (§3: eventos, sync, bootstrap), saúde, auth (9),
+pessoas (5), equipes (4), quadros (10, com copiar), colunas (7), etiquetas (3), clientes (11, menos a trilha),
+demandas (12: detalhe, criar, PATCH, mover, concluir, membros ×2, etiquetas ×2, arquivar, restaurar, excluir),
+arquivos (2) e horas (3: listar, editar, excluir; §4.20).
 
 **Entrega, nesta ordem** (commits pequenos; a ordem destrava a Onda 2 cedo):
 
@@ -86,15 +92,18 @@ detalhe, criar, PATCH, mover, concluir, membros ×2, etiquetas ×2, arquivar, re
    §1), `src/index.ts` (migra, cria o admin no primeiro boot, sobe HTTP, serve `web/dist` com fallback de SPA, a CSP
    **exata** da API §1 em produção e `Referrer-Policy: no-referrer` no HTML de `/a/*`, `/convite` e `/redefinir`),
    `GET /api/saude`.
-2. Auth e sessão (§4.2), pessoas (§4.3, com "entrar na equipe = seguir os quadros dela"), equipes (§4.4), clientes
-   (§4.10 menos a trilha, com responsáveis por equipe).
-3. Quadros (§4.5: criar com modelo e coluna `porMembro` expandida, arquivar, restaurar, excluir vazio, estrela,
-   seguir), colunas (§4.6) e etiquetas (§4.7).
+2. Auth e sessão (§4.2), pessoas (§4.3, com "entrar na equipe = seguir os quadros dela e ganhar a própria coluna nos
+   quadros com `colunaPorMembro`"), equipes (§4.4), clientes (§4.10 menos a trilha, com responsáveis por equipe e o
+   cliente mínimo do papel equipe).
+3. Quadros (§4.5: criar com modelo, coluna `porMembro` expandida com `responsavelId` e automações do modelo, copiar,
+   arquivar, restaurar, excluir vazio, estrela, seguir), colunas (§4.6, com "cards da coluna" e coluna de pessoa) e
+   etiquetas (§4.7).
 4. Tempo real: tabela `evento` + barramento + `GET /api/eventos`, `/api/sync`, `/api/bootstrap` (§3).
 5. Demandas (§4.12): detalhe, criar (com modelo: descrição, checklist, etiquetas por nome, prazo em dias úteis),
-   PATCH com If-Match, `mover()` (§5.1, etiquetas entre quadros §5.6), `concluir()` com repetição (§5.3),
-   `executarAutomacao()` (§5.5; o F2 chama nos gatilhos do ciclo), membros, etiquetas, arquivar, restaurar, excluir.
-   Arquivos (§4.14).
+   PATCH com If-Match, `mover()` (§5.1: coluna de pessoa, `membros`, etiquetas guardadas §5.6), `concluir()` com
+   repetição no quadro de nascimento e restauração depois do Desfazer (§5.3), `executarAutomacao()` (§5.5, com o quadro
+   de referência; o F2 chama nos gatilhos do ciclo), membros, etiquetas, arquivar, restaurar, excluir. Arquivos
+   (§4.14). Horas (§4.20).
 6. `shared/logica/` (puro, sem dependências, usado pelo servidor e pelo front; assinaturas em §1.1.2).
 7. `server/test/ajuda.ts` (ambiente de teste para todos, fixture abaixo), testes do núcleo, `scripts/seed-demo.ts`
    (descobre `scripts/demo/*.ts`), `src/tarefas.ts` (jobs diários descobertos em `src/tarefas/*.ts`: backup
@@ -116,6 +125,7 @@ export function todos<T>(db: Db, sql: string, ...p: unknown[]): T[]
 export function rodar(db: Db, sql: string, ...p: unknown[]): { changes: number; lastInsertRowid: number | bigint }
 export function novoId(): Id
 export function agora(): Instante                              // relógio do app (os testes fixam com relogio())
+export function depoisDe(anterior: Instante): Instante         // max(agora(), anterior + 1 ms): status_desde ao trocar de coluna
 
 // src/erros.ts
 export class ErroHttp extends Error { constructor(status: number, codigo: CodigoErro, mensagem: string, detalhes?: Record<string, unknown>) }
@@ -130,9 +140,11 @@ export function exigirPapel(...papeis: Papel[]): MiddlewareHandler
 export function validar<T>(esquema: ZodType<T>, valor: unknown): T   // 400 validacao com detalhes.campos
 export function limite(chave: string, max: number, janelaSeg: number): MiddlewareHandler   // 429 em memória (página pública)
 
-// src/servicos/permissoes.ts  (usa shared/logica/permissoes.ts; 403 sem_permissao com o motivo)
-export function exigir(ator: Ator, acao: AcaoPermissao, d?: Demanda): void
-export function exigirCamposPermitidos(ator: Ator, entrada: object): void      // CAMPOS_SO_ATENDIMENTO → 403 campo_nao_permitido
+// src/servicos/permissoes.ts  (usa shared/logica/permissoes.ts; 403 sem_permissao com o motivo). Nenhuma rota decide papel
+// fora daqui: anexo, comentário, checklist de rodada, apontamento e versão também (AcaoPermissao, §1.1.2)
+export function exigir(ator: Ator, acao: AcaoPermissao, alvo?: AlvoPermissao): void
+export function exigirCamposPermitidos(ator: Ator, entrada: object, lista?: 'demanda' | 'cliente'): void
+  // demanda: CAMPOS_SO_ATENDIMENTO; cliente: o papel equipe só manda CAMPOS_CLIENTE_EQUIPE → 403 campo_nao_permitido
 
 // src/servicos/eventos.ts  (grava em `evento` na transação; entrega após o commit)
 // publico: 'gestao' p/ link_publico, 'usuario' p/ notificacao e quadro_usuario; `anonimo: true` grava a = t = null
@@ -146,15 +158,21 @@ export function registrarAtividade<T extends TipoAtividade>(db: Db, a: { tipo: T
 export function notificar(db: Db, n: { para: Id | Id[]; tipo: TipoNotificacao; demandaId?: Id; atividadeId?: number;
   ator: Ator; resumo: string; exceto?: Id[] }): Id[]                          // devolve quem recebeu
 export function seguidoresDoQuadro(db: Db, quadroId: Id): Id[]
-// src/servicos/mover.ts  (único caminho de troca de coluna/quadro; API §5.1 e §5.6)
+// regra do `chegou` (API §5.9): entrou no quadro sem nenhum membro da equipe dele; nunca por automação em aguardando_cliente
+export function notificarChegou(db: Db, p: { demandaId: Id; quadroId: Id; ator: Ator; via: ViaMovimento | 'criacao';
+  colunaPapel: PapelColuna; exceto?: Id[] }): Id[]
+// src/servicos/mover.ts  (único caminho de troca de coluna/quadro; API §5.1 e §5.6; restaurar e reabrir também passam aqui)
 export function mover(db: Db, p: { demandaId: Id; ator: Ator; colunaId: Id; posicao?: PosicaoRelativa;
-  via?: ViaMovimento; gatilho?: GatilhoAutomacao; etiquetasSemPar?: 'remover' | 'criar'; etiquetaIds?: Id[];
-  rev?: number }): MoverSaida
+  via?: ViaMovimento; gatilho?: GatilhoAutomacao; etiquetasSemPar?: EtiquetasSemPar; etiquetaIds?: Id[];
+  membros?: MembrosAoMover; membroIds?: Id[]; rev?: number }): MoverSaida
 // src/servicos/concluir.ts  (API §5.3; `automacao: false` quando quem chama é a coluna concluida)
 export function concluir(db: Db, p: { demandaId: Id; ator: Ator; concluida: boolean; via: 'checkbox' | 'coluna' | 'papel';
   repetir?: boolean; automacao?: boolean }): ConcluirSaida
 // src/servicos/automacoes.ts  (API §5.5: o F2 chama em enviar e no retorno)
-export function executarAutomacao(db: Db, demandaId: Id, gatilho: GatilhoAutomacao, ator: Ator): boolean   // true = moveu
+// quadroId: o quadro de referência. Padrão = o atual (enviado_ao_cliente, concluida); ajuste_pedido e aprovado passam
+// o envio.quadro_id do último envio da versão decidida (o F2 lê com quadroDoEnvio)
+export function executarAutomacao(db: Db, demandaId: Id, gatilho: GatilhoAutomacao, ator: Ator, quadroId?: Id): boolean   // true = moveu
+export function quadroDoEnvio(db: Db, versaoId: Id): Id
 // src/servicos/demandas.ts
 export function carregarDemanda(db: Db, id: Id): Demanda                       // 404 se não existe
 export function carregarDetalhe(db: Db, numero: number, ator: Ator): DemandaDetalhe
@@ -167,8 +185,11 @@ export function colunaDeEntrada(db: Db, quadroId: Id): Coluna                  /
 export function abrirRodada(db: Db, p: { demandaId: Id; origem: 'cliente' | 'interna'; linhas: string[];
   motivo: MotivoRodada; motivoTexto?: string | null; prazo?: DataLocal; prazoHora?: HoraLocal | null; ator: Ator }):
   { rodada: Rodada; checklist: ChecklistComItens; sugerirExtra: boolean }     // API §5.7 (o F2 chama)
-// src/servicos/horas.ts  (arquivar demanda/quadro e desativar pessoa param cronômetros; o F1 usa nas rotas)
+// src/servicos/horas.ts  (arquivar demanda/quadro e desativar pessoa param cronômetros; o F1 usa nas rotas do cronômetro)
 export function pararCronometros(db: Db, filtro: { usuarioId?: Id; demandaId?: Id; quadroId?: Id }, ator: Ator): Apontamento[]
+export function lancarApontamento(db: Db, p: { demandaId: Id; ator: Ator; entrada: CriarApontamentoEntrada }): Apontamento
+// src/servicos/quadros.ts  (entrar na equipe; o F5 não chama: as rotas de pessoas e equipes são do núcleo)
+export function criarColunasDaPessoa(db: Db, usuarioId: Id, equipeId: Id, ator: Ator): Coluna[]   // API §4.3
 // src/servicos/mapear.ts  (linha do banco → DTO de shared/tipos; um por entidade de MapaEntidades)
 export const mapear: { demanda(l, membroIds: Id[], etiquetaIds: Id[]): Demanda; quadro(l): Quadro; coluna(l): Coluna;
   etiqueta(l): Etiqueta; automacao(l): AutomacaoQuadro; modeloDemanda(l, itens, etiquetas): ModeloDemanda;
@@ -190,8 +211,8 @@ export function ambiente(): Promise<{ app: App; db: Db;
   pessoas: Record<'admin' | 'am' | 'am2' | 'design' | 'design2' | 'social' | 'web', Usuario>;
   clientes: Record<'he' | 'icc', Cliente>; quadros: Record<'atendimento' | 'criacao' | 'social', QuadroCompleto>;
   como(p: Usuario): { get, post, patch, put, del };            // já com cookie, X-Trace-Id e Origin
-  criarDemanda(p?: Partial<CriarDemandaEntrada> & { como?: Usuario; ate?: 'entregue' | 'enviada' | 'aprovada' }): Promise<Demanda>;
-       // padrão: quadro criacao, coluna Fila, cliente HE, como am; `ate` usa os serviços (versão, envio, retorno), sem rotas
+  criarDemanda(p?: Partial<CriarDemandaEntrada> & { como?: Usuario; ate?: 'entregue' | 'enviada' | 'aprovada' | 'anulada' }): Promise<Demanda>;
+       // padrão: quadro criacao, coluna Fila, cliente HE, como am; `ate` por INSERTs (abaixo), sem rota nem serviço do F2
   coluna(quadro: 'atendimento' | 'criacao' | 'social', nome: string): Coluna;
   relogio(instante: Instante | null): void }>                  // fixa agora() (e o "hoje" de SP); null volta ao real
 // scripts/demo/*.ts
@@ -202,12 +223,30 @@ export function semear(ctx: { db: Db; pessoas; clientes; quadros }): void
 - pessoas: `admin` (admin); `am`, `am2` (atendimento, equipe Atendimento); `design`, `design2` (equipe, Criação);
   `social` (equipe, Social); `web` (equipe, Web).
 - quadros: `atendimento` (Kanban simples: A fazer, Fazendo, Revisão, Com o cliente [`aguardando_cliente`], Concluído
-  [`concluida`]); `criacao` (Por pessoa: Fila, Design, Design2; mais a coluna Pronto e a Concluído [`concluida`];
-  etiquetas "Urgente" rosa e "Alteração" âmbar; automação `aprovado` → `social` › Agendar); `social` (Fila, Agendar,
-  Publicado [`concluida`]; etiqueta "Alteração" âmbar). Membros das equipes seguem os quadros das equipes.
+  [`concluida`]; as automações do modelo: enviado → Com o cliente, ajuste → Fazendo); `criacao` (Por pessoa,
+  `colunaPorMembro`: Fila, Design [responsável `design`], Design2 [responsável `design2`]; mais a coluna Pronto e a
+  Concluído [`concluida`]; etiquetas "Urgente" rosa e "Alteração" âmbar; automações `enviado_ao_cliente` →
+  `atendimento` › Com o cliente, `ajuste_pedido` → `criacao` › Fila, `aprovado` → `social` › Agendar com `membros:
+  'responsavel_destino'`); `social` (Fila, Agendar, Publicado [`concluida`]; etiqueta "Alteração" âmbar). Membros das
+  equipes seguem os quadros das equipes.
 - clientes: `he` = { sigla HE, apelidos `hospital evangelico`, `atendimentoId: am`, responsável Criação = `design`,
   Social = `social`, contato padrão "Fulana" (aprova) }; `icc` = { sigla ICC, `atendimentoId: am2`, contato padrão "Beltrana" }.
 - relógio: começa em `2026-10-14T13:00:00.000Z` (quarta, 10h em São Paulo) para os testes de prazo e feriado.
+- `criarDemanda({ ate })` cria pela `criarDemanda()` do núcleo e completa **por INSERT/UPDATE em SQL** (o NS entrega na
+  Onda 1, sem código do F2; nenhuma automação roda, a demanda fica na coluna em que nasceu; `agora()` em todos os
+  instantes):
+  - `entregue`: `versao` V1 na rodada 1 (`criada_por` = design) + 1 `versao_item` link do Drive (`provedor 'drive'`,
+    `drive_status 'publico'`); os gatilhos põem `n_versoes = 1` e `versao_atual_id`;
+  - `enviada`: + `UPDATE versao SET enviada_cliente_em, enviada_via = 'fora'` (o gatilho põe `versao_enviada_id`);
+    `envio` (`via 'fora'`, `canal 'whatsapp'`, contato padrão, `quadro_id` = o quadro atual, `enviado_por` = am);
+    `demanda.envio_pendente_em = agora`, `atualizado_por` = am;
+  - `aprovada`: + `aprovacao` (`aprovado`, `via 'manual'`, `canal 'whatsapp'`, contato padrão, `registrado_por` = am,
+    `quadro_antes_id`/`coluna_antes_id` = o lugar atual); `demanda.aprovada_em`, `aprovada_versao_id` = V1,
+    `envio_pendente_em = NULL`, `retorno_em = agora`; rodada 1 com `fechada_em = agora`;
+  - `anulada`: + `aprovacao.anulada_em`/`anulada_por` = am; `demanda.aprovada_em`/`aprovada_versao_id`/`retorno_em`
+    nulos, `envio_pendente_em` = o `enviado_em` do envio; rodada 1 reaberta.
+  O F2 entrega `server/test/ciclo-paridade.test.ts`: os serviços reais (entregar, enviar sem automação, retorno
+  aprovado, anular) produzem as mesmas linhas (fora ids e instantes) que cada `ate`.
 
 #### 1.1.2 `shared/logica/` (puro; servidor e front usam o mesmo código)
 
@@ -218,23 +257,36 @@ somarDiasUteis(d: DataLocal, n: number, feriados): DataLocal; diasUteisEntre(de:
 proximoDiaUtil(d: DataLocal, feriados): DataLocal; segundaDaSemana(d: DataLocal): DataLocal
 formatarPrazo(d: DataLocal, h: HoraLocal | null): string        // "qui, 16/10, 18h"
 // prazo.ts  (API §5.2 e §5.3)
-estadoPrazo(d: Pick<Demanda, 'prazo' | 'prazoHora' | 'concluidaEm' | 'envioPendenteEm'>, coluna: Pick<Coluna, 'papel'>, agora: Date): EstadoPrazo
+type DemandaPrazo = Pick<Demanda, 'prazo' | 'prazoHora' | 'concluidaEm' | 'envioPendenteEm' | 'retornoEm' | 'statusDesde'>
+estadoPrazo(d: DemandaPrazo, coluna: Pick<Coluna, 'papel'>, agora: Date): EstadoPrazo
 proximoPrazo(prazo: DataLocal, repetir: Exclude<Repeticao, 'nenhuma'>, feriados): DataLocal
 prazoDoModelo(hoje: DataLocal, diasUteis: number | null, feriados): DataLocal | null
-// quadro.ts  (API §5.4 e §5.6)
-comQuemEsta(d: Pick<Demanda, 'concluidaEm' | 'envioPendenteEm'>, coluna: Pick<Coluna, 'papel'>): ComQuem
+// quadro.ts  (API §5.1, §5.4 e §5.6)
+comQuemEsta(d: Pick<Demanda, 'concluidaEm' | 'envioPendenteEm' | 'retornoEm' | 'statusDesde'>, coluna: Pick<Coluna, 'papel'>): ComQuem
+  // cliente: envioPendenteEm, ou coluna aguardando_cliente com (retornoEm nulo ou statusDesde > retornoEm)
 paradoHa(d: Demanda, coluna: Coluna, agora: Date, feriados): { comQuem: ComQuem; dias: number }
 ehMinha(d: Pick<Demanda, 'membroIds' | 'atendimentoId'>, euId: Id): boolean
 colunaDeEntrada(colunas: Coluna[], quadroId: Id): Coluna | null
-mapearEtiquetas(daDemanda: Etiqueta[], doDestino: Etiqueta[]): { mapa: Record<Id, Id>; semPar: Etiqueta[] }
+mapearEtiquetas(atuais: Etiqueta[], doDestino: Etiqueta[], guardadasNoDestino: Id[]): { ids: Id[]; semPar: Etiqueta[] }
+membrosAoMover(membroIds: Id[], p: { de: Pick<Coluna, 'responsavelId'>; para: Pick<Coluna, 'responsavelId'>;
+  mudaDeQuadro: boolean; membros: MembrosAoMover; responsavelDestino: Id | null; ativos: ReadonlySet<Id> }):
+  { membroIds: Id[]; entraram: Id[]; sairam: Id[] }               // API §5.1 passos 5 e 6 (o front usa no otimista)
 passouWip(coluna: Coluna, quantidade: number): boolean
+ehCardDaColuna(d: Pick<Demanda, 'arquivadoEm' | 'concluidaEm'>, agora: Date, concluidasDias: number): boolean   // API §4.6
 slugDe(nome: string): string
-// permissoes.ts  (API §2; o front usa para esconder o que não pode)
-type AcaoPermissao = 'quadro.administrar' | 'automacao.editar' | 'modelo.global' | 'cliente.criar' | 'cliente.editar'
-  | 'pessoas' | 'config' | 'versao.entregar' | 'ciclo.cliente' | 'comentario.visivel_cliente' | 'demanda.excluir' | 'horas.outros'
-pode(acao: AcaoPermissao, eu: { id: Id; papel: Papel }, alvo?: { demanda?: Demanda; cliente?: ClienteResumo }): boolean
+// permissoes.ts  (API §2; o front usa para esconder o que não pode; o servidor, para negar)
+type AcaoPermissao = 'quadro.administrar' | 'automacao.editar' | 'modelo.global' | 'modelos.revisados' | 'cliente.criar'
+  | 'cliente.editar' | 'pessoas' | 'config' | 'versao.entregar' | 'versao.editar' | 'ciclo.cliente'
+  | 'comentario.visivel_cliente' | 'comentario.editar' | 'comentario.excluir' | 'anexo.excluir'
+  | 'checklist_rodada.excluir' | 'apontamento.editar' | 'demanda.excluir' | 'horas.outros'
+type AlvoPermissao = { demanda?: Demanda; cliente?: ClienteResumo; versao?: Versao; comentario?: Comentario;
+  anexo?: Anexo; checklist?: Checklist; apontamento?: Apontamento }
+pode(acao: AcaoPermissao, eu: { id: Id; papel: Papel }, alvo?: AlvoPermissao): boolean
+  // cliente.criar: todos (a equipe só com CAMPOS_CLIENTE_EQUIPE); anexo.excluir: quem enviou, atendimento, admin;
+  // comentario.editar: o autor; comentario.excluir: o autor ou admin; apontamento.editar: o dono ou admin;
+  // versao.editar: o autor, atendimento, admin; checklist_rodada.excluir: atendimento, admin
 motivoNegado(acao: AcaoPermissao): string                         // "Só o atendimento envia ao cliente."
-camposProibidos(entrada: object, papel: Papel): string[]          // CAMPOS_SO_ATENDIMENTO
+camposProibidos(entrada: object, papel: Papel, lista?: 'demanda' | 'cliente'): string[]   // CAMPOS_SO_ATENDIMENTO / CAMPOS_CLIENTE_EQUIPE
 // posicao.ts
 entre(antes: number | null, depois: number | null): number; precisaRenormalizar(a: number, b: number): boolean
 // texto.ts
@@ -252,26 +304,46 @@ detectarSenha(texto: string): boolean
   desativada → 410; desativar revoga os tokens pendentes e para o cronômetro; redefinição revoga sessões antigas;
   sessão de pessoa desativada → 401; mutação sem `X-Trace-Id` ou com `Origin` errado → 403 csrf; corpo JSON de 2 MiB →
   413 `corpo_grande` sem ler o corpo; cookie `__Host-sid` com `NODE_ENV=production`.
-- quadros: equipe com modelo Por pessoa e 3 membros → colunas Fila + 3 (nome = apelido, cor da pessoa); colunas do
-  corpo vencem o modelo; membros da equipe passam a seguir; não admin criando → 403; nome ativo repetido → 409;
-  excluir com demanda (mesmo arquivada, mesmo só de passagem) → 409 e vazio → 204 levando colunas, etiquetas e
-  automações que apontavam para ele; arquivar quadro tira as demandas do bootstrap e desliga automações de outros
-  quadros que apontavam para ele; restaurar → evento `quadro` com `arquivadoEm` nulo.
-- colunas: arquivar com card ativo → 409; mudar o papel para `concluida` conclui as abertas sem repetição; ordenar por
-  prazo deixa sem prazo por último; mover todos os cards entre quadros passa por `mover()` (etiquetas §5.6).
+- quadros: equipe com modelo Por pessoa e 3 membros → colunas Fila + 3 (nome = apelido, cor da pessoa,
+  `responsavelId`) e `colunaPorMembro`; equipe sem membros → só Fila e a flag ligada; colunas do corpo vencem o modelo;
+  Kanban simples cria as 2 automações do modelo e, com "Com o cliente" desmarcada, só a de ajuste; membros da equipe
+  passam a seguir; não admin criando ou copiando → 403; nome ativo repetido → 409; copiar a Criação → colunas (com
+  responsável), etiquetas, automações (as internas remapeadas, a do Social igual) e modelos do quadro, sem cards;
+  pessoa que entra na equipe (POST, PATCH e PUT membros) ganha uma coluna nos quadros com `colunaPorMembro`, uma só,
+  logo depois da última coluna de pessoa; excluir com demanda (mesmo arquivada, mesmo só de passagem) → 409 e vazio →
+  204 levando colunas, etiquetas e automações que apontavam para ele; arquivar quadro tira as demandas do bootstrap e
+  desliga automações de outros quadros que apontavam para ele; restaurar → evento `quadro` com `arquivadoEm` nulo.
+- colunas: arquivar com card → 409; arquivar coluna só com concluídas antigas → 200, `concluidasArquivadas`; mudar o
+  papel para `concluida` conclui as abertas sem repetição; coluna de pessoa repetida → 409 e com papel
+  `aguardando_cliente` → 400; ordenar por prazo deixa sem prazo por último; mover todos os cards entre quadros passa por
+  `mover()` (etiquetas §5.6) e não leva as concluídas antigas.
+- clientes: equipe criando com sigla e nome → 201 com a pendência `sem_am`; equipe mandando `atendimentoId` → 403
+  `campo_nao_permitido`.
 - demandas: criar com o modelo Post → descrição, checklist de 4 itens, prazo = hoje + 2 dias úteis pulando fim de
   semana e feriado; etiqueta padrão sem par é criada no quadro; número sequencial sem repetir sob 20 criações
   concorrentes (Promise.all); equipe mandando `atendimentoId` → 403 `campo_nao_permitido`; coluna de outro quadro → 400;
-  quadro sem colunas → 422; criar notifica `membro` e `chegou` sem repetir a pessoa.
+  quadro sem colunas → 422; criar na coluna do Design põe `design` como membro; criar notifica `membro` sem repetir a
+  pessoa, e `chegou` só quando nenhum membro é da equipe do quadro.
 - PATCH com rev velho → 409 com `atual.descricaoMd`; comentário, arrastar, membro e etiqueta não mudam o rev; trocar
-  o cliente troca o AM só quando o AM era o do cliente antigo; `capaAnexoId` de PDF → 400; `repetir` sem prazo → 400.
-- mover: mesma coluna só reordena; outro quadro mapeia "Alteração" por nome e remove "Urgente" (`etiquetasRemovidas`),
-  com `etiquetasSemPar: 'criar'` cria; `etiquetaIds` do quadro errado → 400; destino arquivado → 422; entrar em coluna
-  `concluida` conclui e cria a repetição uma só vez (concluir, reabrir, concluir); sair dela reabre; passar do WIP →
-  aviso `limite_wip`; mudar de quadro notifica `chegou` aos seguidores do destino; histórico em `demanda_movimento`.
+  o cliente troca o AM só quando o AM era o do cliente antigo e leva as horas junto; trocar o cliente com versão
+  enviada (`criarDemanda({ ate: 'enviada' })`) → 409; `capaAnexoId` de PDF → 400; `repetir` sem prazo → 400.
+- mover: mesma coluna só reordena; criar e mover no mesmo instante (relógio parado) funciona e `statusDesde` cresce
+  1 ms; outro quadro mapeia "Alteração" por nome e deixa "Urgente" guardada (`etiquetasDeixadas`), e voltar para a
+  Criação traz "Urgente" de volta; com `etiquetasSemPar: 'criar'` cria; `etiquetaIds` do quadro errado → 400; da
+  coluna Design para a Design2 tira `design`, põe `design2` e notifica `membro`; da Fila para a Design só acrescenta;
+  `membros: 'responsavel_destino'` para o Social troca os membros por `social` (cliente sem responsável: mantém);
+  destino arquivado → 422; entrar em coluna `concluida` conclui e cria a repetição uma só vez (concluir, reabrir,
+  concluir); sair dela reabre; passar do WIP → aviso `limite_wip`; `chegou` aos seguidores só sem membro da equipe do
+  destino e nunca por automação em `aguardando_cliente`; histórico em `demanda_movimento` com `por` nulo quando o ator
+  é o cliente.
 - concluir: checkbox roda a automação `concluida` e soltar na coluna não roda; desmarcar numa coluna `concluida` volta
-  para a coluna anterior; repetição semanal/mensal/diária com feriado e 31 → último dia; executarAutomacao com destino
-  arquivado não move e não falha.
+  para a coluna anterior; repetição semanal/mensal/diária com feriado e 31 → último dia; a repetição de uma demanda
+  criada na Criação e concluída no Social nasce na Fila da Criação; concluir → Desfazer (arquiva a próxima) → concluir
+  de novo restaura a mesma próxima (sem erro de UNIQUE); executarAutomacao com destino arquivado não move e não falha;
+  `ajuste_pedido` com `quadroId` = Criação, estando a demanda no Atendimento, leva para a Fila da Criação.
+- horas (§4.20): equipe lista só as próprias; atendimento recebe `porCliente`; admin, `porPessoa`; `usuarioId` de outra
+  pessoa sem ser admin → 403; 93 dias → 400; editar apontamento de outro (equipe) → 403; parar o cronômetro no mesmo
+  instante em que ligou grava 1 minuto.
 - arquivar/restaurar: restaurar emite `demanda` com `c` nulo e escolhe outra coluna se a de antes foi arquivada;
   restaurar em quadro arquivado → 422; excluir com versão → 409; excluir sem versão limpa atividade, notificação,
   checklist e anexos, e histórico/comentários → 404.
@@ -279,18 +351,34 @@ detectarSenha(texto: string): boolean
   tabela vazia com `desde` antigo → `resync`; `desde` maior que o seq atual → `resync` `servidor_reiniciado`;
   notificação e `quadro_usuario` só ao dono; apontamento só ao dono e admin; `link_publico` não chega à equipe;
   bootstrap e sync aplicam o mesmo filtro; bootstrap com 500 demandas em menos de 1 s.
-- `verificar-migracoes.ts` verde; `npm run seed:demo` cria um ambiente navegável (6 quadros, todas as colunas com cards).
+- `verificar-migracoes.ts` verde; `npm run seed:demo` cria o ambiente navegável da §1.1.3.
 - Roteiro manual: `curl` em `/api/saude`; login pelo `curl` com cookie; `curl -N /api/eventos` mostra o evento de um
   `POST /mover` feito em outro terminal.
+
+#### 1.1.3 Seed de demonstração (`npm run seed:demo`, só desenvolvimento)
+
+Pessoas: admin, 2 AMs, 3 designers (Criação), 2 sociais (Social), 1 de cada nas outras equipes. Clientes: 8, com
+contato padrão, AM e responsáveis por equipe. Quadros criados como nos Primeiros passos (com as automações do modelo):
+
+| Quadro | Modelo e colunas (papel) | Automações | Demandas |
+|---|---|---|---|
+| Atendimento | Kanban simples: A fazer, Fazendo, Revisão, Com o cliente (`aguardando_cliente`), Concluído (`concluida`) | do modelo | 20 |
+| Criação | Por pessoa: Fila, uma por designer, Pronto, Concluído (`concluida`) | enviado → Atendimento › Com o cliente; ajuste → Criação › Fila; aprovado → Social › Fila (`responsavel_destino`) | `SEED_DEMANDAS` (padrão 300) |
+| Social | Por pessoa: Fila, uma por social, Agendado, Publicado (`concluida`) | concluída → Publicado | 40 |
+| Web, Tráfego, Produção | Kanban simples | do modelo | 15 cada |
+
+Toda coluna com pelo menos 1 card; entre eles: atrasadas, para hoje, com o cliente (link e por fora), aprovadas, em
+rodada 3 (extra), repetição semanal, concluídas há mais de 7 dias (Arquivo) e o cronômetro do admin ligado.
 
 ### 1.2 DESIGN-SYSTEM-WEB (agente 2 · API 7312, Vite 5182)
 
 **Possui:** `web/index.html`, `web/vite.config.ts`, `web/tsconfig.json`, `web/package.json`, `web/src/main.tsx`,
 `web/src/App.tsx`, `web/src/index.css`, `web/src/estilos/**`, `web/src/ui/**`, `web/src/casca/**`, `web/src/lib/**`,
 `web/src/sessao/**`, `web/src/api/cliente.ts`, `web/src/api/auth.ts`, `web/src/api/bootstrap.ts`,
-`web/src/api/menu.ts`, `web/src/extensoes/registro.ts`, `web/src/telas/auth/**`, `web/src/telas/dev/**`,
-`web/public/fonts/**`, as extensões `extensoes/avatar/nucleo-tema.tsx` e `extensoes/avatar/nucleo-sair.tsx`.
-`web/src/extensoes/tipos.ts` passa a ser dele (muda só por pedido). Não usa migrações.
+`web/src/api/menu.ts`, `web/src/extensoes/registro.ts`, `web/src/extensoes/registro-rotas.ts`,
+`web/src/telas/auth/**`, `web/src/telas/dev/**`, `web/scripts/contraste.ts`, `web/public/fonts/**`, as extensões
+`extensoes/avatar/nucleo-tema.tsx` e `extensoes/avatar/nucleo-sair.tsx`. `web/src/extensoes/tipos.ts` passa a ser dele
+(muda só por pedido). Não usa migrações.
 
 **Entrega:**
 - **Tokens** (`estilos/tokens.css`): exatamente `docs/pesquisa/marca.md` §7 com `light-dark()`, `data-theme`,
@@ -311,7 +399,7 @@ detectarSenha(texto: string): boolean
   (com e sem nome, recolhível como no Trello), ChipCliente, SeletorCor (paleta `CORES` + "sem cor"), Contador,
   BarraProgresso, Abas, Esqueleto, EstadoVazio, SeletorData (com hora opcional), SeletorHora, **GradeCalendario**
   (mês e semana, semana começando na segunda, feriados marcados, células como alvo de soltar com dnd-kit, itens
-  desenhados por quem usa; usado pela Agenda do F3 e pelo Calendário do F6), `Markdown` (exatamente a API §5.8),
+  desenhados por quem usa; base do `CalendarioDemandas` do NÚCLEO-WEB), `Markdown` (exatamente a API §5.8),
   `EditorMarkdown` (TipTap StarterKit + Mention com `injectCSS: false` e o CSS nos estilos; carregado com `lazy()`;
   recebe `buscarPessoas`), `TextoPuro`, `CopiarTexto` (para caminhos `M:\`), avisos com `sonner` (com "Desfazer").
 - **Casca** (`casca/`): barra superior `.chrome-dark` com vidro (logo, slots de `extensoes/topo`, avatar com
@@ -323,17 +411,22 @@ detectarSenha(texto: string): boolean
 - **Dados da casca:** `api/bootstrap.ts` com `useBootstrap()` (GET `/api/bootstrap`, `staleTime: Infinity`, chave
   `['bootstrap']`; o NÚCLEO-WEB mantém o cache pelo SSE) e `api/menu.ts` com `useFavoritar()` e `useSeguir()`
   (`PUT /api/quadros/:id/favorito|seguir`, otimistas sobre `['bootstrap'].eu`).
-- **Registro** (`extensoes/registro.ts`): um `import.meta.glob('./<pasta>/*.{ts,tsx}', { eager: true })` por pasta da
-  tabela de `extensoes/tipos.ts`, tipado com `ModulosExtensao`, ordenado por `ordem`, com funções `rotas()`,
-  `globais()`, `menus()`, `topo()`, `avatar()`, `abasCelular()`, `cabecalhoQuadro()`, `menuQuadro()`, `layouts()`,
-  `menuColuna()`, `entradaColuna()`, `selosCard()`, `interceptadoresSoltar()`, `secoesDemanda()`, `acoesDemanda()`,
-  `menuDemanda()`, `dialogos()`, `comandos()`, `fontesBusca()`, `atalhos()`, `tratadores()` (vários por entidade, em
-  ordem de id), `secoesInicio()`, `secoesConfig()`. Ids repetidos: erro no console em dev.
-- **Roteador** (`App.tsx`): rotas de `telas/**/rota.tsx` com `acesso` e `layout`, cada tela por `React.lazy(carregar)`
+- **Registro**, em dois arquivos para a página pública não baixar as extensões (cabeçalho de `extensoes/tipos.ts`):
+  `extensoes/registro-rotas.ts` com `rotas()` (só `telas/**/rota.tsx`), importado pelo `App.tsx`; e
+  `extensoes/registro.ts`, importado com `import()` pela casca autenticada: um `import.meta.glob('./<pasta>/*.{ts,tsx}',
+  { eager: true })` por pasta da tabela de `extensoes/tipos.ts` (com o padrão negativo `!./*/nucleo-exemplo*` no build
+  de produção), tipado com `ModulosExtensao`, ordenado por `ordem`, com funções `globais()`, `menus()`, `topo()`,
+  `avatar()`, `abasCelular()`, `cabecalhoQuadro()`, `menuQuadro()`, `layouts()`, `menuColuna()`, `entradaColuna()`,
+  `selosCard()`, `interceptadoresSoltar()`, `secoesDemanda()`, `acoesDemanda()`, `menuDemanda()`, `dialogos()`,
+  `comandos()`, `fontesBusca()`, `atalhos()`, `tratadores()` (vários por entidade, em ordem de id), `secoesInicio()`,
+  `secoesConfig()` e `exemplos()` (só DEV). Ids repetidos: erro no console em dev. Os pontos com `carregar` viram
+  `React.lazy` uma vez por id (cache), nunca a cada render.
+- **Roteador** (`App.tsx`): rotas de `registro-rotas.ts` com `acesso` e `layout`, cada tela por `React.lazy(carregar)`
   com `Suspense` (esqueleto); rotas `sobreposta` renderizam por cima da tela anterior (padrão "background location"
   do react-router); `/` redireciona para `eu.rotaInicial` (`/inicio`); rota desconhecida → "Página não encontrada";
-  título da aba "<titulo> · <APP_NOME>" (`useTituloAba()` para títulos dinâmicos). Monta os `globais()` dentro do
-  `QueryClientProvider` e do Router conforme o escopo. Rota pública nunca chama `/api/bootstrap` nem redireciona.
+  título da aba "<titulo> · <APP_NOME>" (`useTituloAba()` para títulos dinâmicos). A casca autenticada carrega
+  `registro.ts` e monta os `globais()` dentro do `QueryClientProvider` e do Router conforme o escopo. Rota pública
+  nunca chama `/api/bootstrap` nem redireciona.
 - **Cliente HTTP** (`api/cliente.ts`): `api<T>(metodo, caminho, { corpo?, ifMatch?, idempotencia?, sinal? })` com
   `credentials: 'same-origin'`, `X-Trace-Id` novo a cada mutação (exporta `ultimosTraces()` para o eco do SSE),
   erro tipado `ErroDaApi { status, codigo, mensagem, detalhes }`, 401 → `/entrar?volta=` (exceto em rota pública).
@@ -345,8 +438,11 @@ detectarSenha(texto: string): boolean
   `localStorage` para pintar antes do login.
 
 **Critérios de aceite:** `npm run build` sem aviso de chunk acima de 500 kB (telas em chunks próprios; TipTap e cmdk
-fora do chunk inicial); `/dev/ui` no claro e no escuro passa no contraste AA (texto da coluna tingida e card sobre ela
-inclusive) e navega só pelo teclado; login → `/inicio`; convite em janela anônima define a senha e entra (URL sem o
+fora do chunk inicial); o que `/a/:token` baixa (entrada + tela pública) soma menos de 150 kB comprimidos (gzip) e não
+inclui `registro.ts`; `npm run contraste --workspace web` (`web/scripts/contraste.ts`, sem dependência: lê
+`estilos/tokens.css` e calcula a razão WCAG de cada par texto/fundo, inclusive o texto da coluna tingida e o card sobre
+ela, nos dois temas) passa com mínimo 4,5:1; `/dev/ui` no claro e no escuro navega só pelo teclado; login →
+`/inicio`; convite em janela anônima define a senha e entra (URL sem o
 `#token`); com o servidor da Onda 1, o menu lista os quadros do bootstrap, a estrela leva o quadro para Favoritos e
 arrastar reordena (persistindo); 390 px sem rolagem horizontal na casca; `[` recolhe o menu; nenhuma cor hex fora de
 `estilos/`; `Markdown` com `[x](javascript:alert(1))` não gera link e com `@[Rafa](mencao:u1)` gera o `span`; build
@@ -360,15 +456,23 @@ Começa quando a Onda 1 estiver na branch principal. Branch principal, árvore p
 
 **Possui:** `web/src/api/**` (exceto `cliente.ts`, `auth.ts`, `bootstrap.ts` e `menu.ts`), `web/src/tempo-real/**`,
 `web/src/quadro/**`, `web/src/demanda/**`, `web/src/paleta/**`, `web/src/dialogos/**`, `web/src/teclado/**`,
-`web/src/telas/quadro/**` (`/q/:slug`), `web/src/telas/demanda/**` (`/d/:numero`), `shared/logica/filtros.ts` (só na
-Onda 2: na Onda 3 passa ao F6), `shared/logica/sinal.ts` e todos os arquivos `nucleo{,-*}` em `web/src/extensoes/*/`.
-Sem migrações.
+`web/src/calendario/**`, `web/src/telas/quadro/**` (`/q/:slug`), `web/src/telas/demanda/**` (`/d/:numero`),
+`web/src/telas/config/**` (`/config` e `/config/:caminho`: o host que lista `secoesConfig()`), `web/src/telas/dev-extensoes/**`
+(`/dev/extensoes`, só DEV), `shared/logica/filtros.ts` (só na Onda 2: na Onda 3 passa ao F6), `shared/logica/sinal.ts`
+e todos os arquivos `nucleo{,-*}` em `web/src/extensoes/*/` (inclusive os `nucleo-exemplo*`, só DEV). Sem migrações.
 
 **Entrega:**
 - **Componentes globais** (`extensoes/global/`, escopo `autenticada`): `nucleo-tempo-real.tsx` (cliente SSE),
-  `nucleo-dialogos.tsx` (host de diálogos: modal ou popover ancorado, folha no celular), `nucleo-paleta.tsx` (Cmd+K),
-  `nucleo-teclado.tsx` (despachante). Nada é montado editando o `App.tsx` do DS.
+  `nucleo-dialogos.tsx` (host de diálogos: modal ou popover ancorado, folha no celular; diálogo aberto de dentro de
+  outro empilha e devolve o foco), `nucleo-paleta.tsx` (Cmd+K), `nucleo-teclado.tsx` (despachante). Nada é montado
+  editando o `App.tsx` do DS.
 - **Dados** (`api/`): chaves (§2.1); seletores e mutações otimistas com reversão e aviso (assinaturas fixas na §2.2).
+  As mesmas mutações formam o `AcoesNucleo` (`web/src/extensoes/tipos.ts`), montado uma vez pelos hosts e injetado em
+  `ContextoAcao` e `UtilModal` (`qc` e `acoes`) para quem roda fora do render.
+- **Configurações** (`/config`): lista as `secoesConfig()` permitidas ao papel, no menu à esquerda (folha no celular),
+  e roteia `/config/:caminho`; sem seção para o caminho → "Página não encontrada". O F4 e o F5 só trazem seções.
+- **Calendário** (`calendario/`): `CalendarioDemandas` (§2.2) sobre a `GradeCalendario` do DS, para a Agenda (F3) e o
+  Calendário do quadro (F6).
 - **Tempo real** (`tempo-real/`): EventSource em `/api/eventos?desde=<seq do bootstrap>`, reconexão 1 s → 30 s (× 4 com
   a aba oculta), polling em `/api/sync` se o SSE falhar, ignora o próprio eco, `resync` → recarrega o bootstrap,
   entrega a `tratadores()`. Tratadores do núcleo: demanda, quadro (arquivado → limpa; restaurado → recarrega o
@@ -401,11 +505,14 @@ Sem migrações.
   comentários, check de concluída, prioridade (faixa de 3 px à esquerda em alta/urgente) e avatares dos membros (até
   3 + "+2"); depois os `selosCard()`. Lápis no hover e botão direito abrem o menu de contexto (`menuDemanda()` com
   `onde` card).
-- **Mover** (`useMover`): aplica na hora, chama `interceptadoresSoltar()` (o primeiro cujo `quando` for true; card
-  pendente enquanto decide), chama `POST /mover`, mostra "Movida para X · Desfazer" (com as `etiquetasRemovidas`, se
-  houver) e reverte com aviso no erro. Interceptador do núcleo `soltar/nucleo-concluir.ts`: soltar numa coluna
-  `concluida` com `repetir` mostra "Concluída. A próxima fica para sex, 24/10" (não pergunta).
-- **Modal** (`demanda/`, rota sobreposta `/d/:numero`): abre do cache; Esc fecha; ←/→ e J/K abrem a vizinha da mesma
+- **Mover** (`useMover`): aplica na hora (inclusive os membros pela coluna de pessoa, com `membrosAoMover`), chama
+  `interceptadoresSoltar()` (o primeiro cujo `quando` for true, com `executar(pedido, ctx)`; card pendente enquanto
+  decide; `feito` não chama `/mover`), chama `POST /mover`, mostra "Movida para X · Desfazer" (com as
+  `etiquetasDeixadas`, se houver; o Desfazer manda `etiquetaIds` e `membroIds` de antes) e reverte com aviso no erro.
+  Interceptador do núcleo `soltar/nucleo-concluir.ts`: soltar numa coluna `concluida` com `repetir` mostra
+  "Concluída. A próxima fica para sex, 24/10" (não pergunta).
+- **Modal** (`demanda/`, rota sobreposta `/d/:numero`): abre do cache (fora do cache, espera o detalhe e usa
+  `detalhe.quadro`/`detalhe.coluna`, com `somenteLeitura` para arquivada ou de quadro arquivado); Esc fecha; ←/→ e J/K abrem a vizinha da mesma
   coluna; topo com capa, título editável, "na coluna **Fazendo** do quadro **Criação**" (clique abre `mover-demanda`
   do F1), checkbox **Concluída** (`POST /concluir`, com o aviso da repetição), ações (`acoesDemanda()`, um primário
   laranja) e menu ··· (`menuDemanda()`; do núcleo `demanda-menu/nucleo.tsx`: Copiar link, Arquivar/Restaurar,
@@ -434,27 +541,43 @@ Sem migrações.
 | `['demanda', id, 'links']` | `LinkPublicoComUrl[]` | ciclo |
 | `['quadros', 'arquivados']` · `['quadro', id]` | `Quadro[]` · `QuadroCompleto` | cadastros |
 | `['modelos-demanda']` | `ModeloDemanda[]` com inativos | entrada |
-| `['clientes']` · `['cliente', sigla]` · `['cliente', id, 'aprovacoes']` | listas e detalhe | cadastros |
+| `['cliente', sigla]` | `Cliente` (contatos, links, contadores) | núcleo-web (`useClienteDetalhe`; F1, F2 e F5 usam) |
+| `['clientes']` · `['cliente', id, 'aprovacoes']` | lista e trilha | cadastros |
 | `['pessoas']` · `['config', 'app']` · `['feriados', ano]` · `['arquivo', consulta]` | cadastros | cadastros |
 | `['inicio']` · `['agenda', consulta]` · `['notificacoes']` | painéis | painéis |
-| `['apontamentos', consulta]` | horas | modal |
+| `['apontamentos', consulta]` | `ListarApontamentosSaida` | núcleo-web (`useApontamentos`; F3 e F5 usam) |
 | `['busca', q]` | `BuscaSaida` | entrada |
 
 Toda mutação de uma funcionalidade atualiza o cache pelo retorno da API **e** pelo tratador SSE (idempotente).
 
-**Critérios de aceite:** com `seed:demo`, `/q/criacao` com 300 demandas abre em menos de 1 s (medir no Performance);
+**Critérios de aceite:** com `seed:demo` (§1.1.3, `SEED_DEMANDAS=300`), `/q/criacao` abre em menos de 1 s (medir no Performance);
 arrastar card entre colunas e entre posições reflete em outra janela em menos de 1 s; arrastar coluna persiste; soltar
 numa coluna `concluida` marca o check e, com `repetir`, a próxima aparece na coluna de entrada; Esc durante o arraste
 devolve; recolher coluna persiste após recarregar; `/d/12` por cima de `/q/criacao` e Esc volta sem recarregar; `?f=`
 e `?v=` sobrevivem ao recarregar; derrubar o servidor mostra "Sem conexão" e, ao voltar, ressincroniza sem duplicar
 cards; 409 de rev mescla (inclusive a descrição) e avisa; arquivar um quadro numa janela tira o quadro do menu da
-outra e restaurar o devolve; Espaço entra na demanda e o avatar aparece na outra janela; `/a/qualquer` não chama
-`/api/bootstrap` nem abre SSE; tudo pelo teclado; 390 px com snap por coluna e sem rolagem horizontal da página.
+outra e restaurar o devolve; Espaço entra na demanda e o avatar aparece na outra janela; arrastar da coluna de uma
+pessoa para a de outra troca o avatar na hora e na outra janela; `/a/qualquer` não chama `/api/bootstrap` nem abre SSE
+nem baixa `registro.ts`; tudo pelo teclado; 390 px com snap por coluna e sem rolagem horizontal da página.
+
+**Hosts testados antes da Onda 3** (`/dev/extensoes`, só DEV, com as contribuições `extensoes/*/nucleo-exemplo*`): um
+defeito num host apareceria em seis worktrees que não podem corrigi-lo. Um critério por host:
+- seções do modal: principal e lateral na ordem, `visivel` falso esconde, `carregar` mostra esqueleto e não recarrega;
+- ações do modal: um só primário (o de menor ordem com `primaria`), até 2 secundários, o resto no ···;
+- menu da demanda: `onde: ['card']` não aparece no modal; `subitens` abre submenu; menu do quadro e da coluna;
+- selos do card: topo e rodapé, com `coluna`/`quadro` nulos num card do Arquivo;
+- cabeçalho do quadro: esquerda e direita; layouts: o terceiro layout aparece no seletor;
+- entrada da coluna: com duas registradas, N abre a de menor `ordem`;
+- interceptadores: `seguir` chama `/mover` com os extras; `cancelado` (e Esc) volta o card em 200 ms; `feito` não chama
+  `/mover`; um interceptador que abre um diálogo de dentro do "Mover para…" empilha e devolve o foco;
+- diálogos: modal, popover ancorado no desktop e folha a 390 px; id sem registro → "Disponível em breve";
+- tratadores: dois para a mesma entidade, chamados em ordem de id; abas do celular com `useContador`;
+- `acoes` fora do render: um comando da paleta que chama `ctx.acoes.mover` atualiza o quadro sem esperar o SSE.
 
 ### 2.2 API interna do núcleo-web (o que as funcionalidades importam)
 
-Como a §1.1.1 para o servidor: caminhos e assinaturas fixos. Componentes de extensão não recebem utilitários por
-props; usam estes hooks. Mudar uma assinatura é pedido (regra 0.1).
+Como a §1.1.1 para o servidor: caminhos e assinaturas fixos. Componentes de extensão usam estes hooks; funções fora do
+render usam `ctx.qc` e `ctx.acoes` (os mesmos tipos). Mudar uma assinatura é pedido (regra 0.1).
 
 ```ts
 // web/src/api/chaves.ts  (as chaves da §2.1, tipadas)
@@ -490,27 +613,59 @@ export function useModelosDemanda(quadroId: Id | null): ModeloDemanda[]  // glob
 export function useUsuarios(): UsuarioResumo[]; export function useUsuario(id: Id | null): UsuarioResumo | undefined
 export function useClientes(): ClienteResumo[]; export function useCliente(id: Id | null): ClienteResumo | undefined
 export function useEquipes(): Equipe[]; export function useFeriados(): ReadonlySet<string>; export function useConfig(): ConfigApp
-// web/src/api/demandas.ts  (otimistas: aplicam na hora, revertem com aviso no erro; null = cancelado pelo usuário)
+// web/src/api/demandas.ts  (otimistas: aplicam na hora, revertem com aviso no erro; null = cancelado pelo usuário).
+// Cada hook devolve a função do AcoesNucleo de mesmo nome (web/src/extensoes/tipos.ts).
 export function useDetalhe(numero: number): UseQueryResult<DemandaDetalhe, ErroDaApi>
-export function useMover(): (d: Demanda, entrada: MoverEntrada, origem: PedidoSoltar['origem']) => Promise<MoverSaida | null>
-  // interceptadores, "Movida para X · Desfazer" (o Desfazer volta com etiquetaIds originais entre quadros)
-export function useEditarDemanda(): (d: Demanda, mudancas: EditarDemandaEntrada) => Promise<EditarDemandaSaida | null>
-export function useConcluir(): (d: Demanda, concluida: boolean) => Promise<ConcluirSaida | null>
-export function useMembros(): { entrar(d: Demanda, usuarioId: Id): Promise<Demanda | null>; sair(d: Demanda, usuarioId: Id): Promise<Demanda | null> }
-export function useEtiquetasDemanda(): { por(d: Demanda, etiquetaId: Id): Promise<Demanda | null>; tirar(d: Demanda, etiquetaId: Id): Promise<Demanda | null> }
-export function useArquivar(): (d: Demanda) => Promise<Demanda | null>  // "Arquivada · Desfazer"
-export function useRestaurar(): (d: Demanda, colunaId?: Id) => Promise<Demanda | null>
+export function useMover(): AcoesNucleo['mover']
+  // interceptadores, "Movida para X · Desfazer" (o Desfazer volta com etiquetaIds e membroIds de antes entre quadros);
+  // resultado 'feito' de um interceptador: { demanda, etiquetasDeixadas: [], etiquetasCriadas: [], proxima: null, avisos: [] }
+export function useEditarDemanda(): AcoesNucleo['editar']
+export function useMudarPrazo(): AcoesNucleo['mudarPrazo']   // mantém prazoHora, manda If-Match, "Prazo: sex, 24/10 · Desfazer"
+export function useConcluir(): AcoesNucleo['concluir']
+export function useMembros(): AcoesNucleo['membros']
+export function useEtiquetasDemanda(): AcoesNucleo['etiquetas']
+export function useArquivar(): AcoesNucleo['arquivar']       // "Arquivada · Desfazer"
+export function useRestaurar(): AcoesNucleo['restaurar']
+export function useAcoes(): AcoesNucleo                       // tudo junto (o que os hosts injetam)
 export function useCriarDemanda(): (e: CriarDemandaEntrada) => Promise<CriarDemandaSaida | null>
 // web/src/api/quadros.ts  (colunas e etiquetas: otimistas)
-export function useColunasMutacoes(): { criar; editar; arquivar; restaurar; moverCards; arquivarCards; ordenar }
-export function useEtiquetasMutacoes(): { criar; editar; excluir }
+export function useColunasMutacoes(): {
+  criar(quadroId: Id, e: CriarColunaEntrada): Promise<Coluna | null>
+  editar(c: Coluna, e: EditarColunaEntrada): Promise<EditarColunaSaida | null>
+  arquivar(c: Coluna): Promise<ArquivarColunaSaida | null>
+  restaurar(c: Coluna): Promise<Coluna | null>
+  moverCards(c: Coluna, e: MoverCardsEntrada): Promise<MoverCardsSaida | null>
+  arquivarCards(c: Coluna): Promise<ArquivarCardsSaida | null>
+  ordenar(c: Coluna, por: OrdemColuna): Promise<OrdenarColunaSaida | null> }
+export function useEtiquetasMutacoes(): {
+  criar(quadroId: Id, e: CriarEtiquetaEntrada): Promise<Etiqueta | null>
+  editar(et: Etiqueta, e: EditarEtiquetaEntrada): Promise<Etiqueta | null>
+  excluir(et: Etiqueta): Promise<boolean> }
 export function useEditarQuadro(): (q: Quadro, e: EditarQuadroEntrada) => Promise<Quadro | null>
+export function useCopiarQuadro(): (q: Quadro, e: CopiarQuadroEntrada) => Promise<QuadroCompleto | null>   // F5 (menu do quadro)
+// web/src/api/clientes.ts  (chave ['cliente', sigla]; a sigla sai do bootstrap)
+export function useClienteDetalhe(id: Id | null): UseQueryResult<Cliente, ErroDaApi>   // contatos (F2), links (F1), página (F5)
+// web/src/api/arquivos.ts
+export function useEnviarArquivo(): (f: File, sinal?: AbortSignal) => Promise<ArquivoInfo>
+  // FormData sem Content-Type; rejeita com ErroDaApi (413 arquivo_grande, 415 tipo_arquivo); Ctrl+V (F1), print (F2), logo (F5)
+// web/src/api/horas.ts  (§4.20 da API; /horas do F3 e aba Horas do cliente do F5)
+export function useApontamentos(c: ListarApontamentosConsulta): UseQueryResult<ListarApontamentosSaida, ErroDaApi>
+export function useEditarApontamento(): { editar(a: Apontamento, e: EditarApontamentoEntrada): Promise<Apontamento | null>;
+  excluir(a: Apontamento): Promise<boolean> }   // "Excluído · Desfazer"
+// web/src/calendario/index.ts  (Agenda do F3 e Calendário do quadro do F6; sobre a GradeCalendario do DS)
+export function CalendarioDemandas(p: {
+  modo: 'mes' | 'semana'; inicio: DataLocal; mudarPeriodo(inicio: DataLocal, modo: 'mes' | 'semana'): void
+  itens: { demanda: Demanda; campo: CampoAgenda; data: DataLocal; hora: HoraLocal | null }[]
+  feriados: Feriado[]; semPrazo?: Demanda[]          // com semPrazo: faixa "Sem prazo" de onde se arrasta para um dia
+  mostrarQuadro?: boolean; abrir(numero: number): void }): JSX.Element
+  // arrastar um item de campo 'prazo' (ou da faixa) para um dia chama useMudarPrazo; início e publicação só aparecem;
+  // concluídas riscadas; feriados marcados; semana começa na segunda; no celular vira lista por dia
 // web/src/quadro/index.ts
 export function CardDemanda(p: { demanda: Demanda; compacto?: boolean; mostrarQuadro?: boolean }): JSX.Element  // sem arrastar
 export function useRolarParaColuna(): (colunaId: Id) => void            // celular: barra de chips do F6
 // web/src/dialogos/index.ts
 export function useAbrirDialogo(): AbrirDialogo                          // id sem diálogo registrado → "Disponível em breve"
-export function useContextoAcao(): ContextoAcao                          // eu, navegar, abrirDialogo, demandaEmFoco, quadroAtual
+export function useContextoAcao(): ContextoAcao                          // eu, navegar, abrirDialogo, demandaEmFoco, quadroAtual, qc, acoes
 // web/src/teclado/index.ts
 export function useEscopoAtalho(escopo: EscopoAtalho, ativo?: boolean): void
 export function useFocoDemanda(): [Demanda | null, (d: Demanda | null) => void]
@@ -532,15 +687,17 @@ Regras da onda: dono único dos arquivos listados (extensões pelo glob `extenso
 internas do servidor (§1.1.1) e do front (§2.2); fala com as outras funcionalidades **só** por diálogos
 (`abrirDialogo`), eventos SSE e cache (chaves da §2.1), nunca por rota HTTP ou import de arquivo de outra
 funcionalidade. Depender de diálogo de outra funcionalidade é permitido: até o merge dela, o host mostra "Disponível em
-breve". A `ordem` de cada contribuição está na §4; os textos de estado vazio e de erro, na §4.1.
+breve". A `ordem` de cada contribuição está na §4; os textos de estado vazio e de erro, na §4.1. Testes que precisam
+de demanda entregue, enviada, aprovada ou anulada usam `criarDemanda({ ate })` (§1.1.1, SQL do núcleo), nunca o
+código do F2.
 
 | # | Funcionalidade | Branch | Agente N | API / Vite | Migrações | Rotas |
 |---|---|---|---|---|---|---|
-| F1 | Modal completo | `funcionalidade/modal` | 4 | 7314 / 5184 | 020–029 | 21 |
+| F1 | Modal completo | `funcionalidade/modal` | 4 | 7314 / 5184 | 020–029 | 18 |
 | F2 | Ciclo da peça + página pública + automações | `funcionalidade/ciclo` | 5 | 7315 / 5185 | 030–039 | 20 |
-| F3 | Início, Agenda, notificações e jobs de prazo | `funcionalidade/paineis` | 6 | 7316 / 5186 | 040–049 | 4 + tarefa |
-| F4 | Entrada: Nova demanda, rápida, Colar do WhatsApp, busca, atalhos, modelos | `funcionalidade/entrada` | 7 | 7317 / 5187 | 050–059 | 7 |
-| F5 | Cadastros, Configurações, Novo quadro, Primeiros passos, Arquivo | `funcionalidade/cadastros` | 8 | 7318 / 5188 | 060–069 | 7 |
+| F3 | Início, Agenda, Horas, notificações e jobs de prazo | `funcionalidade/paineis` | 6 | 7316 / 5186 | 040–049 | 4 + tarefa |
+| F4 | Entrada: Nova demanda, rápida, Colar do WhatsApp, busca, atalhos, modelos | `funcionalidade/entrada` | 7 | 7317 / 5187 | 050–059 | 8 |
+| F5 | Cadastros, seções de Configurações, Novo quadro, Copiar quadro, Arquivo | `funcionalidade/cadastros` | 8 | 7318 / 5188 | 060–069 | 7 |
 | F6 | Lista e Calendário do quadro, filtros, celular | `funcionalidade/lista` | 9 | 7319 / 5189 | 070–079 | 0 |
 
 Integração e correções pós-merge: faixa **090–099**.
@@ -549,9 +706,10 @@ Integração e correções pós-merge: faixa **090–099**.
 - **Possui:** `server/src/rotas/modal-*.ts`, `server/src/servicos/modal-*.ts`, `server/test/modal-*.test.ts`,
   `server/test/modal-ajuda.ts`, `server/scripts/demo/modal.ts`, `web/src/funcionalidades/modal/**`,
   `web/src/extensoes/*/modal{,-*}.{ts,tsx}`.
-- **Rotas (API §4.15, 21):** comentários (GET, POST, PATCH, DELETE), histórico, checklists (POST, PATCH, DELETE), itens
-  (POST, PATCH, DELETE), anexos (POST, PATCH, DELETE), copiar, cronômetro (iniciar, parar), apontamentos (GET, POST,
-  PATCH, DELETE).
+- **Rotas (API §4.15, 18):** comentários (GET, POST, PATCH, DELETE), histórico, checklists (POST, PATCH, DELETE), itens
+  (POST, PATCH, DELETE), anexos (POST, PATCH, DELETE), copiar, cronômetro (iniciar, parar), lançar tempo (POST
+  apontamentos). Listar, editar e excluir horas são do núcleo (API §4.20). Toda regra de papel por `pode()`
+  (`anexo.excluir`, `comentario.editar`, `comentario.excluir`, `checklist_rodada.excluir`).
 - **Extensões:**
   - coluna principal: `demanda/modal-descricao` (Markdown com @ no `EditorMarkdown`, salva com Ctrl+Enter ou ao sair;
     "Texto original (WhatsApp)" recolhido como texto puro), `demanda/modal-checklists` (vários, barra e %, esconder
@@ -559,14 +717,18 @@ Integração e correções pós-merge: faixa **090–099**.
     `demanda/modal-anexos` (links, caminhos `M:\` com [Copiar caminho], arquivos com Ctrl+V e arrastar; "Tornar capa"
     nas imagens), `demanda/modal-atividade` (abas Comentários | Atividade; compositor com @, Ctrl+Enter, "Visível ao
     cliente" só para atendimento/admin; atividade tipada "Rafa moveu de Fazendo para Revisão · há 2 h");
-  - coluna lateral: `demanda/modal-membros`, `modal-etiquetas`, `modal-cliente` (cliente com "Criar cliente XYZ", AM
-    para atendimento/admin, links do cliente, pasta de saída com Copiar, Acessos), `modal-datas` (início, prazo com
+  - todas respeitam `ctx.somenteLeitura` (arquivada ou de quadro arquivado: mostram e não editam);
+  - coluna lateral: `demanda/modal-membros`, `modal-etiquetas`, `modal-cliente` (cliente com "Criar cliente XYZ" pelo
+    diálogo `criar-cliente` do F5; AM para atendimento/admin; links do cliente por `useClienteDetalhe`; pasta de saída
+    com Copiar; Acessos; trocar o cliente depois do envio mostra o 409 com "Copiar demanda"), `modal-datas` (início, prazo com
     hora, publicação, repetir), `modal-prioridade`, `modal-estimativa`, `modal-tempo` (cronômetro ▶/■ com o tempo
     correndo, [Lançar tempo], total e meus), `modal-capa`;
   - `demanda-menu/modal.tsx` (modal e card: Mover…, Copiar…, Enviar para ▸ (favoritos primeiro, depois por equipe;
-    vai para o topo da coluna de entrada), Membros, Etiquetas, Datas, Capa); `quadro-menu/modal-etiquetas`
+    vai para o topo da coluna de entrada; com responsável do cliente na equipe do destino, manda `membros:
+    'responsavel_destino'`), Membros, Etiquetas, Datas, Capa; tudo por `util.acoes`); `quadro-menu/modal-etiquetas`
     (Etiquetas do quadro); `dialogos/modal-*` (`mover-demanda` com quadro, coluna e posição, etiquetas sem par
-    [Criar lá | Remover] e o responsável do cliente na equipe do destino como membro sugerido; `copiar-demanda`;
+    [Criar lá | Deixar no quadro de origem] e, quando o cliente tem responsável na equipe do destino, [Manter os
+    membros | Passar para Bia] (`membros`); `copiar-demanda`;
     `membros`, `etiquetas`, `datas`, `capa` como popover ancorado; `lancar-tempo`); `card/modal-cronometro` (selo do
     meu cronômetro ligado neste card); `topo/modal-cronometro` ("⏱ 0:42 · #123" com ■, só com cronômetro ligado);
     `atalhos/modal.ts` (M membros, L etiquetas, D datas, T cronômetro, Shift+M mover; escopos card e modal; C não
@@ -575,16 +737,21 @@ Integração e correções pós-merge: faixa **090–099**.
 - **Testes:** contadores `nCheck*`/`nAnexos`/`nComentarios` no evento de demanda; menção notifica o mencionado e não o
   autor, membros recebem `comentario` sem repetir quem foi mencionado, e editar só notifica a menção nova; editar
   comentário de outro → 403; equipe com `visivelCliente: true` (POST e PATCH) → 403 `campo_nao_permitido`; anexo
-  `http://` → 400; `anexoIds` de outra demanda → 400; excluir o anexo da capa limpa a capa; copiar para outro quadro
-  com `manter.etiquetas` mapeia por nome e com `manter.checklists` desmarca os itens e deixa o de rodada de fora;
-  cronômetro: iniciar outro para o anterior e soma os minutos; dois inícios simultâneos da mesma pessoa → um 200 e o
-  outro também 200 com o primeiro parado (nunca dois ligados); parar depois de 11 h grava 10 h e avisa; arquivar a
-  demanda para o cronômetro; apontamento de outro (equipe) → 403; `minutosRegistrados` num evento com `a`/`t` nulos e
-  o `apontamento` só ao dono e ao admin; histórico paginado em ordem decrescente, sem o `tempo.lancado` de outra pessoa.
+  `http://` → 400; `anexoIds` de outra demanda → 400; excluir o anexo da capa limpa a capa; excluir o print de
+  evidência de uma aprovação (`criarDemanda({ ate: 'aprovada' })` + anexo `evidencia`) → 409; equipe excluindo anexo
+  enviado por outra pessoa → 403; equipe apagando o checklist de rodada → 403; copiar para outro quadro com
+  `manter.etiquetas` mapeia por nome e com `manter.checklists` desmarca os itens e deixa o de rodada de fora;
+  cronômetro: iniciar outro para o anterior e soma os minutos; ligar e parar no mesmo instante (relógio parado) grava
+  1 minuto; dois inícios simultâneos da mesma pessoa → um 200 e o outro também 200 com o primeiro parado (nunca dois
+  ligados); parar depois de 11 h grava 10 h e avisa; arquivar a demanda para o cronômetro; `minutosRegistrados` num
+  evento com `a`/`t` nulos e o `apontamento` só ao dono e ao admin; histórico paginado em ordem decrescente, sem o
+  `tempo.lancado` de outra pessoa.
 - **Roteiro:** abrir uma demanda do quadro; escrever a descrição com @Rafa e conferir, como Rafa, `GET /api/notificacoes`;
   marcar itens e ver "3/5" no card; colar um print com Ctrl+V e torná-lo capa (o card mostra a imagem); M e Espaço
   mudam membros; D muda o prazo e o card muda de estado; T liga o cronômetro, o topo mostra o tempo, T de novo para;
-  "Mover para…" leva ao quadro Social e avisa a etiqueta sem par; "Copiar…" cria a cópia na coluna escolhida.
+  "Mover para…" leva ao quadro Social, avisa que "Urgente" fica na Criação e oferece passar para o responsável do
+  Social; voltar para a Criação traz "Urgente" de volta; "Copiar…" cria a cópia na coluna escolhida; uma demanda
+  arquivada abre só para leitura.
 
 ### F2 · Ciclo da peça, página pública e automações (`ciclo`)
 - **Possui:** `server/src/rotas/ciclo-*.ts`, `server/src/rotas/publico.ts`, `server/src/servicos/ciclo*.ts`,
@@ -600,117 +767,155 @@ Integração e correções pós-merge: faixa **090–099**.
   texto da §4.1); `demanda-acoes/ciclo.tsx` (Entregar versão, Enviar ao cliente, Registrar retorno, Aprovado pelo
   WhatsApp, Pedir ajuste interno, Copiar para WhatsApp; o primário depende do estado: sem versão → Entregar; versão
   não enviada → Enviar; envio pendente → Registrar retorno); `dialogos/ciclo-*` (`entregar-versao`,
-  `enviar-ao-cliente` com teste de Drive, "[Enviar arquivo (até 10 MB)]", "Copiar para WhatsApp" no fim e o aviso
-  "Movida para Atendimento › Com o cliente" quando a automação rodar; `registrar-retorno` com Ctrl+V do print;
-  `ajuste-interno`; `anular-aprovacao`; `copiar-whatsapp`; `automacoes-quadro` com as 4 linhas "Ao enviar ao cliente,
-  mover para [quadro › coluna]"); `soltar/ciclo.ts` (soltar numa coluna `aguardando_cliente` com versão não enviada,
-  sendo atendimento: "Enviar ao cliente agora?" [Enviar | Só mover | Cancelar]); `quadro-menu/ciclo-automacoes`;
+  `enviar-ao-cliente` com teste de Drive, "[Enviar arquivo (até 10 MB)]" (`useEnviarArquivo`), "Copiar para WhatsApp"
+  no fim e o aviso "Movida para Atendimento › Com o cliente" quando a automação rodar; `registrar-retorno` com Ctrl+V
+  do print (contatos por `useClienteDetalhe`); `ajuste-interno`; `anular-aprovacao`; `copiar-whatsapp`;
+  `enviar-ao-soltar` ("Enviar ao cliente agora?" [Enviar | Só mover | Cancelar]); `automacoes-quadro` com as 4 linhas
+  "Ao enviar ao cliente, mover para [quadro › coluna]" e, quando o destino é outro quadro, [Manter os membros |
+  Responsável do cliente no destino]); `soltar/ciclo.ts` (soltar numa coluna `aguardando_cliente` com versão não
+  enviada, sendo atendimento: abre `enviar-ao-soltar` com `ctx.abrirDialogo` e devolve `feito` (enviado; o diálogo já
+  atualizou o cache com `ctx.qc`), `seguir` (só mover) ou `cancelado`); `quadro-menu/ciclo-automacoes`;
   `card/ciclo.tsx` (selo "V2" e "R3/2" quando passa das inclusas); `atalhos/ciclo.ts` (Shift+R, Shift+E entregar);
   `eventos/ciclo.ts` (versao, rodada, envio, aprovacao, link_publico).
   Tela pública `/a/:token` (`acesso: 'publica'`, layout vazio, celular primeiro, logo do cliente por URL assinada e
   "por Melt", folha de confirmação ao aprovar, "um ajuste por linha", "Você é Fulana?" (ou o nome, obrigatório), nome
   lembrado no aparelho, 409 "Chegou a V3", 409 "Esta peça não aguarda mais sua decisão", link inativo).
 - **Testes:** entregar não muda a coluna e notifica o AM; equipe que não é membro entregando → 403; enviar sem cliente
-  ou sem versão → 422; enviar roda a automação `enviado_ao_cliente` (e sem automação não move); enviar por link
-  reaproveita o link ativo do contato; contato de outro cliente → 400; Drive privado (fetch simulado) → 422
+  ou sem versão → 422; enviar grava `envio.quadro_id` = o quadro antes da automação e roda `enviado_ao_cliente` (e sem
+  automação não move); **vaivém** com as automações da fixture: enviar leva ao Atendimento › Com o cliente, o ajuste
+  pelo link volta para Criação › Fila (automação do quadro do envio, não do Atendimento), V2 enviada e aprovada vai
+  para Social › Agendar com `social` como único membro (`responsavel_destino`) e sem `chegou`; decisão sem automação
+  numa coluna `aguardando_cliente` grava `retornoEm`, a bola volta para a equipe e o prazo da R2 pode ficar atrasado;
+  anular limpa `retornoEm`; `ciclo-paridade.test.ts` (§1.1.1); enviar por link reaproveita o link ativo do contato;
+  contato de outro cliente → 400; Drive privado (fetch simulado) → 422
   `drive_privado`; acrescentar item a versão enviada → 409; `GET /api/publico/a/:token` não muda `acessos`; mesma
   `Idempotency-Key` 2× → uma aprovação e duas 200; mesma chave com outra decisão → 422; a mesma chave em outro link é
   outra decisão; decisão com `contatoId` diferente do link → 400; versão antiga → 409 com `versaoAtual`; última versão
   enviada por fora → 409 `conflito`; duas decisões simultâneas → uma 200 e uma 409 `ja_decidida`; aprovado pelo link
-  com automação para o Social › Agendar → a demanda muda de quadro com etiquetas mapeadas e o Social recebe `chegou`;
+  com automação para o Social › Agendar → a demanda muda de quadro com "Alteração" mapeada e "Urgente" guardada na
+  Criação;
   anular devolve à coluna de antes e não devolve se alguém moveu depois; ajuste abre a rodada 2 com checklist e prazo
   em dias úteis pulando feriado e roda `ajuste_pedido`; rodada 3 com 2 inclusas → `sugerirExtra`; demanda arquivada
   some do link (410 sem itens); URL assinada vencida → 403; 31ª requisição no minuto no mesmo IP+token → 429;
   equipe enviando → 403; `link_publico` não chega à equipe; automação só por admin/atendimento; destino arquivado → 400;
   headers `no-store`, `noindex`, `no-referrer` na API e no HTML de `/a/:token`.
-- **Roteiro:** configurar as automações da Criação (enviado → Com o cliente; ajuste → Fila; aprovado → Social ›
-  Agendar); entregar V1 (link do Drive) → enviar por link (o card vai sozinho para Com o cliente) → abrir o link no
-  celular (390 px), pedir ajuste com 3 linhas → o card volta para Fila com "Ajustes R2" → entregar V2 → arrastar para
-  Com o cliente oferece o envio → aprovar no celular → o card aparece no quadro Social › Agendar em outra janela;
-  "Aprovado pelo WhatsApp" + Desfazer devolve o card.
+- **Roteiro:** configurar as automações da Criação (enviado → Atendimento › Com o cliente; ajuste → Criação › Fila;
+  aprovado → Social › Agendar com o responsável do cliente); entregar V1 (link do Drive) → enviar por link (o card vai
+  sozinho para Atendimento › Com o cliente) → abrir o link no celular (390 px), pedir ajuste com 3 linhas → o card
+  volta para Criação › Fila com "Ajustes R2" → entregar V2 → enviar → aprovar no celular → o card aparece no Social ›
+  Agendar em outra janela, com o social como membro; "Aprovado pelo WhatsApp" + Desfazer devolve o card. No quadro
+  Atendimento, arrastar de Revisão para Com o cliente uma demanda com versão não enviada oferece [Enviar | Só mover |
+  Cancelar], e Cancelar devolve o card.
 
 ### F3 · Início, Agenda, notificações e jobs (`paineis`)
 - **Possui:** `server/src/rotas/paineis-*.ts`, `server/src/servicos/paineis*.ts`, `server/src/tarefas/paineis-*.ts`
-  (prazo, 8h), `server/test/paineis-*.test.ts`, `server/test/paineis-ajuda.ts`, `shared/logica/paineis.ts`,
-  `web/src/funcionalidades/paineis/**`, `web/src/telas/{inicio,agenda}/**`, `web/src/extensoes/*/paineis{,-*}.{ts,tsx}`.
-- **Rotas (API §4.18, 4):** início, agenda, notificações, marcar lidas. Tarefa diária `paineis-prazo`.
-- **Extensões e telas:** `/inicio` com `inicio/paineis-*` (Primeiros passos do admin com os critérios e caminhos da API
-  §4.18; Minhas: Atrasadas, Hoje, Esta semana, Depois, Sem prazo, com `CardDemanda` e o quadro de cada uma; Com o
-  cliente há mais de 2 dias úteis, só atendimento, com "Copiar lembrete" (`copiar-whatsapp`, F2) e "Registrar retorno"
-  (F2); Menções recentes); `/agenda` (mês e semana com a `GradeCalendario` do DS, todos os quadros com a cor de cada
-  um, "Só as minhas", filtro de quadros, prazo/início/publicação, concluídas riscadas, feriados; **arrastar muda o
-  prazo** por `useEditarDemanda` mantendo a hora; clique abre `/d/:numero`); `topo/paineis-sino` (sino com contagem,
-  lista, marcar lidas, link para a demanda); `menu/paineis.tsx` (Início com o número de atrasadas, Agenda);
-  `celular/paineis-*` (Início, Agenda, Sino); `atalhos/paineis.ts` (G I, G A; escopo `agenda`: Shift+← e Shift+→
-  mudam o período, Shift+T volta para hoje; as letras sozinhas ficam com o card em foco); `eventos/paineis-*.ts`
-  (notificacao; demanda invalida `['inicio']` e `['agenda', …]` com debounce de 1 s). Textos de Início vazio, Agenda
-  vazia e sino vazio (§4.1).
+  (prazo e atrasada, 8h), `server/test/paineis-*.test.ts`, `server/test/paineis-ajuda.ts`, `shared/logica/paineis.ts`,
+  `web/src/funcionalidades/paineis/**`, `web/src/telas/{inicio,agenda,horas}/**`,
+  `web/src/extensoes/*/paineis{,-*}.{ts,tsx}`.
+- **Rotas (API §4.18, 4):** início, agenda, notificações, marcar lidas. Tarefa diária `paineis-prazo` (8h, só em dia
+  útil: `prazo` e `atrasada`, ignorando com o cliente; API §5.9). A tela `/horas` usa a rota do núcleo (§4.20).
+- **Extensões e telas:** `/inicio` com `inicio/paineis-*` (Primeiros passos do admin na ordem e com os critérios e
+  caminhos da API §4.18; Minhas: Atrasadas, Hoje, Esta semana, Depois, Sem prazo, com `CardDemanda` e o quadro de cada
+  uma; Com o cliente há mais de 2 dias úteis, só atendimento, com "Copiar lembrete" (`copiar-whatsapp`, F2) e
+  "Registrar retorno" (F2) só com envio pendente; Menções recentes); `/agenda` (o `CalendarioDemandas` do NÚCLEO-WEB
+  alimentado por `GET /api/agenda`: mês e semana, todos os quadros com a cor de cada um, "Só as minhas", filtro de
+  quadros, prazo/início/publicação, concluídas riscadas, feriados, **arrastar muda o prazo**; clique abre
+  `/d/:numero`); `/horas` (todos: Minhas horas da semana com total por dia, editar e excluir por `useEditarApontamento`
+  e [Lançar tempo] = escolher a demanda e abrir o diálogo `lancar-tempo` do F1; atendimento e admin: total por cliente
+  no mês; admin: total por pessoa e as horas de qualquer pessoa); `topo/paineis-sino` (sino com contagem; abre o
+  diálogo `notificacoes`); `dialogos/paineis-notificacoes` (lista, marcar lidas, link para a demanda; popover no
+  desktop, folha no celular); `menu/paineis.tsx` (Início com o número de atrasadas, Agenda, Horas);
+  `celular/paineis-*` (Início, Agenda, Sino com `useContador` e `executar` abrindo `notificacoes`); `atalhos/paineis.ts`
+  (G I, G A, G H; escopo `agenda`: Shift+← e Shift+→ mudam o período, Shift+T volta para hoje; as letras sozinhas
+  ficam com o card em foco); `eventos/paineis-*.ts` (notificacao; demanda invalida `['inicio']` e `['agenda', …]` com
+  debounce de 1 s; apontamento invalida `['apontamentos', …]`). Textos de Início vazio, Agenda vazia, Horas vazia e
+  sino vazio (§4.1).
 - **Testes:** "Minhas" inclui membro e AM e não inclui de quadro arquivado; com o cliente nunca entra em Atrasadas;
-  "Esta semana" vai até domingo; "com o cliente há mais de 2 dias úteis" conta feriado e conta desde o envio; agenda
-  com intervalo de 63 dias → 400, `soMinhas` e `quadroIds` filtram, concluída antiga vem em `extras`; tarefa de prazo
-  notifica membros (ou o AM sem membros), não repete no mesmo dia (com `relogio()`) e ignora concluídas e de quadro
-  arquivado; marcar lidas só emite ao dono; primeiros passos: cada passo vira `feito` pelo critério e o bloco some no fim.
-- **Roteiro:** admin novo vê os primeiros passos; a Agenda mostra demandas de 3 quadros; arrastar de quarta para sexta
-  muda o prazo e o card do quadro muda de estado na outra janela; "Só as minhas" filtra; o sino recebe a menção em
-  menos de 1 s; demanda movida em outra janela entra e sai do Início em menos de 1 s.
+  "Esta semana" vai até domingo; "com o cliente há mais de 2 dias úteis" conta feriado e conta desde o envio; decisão
+  registrada sem automação numa coluna `aguardando_cliente` sai do `comClienteParado` e o prazo da R2 entra em
+  Atrasadas quando vence; agenda com intervalo de 63 dias → 400, `soMinhas` e `quadroIds` filtram, concluída antiga vem
+  em `extras`; tarefa: `prazo` notifica membros (ou o AM sem membros), não repete no mesmo dia (com `relogio()`) e
+  ignora concluídas, com o cliente e de quadro arquivado; `atrasada` sai uma vez por pessoa, demanda e prazo, e de novo
+  depois de um prazo novo; nada sai em sábado, domingo ou feriado; marcar lidas só emite ao dono; primeiros passos: cada
+  passo vira `feito` pelo critério, na ordem de `PASSOS_INICIAIS`, e o bloco some no fim.
+- **Roteiro:** admin novo vê os primeiros passos (convidar primeiro); a Agenda mostra demandas de 3 quadros; arrastar de
+  quarta para sexta muda o prazo e o card do quadro muda de estado na outra janela; "Só as minhas" filtra; o sino recebe
+  a menção em menos de 1 s (no celular, a aba Sino mostra o número); demanda movida em outra janela entra e sai do Início
+  em menos de 1 s; `/horas` mostra o cronômetro parado no dia certo, edita e exclui, e o atendimento vê o total por
+  cliente sem as horas de cada pessoa.
 
 ### F4 · Entrada (`entrada`)
 - **Possui:** `server/src/rotas/entrada*.ts`, `server/src/rotas/busca.ts`, `server/src/servicos/entrada*.ts`,
   `server/test/entrada-*.test.ts`, `server/test/entrada-ajuda.ts`, `shared/logica/rapida.ts`,
   `shared/logica/colar-whatsapp.ts`, `web/src/funcionalidades/entrada/**`, `web/src/extensoes/*/entrada{,-*}.{ts,tsx}`.
-- **Rotas (API §4.9 e §4.13, 7):** modelos de demanda (GET, POST, PATCH), rápida, prévia, analisar (Colar do
-  WhatsApp), busca. A Nova demanda usa `POST /api/demandas` (núcleo) e `POST /api/clientes` ("Criar cliente HE").
+- **Rotas (API §4.9 e §4.13, 8):** modelos de demanda (GET, POST, PATCH), "Revisei os modelos" (`POST
+  /api/modelos-demanda/revisados`), rápida, prévia, analisar (Colar do WhatsApp), busca. A Nova demanda usa `POST
+  /api/demandas` (núcleo) e o diálogo `criar-cliente` (F5) para "Criar cliente HE".
 - **Extensões:** `dialogos/entrada-nova-demanda` (Colar do WhatsApp no topo; Quadro e Coluna (padrão: o quadro aberto e
   a coluna de entrada); grade de modelos (globais + do quadro) com ícone e descrição; Cliente com apelidos e "Criar
-  cliente XYZ" quando vier `siglaNova`; Título; descrição pré-preenchida com o briefing do modelo; Membros (sugere o
+  cliente XYZ" (diálogo `criar-cliente`, para todos os papéis) quando vier `siglaNova`; Título; descrição
+  pré-preenchida com o briefing do modelo; Membros (sugere o
   responsável do cliente na equipe do quadro); Etiquetas; Prioridade; Início, Prazo (sugerido pelo modelo) e
   Publicação; Estimativa; Repetir; AM só para atendimento/admin; Criar (Ctrl+Enter) e Criar e abrir);
   `topo/entrada-nova` (o botão laranja "+ Nova demanda"); `celular/entrada-mais` ("+" com foco no Colar);
   `coluna-entrada/entrada-rapida` (Enter cria e mantém o campo aberto, chips `HE:`/`@rafa`, prévia ao vivo,
-  Backspace desfaz o chip, "Criar cliente XYZ", cliente herdado de um filtro de um só cliente); `busca/entrada-demandas`
+  Backspace desfaz o chip, "Criar cliente XYZ" pelo diálogo `criar-cliente`, cliente herdado de um filtro de um só
+  cliente; na coluna de uma pessoa, a prévia mostra a pessoa como membro); `busca/entrada-demandas`
   (fonte Demandas via `/api/busca`; busca vazia com o texto da §4.1); `comandos/entrada.ts` (Nova demanda, Nova
   demanda neste quadro); `atalhos/entrada.ts` (Shift+N e `?`); `dialogos/entrada-atalhos` (lista do `?` gerada de
-  `atalhos()`); `config/entrada-modelos` (Configurações › Modelos de demanda: globais e por quadro, briefing em
-  Markdown com prévia, checklist, etiquetas padrão, prazo, ativar/desativar e o botão "Revisei os modelos");
-  `quadro-menu/entrada-modelos` (Modelos deste quadro → `/config/modelos?quadro=`).
+  `atalhos()`); `config/entrada-modelos` (seção da tela `/config` do NÚCLEO-WEB: Modelos de demanda, globais e por
+  quadro, briefing em Markdown com prévia, checklist, etiquetas padrão, prazo, ativar/desativar e o botão "Revisei os
+  modelos" para o admin); `quadro-menu/entrada-modelos` (Modelos deste quadro → `/config/modelos?quadro=`).
 - **Testes:** "HE: Carrossel @rafa @ana" → cliente HE, membros Rafa e Ana, título "Carrossel"; "he outubro" não vira
   marcador; "XYZ: Banner" com XYZ desconhecida → `siglaNova = 'XYZ'`; sem cliente cria normalmente; `clienteId` do
   contexto vale sem marcador e o marcador vence; coluna arquivada → 422; analisar reconhece "[14/10 15:32] Fulana:",
   o cliente por apelido sem acento e o modelo Carrossel por "carrossel"; busca "#12" acha pelo número, "he outubro"
-  filtra o cliente, "acao" acha "Ação", arquivadas só com `incluirArquivadas`, resposta em menos de 150 ms com 5 mil
-  demandas; modelo global por equipe → 403 e do quadro → 201; nome repetido no escopo → 409; desativar some do bootstrap.
+  filtra o cliente, "acao" acha "Ação", arquivadas só com `incluirArquivadas`, a anonimizada nunca (nem por "#12"),
+  resposta em menos de 150 ms com 5 mil demandas; modelo global por equipe → 403 e do quadro → 201; nome repetido no
+  escopo → 409; desativar some do bootstrap; "Revisei os modelos" por equipe → 403 e pelo admin grava o instante.
 - **Roteiro:** Shift+N, colar uma conversa do WhatsApp → cliente e modelo sugeridos, briefing preenchido, cria no
-  quadro aberto; sigla nova "XYZ" → "Criar cliente XYZ" sem sair do formulário; no rodapé da coluna, três Enter
+  quadro aberto; sigla nova "XYZ" → "Criar cliente XYZ" sem sair do formulário (também como designer); no rodapé da coluna, três Enter
   seguidos criam três demandas; Cmd+K "#12" + Enter abre o modal; `?` lista os atalhos de todas as funcionalidades.
 
-### F5 · Cadastros, Configurações, Novo quadro, Primeiros passos e Arquivo (`cadastros`)
+### F5 · Cadastros, seções de Configurações, Novo quadro, Copiar quadro e Arquivo (`cadastros`)
 - **Possui:** `server/src/rotas/cadastros-*.ts`, `server/src/rotas/arquivo.ts`, `server/src/servicos/cadastros*.ts`,
   `server/test/cadastros-*.test.ts`, `server/test/cadastros-ajuda.ts`, `web/src/funcionalidades/cadastros/**`,
-  `web/src/telas/{clientes,config,arquivo,quadros}/**`, `web/src/extensoes/*/cadastros{,-*}.{ts,tsx}`.
+  `web/src/telas/{clientes,arquivo,quadros}/**`, `web/src/extensoes/*/cadastros{,-*}.{ts,tsx}` (a tela `/config` é do
+  NÚCLEO-WEB; o F5 traz as seções).
 - **Rotas (API §4.10 trilha, §4.11, §4.19; 7):** trilha de aprovações do cliente, feriados (GET, POST, DELETE), config
   da aplicação (GET, PATCH), arquivo. As telas usam as rotas do núcleo de pessoas, equipes, clientes, quadros, colunas
   e etiquetas.
 - **Telas e extensões:** `/quadros/novo` (sobreposta, admin: nome, equipe, cor, fundo, modelo de quadro com as colunas
-  sugeridas editáveis (desmarcar, renomear, cor, papel); com `?equipes=1` vira **"Criar os quadros das equipes"** dos
-  Primeiros passos: uma linha por equipe ativa sem quadro, modelo sugerido, colunas expandidas com os membros, um
-  `POST /api/quadros` por linha); `config/cadastros-*` (Pessoas com convite e "copiar link", redefinição e desativar;
-  Equipes com membros e modelo sugerido; **Quadros**: ativos e arquivados, editar nome/slug/cor/fundo/equipe, colunas
-  (cor, papel, limite WIP, ordem, arquivar), etiquetas, [Automações] (diálogo `automacoes-quadro` do F2), arquivar,
-  restaurar, excluir vazio; Feriados; Aparência: tema e atalhos); `menu/cadastros.tsx` (Clientes, Arquivo,
-  Configurações); `quadro-menu/cadastros.tsx` (Editar quadro, Arquivar quadro: admin); `/clientes` (lista com
-  contadores e "Completar cadastro"), `/clientes/:sigla` (cabeçalho com logo, contatos, pasta de saída, links,
-  responsáveis por equipe e pendências; abas Demandas (de todos os quadros, agrupadas por quadro, com `CardDemanda`),
-  Aprovações, Configurações: rodadas, apelidos, grupo), `/arquivo` (cliente, quadro, mês, texto; arquivadas e
-  concluídas que saíram do quadro; restaurar só as arquivadas; desmarcar concluída devolve ao quadro).
-  Estados vazios de Clientes, Quadros arquivados e Arquivo (§4.1).
-- **Testes:** feriado novo não muda prazos gravados e entra no próximo prazo de modelo; trilha inclui anuladas; arquivo
-  filtra por mês, cliente e quadro e lista a concluída há 8 dias sem arquivar; `demandaNumeroInicial` menor que o
-  maior número → 400; `conviteValidadeDias: 365` → 400; `uploadLimiteBytes` acima de 10 MB → 400; `modelosRevisados`
-  grava o instante; equipe e atendimento no PATCH de config → 403.
-- **Roteiro:** admin novo abre os Primeiros passos → "Criar os quadros das equipes" cria 6 quadros (Criação e Social
-  com uma coluna por pessoa) e eles aparecem no menu de outra janela; convida uma pessoa e copia o link → janela
-  anônima define a senha e entra; cria cliente com contato padrão e responsável da Criação e vê sumir "Completar
-  cadastro"; muda a cor e o papel de uma coluna e o quadro na outra janela muda; restaura do Arquivo.
+  sugeridas editáveis (desmarcar, renomear, cor, papel) e as automações do modelo que seguem cada coluna; com
+  `?equipes=1` vira **"Criar os quadros das equipes"** dos Primeiros passos: uma linha por equipe ativa sem quadro,
+  modelo sugerido, colunas das pessoas já expandidas com `responsavelId` (equipe sem membros: aviso "Convide a equipe
+  antes: quem entrar depois ganha a própria coluna"), `modeloColunaId` em cada coluna do modelo, um `POST /api/quadros`
+  por linha); `dialogos/cadastros-criar-cliente` (o diálogo `criar-cliente`: sigla e nome, para todos os papéis; o
+  resto do cadastro fica para o atendimento); `config/cadastros-*` (seções da tela `/config` do NÚCLEO-WEB: Pessoas com
+  convite e "copiar link", redefinição e desativar; Equipes com membros e modelo sugerido; **Quadros**: ativos e
+  arquivados, editar nome/slug/cor/fundo/equipe/"uma coluna por pessoa", colunas (cor, papel, pessoa, limite WIP,
+  ordem, arquivar), etiquetas, [Automações] (diálogo `automacoes-quadro` do F2), copiar, arquivar, restaurar, excluir
+  vazio; Feriados; Aparência: tema e atalhos); `menu/cadastros.tsx` (Clientes, Arquivo, Configurações);
+  `quadro-menu/cadastros.tsx` (Editar quadro, Copiar quadro (`useCopiarQuadro`, pede nome e equipe), Arquivar quadro:
+  admin); `/clientes` (lista com contadores e "Completar cadastro"), `/clientes/:sigla` (`useClienteDetalhe`;
+  cabeçalho com logo (`useEnviarArquivo`), contatos, pasta de saída, links, responsáveis por equipe e pendências; abas
+  Demandas (de todos os quadros, agrupadas por quadro, com `CardDemanda`), Aprovações, Horas (atendimento e admin:
+  total do cliente por mês, de `porCliente`; o admin também vê por pessoa e os lançamentos; `useApontamentos({
+  clienteId, de, ate })`), Configurações: rodadas,
+  apelidos, grupo), `/arquivo` (cliente, quadro, mês, texto; arquivadas e concluídas que saíram do quadro; restaurar
+  só as arquivadas; desmarcar concluída devolve ao quadro). Estados vazios de Clientes, Quadros arquivados e Arquivo
+  (§4.1).
+- **Testes:** feriado novo não muda prazos gravados e entra no próximo prazo de modelo; trilha inclui anuladas
+  (`criarDemanda({ ate: 'anulada' })`); arquivo filtra por mês, cliente e quadro e lista a concluída há 8 dias sem
+  arquivar; `demandaNumeroInicial` menor que o maior número → 400; `conviteValidadeDias: 365` → 400;
+  `uploadLimiteBytes` acima de 10 MB → 400; equipe e atendimento no PATCH de config → 403.
+- **Roteiro:** admin novo abre os Primeiros passos → convida a equipe (copia o link → janela anônima define a senha e
+  entra) → "Criar os quadros das equipes" cria 6 quadros (Criação e Social com uma coluna por pessoa e o Kanban com as
+  automações sugeridas) e eles aparecem no menu de outra janela; uma pessoa nova na Criação ganha a própria coluna na
+  outra janela; "Copiar quadro" da Criação cria "Criação 2" com as mesmas colunas, etiquetas e automações; um designer
+  cria "Criar cliente XYZ" e o atendimento vê "Completar cadastro"; cria cliente com contato padrão e responsável da
+  Criação e vê sumir "Completar cadastro"; muda a cor e o papel de uma coluna e o quadro na outra janela muda;
+  restaura do Arquivo.
 
 ### F6 · Lista e Calendário do quadro, filtros e celular (`lista`)
 - **Possui:** `web/src/funcionalidades/lista/**`, `web/src/extensoes/*/lista{,-*}.{ts,tsx}`, `server/test/lista-*.test.ts`
@@ -720,8 +925,8 @@ Integração e correções pós-merge: faixa **090–099**.
 - **Extensões:** `layouts/lista-lista` (tabela virtualizada: #, Título, Cliente, Coluna, Membros, Etiquetas,
   Prioridade, Início, Prazo, Concluída; ordena pelo cabeçalho; agrupa por coluna, membro, cliente, prioridade ou prazo;
   arrastar entre grupos de coluna = mover; clique abre o modal; no celular vira lista de `CardDemanda` agrupada);
-  `layouts/lista-calendario` (mês e semana com a `GradeCalendario`; arrastar entre dias muda o prazo mantendo a hora;
-  faixa "Sem prazo" de onde se arrasta para um dia; concluídas riscadas); `quadro-cabecalho/lista-filtros` (chips
+  `layouts/lista-calendario` (o `CalendarioDemandas` do NÚCLEO-WEB alimentado pelas demandas filtradas do quadro, com
+  a faixa "Sem prazo"; arrastar muda o prazo mantendo a hora; concluídas riscadas); `quadro-cabecalho/lista-filtros` (chips
   Cliente, Membro, Etiqueta, Prazo, Prioridade, Com o cliente, Concluídas, texto; contador e Limpar; tudo na URL);
   `quadro-cabecalho/lista-colunas-celular` (no celular, barra de chips com as colunas e as contagens; toque rola até
   a coluna com `useRolarParaColuna`); folha de filtros no celular; `atalhos/lista.ts` (F abre os filtros; escopo quadro).
@@ -740,14 +945,14 @@ Contrato em `web/src/extensoes/tipos.ts`. O DESIGN-SYSTEM-WEB escreve os carrega
 
 | Ponto | Mecanismo (consome) | Contribuem |
 |---|---|---|
-| `telas/**/rota.tsx` | DS (roteador, lazy) | DS (auth, dev), NW (quadro, demanda), F2 (pública), F3 (início, agenda), F5 (clientes, config, arquivo, quadros/novo) |
+| `telas/**/rota.tsx` | DS (`registro-rotas.ts`, lazy) | DS (auth, dev), NW (quadro, demanda, config, dev-extensoes), F2 (pública), F3 (início, agenda, horas), F5 (clientes, arquivo, quadros/novo) |
 | `extensoes/global` | DS (App.tsx) | NW (tempo real, diálogos, paleta, teclado) |
 | `extensoes/menu` | DS (menu lateral; a seção Quadros é da casca) | F3 (trabalho), F5 (agência) |
 | `extensoes/topo` | DS | NW (busca), F1 (cronômetro), F3 (sino), F4 (Nova demanda) |
 | `extensoes/avatar` | DS | DS (tema, sair) |
 | `extensoes/celular` | DS | NW (busca), F3, F4 |
 | `extensoes/quadro-cabecalho` | NW (página do quadro) | F6 (filtros, colunas no celular) |
-| `extensoes/quadro-menu` | NW | NW (seguir, copiar link), F1 (etiquetas), F2 (automações), F4 (modelos), F5 (editar, arquivar) |
+| `extensoes/quadro-menu` | NW | NW (seguir, copiar link), F1 (etiquetas), F2 (automações), F4 (modelos), F5 (editar, copiar, arquivar) |
 | `extensoes/layouts` | NW (página do quadro) | NW (quadro), F6 (lista, calendário) |
 | `extensoes/coluna-menu` · `extensoes/coluna-entrada` | NW (quadro) | NW (menu da coluna), F4 (criação rápida) |
 | `extensoes/card` | NW (CardDemanda) | F1 (cronômetro), F2 (versão e rodada) |
@@ -755,12 +960,12 @@ Contrato em `web/src/extensoes/tipos.ts`. O DESIGN-SYSTEM-WEB escreve os carrega
 | `extensoes/demanda` (seções) | NW (modal) | F1, F2 |
 | `extensoes/demanda-acoes` | NW | F2 (e quem precisar) |
 | `extensoes/demanda-menu` | NW (modal e card) | NW (copiar link, arquivar, excluir), F1 (mover, copiar, enviar para, membros, etiquetas, datas, capa) |
-| `extensoes/dialogos` | NW (host + `abrirDialogo`) | NW (confirmar), F1, F2, F4 |
+| `extensoes/dialogos` | NW (host + `abrirDialogo`) | NW (confirmar), F1, F2 (inclusive `enviar-ao-soltar`), F3 (`notificacoes`), F4, F5 (`criar-cliente`) |
 | `extensoes/comandos` · `extensoes/busca` | NW (paleta) | NW, F4 |
 | `extensoes/atalhos` | NW (despachante) | NW, F1, F2, F3, F4, F6 |
 | `extensoes/eventos` | NW (cliente SSE; vários por entidade) | NW, F1, F2, F3 |
 | `extensoes/inicio` | F3 (tela Início) | F3 |
-| `extensoes/config` | F5 (tela Configurações) | F4 (modelos), F5 |
+| `extensoes/config` | NW (tela `/config`) | F4 (modelos), F5 |
 | `server/src/rotas/*.ts` | NS (`criarApp`) | NS, F1–F5 |
 | `server/src/tarefas/*.ts` | NS (`tarefas.ts`) | NS, F3 |
 | `server/scripts/demo/*.ts` | NS (`seed-demo.ts`) | NS, F1, F2 |
@@ -776,14 +981,14 @@ DS = DESIGN-SYSTEM-WEB, NS = NÚCLEO-SERVIDOR, NW = NÚCLEO-WEB.
 | modal, coluna lateral | `modal-membros` 100 · `modal-etiquetas` 150 · `modal-cliente` 200 · `modal-datas` 300 · `modal-prioridade` 350 · `modal-estimativa` 400 · `modal-tempo` 500 · `modal-capa` 600 |
 | ações do modal | `ciclo` 100–199 (o primário sai daqui) · outras 200+ |
 | menu ··· do modal e do card | `modal` 100–199 (mover 100, copiar 110, enviar para 120, membros 130, etiquetas 140, datas 150, capa 160) · `nucleo-copiar-link` 300 · `nucleo-arquivar` 900 · `nucleo-excluir` 950 |
-| menu ··· do quadro | `nucleo` (seguir 100, copiar link 110) · `modal-etiquetas` 200 · `ciclo-automacoes` 300 · `entrada-modelos` 400 · `cadastros` (editar 800, arquivar 900) |
+| menu ··· do quadro | `nucleo` (seguir 100, copiar link 110) · `modal-etiquetas` 200 · `ciclo-automacoes` 300 · `entrada-modelos` 400 · `cadastros` (editar 800, copiar 850, arquivar 900) |
 | menu da coluna | `nucleo` 100–900 (renomear 100, cor 110, papel 120, WIP 130, ordenar 200, mover todos 300, arquivar todos 800, arquivar coluna 900) |
 | cabeçalho do quadro | esquerda: `lista-filtros` 100; direita: `lista-colunas-celular` 100 |
 | layouts | `nucleo-quadro` 100 · `lista-lista` 200 · `lista-calendario` 300 |
 | selos do card | rodapé: `ciclo` 100 · `modal-cronometro` 200 |
 | soltar | `ciclo` 100 · `nucleo-concluir` 200 |
 | celular | `paineis-inicio` 100 · `paineis-agenda` 200 · `entrada-mais` 300 · `nucleo-busca` 400 · `paineis-sino` 500 |
-| menu lateral | grupo `trabalho`: `paineis` (Início 100, Agenda 200); seção Quadros (casca); grupo `agencia`: `cadastros` (Clientes 100, Arquivo 200, Configurações 300) |
+| menu lateral | grupo `trabalho`: `paineis` (Início 100, Agenda 200, Horas 300); seção Quadros (casca); grupo `agencia`: `cadastros` (Clientes 100, Arquivo 200, Configurações 300) |
 | barra superior | esquerda: `nucleo-busca` 100; direita: `modal-cronometro` 50, `entrada-nova` 100, `paineis-sino` 200 |
 | avatar | `nucleo-tema` 200 · `nucleo-sair` 900 |
 | Início | `paineis-primeiros-passos` 50 · `paineis-minhas` 100 · `paineis-cliente-parado` 200 · `paineis-mencoes` 300 |
@@ -806,10 +1011,14 @@ DS = DESIGN-SYSTEM-WEB, NS = NÚCLEO-SERVIDOR, NW = NÚCLEO-WEB.
 | Sem permissão | "Você não tem acesso a esta ação." + o motivo (`mensagem` do erro) | NW |
 | 409 de rev | "Alguém mudou esta demanda ao mesmo tempo. Juntamos as mudanças." | NW |
 | Arquivar | "Arquivada · Desfazer" | NW |
-| Mover entre quadros | "Movida para Social › Agendar · Desfazer" (+ "2 etiquetas ficaram para trás") | NW |
+| Mover entre quadros | "Movida para Social › Agendar · Desfazer" (+ "2 etiquetas ficaram no quadro Criação") | NW |
+| Demanda arquivada ou de quadro arquivado no modal | faixa "Demanda arquivada. Restaure para editar." [Restaurar]; seções só leitura | NW |
+| Configurações sem a seção | "Página não encontrada." (seção de funcionalidade ainda não mergeada) | NW |
 | Início vazio | "Nada com você agora. Veja os seus quadros favoritos." | F3 |
 | Agenda vazia | "Nenhuma demanda com prazo neste período." | F3 |
 | Sino vazio | "Nenhuma notificação." | F3 |
+| Horas vazia | "Nenhuma hora nesta semana. Ligue o cronômetro (T) num card ou [Lançar tempo]." | F3 |
+| Equipe sem membros em "Criar os quadros das equipes" | "Convide a equipe antes: quem entrar depois ganha a própria coluna." | F5 |
 | Busca vazia | "Nada encontrado para "termo". Tente a sigla do cliente ou o número." | F4 |
 | Demanda sem versão | "Nenhuma versão entregue. Cole o link do Drive ou o caminho da pasta de saída." | F2 |
 | Drive privado | "O cliente verá uma tela de login." [Abrir compartilhamento] [Testar de novo] [Enviar arquivo (até 10 MB)] | F2 |
@@ -826,10 +1035,11 @@ DS = DESIGN-SYSTEM-WEB, NS = NÚCLEO-SERVIDOR, NW = NÚCLEO-WEB.
 
 **Ordem de merge da Onda 3:** F5 → F4 → F1 → F2 → F3 → F6. Os roteiros de cada funcionalidade usam só superfícies
 próprias e do núcleo (as checagens cruzadas ficam na verificação final), mas a ordem ainda importa para o rebase:
-F5 primeiro porque traz o "Novo quadro" e os Primeiros passos (quadros reais em vez do seed); F4 traz a Nova demanda,
-usada por todos os outros roteiros; F1 traz os diálogos de membros, etiquetas, datas e "Mover para", que o card e o
-ciclo usam; F2 depois do F1 (selo "Ajustes R2" nos checklists); F3 depois do F2 (o Início usa `copiar-whatsapp` e
-`registrar-retorno`); F6 por último porque recebe `shared/logica/filtros.ts`.
+F5 primeiro porque traz o "Novo quadro" (quadros reais em vez do seed) e o diálogo `criar-cliente`, que o F4 e o F1
+usam; F4 traz a Nova demanda, usada por todos os outros roteiros; F1 traz os diálogos de membros, etiquetas, datas,
+"Mover para" e `lancar-tempo`, que o card, o ciclo e a tela `/horas` usam; F2 depois do F1 (selo "Ajustes R2" nos
+checklists); F3 depois do F2 (o Início usa `copiar-whatsapp` e `registrar-retorno`); F6 por último porque recebe
+`shared/logica/filtros.ts`.
 
 Para cada funcionalidade, o integrador:
 1. Pede à funcionalidade `git rebase master` e o "pronto" da regra 8 verde na própria worktree.
@@ -837,37 +1047,45 @@ Para cada funcionalidade, o integrador:
    extensões pelo glob `web/src/extensoes/*/<f>{,-*}.{ts,tsx}`); migrações só na faixa dela; nada em
    `shared/tipos/*.ts` existentes nem em `web/src/extensoes/tipos.ts`.
 3. `git merge --no-ff funcionalidade/<nome>` na branch principal e roda, na raiz: `npm ci`, `npx tsc --noEmit -p server`,
-   `npx tsc --noEmit -p web`, `npm test`, `node server/scripts/verificar-migracoes.ts`, `npm run build`.
+   `npx tsc --noEmit -p web`, `npm test`, `node server/scripts/verificar-migracoes.ts`, `npm run build` (sem aviso de
+   chunk acima de 500 kB; o que `/a/:token` baixa abaixo de 150 kB gzip) e a tela `/dev/extensoes`.
 4. Aplica os pedidos de `docs/pedidos/*.md` aceitos (migração na faixa 090–099 quando for banco), avisa as outras
    funcionalidades para fazer rebase, e remove a worktree (`git worktree remove`).
 
 **Verificação final** (banco novo, `DATA_DIR` limpo, build de produção servido pelo Node na 7300):
-1. Primeiro boot com `ADMIN_EMAIL`/`ADMIN_SENHA` cria o admin; o Início do admin mostra os 4 primeiros passos.
-2. "Criar os quadros das equipes" cria Atendimento, Criação, Social, Web, Tráfego e Produção (Criação e Social com uma
-   coluna por pessoa depois de convidar a equipe; o admin renomeia "Revisão" para "Pronto" na Criação antes de criar).
-3. Admin convida um AM, dois designers e um social; cada um define a senha pelo link (janelas separadas) e já segue o
-   quadro da própria equipe. Cadastra o cliente HE com contato padrão, AM e o responsável da Criação; aperta "Revisei
-   os modelos". Os primeiros passos somem.
+1. Primeiro boot com `ADMIN_EMAIL`/`ADMIN_SENHA` cria o admin; o Início do admin mostra os 4 primeiros passos, na
+   ordem: convidar, criar quadros, cadastrar clientes, revisar modelos.
+2. Admin convida um AM, dois designers e um social; cada um define a senha pelo link (janelas separadas).
+3. "Criar os quadros das equipes" cria Atendimento, Criação, Social, Web, Tráfego e Produção (Criação e Social com uma
+   coluna por pessoa; o Kanban com as automações sugeridas; o admin renomeia "Revisão" para "Pronto" na Criação antes
+   de criar). Cada pessoa já segue o quadro da própria equipe. Um terceiro designer convidado depois ganha a própria
+   coluna na Criação. Cadastra o cliente HE com contato padrão, AM e os responsáveis da Criação e do Social; aperta
+   "Revisei os modelos". Os primeiros passos somem.
 4. Admin configura as automações da Criação: enviado ao cliente → Atendimento › Com o cliente; ajuste pedido →
-   Criação › Fila; aprovado → Social › Fila.
+   Criação › Fila; aprovado → Social › Fila com "Responsável do cliente no destino".
 5. AM cola uma conversa do WhatsApp na Nova demanda (quadro Criação, modelo Carrossel sugerido, briefing preenchido,
-   designer sugerido como membro) → a demanda nasce na Fila; o designer recebe `membro` e os seguidores, `chegou`. No
-   rodapé da coluna, "HE: Ideia de post @rafa" + Enter cria outra.
-6. Designer arrasta para a coluna dele, liga o cronômetro (T), marca o checklist, entrega V1 com link do Drive; o AM
-   recebe `versao_entregue`.
-7. AM envia por link; o card vai sozinho para Atendimento › Com o cliente; no celular (390 px) o cliente pede ajuste
-   com 2 linhas; o card volta para Criação › Fila com "Ajustes R2" e prazo novo; o designer recebe `ajuste_pedido`.
+   designer sugerido como membro) → a demanda nasce na Fila; o designer recebe `membro` (os seguidores não recebem
+   `chegou`, porque o membro é da equipe). No rodapé da coluna, "HE: Ideia de post @rafa" + Enter cria outra; um
+   designer cria "XYZ: Banner" com "Criar cliente XYZ".
+6. Designer arrasta de uma coluna de pessoa para a dele (o avatar troca), liga o cronômetro (T), marca o checklist,
+   entrega V1 com link do Drive; o AM recebe `versao_entregue`.
+7. AM envia por link; o card vai sozinho para Atendimento › Com o cliente (as etiquetas sem par ficam guardadas na
+   Criação); no celular (390 px) o cliente pede ajuste com 2 linhas; o card volta para Criação › Fila com "Ajustes R2",
+   prazo novo e as etiquetas de antes; o designer recebe `ajuste_pedido`.
 8. Designer entrega V2; AM envia; o cliente aprova; o card vai para Social › Fila com as etiquetas de mesmo nome e o
-   social, que segue o quadro, recebe `chegou`; o social marca concluída numa demanda semanal e a próxima aparece.
+   social como membro (recebe `membro`; o designer sai de "Minhas"); o social marca concluída numa demanda semanal
+   criada na Criação e a próxima aparece na Fila da Criação.
 9. A Agenda mostra as demandas dos 3 quadros; arrastar uma de dia muda o prazo e o card muda na outra janela. A Lista
-   e o Calendário do quadro Criação funcionam com filtros na URL.
+   e o Calendário do quadro Criação funcionam com filtros na URL. `/horas` mostra o tempo do cronômetro do passo 6.
 10. AM arquiva as concluídas da coluna; a busca do Arquivo encontra a demanda por "he" + palavra do título; restaurar a
     devolve e o card reaparece na outra janela. Uma concluída há mais de 7 dias sem arquivar também está no Arquivo.
+    "Copiar quadro" da Criação cria "Criação 2" sem cards.
 11. Duas janelas abertas o tempo todo: tudo aparece na outra em menos de 1 s (inclusive o sino depois de uma menção e
     a estrela no menu); derrubar e subir o servidor ressincroniza.
 12. Tema claro e escuro (colunas tingidas legíveis, vidro só na barra, no menu, nos popovers e no modal), teclado
     apenas no quadro e no modal, CSP da API §1 sem violações no console, `/api/publico/*` e `/a/*` com
-    `no-store`/`noindex`/`no-referrer`, convite sem token na URL depois de aberto, backup diário em `DATA_DIR/backups`.
+    `no-store`/`noindex`/`no-referrer`, `/a/:token` sem baixar `registro.ts`, convite sem token na URL depois de
+    aberto, backup diário em `DATA_DIR/backups`.
 13. `docker build` e o container sobem com o volume em `/app/data` e respondem em `/api/saude`; atrás do Traefik, o
     limite de login conta o IP real (`TRUST_PROXY_HOPS=1`).
 
@@ -877,45 +1095,61 @@ Para cada funcionalidade, o integrador:
 
 Decisões tomadas no contrato que o dono do produto deve confirmar (nenhuma bloqueia o início):
 
-1. **Automações entre quadros:** a ADAPTACOES cita "outro quadro" só para "quando o cliente aprovar". O contrato deixa
-   **os 4 gatilhos** apontarem para qualquer quadro (ex.: enviado ao cliente → Atendimento › Com o cliente), porque o
-   fluxo real passa por 2 a 6 quadros. Se for para travar, é um CHECK numa migração 090–099.
-2. **Etiquetas ao mover entre quadros:** por padrão, as sem par de mesmo nome **saem** (o Trello recria e por isso a Melt
-   tem ~500 etiquetas); o "Mover para…" oferece "Criar lá". Automação e "Enviar para" sempre removem.
-3. **Entregar versão** fica com os membros da demanda, o AM, atendimento e admin (a ADAPTACOES diz "qualquer membro").
-   Quem não é membro entra com Espaço antes.
-4. **Sem prazo automático:** o modelo sugere o prazo na criação (dias úteis) e só. Feriado novo não recalcula prazos.
-5. **Concluídas saem do quadro depois de 7 dias** (`quadroConcluidasDias`, mesmo sem arquivar) e ficam no Arquivo;
-   desmarcar devolve ao quadro. Isso vale também para a concluída pelo checkbox fora de uma coluna `concluida`.
-6. **Modelo "Por pessoa"** é literalmente Fila + uma coluna por pessoa (sem Concluído). As concluídas ficam marcadas
-   no lugar até sair do quadro.
-7. **Fundos de quadro** são gradientes da marca (`liso`, `grafite`, `berinjela`, `cobalto`, `aurora`); as fotos da
-   marca §3.4 (fora do repositório) podem virar fundos na v1.
-8. **Seguir quadro:** entrar numa equipe faz seguir os quadros dela; quem segue recebe `chegou` a cada demanda que
-   entra (criada ou movida). Se virar ruído, a v1 limita a "chegou sem membros".
-9. **Ajuste interno** (rodada interna) fica com atendimento e admin; a equipe pede ajuste pelo comentário.
-10. **Visível ao cliente** só pode ser ligado por atendimento e admin (a equipe não fala com o cliente).
-11. **Desativar uma pessoa** não a tira das demandas; alguém tira.
-12. **Peça com o cliente nunca é "atrasada"** (estado `pausado`); o atraso do cliente aparece como "com o cliente há N"
-    e no Início do AM.
-13. **Branch principal:** o repositório usa `master`; o plano usa `master`.
-14. **Feriados:** Carnaval e Corpus Christi entram como facultativos e contam como dia não útil; os municipais da sede
+1. **Automações entre quadros:** os 4 gatilhos podem apontar para qualquer quadro, e o ajuste e a aprovação rodam as
+   automações do quadro **de onde a peça foi enviada** (a Criação configura o vaivém inteiro). Se for para travar
+   em "só aprovado vai a outro quadro", é um CHECK numa migração 090–099.
+2. **Etiquetas entre quadros:** as sem par de mesmo nome **ficam guardadas** no quadro de origem e voltam quando a
+   demanda volta (o Trello recria e por isso a Melt tem ~500 etiquetas); o "Mover para…" oferece "Criar lá".
+   Automação e "Enviar para" sempre deixam.
+3. **Arrastar entre pessoas reatribui para todos os papéis** (a SPEC limitava a AM e admin; no Trello da Melt todo
+   mundo arrasta). Sair da coluna de uma pessoa para uma comum não tira ninguém.
+4. **Membros ao trocar de quadro:** o padrão é manter; "Responsável do cliente no destino" é opção da automação e do
+   "Mover para". Sugestão para os Primeiros passos: ligar essa opção na automação "aprovado" da Criação.
+5. **Equipe cria cliente** só com sigla e nome (nasce sem AM, com "Completar cadastro"). Editar continua com o
+   atendimento.
+6. **Cliente fixo depois do envio:** com uma versão enviada, o cliente da demanda não muda (copie a demanda).
+7. **Repetição nasce no quadro em que a demanda foi criada**, na coluna de entrada, com o responsável do cliente
+   naquela equipe.
+8. **Horas sempre numa demanda** (sem "horas avulsas" do cliente no MVP); atendimento vê o total por cliente, só o
+   admin vê por pessoa.
+9. **Notificações:** `atrasada` uma vez por prazo, no dia útil seguinte às 8h; `prazo` e `atrasada` nunca com a peça
+   com o cliente; `chegou` só quando a demanda entra sem ninguém da equipe do quadro (Seguir continua, sem ruído).
+10. **Kanban simples** já vem com "enviado → Com o cliente" e "ajuste → Fazendo"; "aprovado" não move (cada equipe decide).
+11. **Entregar versão** fica com os membros da demanda, o AM, atendimento e admin (a ADAPTACOES diz "qualquer membro").
+    Quem não é membro entra com Espaço antes.
+12. **Sem prazo automático:** o modelo sugere o prazo na criação (dias úteis) e só. Feriado novo não recalcula prazos.
+13. **Concluídas saem do quadro depois de 7 dias** (`quadroConcluidasDias`, mesmo sem arquivar) e ficam no Arquivo;
+    desmarcar devolve ao quadro. Arquivar uma coluna arquiva junto essas concluídas antigas.
+14. **Modelo "Por pessoa"** é Fila + uma coluna por pessoa (sem Concluído). As concluídas ficam marcadas no lugar até
+    sair do quadro.
+15. **Fundos de quadro** são gradientes da marca (`liso`, `grafite`, `berinjela`, `cobalto`, `aurora`); as fotos da
+    marca §3.4 (fora do repositório) podem virar fundos na v1.
+16. **Ajuste interno** (rodada interna) fica com atendimento e admin; a equipe pede ajuste pelo comentário.
+17. **Visível ao cliente** só pode ser ligado por atendimento e admin (a equipe não fala com o cliente).
+18. **Desativar uma pessoa** não a tira das demandas nem arquiva a coluna dela; alguém tira.
+19. **Peça com o cliente nunca é "atrasada"** (estado `pausado`) até o cliente decidir; depois da decisão a bola volta
+    para a equipe mesmo que o card continue em "Com o cliente" (refina a ADAPTACOES, `retornoEm`). O atraso do cliente
+    aparece como "com o cliente há N" e no Início do AM.
+20. **Feriados:** Carnaval e Corpus Christi entram como facultativos e contam como dia não útil; os municipais da sede
     não foram semeados (falta a cidade).
-15. **Proxy:** `TRUST_PROXY_HOPS=1` supõe o Traefik do EasyPanel como único proxy; com Cloudflare na frente, 2.
-16. **`style-src 'unsafe-inline'`** na CSP: o sonner e o TipTap injetam `<style>` em tempo de execução. Scripts
+21. **Proxy:** `TRUST_PROXY_HOPS=1` supõe o Traefik do EasyPanel como único proxy; com Cloudflare na frente, 2.
+22. **`style-src 'unsafe-inline'`** na CSP: o sonner e o TipTap injetam `<style>` em tempo de execução. Scripts
     continuam só `'self'`.
 
 ---
 
 ## 7. Críticas descartadas
 
-Da revisão anterior do contrato (fidelidade, integridade e paralelismo), continuam recusadas no modelo de quadros:
+Uma linha por crítica recusada (ou pela parte recusada), com o motivo.
 
-1. **`422 validacao` para chave de idempotência repetida com outro corpo:** é `422 idempotencia`, porque no contrato
-   inteiro `validacao` é o 400 do zod.
-2. **`style-src 'self'` puro:** o sonner e o TipTap injetam `<style>`; o estilo aceita `'unsafe-inline'` e o script
-   continua só `'self'`.
-3. **Baixar logo por URL externa no cadastro:** seria o servidor buscando URL de usuário (risco de SSRF) por pouco
-   ganho; o logo é só por upload.
-4. **Liberar url/caminho de `versao_item` na exclusão:** abriria brecha na trilha imutável; excluir fica bloqueado com
-   qualquer versão.
+1. **`422 validacao` para chave de idempotência repetida com outro corpo:** é `422 idempotencia`; no contrato inteiro `validacao` é o 400 do zod.
+2. **`style-src 'self'` puro:** o sonner e o TipTap injetam `<style>`; o estilo aceita `'unsafe-inline'` e o script continua só `'self'`.
+3. **Baixar logo por URL externa:** seria o servidor buscando URL de usuário (risco de SSRF) por pouco ganho; o logo é só por upload.
+4. **Liberar url/caminho de `versao_item` na exclusão:** abriria brecha na trilha imutável; excluir fica bloqueado com qualquer versão.
+5. **Oferecer "Criar cliente" só a quem `pode('cliente.criar')`, senão "Peça ao atendimento" (integridade 7):** a crítica de produto 11 venceu; a equipe cria o cliente mínimo, então a oferta vale para todos.
+6. **`AcoesNucleo` com `ReturnType<typeof useMover>` (paralelismo 1):** `tipos.ts` não pode importar hooks que só nascem na Onda 2 (o `tsc` quebraria); as assinaturas ficam explícitas lá e os hooks as devolvem.
+7. **Passar `GET/PATCH /api/config/app` ao núcleo (paralelismo 3, 1ª opção):** basta a rota própria `POST /api/modelos-demanda/revisados` no F4; o resto da configuração segue com o F5.
+8. **Pôr "Com o cliente" na Criação do seed (paralelismo 12, 1ª opção):** no fluxo real a Criação manda ao Atendimento; o roteiro do F2 arrasta no quadro Atendimento.
+9. **Modelos de quadro editáveis (produto 13, título):** "Copiar quadro" cobre montar uma vez e repetir; editar modelos fica para a v1.
+10. **Tirar o "Seguir" do MVP (produto 10, motivo citado):** com a regra nova o `chegou` só avisa demanda sem ninguém da equipe, que é o caso útil; a estrela continua separada.
+11. **"Chunk de `/a/:token` abaixo de 150 kB" sem compressão (paralelismo 5):** o React sozinho passa disso descomprimido; o critério é 150 kB gzip somando o que a página baixa.

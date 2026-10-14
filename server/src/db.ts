@@ -252,3 +252,8 @@ export function depoisDe(anterior: Instante): Instante {
 export function fixarRelogio(instante: Instante | null): void {
   relogioFixo = instante === null ? null : new Date(instante).getTime()
 }
+
+/** O instante em que o relógio está fixado (null = relógio real). Para scripts voltarem o relógio como estava. */
+export function relogioFixado(): Instante | null {
+  return relogioFixo === null ? null : new Date(relogioFixo).toISOString()
+}

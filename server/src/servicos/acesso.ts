@@ -34,10 +34,10 @@ function conferir(db: Db, tipo: 'login' | 'senha', limites: Limite[]): void {
 
 /** 429 se e-mail+IP, e-mail ou IP já estouraram o limite de falhas de login. */
 export function exigirLimitesLogin(db: Db, email: string, ip: string): void {
-  const ultimoAcerto = um<{ em: string | null }>(db,
-    "SELECT max(criado_em) AS em FROM login_tentativa WHERE tipo = 'login' AND ok = 1 AND email = ? AND ip = ?", email, ip)?.em ?? ''
+  const ultimoAcerto = um<{ id: number | null }>(db,
+    "SELECT max(id) AS id FROM login_tentativa WHERE tipo = 'login' AND ok = 1 AND email = ? AND ip = ?", email, ip)?.id ?? 0
   conferir(db, 'login', [
-    { max: 5, janelaMs: 15 * MIN, onde: 'email = ? AND ip = ? AND criado_em > ?', params: [email, ip, ultimoAcerto] },
+    { max: 5, janelaMs: 15 * MIN, onde: 'email = ? AND ip = ? AND id > ?', params: [email, ip, ultimoAcerto] },
     { max: 20, janelaMs: 60 * MIN, onde: 'email = ?', params: [email] },
     { max: 50, janelaMs: 15 * MIN, onde: 'ip = ?', params: [ip] },
   ])

@@ -204,7 +204,8 @@ export function atualizarLinhaDemanda(db: Db, id: Id, campos: Record<string, unk
  * evento à parte com ator e trace nulos (não revela quem lançou). `antes` limita aos que mudaram.
  */
 export function emitirContadores(db: Db, demandaId: Id, ator: Ator, antes?: Demanda): void {
-  rodar(db, 'UPDATE demanda SET atualizado_em = ? WHERE id = ?', agora(), demandaId)
+  // toda UPDATE em demanda grava atualizado_por e atualizado_em (001_base.sql); atualizado_por não sai no DTO
+  rodar(db, 'UPDATE demanda SET atualizado_por = ?, atualizado_em = ? WHERE id = ?', ator.usuario?.id ?? null, agora(), demandaId)
   const d = carregarDemanda(db, demandaId)
   const contadores = (['nVersoes', 'nAnexos', 'nCheckTotal', 'nCheckFeitos', 'nComentarios', 'versaoAtualId', 'capaAnexoId', 'capaUrl'] as const)
     .filter((k) => !antes || antes[k] !== d[k])

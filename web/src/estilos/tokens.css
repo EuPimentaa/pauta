@@ -1,0 +1,190 @@
+/*
+ * Tokens da marca Melt (docs/pesquisa/marca.md §7 e §8; ADAPTACOES, "Visual").
+ *
+ * Um bloco só com light-dark(): o tema segue o sistema; data-theme="light|dark" no <html> força a escolha da pessoa;
+ * qualquer sub-árvore troca de tema com color-scheme (.chrome-dark = barra superior escura no tema claro).
+ * Nenhuma cor hex fora de web/src/estilos/: telas e componentes usam os utilitários do Tailwind mapeados em
+ * index.css (@theme) ou estas variáveis. `npm run contraste --workspace web` confere os pares texto/fundo (AA).
+ *
+ * Cores por item (etiqueta, coluna, cliente, pessoa, quadro): ponha data-cor="<cor de CORES>" no elemento e use
+ * --cor, --cor-bg, --cor-ink, --cor-coluna, --cor-ponto (utilitários bg-cor-bg, text-cor-ink, bg-cor-coluna...).
+ */
+:root {
+  color-scheme: light dark;
+  --font: 'Syne', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* ---------- marca (fixos) ---------- */
+  --melt-orange: #FE5000;  --melt-yellow: #FFCC33; --melt-pink: #FF3366;
+  --melt-purple: #660099;  --melt-green: #33CC66;  --melt-blue: #3399FF;
+  --melt-deep-purple: #3C2254; --melt-black: #111111; --melt-dark: #0A0A0A; --melt-white: #FFFFFF;
+  /* paradas da barra assinatura (bar_rainbow.png) usadas nos fundos e no palco do login */
+  --melt-amber: #FEA824; --melt-magenta: #CA2177; --melt-violet: #981188; --melt-teal: #33B2B1; --melt-sky: #48A1FD;
+
+  /* ---------- superfícies ---------- */
+  --bg:              light-dark(#F3F3F3, #0A0A0A);  /* canvas do quadro sem imagem */
+  --surface-sunken:  light-dark(#EBEBEB, #111111);  /* corpo da coluna, trilhos */
+  --surface:         light-dark(#FFFFFF, #181818);  /* card, input, sidebar */
+  --surface-raised:  light-dark(#FFFFFF, #1F1F1F);  /* popover, menu, modal */
+  --surface-hover:   light-dark(#F7F7F7, #222222);  /* linha de menu, item de lista */
+  --surface-inverse: light-dark(#111111, #EDECEA);  /* tooltip, toast */
+  --overlay:         light-dark(rgb(10 10 10 / .40), rgb(0 0 0 / .60)); /* scrim de modal */
+
+  /* ---------- texto ---------- */
+  --text:          light-dark(#111111, #EDECEA);  /* #EDECEA = branco do logo */
+  --text-2:        light-dark(#4A4A4A, #B8B7B5);  /* secundário, descrição */
+  --text-3:        light-dark(#666666, #8A8A8A);  /* metadados, placeholder */
+  --text-disabled: light-dark(#8A8A8A, #5C5C5C);  /* só desabilitado (isento de AA) */
+  --text-inverse:  light-dark(#EDECEA, #111111);
+
+  /* ---------- bordas ---------- */
+  --border:         light-dark(#E6E6E6, #262626);  /* hairline decorativa */
+  --border-strong:  light-dark(#D4D4D4, #333333);  /* divisória, card arrastando */
+  --border-control: light-dark(#8A8A8A, #707070);  /* contorno de input/checkbox: 3:1 ou mais */
+
+  /* ---------- acento ---------- */
+  --accent:       #FE5000;
+  --accent-hover: light-dark(#E34700, #FF6B3B);  /* OKLab: 8% preto / 12% branco */
+  --on-accent:    #0A0A0A;                       /* texto sobre laranja: 6,00:1 (branco seria 3,30:1) */
+  --accent-ink:   light-dark(#BD3900, #FE5000);  /* texto/ícone laranja pequeno */
+  --accent-soft:  light-dark(#FFEEE6, #341F15);  /* fundo de selecionado: 10% / 12% de laranja */
+  --focus-ring:   0 0 0 2px var(--surface), 0 0 0 4px var(--accent); /* halo opaco garante 3:1 em qualquer fundo */
+  --logo-color:   light-dark(#FE5000, #EDECEA);
+
+  /* ---------- estados (base = hex da marca; bg = tinta; ink = texto AA) ---------- */
+  --success: #33CC66; --success-bg: light-dark(#E7F9ED, #1C3524); --success-ink: light-dark(#197638, #33CC66);
+  --warning: #FFCC33; --warning-bg: light-dark(#FFF9E7, #3D351C); --warning-ink: light-dark(#806514, #FFCC33);
+  --danger:  #FF3366; --danger-bg:  light-dark(#FFE7ED, #3D1C24); --danger-ink:  light-dark(#C7254E, #FF4A70);
+  --info:    #3399FF; --info-bg:    light-dark(#E7F3FF, #1C2D3D); --info-ink:    light-dark(#216AB4, #3399FF);
+
+  /* ---------- etiquetas e colunas (10), cores da marca e da barra assinatura ----------
+     base = faixa/ponto; -bg = fundo do chip; -ink = texto do chip (4,6:1 ou mais no bg e na superfície) */
+  --label-ambar:     #FEA824; --label-ambar-bg:     light-dark(#FFF3E0, #4B381B); --label-ambar-ink:     light-dark(#976211, #FEA824);
+  --label-amarelo:   #FFCC33; --label-amarelo-bg:   light-dark(#FFF8E2, #4B401E); --label-amarelo-ink:   light-dark(#896C16, #FFCC33);
+  --label-rosa:      #FF3366; --label-rosa-bg:      light-dark(#FFE2EA, #4B1E29); --label-rosa-ink:      light-dark(#C4254D, #FF5A79);
+  --label-magenta:   #CA2177; --label-magenta-bg:   light-dark(#F8E0EC, #3F1A2D); --label-magenta-ink:   light-dark(#BF1F70, #DE6697);
+  --label-roxo:      light-dark(#660099, #844AB1); --label-roxo-bg:      light-dark(#EADBF1, #291334); --label-roxo-ink:      light-dark(#660099, #9F74C4);
+  --label-berinjela: light-dark(#3C2254, #6F5D84); --label-berinjela-bg: light-dark(#E4E0E7, #201A25); --label-berinjela-ink: light-dark(#3C2254, #8E7F9F);
+  --label-verde:     #33CC66; --label-verde-bg:     light-dark(#E2F8EA, #1E4029); --label-verde-ink:     light-dark(#1B7B3B, #33CC66);
+  --label-turquesa:  #33B2B1; --label-turquesa-bg:  light-dark(#E2F4F4, #1E3A3A); --label-turquesa-ink:  light-dark(#1F7877, #33B2B1);
+  --label-azul:      #3399FF; --label-azul-bg:      light-dark(#E2F1FF, #1E344B); --label-azul-ink:      light-dark(#226CB7, #419FFF);
+  --label-grafite:   #737373; --label-grafite-bg:   light-dark(#EBEBEB, #2C2C2C); --label-grafite-ink:   light-dark(#696969, #949494);
+  /* o laranja NÃO é etiqueta: fica reservado para acento, foco e seleção */
+
+  /* ---------- colunas tingidas (ADAPTACOES, "Visual") ----------
+     Fundo = mistura OKLab da cor com --surface-sunken. A fração de cada cor foi calculada para cair na mesma
+     claridade (L OKLab 0,90 no claro e 0,255 no escuro, teto de 32%/24%): as cores claras tingem mais, as escuras
+     menos, e todas ficam pastel com o mesmo peso visual. Na coluna use --text e --text-2 (AA nos dois temas,
+     contraste.ts); o --text-3 fica dentro do card. Destaque sobre a coluna (limite WIP) vai em pílula
+     --accent-soft/--accent-ink, nunca laranja solto no fundo tingido.
+     -ponto = bolinha no título (a cor cheia; com contorno sutil no componente). */
+  --coluna-ambar-bg:     light-dark(color-mix(in oklab, var(--label-ambar) 28%, var(--surface-sunken)),     color-mix(in oklab, var(--label-ambar) 12%, var(--surface-sunken)));
+  --coluna-amarelo-bg:   light-dark(color-mix(in oklab, var(--label-amarelo) 32%, var(--surface-sunken)),   color-mix(in oklab, var(--label-amarelo) 11%, var(--surface-sunken)));
+  --coluna-rosa-bg:      light-dark(color-mix(in oklab, var(--label-rosa) 14%, var(--surface-sunken)),      color-mix(in oklab, var(--label-rosa) 16%, var(--surface-sunken)));
+  --coluna-magenta-bg:   light-dark(color-mix(in oklab, var(--label-magenta) 11%, var(--surface-sunken)),   color-mix(in oklab, var(--label-magenta) 20%, var(--surface-sunken)));
+  --coluna-roxo-bg:      light-dark(color-mix(in oklab, var(--label-roxo) 7%, var(--surface-sunken)),      color-mix(in oklab, var(--label-roxo) 22%, var(--surface-sunken)));
+  --coluna-berinjela-bg: light-dark(color-mix(in oklab, var(--label-berinjela) 6%, var(--surface-sunken)), color-mix(in oklab, var(--label-berinjela) 23%, var(--surface-sunken)));
+  --coluna-verde-bg:     light-dark(color-mix(in oklab, var(--label-verde) 21%, var(--surface-sunken)),     color-mix(in oklab, var(--label-verde) 13%, var(--surface-sunken)));
+  --coluna-turquesa-bg:  light-dark(color-mix(in oklab, var(--label-turquesa) 16%, var(--surface-sunken)),  color-mix(in oklab, var(--label-turquesa) 15%, var(--surface-sunken)));
+  --coluna-azul-bg:      light-dark(color-mix(in oklab, var(--label-azul) 15%, var(--surface-sunken)),      color-mix(in oklab, var(--label-azul) 16%, var(--surface-sunken)));
+  --coluna-grafite-bg:   light-dark(color-mix(in oklab, var(--label-grafite) 10%, var(--surface-sunken)),   color-mix(in oklab, var(--label-grafite) 20%, var(--surface-sunken)));
+  --coluna-ambar-ponto: var(--label-ambar);         --coluna-amarelo-ponto: var(--label-amarelo);
+  --coluna-rosa-ponto: var(--label-rosa);           --coluna-magenta-ponto: var(--label-magenta);
+  --coluna-roxo-ponto: var(--label-roxo);           --coluna-berinjela-ponto: var(--label-berinjela);
+  --coluna-verde-ponto: var(--label-verde);         --coluna-turquesa-ponto: var(--label-turquesa);
+  --coluna-azul-ponto: var(--label-azul);           --coluna-grafite-ponto: var(--label-grafite);
+  --coluna-sem-cor-bg: var(--surface-sunken);
+
+  /* ---------- fundos de quadro (FUNDOS_QUADRO; gradientes da marca, claros no tema claro) ----------
+     -a/-b = paradas (o contraste.ts confere --text sobre cada uma). 'liso' = --bg. */
+  --fundo-grafite-a:   light-dark(#F4F4F4, #1C1C1C); --fundo-grafite-b:   light-dark(#E0E0E0, #0A0A0A);
+  --fundo-berinjela-a: light-dark(#F3EFF6, #3C2254); --fundo-berinjela-b: light-dark(#E3DBEA, #120B19);
+  --fundo-cobalto-a:   light-dark(#EEF5FC, #133A6B); --fundo-cobalto-b:   light-dark(#D9E7F6, #0A1324);
+  --fundo-aurora-a:    light-dark(#FFF0E8, #3A1A10); --fundo-aurora-b:    light-dark(#F6E7F1, #2A0F2A); --fundo-aurora-c: light-dark(#ECE6F6, #160E24);
+  --fundo-liso: var(--bg);
+  --fundo-grafite:   radial-gradient(120% 90% at 0% 0%, var(--fundo-grafite-a), var(--fundo-grafite-b));
+  --fundo-berinjela: radial-gradient(130% 100% at 100% 0%, var(--fundo-berinjela-a), var(--fundo-berinjela-b));
+  --fundo-cobalto:   radial-gradient(130% 110% at 0% 0%, var(--fundo-cobalto-a), var(--fundo-cobalto-b));
+  --fundo-aurora:    radial-gradient(70% 90% at 0% 0%, var(--fundo-aurora-a), transparent 70%),
+                     radial-gradient(60% 80% at 100% 10%, var(--fundo-aurora-b), transparent 70%),
+                     linear-gradient(160deg, var(--fundo-aurora-b), var(--fundo-aurora-c));
+
+  /* ---------- tipografia (marca §4; a Syne é larga: nada abaixo de 12px em texto lido) ---------- */
+  --fs-micro: 11px; --lh-micro: 14px;   /* 700 caixa alta, eyebrow e rótulo de seção */
+  --fs-meta: 12px;  --lh-meta: 16px;    /* 500 metadados do card */
+  --fs-body: 14px;  --lh-body: 21px;    /* 400 texto padrão */
+  --fs-card: 14px;  --lh-card: 19px;    /* 500 título do card */
+  --fs-col: 15px;   --lh-col: 20px;     /* 600 título da coluna */
+  --fs-h3: 18px;    --lh-h3: 24px;      /* 600 título do modal */
+  --fs-h2: 22px;    --lh-h2: 28px;      /* 600 nome do quadro */
+  --fs-h1: 30px;    --lh-h1: 36px;      /* 500 telas vazias, login */
+  --tracking-titulo: -0.01em; --tracking-micro: 0.12em;
+
+  /* ---------- espaçamento (base 4) ---------- */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-16: 64px;
+
+  /* ---------- raios (14px = card de equipe da marca) ---------- */
+  --radius-xs: 6px;   /* chip de etiqueta, badge */
+  --radius-sm: 8px;   /* botão, input */
+  --radius-md: 10px;  /* card do quadro */
+  --radius-lg: 14px;  /* coluna, painel, popover */
+  --radius-xl: 20px;  /* modal, card de login */
+  --radius-full: 999px; /* avatar, pílula, contador */
+
+  /* ---------- sombras (cores por tema; o escuro ganha brilho interno no topo) ---------- */
+  --shadow-c1: light-dark(rgb(17 17 17 / .06), rgb(0 0 0 / .45));
+  --shadow-c2: light-dark(rgb(17 17 17 / .10), rgb(0 0 0 / .60));
+  --highlight: light-dark(rgb(255 255 255 / 0), rgb(255 255 255 / .04));
+  --shadow-card:  0 1px 2px var(--shadow-c1), inset 0 1px 0 var(--highlight);
+  --shadow-hover: 0 2px 4px var(--shadow-c1), 0 6px 16px var(--shadow-c1), inset 0 1px 0 var(--highlight);
+  --shadow-pop:   0 2px 6px var(--shadow-c1), 0 12px 32px var(--shadow-c2), inset 0 1px 0 var(--highlight);
+  --shadow-drag:  0 10px 24px var(--shadow-c2), 0 24px 48px var(--shadow-c1);
+  --shadow-modal: 0 24px 64px var(--shadow-c2);
+
+  /* ---------- vidro fosco (marca §8; só barra superior, menu lateral, popovers, menus e modal) ---------- */
+  --glass-bg:        light-dark(rgb(255 255 255 / .80), rgb(17 17 17 / .82));
+  --glass-border:    light-dark(rgb(255 255 255 / .55), rgb(255 255 255 / .08));
+  --glass-edge:      light-dark(rgb(17 17 17 / .06), rgb(0 0 0 / .40));
+  --glass-highlight: light-dark(rgb(255 255 255 / .70), rgb(255 255 255 / .06));
+  --glass-text-3:    light-dark(#4A4A4A, #B8B7B5);  /* metadado sobre vidro sobe um degrau */
+  --glass-solido:    light-dark(rgb(255 255 255 / .96), rgb(17 17 17 / .96)); /* sem backdrop-filter */
+  --glass-blur: 24px; --glass-saturate: 160%;
+
+  /* ---------- movimento ---------- */
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --dur-1: 120ms; --dur-2: 200ms; --dur-3: 320ms;
+
+  /* ---------- véus de interação (hover e pressionado sobre qualquer superfície, inclusive vidro e coluna) ---------- */
+  --veu-1: color-mix(in oklab, var(--text) 5%, transparent);
+  --veu-2: color-mix(in oklab, var(--text) 9%, transparent);
+  --fs-rotulo: 13px; --lh-rotulo: 18px;  /* rótulo de campo */
+
+  /* ---------- casca e camadas ---------- */
+  --topo-h: 56px; --menu-w: 264px; --menu-w-recolhido: 64px; --abas-h: 64px;
+  --z-menu: 30; --z-topo: 40; --z-faixa: 45; --z-abas: 50; --z-popover: 60; --z-modal: 70; --z-aviso: 80; --z-tooltip: 90;
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
+.chrome-dark { color-scheme: dark; }      /* topbar escura no tema claro (alternância da marca) */
+.chrome-light { color-scheme: light; }    /* cartão claro sobre o palco escuro do login */
+@media (prefers-reduced-motion: reduce) { :root { --dur-1: 0ms; --dur-2: 0ms; --dur-3: 0ms; } }
+
+/* ---------- cor por item: data-cor="<cor>" ---------- */
+[data-cor="ambar"]     { --cor: var(--label-ambar);     --cor-bg: var(--label-ambar-bg);     --cor-ink: var(--label-ambar-ink);     --cor-coluna: var(--coluna-ambar-bg);     --cor-ponto: var(--coluna-ambar-ponto); }
+[data-cor="amarelo"]   { --cor: var(--label-amarelo);   --cor-bg: var(--label-amarelo-bg);   --cor-ink: var(--label-amarelo-ink);   --cor-coluna: var(--coluna-amarelo-bg);   --cor-ponto: var(--coluna-amarelo-ponto); }
+[data-cor="rosa"]      { --cor: var(--label-rosa);      --cor-bg: var(--label-rosa-bg);      --cor-ink: var(--label-rosa-ink);      --cor-coluna: var(--coluna-rosa-bg);      --cor-ponto: var(--coluna-rosa-ponto); }
+[data-cor="magenta"]   { --cor: var(--label-magenta);   --cor-bg: var(--label-magenta-bg);   --cor-ink: var(--label-magenta-ink);   --cor-coluna: var(--coluna-magenta-bg);   --cor-ponto: var(--coluna-magenta-ponto); }
+[data-cor="roxo"]      { --cor: var(--label-roxo);      --cor-bg: var(--label-roxo-bg);      --cor-ink: var(--label-roxo-ink);      --cor-coluna: var(--coluna-roxo-bg);      --cor-ponto: var(--coluna-roxo-ponto); }
+[data-cor="berinjela"] { --cor: var(--label-berinjela); --cor-bg: var(--label-berinjela-bg); --cor-ink: var(--label-berinjela-ink); --cor-coluna: var(--coluna-berinjela-bg); --cor-ponto: var(--coluna-berinjela-ponto); }
+[data-cor="verde"]     { --cor: var(--label-verde);     --cor-bg: var(--label-verde-bg);     --cor-ink: var(--label-verde-ink);     --cor-coluna: var(--coluna-verde-bg);     --cor-ponto: var(--coluna-verde-ponto); }
+[data-cor="turquesa"]  { --cor: var(--label-turquesa);  --cor-bg: var(--label-turquesa-bg);  --cor-ink: var(--label-turquesa-ink);  --cor-coluna: var(--coluna-turquesa-bg);  --cor-ponto: var(--coluna-turquesa-ponto); }
+[data-cor="azul"]      { --cor: var(--label-azul);      --cor-bg: var(--label-azul-bg);      --cor-ink: var(--label-azul-ink);      --cor-coluna: var(--coluna-azul-bg);      --cor-ponto: var(--coluna-azul-ponto); }
+[data-cor="grafite"]   { --cor: var(--label-grafite);   --cor-bg: var(--label-grafite-bg);   --cor-ink: var(--label-grafite-ink);   --cor-coluna: var(--coluna-grafite-bg);   --cor-ponto: var(--coluna-grafite-ponto); }
+[data-cor="nenhuma"]   { --cor: var(--border-strong);   --cor-bg: var(--surface-sunken);     --cor-ink: var(--text-2);              --cor-coluna: var(--coluna-sem-cor-bg);   --cor-ponto: var(--border-control); }
+
+/* ---------- fundo de quadro: data-fundo="<fundo>" (FUNDOS_QUADRO) ---------- */
+[data-fundo="liso"]      { --fundo: var(--fundo-liso); }
+[data-fundo="grafite"]   { --fundo: var(--fundo-grafite); }
+[data-fundo="berinjela"] { --fundo: var(--fundo-berinjela); }
+[data-fundo="cobalto"]   { --fundo: var(--fundo-cobalto); }
+[data-fundo="aurora"]    { --fundo: var(--fundo-aurora); }

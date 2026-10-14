@@ -1,0 +1,78 @@
+/* Base global: documento, foco, seleção, rolagem, vidro (marca §8) e as marcas (logo, "e", barra assinatura). */
+@layer base {
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scrollbar-gutter: stable; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 400 var(--fs-body) / var(--lh-body) var(--font);
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
+    font-synthesis-weight: none;
+  }
+  #root { min-height: 100%; isolation: isolate; }
+  h1, h2, h3, h4 { letter-spacing: var(--tracking-titulo); }
+  ::selection { background: var(--accent-soft); color: var(--text); }
+  :focus { outline: none; }
+  :focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  /* contadores, datas e valores (marca §4) */
+  .tabular { font-variant-numeric: tabular-nums; }
+  input, textarea, select, button { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  [hidden] { display: none !important; }
+  * { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+  @media (forced-colors: active) { :focus-visible { outline: 2px solid Highlight; outline-offset: 2px; } }
+}
+
+@layer components {
+  /* "Pular para o conteúdo": só aparece no foco do teclado */
+  .pular-conteudo {
+    position: fixed; left: var(--space-3); top: var(--space-3); z-index: calc(var(--z-tooltip) + 1);
+    padding: var(--space-2) var(--space-4); border-radius: var(--radius-sm);
+    background: var(--surface-raised); color: var(--text); box-shadow: var(--shadow-pop);
+    transform: translateY(-200%); transition: transform var(--dur-2) var(--ease);
+  }
+  .pular-conteudo:focus-visible { transform: none; box-shadow: var(--focus-ring), var(--shadow-pop); }
+
+  /* ---------- vidro fosco: só barra superior, menu lateral, popovers, menus e modal ---------- */
+  .vidro {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+            backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-highlight), var(--shadow-pop);
+  }
+  .vidro .meta, .vidro-meta { color: var(--glass-text-3); }
+  /* barra e menu: vidro sem a sombra de popover (são camadas da página) */
+  .vidro-plano {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+            backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  }
+  /* ao arrastar (data-arrastando no <html>), o blur baixa para manter 60 fps */
+  :root[data-arrastando] .vidro, :root[data-arrastando] .vidro-plano { --glass-blur: 12px; }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .vidro, .vidro-plano { background: var(--glass-solido); }
+  }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    .vidro, .vidro-plano { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .vidro { border-color: var(--border-strong); }
+  }
+  @media (forced-colors: active) { .vidro, .vidro-plano { background: Canvas; border: 1px solid CanvasText; } }
+
+  /* ---------- marcas (máscara CSS sobre os PNG da marca; a cor vem de --logo-color e acompanha o tema) ---------- */
+  .marca-logo {
+    display: inline-block; flex: none; height: 20px; aspect-ratio: 2500 / 864;
+    background: var(--marca-cor, var(--logo-color));
+    -webkit-mask: url('/marca/logo_dark.png') center / contain no-repeat;
+            mask: url('/marca/logo_dark.png') center / contain no-repeat;
+  }
+  .marca-e {
+    display: inline-block; flex: none; height: 22px; aspect-ratio: 2004 / 2012;
+    background: var(--marca-cor, var(--logo-color));
+    -webkit-mask: url('/marca/emark_dark.png') center / contain no-repeat;
+            mask: url('/marca/emark_dark.png') center / contain no-repeat;
+  }
+  @media (forced-colors: active) { .marca-logo, .marca-e { background: CanvasText; } }
+  /* barra assinatura: só no login, convite e redefinição (marca §3.1) */
+  .barra-assinatura { display: block; height: 3px; background: url('/marca/bar_rainbow.png') center / 100% 100% no-repeat; }
+}

@@ -1,1 +1,102 @@
+/*
+ * Entrada de estilos. Tailwind 4 com o tema apontando para os tokens da marca (estilos/tokens.css). As cores, os
+ * tamanhos de texto, os raios e as sombras padrão do Tailwind foram removidos: só existem os da marca.
+ *   fundo:  bg-canvas, bg-sunken, bg-surface, bg-raised, bg-hover, bg-inverse, bg-veu, bg-veu-2
+ *   texto:  text-fg, text-fg-2, text-fg-3, text-fg-disabled, text-fg-inverse
+ *   linhas: border-line, border-line-strong, border-control
+ *   acento: bg-accent, bg-accent-hover, text-on-accent, text-accent-ink, bg-accent-soft
+ *   estado: bg-success-bg text-success-ink (e warning, danger, info; bg-success = cor cheia)
+ *   item:   data-cor="<cor>" + bg-cor, bg-cor-bg, text-cor-ink, bg-cor-coluna, bg-cor-ponto
+ *   tipo:   text-micro, text-meta, text-rotulo, text-body, text-card, text-col, text-h3, text-h2, text-h1
+ *   raio:   rounded-xs/sm/md/lg/xl/full · sombra: shadow-card, shadow-hover, shadow-pop, shadow-drag, shadow-modal
+ *   tela:   desk:… vale a partir de 768 px; max-desk:… vale abaixo de 768 px (celular)
+ * Variante dark: tema escuro forçado, sistema escuro sem tema claro forçado e dentro de .chrome-dark.
+ */
 @import "tailwindcss";
+@import "./estilos/fontes.css";
+@import "./estilos/tokens.css";
+@import "./estilos/base.css";
+@import "./estilos/componentes.css";
+@import "./estilos/sobreposicoes.css";
+@import "./estilos/conteudo.css";
+@import "./estilos/casca.css";
+@import "./estilos/auth.css";
+
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *, .chrome-dark, .chrome-dark *) { @slot; }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) { @slot; }
+  }
+}
+
+@theme inline {
+  --color-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-canvas: var(--bg);
+  --color-sunken: var(--surface-sunken);
+  --color-surface: var(--surface);
+  --color-raised: var(--surface-raised);
+  --color-hover: var(--surface-hover);
+  --color-inverse: var(--surface-inverse);
+  --color-overlay: var(--overlay);
+  --color-veu: var(--veu-1);
+  --color-veu-2: var(--veu-2);
+  --color-fg: var(--text);
+  --color-fg-2: var(--text-2);
+  --color-fg-3: var(--text-3);
+  --color-fg-disabled: var(--text-disabled);
+  --color-fg-inverse: var(--text-inverse);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-control: var(--border-control);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success); --color-success-bg: var(--success-bg); --color-success-ink: var(--success-ink);
+  --color-warning: var(--warning); --color-warning-bg: var(--warning-bg); --color-warning-ink: var(--warning-ink);
+  --color-danger: var(--danger);   --color-danger-bg: var(--danger-bg);   --color-danger-ink: var(--danger-ink);
+  --color-info: var(--info);       --color-info-bg: var(--info-bg);       --color-info-ink: var(--info-ink);
+  --color-cor: var(--cor);
+  --color-cor-bg: var(--cor-bg);
+  --color-cor-ink: var(--cor-ink);
+  --color-cor-coluna: var(--cor-coluna);
+  --color-cor-ponto: var(--cor-ponto);
+
+  --font-sans: var(--font);
+  --default-font-family: var(--font);
+
+  --text-micro: var(--fs-micro);   --text-micro--line-height: var(--lh-micro);
+  --text-meta: var(--fs-meta);     --text-meta--line-height: var(--lh-meta);
+  --text-rotulo: var(--fs-rotulo); --text-rotulo--line-height: var(--lh-rotulo);
+  --text-body: var(--fs-body);     --text-body--line-height: var(--lh-body);
+  --text-card: var(--fs-card);     --text-card--line-height: var(--lh-card);
+  --text-col: var(--fs-col);       --text-col--line-height: var(--lh-col);
+  --text-h3: var(--fs-h3);         --text-h3--line-height: var(--lh-h3);
+  --text-h2: var(--fs-h2);         --text-h2--line-height: var(--lh-h2);
+  --text-h1: var(--fs-h1);         --text-h1--line-height: var(--lh-h1);
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-hover: var(--shadow-hover);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-drag: var(--shadow-drag);
+  --shadow-modal: var(--shadow-modal);
+
+  --ease-melt: var(--ease);
+  --breakpoint-desk: 48rem;
+}

@@ -144,7 +144,7 @@ export interface NovaColuna {
   cor?: Cor | null
   papel?: PapelColuna
   limiteWip?: number | null
-  /** Coluna de uma pessoa ativa (só papel normal; 400 validacao se a pessoa já tem coluna ativa no quadro). */
+  /** Coluna de uma pessoa ativa (só papel normal). Ela já tem coluna ativa no quadro: 409 conflito (API.md §4.6). */
   responsavelId?: Id | null
   /** No "Novo quadro": de qual coluna do modelo esta veio (as automações do modelo seguem a coluna; API.md §4.5). */
   modeloColunaId?: Id | null

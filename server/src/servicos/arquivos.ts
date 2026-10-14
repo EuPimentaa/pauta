@@ -4,13 +4,13 @@
  * (HMAC com SEGREDO, validade em minutos) para a página pública.
  */
 import { createHash } from 'node:crypto'
-import { createReadStream, mkdirSync, statSync, writeFileSync } from 'node:fs'
+import { createReadStream, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import type { ArquivoInfo, Id, MimePermitido } from '../../../shared/tipos/index.ts'
 import type { Ator } from '../auth.ts'
 import { config } from '../config.ts'
-import { agora, agoraData, novoId, rodar, um, type Db } from '../db.ts'
+import { agora, agoraData, novoId, rodar, seDesfeita, um, type Db } from '../db.ts'
 import { ErroHttp, naoEncontrado, validacao } from '../erros.ts'
 import { lerConfig } from './config-app.ts'
 import { hmac, iguaisSeguro } from './cripto.ts'
@@ -62,6 +62,8 @@ export function salvarUpload(db: Db, conteudo: Uint8Array, nomeOriginal: string,
   const destino = caminhoDoArquivo(id)
   mkdirSync(join(pastaUploads(), id.slice(0, 2)), { recursive: true })
   writeFileSync(destino, conteudo, { flag: 'wx' })
+  // a transação de quem chama pode desfazer a linha: o arquivo sai do disco junto (nada no disco sem linha)
+  seDesfeita(db, () => rmSync(destino, { force: true }))
   const sha256 = createHash('sha256').update(conteudo).digest('hex')
   rodar(db, 'INSERT INTO arquivo (id, nome, mime, bytes, sha256, enviado_por, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)',
     id, nomeSeguro(nomeOriginal), mime, conteudo.byteLength, sha256, ator.usuario!.id, agora())

@@ -1,7 +1,8 @@
 /**
  * Banco: abrir, migrar, transações (BEGIN IMMEDIATE, reentrantes com SAVEPOINT), consultas e o relógio do app.
  * Um só processo escreve: toda mutação roda inteira dentro de `tx()` (síncrona), então nada se intercala.
- * O que precisa acontecer só depois do commit (entregar eventos ao SSE, fechar conexões) entra por `depoisDoCommit()`.
+ * O que precisa acontecer só depois do commit (entregar eventos ao SSE, fechar conexões) entra por `depoisDoCommit()`;
+ * o que desfaz um efeito fora do banco se a transação for desfeita (apagar o upload gravado no disco), por `seDesfeita()`.
  */
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite'
 import { randomUUID } from 'node:crypto'
@@ -59,13 +60,14 @@ export function migrar(db: Db, pasta: string = PASTA_MIGRACOES): string[] {
 interface EstadoTx {
   profundidade: number
   depois: (() => void)[]
+  desfazer: (() => void)[]
 }
 const estados = new WeakMap<Db, EstadoTx>()
 
 function estado(db: Db): EstadoTx {
   let e = estados.get(db)
   if (!e) {
-    e = { profundidade: 0, depois: [] }
+    e = { profundidade: 0, depois: [], desfazer: [] }
     estados.set(db, e)
   }
   return e
@@ -75,9 +77,21 @@ function exigirSincrono(r: unknown): void {
   if (r instanceof Promise) throw new Error('tx() recebeu uma função assíncrona: a transação não pode esperar')
 }
 
+/** Roda cada função isolada: uma falha vai ao log e não impede as outras. */
+function rodarCada(fns: (() => void)[], rotulo: string): void {
+  for (const f of fns) {
+    try {
+      f()
+    } catch (erro) {
+      console.error(`${rotulo} falhou:`, erro)
+    }
+  }
+}
+
 /**
  * `BEGIN IMMEDIATE … COMMIT`. Dentro de outra `tx()`, vira SAVEPOINT (erro desfaz só o pedaço de dentro).
- * Depois do COMMIT de fora, roda o que foi registrado com `depoisDoCommit()` (entrega dos eventos).
+ * Depois do COMMIT de fora, roda o que foi registrado com `depoisDoCommit()` (entrega dos eventos); se a transação
+ * (ou o SAVEPOINT) for desfeita, roda o que foi registrado com `seDesfeita()` dentro dela, do mais novo ao mais velho.
  */
 export function tx<T>(db: Db, fn: () => T): T {
   const e = estado(db)
@@ -92,23 +106,22 @@ export function tx<T>(db: Db, fn: () => T): T {
     } catch (erro) {
       e.depois = []
       if (db.isTransaction) db.exec('ROLLBACK')
+      const desfazer = e.desfazer.reverse()
+      e.desfazer = []
+      rodarCada(desfazer, 'seDesfeita')
       throw erro
     } finally {
       e.profundidade = 0
     }
     const depois = e.depois
     e.depois = []
-    for (const f of depois) {
-      try {
-        f()
-      } catch (erro) {
-        console.error('depoisDoCommit falhou:', erro)
-      }
-    }
+    e.desfazer = []
+    rodarCada(depois, 'depoisDoCommit')
     return r
   }
   const nome = `sp${e.profundidade}`
   const marca = e.depois.length
+  const marcaDesfazer = e.desfazer.length
   db.exec(`SAVEPOINT ${nome}`)
   e.profundidade++
   try {
@@ -120,6 +133,7 @@ export function tx<T>(db: Db, fn: () => T): T {
     db.exec(`ROLLBACK TO ${nome}`)
     db.exec(`RELEASE ${nome}`)
     e.depois.length = marca
+    rodarCada(e.desfazer.splice(marcaDesfazer).reverse(), 'seDesfeita')
     throw erro
   } finally {
     e.profundidade--
@@ -144,6 +158,12 @@ export function depoisDoCommit(db: Db, fn: () => void): void {
   const e = estado(db)
   if (e.profundidade === 0) fn()
   else e.depois.push(fn)
+}
+
+/** Roda `fn` se a transação atual (ou o SAVEPOINT em que está) for desfeita. Fora de transação, não registra. */
+export function seDesfeita(db: Db, fn: () => void): void {
+  const e = estado(db)
+  if (e.profundidade > 0) e.desfazer.push(fn)
 }
 
 export function emTransacao(db: Db): boolean {

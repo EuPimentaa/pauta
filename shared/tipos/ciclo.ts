@@ -54,6 +54,12 @@ export interface VersaoComItens extends Versao {
 export interface Envio {
   id: Id
   demandaId: Id
+  /**
+   * Quadro em que a demanda estava ao ser enviada (gravado antes da automação 'enviado_ao_cliente'). As automações
+   * 'ajuste_pedido' e 'aprovado' da decisão sobre este envio são as DESTE quadro (API.md §5.5), mesmo que a demanda
+   * tenha ido para outro quadro enquanto espera o cliente.
+   */
+  quadroId: Id
   versaoId: Id
   via: 'link' | 'fora'
   canal: Canal | null
@@ -193,7 +199,7 @@ export interface RegistrarRetornoSaida {
   checklist: ChecklistComItens | null
   /** "Rodada 3 · 2 inclusas": sugerir [Marcar como extra]. */
   sugerirExtra: boolean
-  /** A automação 'aprovado' ou 'ajuste_pedido' moveu a demanda. */
+  /** A automação 'aprovado' ou 'ajuste_pedido' (do quadro do envio) moveu a demanda. */
   automacao: boolean
 }
 

@@ -88,7 +88,11 @@ export interface ClienteNaLista extends ClienteResumo {
 
 // ─────────────────────────────── DTOs ───────────────────────────────
 
-/** Também usado pelo "Criar cliente HE" dentro da Nova demanda e da criação rápida (só sigla + nome). */
+/**
+ * POST /api/clientes. Também usado pelo diálogo "Criar cliente HE" (F5) aberto da Nova demanda, da criação rápida e
+ * do modal: só sigla + nome. O papel equipe só manda CAMPOS_CLIENTE_EQUIPE (o resto: 403 campo_nao_permitido); o
+ * cliente nasce com a pendência sem_am e o atendimento completa depois.
+ */
 export interface CriarClienteEntrada {
   sigla: string
   nome: string
@@ -106,6 +110,9 @@ export interface CriarClienteEntrada {
   /** Além da sigla, que entra sozinha. */
   apelidos?: string[]
 }
+
+/** O que o papel equipe pode mandar ao criar cliente (API.md §2). Editar continua só com atendimento e admin. */
+export const CAMPOS_CLIENTE_EQUIPE = ['sigla', 'nome'] as const satisfies readonly (keyof CriarClienteEntrada)[]
 
 export type EditarClienteEntrada = Partial<Omit<CriarClienteEntrada, 'apelidos'>>
 

@@ -1,8 +1,10 @@
 /**
- * Modelos de quadro (colunas sugeridas do "Novo quadro"; seed, só leitura no MVP) e modelos de demanda (no lugar dos
- * tipos de peça com campos): briefing-modelo em Markdown, checklist padrão, etiquetas padrão e prazo em dias úteis.
+ * Modelos de quadro (colunas e automações sugeridas do "Novo quadro"; seed, só leitura no MVP: para repetir um quadro
+ * montado, use "Copiar quadro") e modelos de demanda (no lugar dos tipos de peça com campos): briefing-modelo em
+ * Markdown, checklist padrão, etiquetas padrão e prazo em dias úteis.
  */
 import type { Cor, Id, Instante, PapelColuna, PosicaoRelativa, Prioridade } from './nucleo.ts'
+import type { GatilhoAutomacao } from './quadros.ts'
 
 export interface ModeloQuadroColuna {
   id: Id
@@ -14,12 +16,21 @@ export interface ModeloQuadroColuna {
   pos: number
 }
 
+/** Automação sugerida pelo modelo, para uma coluna do próprio modelo (nunca a por_membro). */
+export interface ModeloQuadroAutomacao {
+  gatilho: GatilhoAutomacao
+  /** Id de ModeloQuadroColuna. Se a coluna for desmarcada no "Novo quadro", a automação não nasce. */
+  destinoColunaId: Id
+}
+
 export interface ModeloQuadro {
   id: Id
   nome: string
   descricao: string
   pos: number
   colunas: ModeloQuadroColuna[]
+  /** Kanban simples: enviado ao cliente → Com o cliente; ajuste pedido → Fazendo. */
+  automacoes: ModeloQuadroAutomacao[]
 }
 
 export interface ModeloDemandaItem {
@@ -81,4 +92,9 @@ export interface CriarModeloDemandaEntrada {
 export type EditarModeloDemandaEntrada = Partial<Omit<CriarModeloDemandaEntrada, 'quadroId'>> & {
   ativo?: boolean
   posicao?: PosicaoRelativa
+}
+
+/** POST /api/modelos-demanda/revisados (admin; "Revisei os modelos" dos Primeiros passos). */
+export interface ModelosRevisadosSaida {
+  modelosRevisadosEm: Instante
 }

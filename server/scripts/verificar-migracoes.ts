@@ -14,7 +14,8 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   ATORES_ATIVIDADE, CANAIS, CHAVES_CONFIG, CORES, FAIXAS_CONFIG, FINALIDADES_ANEXO, FUNDOS_QUADRO, GATILHOS_AUTOMACAO,
-  MIMES_PERMITIDOS, MOTIVOS_RODADA, ORIGENS_APONTAMENTO, ORIGENS_DEMANDA, ORIGENS_RODADA, PAPEIS, PAPEIS_COLUNA,
+  MEMBROS_AO_MOVER, MIMES_PERMITIDOS, MOTIVOS_RODADA, ORIGENS_APONTAMENTO, ORIGENS_DEMANDA, ORIGENS_RODADA, PAPEIS,
+  PAPEIS_COLUNA,
   PRIORIDADES, PROVEDORES, PUBLICOS_EVENTO, REPETICOES, STATUS_CLIENTE, TIPOS_FERIADO, TIPOS_LINK_CLIENTE,
   TIPOS_NOTIFICACAO,
 } from '../../shared/tipos/index.ts'
@@ -107,14 +108,21 @@ for (const velha of ['fluxo', 'etapa', 'transicao', 'visao', 'ausencia', 'aviso'
   conferir(!tabelasBanco.includes(velha), `a tabela ${velha} (fluxo único) não existe mais`)
 }
 for (const nova of ['quadro', 'quadro_usuario', 'coluna', 'etiqueta', 'demanda_etiqueta', 'demanda_membro',
-  'demanda_movimento', 'modelo_quadro', 'modelo_quadro_coluna', 'modelo_demanda', 'modelo_demanda_item',
-  'modelo_demanda_etiqueta', 'automacao_quadro', 'cliente_responsavel', 'apontamento']) {
+  'demanda_movimento', 'modelo_quadro', 'modelo_quadro_coluna', 'modelo_quadro_automacao', 'modelo_demanda',
+  'modelo_demanda_item', 'modelo_demanda_etiqueta', 'automacao_quadro', 'cliente_responsavel', 'apontamento']) {
   conferir(tabelasBanco.includes(nova), `tabela ${nova} existe`)
 }
-const colunasDemanda = todos(db, 'PRAGMA table_info(demanda)').map((c) => c.name as string)
+const colunasDe = (t: string) => todos(db, `PRAGMA table_info(${t})`).map((c) => c.name as string)
+const colunasDemanda = colunasDe('demanda')
 for (const velha of ['etapa_id', 'status', 'bola', 'responsavel_id', 'tipo_peca_id', 'equipe_id', 'briefing_campos']) {
   conferir(!colunasDemanda.includes(velha), `demanda sem a coluna ${velha}`)
 }
+for (const [t, c] of [['demanda', 'retorno_em'], ['coluna', 'responsavel_id'], ['quadro', 'coluna_por_membro'],
+  ['envio', 'quadro_id'], ['automacao_quadro', 'membros']] as const) {
+  conferir(colunasDe(t).includes(c), `${t}.${c} existe (modelo de quadros, revisão 2)`)
+}
+conferir(todos(db, 'PRAGMA table_info(apontamento)').find((c) => c.name === 'demanda_id')?.notnull === 1,
+  'apontamento sempre numa demanda (demanda_id NOT NULL)')
 
 // ─────────────────────────── 4. listas fechadas: shared/tipos = CHECK do banco ───────────────────────────
 function listaDoCheck(tabela: string, coluna: string): string[] | null {
@@ -140,6 +148,8 @@ mesmaLista('modelo_demanda', 'prioridade', PRIORIDADES)
 mesmaLista('demanda', 'repetir', REPETICOES)
 mesmaLista('demanda', 'origem', ORIGENS_DEMANDA)
 mesmaLista('automacao_quadro', 'gatilho', GATILHOS_AUTOMACAO)
+mesmaLista('modelo_quadro_automacao', 'gatilho', GATILHOS_AUTOMACAO)
+mesmaLista('automacao_quadro', 'membros', MEMBROS_AO_MOVER)
 mesmaLista('notificacao', 'tipo', TIPOS_NOTIFICACAO)
 mesmaLista('evento', 'publico', PUBLICOS_EVENTO)
 mesmaLista('atividade', 'ator_tipo', ATORES_ATIVIDADE)
@@ -186,6 +196,12 @@ const semana = colsModelo('mq-semana')
 conferir(JSON.stringify(semana.map((c) => c.nome)) === JSON.stringify(['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Concluído'])
   && semana[5]!.papel === 'concluida', 'Semana: Seg…Sex + Concluído (concluida)')
 conferir(colsModelo('mq-branco').length === 0, 'Em branco: sem colunas')
+const autoModelo = todos(db, `SELECT a.modelo_id, a.gatilho, c.nome, c.papel, c.por_membro FROM modelo_quadro_automacao a
+  JOIN modelo_quadro_coluna c ON c.id = a.destino_coluna_id ORDER BY a.modelo_id, a.gatilho`)
+conferir(JSON.stringify(autoModelo.filter((a) => a.modelo_id === 'mq-kanban').map((a) => `${a.gatilho}:${a.nome}`)) ===
+  JSON.stringify(['ajuste_pedido:Fazendo', 'enviado_ao_cliente:Com o cliente']),
+  'Kanban simples sugere enviado → Com o cliente e ajuste → Fazendo')
+conferir(autoModelo.every((a) => a.por_membro === 0), 'nenhuma automação de modelo aponta para a coluna por pessoa')
 
 const modelosD = todos(db, 'SELECT * FROM modelo_demanda ORDER BY pos')
 conferir(JSON.stringify(modelosD.map((m) => m.nome)) === JSON.stringify(['Post', 'Carrossel', 'Reels', 'Stories', 'Vídeo',
@@ -245,7 +261,8 @@ const indices = todos(db, "SELECT name FROM sqlite_master WHERE type = 'index'")
 for (const nome of ['demanda_arquivo_ix', 'demanda_arquivo_cli_ix', 'demanda_coluna_ix', 'demanda_prazo_ix',
   'demanda_repeticao_uk', 'demanda_movimento_aberto_uk', 'etiqueta_nome_uk', 'apontamento_um_cronometro_uk',
   'token_acesso_pendente_uk', 'aprovacao_idem_uk', 'login_tentativa_email_ix', 'login_tentativa_ip_ix',
-  'quadro_usuario_seguidores_ix', 'modelo_demanda_nome_uk']) conferir(indices.includes(nome), `índice ${nome}`)
+  'quadro_usuario_seguidores_ix', 'modelo_demanda_nome_uk', 'demanda_inicio_ix', 'demanda_publicacao_ix',
+  'coluna_responsavel_uk', 'notificacao_atrasada_ix']) conferir(indices.includes(nome), `índice ${nome}`)
 const plano = (sql: string) => todos(db, `EXPLAIN QUERY PLAN ${sql}`).map((l) => String(l.detail)).join(' | ')
 const planoArquivo = plano(`SELECT id FROM demanda
   WHERE excluido_em IS NULL AND (arquivado_em IS NOT NULL OR concluida_em IS NOT NULL)
@@ -253,6 +270,11 @@ const planoArquivo = plano(`SELECT id FROM demanda
 conferir(planoArquivo.includes('demanda_arquivo'), `consulta do Arquivo usa o índice parcial (${planoArquivo})`)
 const planoColuna = plano("SELECT id FROM demanda WHERE coluna_id = 'x' AND arquivado_em IS NULL ORDER BY posicao")
 conferir(planoColuna.includes('demanda_coluna_ix'), `cards de uma coluna usam demanda_coluna_ix (${planoColuna})`)
+for (const [campo, indice] of [['inicio', 'demanda_inicio_ix'], ['publicacao_data', 'demanda_publicacao_ix']] as const) {
+  const p = plano(`SELECT id FROM demanda WHERE ${campo} BETWEEN '2026-10-01' AND '2026-10-31'
+    AND ${campo} IS NOT NULL AND arquivado_em IS NULL AND excluido_em IS NULL`)
+  conferir(p.includes(indice), `Agenda por ${campo} usa ${indice} (${p})`)
+}
 
 // ─────────────────────────── 6. fumaça dos gatilhos e restrições (desfeita no fim) ───────────────────────────
 db.exec('BEGIN')
@@ -283,6 +305,7 @@ deveFalhar(db, insQuadro, ['q-x', 'criação', 'criacao-2', null, 3072, 'u-adm']
 deveFalhar(db, insQuadro, ['q-x', 'Outro', 'Criação', null, 3072, 'u-adm'], 'CHECK', 'slug com maiúscula ou acento é recusado')
 deveFalhar(db, "UPDATE quadro SET fundo = 'foto' WHERE id = 'q-cri'", [], 'CHECK', 'fundo fora da lista é recusado')
 deveFalhar(db, "UPDATE quadro SET arquivado_por = 'u-adm' WHERE id = 'q-cri'", [], 'CHECK', 'arquivado_por exige arquivado_em')
+conferir(um(db, "SELECT coluna_por_membro c FROM quadro WHERE id = 'q-cri'")!.c === 0, 'coluna_por_membro começa desligado')
 
 // colunas
 const insColuna = 'INSERT INTO coluna (id, quadro_id, nome, cor, papel, pos) VALUES (?, ?, ?, ?, ?, ?)'
@@ -296,6 +319,12 @@ deveFalhar(db, insColuna, ['k-x', 'q-cri', 'Triagem', null, 'triagem', 9000], 'C
 deveFalhar(db, insColuna, ['k-x', 'q-cri', 'Laranja', 'laranja', 'normal', 9000], 'CHECK', 'laranja nunca é cor de coluna')
 deveFalhar(db, "UPDATE coluna SET limite_wip = 0 WHERE id = 'k-fila'", [], 'CHECK', 'limite WIP começa em 1')
 deveFalhar(db, "UPDATE coluna SET quadro_id = 'q-soc' WHERE id = 'k-fila'", [], 'coluna_quadro_fixo', 'coluna não muda de quadro')
+rodar(db, "UPDATE coluna SET responsavel_id = 'u-rafa' WHERE id = 'k-rafa'")
+deveFalhar(db, "INSERT INTO coluna (id, quadro_id, nome, responsavel_id, pos) VALUES ('k-x','q-cri','Rafa 2','u-rafa',9000)", [],
+  'UNIQUE', 'uma coluna por pessoa entre as ativas do quadro')
+rodar(db, "INSERT INTO coluna (id, quadro_id, nome, responsavel_id, pos) VALUES ('k-s-rafa','q-soc','Rafa','u-rafa',3072)")
+deveFalhar(db, "UPDATE coluna SET papel = 'aguardando_cliente' WHERE id = 'k-rafa'", [], 'CHECK',
+  'coluna de pessoa só tem papel normal')
 
 // etiquetas
 const insEtiqueta = 'INSERT INTO etiqueta (id, quadro_id, nome, cor, pos) VALUES (?, ?, ?, ?, ?)'
@@ -322,6 +351,13 @@ rodar(db, insAuto, 'q-cri', 'enviado_ao_cliente', 'q-cri', 'k-cli')
 deveFalhar(db, insAuto, ['q-cri', 'ajuste_pedido', 'q-cri', 'k-s-fila'], 'FOREIGN KEY', 'destino com coluna de outro quadro é recusado')
 deveFalhar(db, insAuto, ['q-cri', 'liberado', 'q-cri', 'k-fila'], 'CHECK', 'gatilho fora dos 4 é recusado')
 deveFalhar(db, insAuto, ['q-cri', 'aprovado', 'q-cri', 'k-fila'], 'UNIQUE', 'uma automação por gatilho e quadro')
+conferir(um(db, "SELECT membros m FROM automacao_quadro WHERE quadro_id = 'q-cri' AND gatilho = 'aprovado'")!.m === 'manter',
+  'automação mantém os membros por padrão')
+rodar(db, "UPDATE automacao_quadro SET membros = 'responsavel_destino' WHERE quadro_id = 'q-cri' AND gatilho = 'aprovado'")
+deveFalhar(db, "UPDATE automacao_quadro SET membros = 'todos' WHERE quadro_id = 'q-cri' AND gatilho = 'aprovado'", [], 'CHECK',
+  'membros da automação fora da lista')
+deveFalhar(db, "INSERT INTO modelo_quadro_automacao (modelo_id, gatilho, destino_coluna_id) VALUES ('mq-semana','aprovado','mqc-kanban-concluido')",
+  [], 'FOREIGN KEY', 'automação de modelo com coluna de outro modelo é recusada')
 
 // demanda
 const insDemanda = `INSERT INTO demanda (id, numero, quadro_id, coluna_id, posicao, titulo, cliente_id, atendimento_id,
@@ -345,6 +381,8 @@ conferir(mov.length === 1 && mov[0]!.saiu_em === null && mov[0]!.entrou_em === T
 // mover dentro do quadro
 deveFalhar(db, "UPDATE demanda SET coluna_id = 'k-rafa', atualizado_por = 'u-rafa' WHERE id = 'd1'", [],
   'demanda_status_desde', 'mudar de coluna sem gravar status_desde é recusado')
+deveFalhar(db, "UPDATE demanda SET coluna_id = 'k-rafa', status_desde = ?, atualizado_por = 'u-rafa' WHERE id = 'd1'",
+  ['2029-12-31T00:00:00.000Z'], 'demanda_status_desde', 'status_desde que volta no tempo é recusado')
 rodar(db, "UPDATE demanda SET coluna_id = 'k-rafa', status_desde = ?, atualizado_em = ?, atualizado_por = 'u-rafa' WHERE id = 'd1'", T1, T1)
 mov = todos(db, "SELECT * FROM demanda_movimento WHERE demanda_id = 'd1' ORDER BY id")
 conferir(mov.length === 2 && mov[0]!.saiu_em === T1 && mov[1]!.entrou_em === T1 && mov[1]!.por === 'u-rafa'
@@ -366,15 +404,17 @@ deveFalhar(db, "INSERT INTO demanda_membro (demanda_id, usuario_id) VALUES ('d1'
 const insDE = 'INSERT INTO demanda_etiqueta (demanda_id, etiqueta_id, quadro_id) VALUES (?, ?, ?)'
 rodar(db, insDE, 'd1', 'e-urg', 'q-cri')
 rodar(db, insDE, 'd1', 'e-alt', 'q-cri')
-deveFalhar(db, insDE, ['d1', 'e-s-alt', 'q-soc'], 'FOREIGN KEY', 'etiqueta com o quadro errado da demanda é recusada')
-deveFalhar(db, insDE, ['d1', 'e-s-alt', 'q-cri'], 'FOREIGN KEY', 'etiqueta de outro quadro é recusada')
+deveFalhar(db, insDE, ['d1', 'e-s-alt', 'q-cri'], 'FOREIGN KEY', 'etiqueta gravada com outro quadro que não o dela é recusada')
+const etiquetasAtuais = (id: string) => todos(db, `SELECT de.etiqueta_id e FROM demanda_etiqueta de
+  JOIN demanda d ON d.id = de.demanda_id AND d.quadro_id = de.quadro_id WHERE d.id = ? ORDER BY de.etiqueta_id`, id).map((l) => l.e)
 
-// mover entre quadros: tirar as etiquetas do quadro antigo antes (o serviço mapeia por nome)
+// mover entre quadros: as etiquetas do quadro antigo ficam guardadas e voltam se a demanda voltar (API.md §5.6)
 const moverSocial = "UPDATE demanda SET quadro_id = 'q-soc', coluna_id = 'k-s-fila', status_desde = ?, atualizado_em = ?, atualizado_por = 'u-am' WHERE id = 'd1'"
-deveFalhar(db, moverSocial, [T2, T2], 'FOREIGN KEY', 'mudar de quadro com etiquetas do quadro antigo é recusado')
-rodar(db, "DELETE FROM demanda_etiqueta WHERE demanda_id = 'd1'")
 rodar(db, moverSocial, T2, T2)
 rodar(db, insDE, 'd1', 'e-s-alt', 'q-soc')
+conferir(JSON.stringify(etiquetasAtuais('d1')) === JSON.stringify(['e-s-alt']), 'etiquetas atuais = as do quadro em que a demanda está')
+conferir(um(db, "SELECT count(*) n FROM demanda_etiqueta WHERE demanda_id = 'd1' AND quadro_id = 'q-cri'")!.n === 2,
+  'as etiquetas do quadro de origem ficam guardadas')
 mov = todos(db, "SELECT * FROM demanda_movimento WHERE demanda_id = 'd1' ORDER BY id")
 conferir(mov.length === 3 && mov[2]!.quadro_id === 'q-soc' && mov[1]!.saiu_em === T2, 'histórico guarda a troca de quadro')
 conferir(um(db, "SELECT numero FROM demanda WHERE id = 'd1'")!.numero === 1, 'o número não muda entre quadros')
@@ -412,6 +452,9 @@ deveFalhar(db, "UPDATE demanda SET coluna_id = 'k-cli', status_desde = ?, atuali
   'destino_arquivado', 'mover para coluna arquivada é recusado')
 rodar(db, "UPDATE demanda SET arquivado_em = ?, arquivado_por = 'u-am', atualizado_por = 'u-am' WHERE id = 'd6'", T3)
 rodar(db, "UPDATE coluna SET arquivada_em = ?, arquivada_por = 'u-adm' WHERE id = 'k-rafa'", T3)
+rodar(db, "INSERT INTO coluna (id, quadro_id, nome, responsavel_id, pos) VALUES ('k-rafa2','q-cri','Rafa','u-rafa',2560)")
+conferir(um(db, "SELECT count(*) n FROM coluna WHERE responsavel_id = 'u-rafa' AND quadro_id = 'q-cri'")!.n === 2,
+  'arquivar a coluna da pessoa libera uma nova coluna para ela')
 deveFalhar(db, "UPDATE demanda SET arquivado_em = NULL, arquivado_por = NULL, atualizado_por = 'u-am' WHERE id = 'd6'", [],
   'destino_arquivado', 'restaurar para coluna arquivada é recusado (o serviço escolhe outra)')
 rodar(db, "UPDATE demanda SET arquivado_em = NULL, arquivado_por = NULL, coluna_id = 'k-fila', status_desde = ?, atualizado_por = 'u-am' WHERE id = 'd6'", T4)
@@ -463,6 +506,8 @@ rodar(db, "INSERT INTO comentario (id, demanda_id, autor_id, corpo_md) VALUES ('
 conferir(um(db, "SELECT n_comentarios n FROM demanda WHERE id = 'd1'")!.n === 2, 'n_comentarios conta comentários')
 rodar(db, "UPDATE comentario SET excluido_em = ?, corpo_md = '' WHERE id = 'cm2'", agora())
 conferir(um(db, "SELECT n_comentarios n FROM demanda WHERE id = 'd1'")!.n === 1, 'n_comentarios ignora excluídos')
+deveFalhar(db, "INSERT INTO anexo (id, demanda_id, comentario_id, tipo, nome, url, pos) VALUES ('ax-c','d5','cm1','link','x','https://x.com',1)",
+  [], 'FOREIGN KEY', 'anexo preso a comentário de outra demanda é recusado')
 
 // busca
 conferir(todos(db, "SELECT rowid FROM demanda_fts WHERE demanda_fts MATCH 'acao'").length === 1, 'busca ignora acento')
@@ -515,7 +560,9 @@ deveFalhar(db, "UPDATE apontamento SET parado_em = ? WHERE id = 't1'", [T1], 'CH
 deveFalhar(db, "INSERT INTO apontamento (id, usuario_id, demanda_id, data, origem) VALUES ('t9','u-am','d1','2030-01-02','manual')", [],
   'CHECK', 'lançamento manual sem minutos é recusado')
 deveFalhar(db, "INSERT INTO apontamento (id, usuario_id, cliente_id, data, origem, iniciado_em) VALUES ('t9','u-adm','c-he','2030-01-02','cronometro',?)",
-  [T0], 'CHECK', 'cronômetro sem demanda é recusado')
+  [T0], 'NOT NULL', 'cronômetro sem demanda é recusado')
+deveFalhar(db, "INSERT INTO apontamento (id, usuario_id, cliente_id, data, minutos) VALUES ('t9','u-adm','c-he','2030-01-02',30)",
+  [], 'NOT NULL', 'lançar tempo sem demanda é recusado (horas sem demanda: v1)')
 rodar(db, "UPDATE apontamento SET parado_em = ?, minutos = 90 WHERE id = 't1'", '2030-01-02T13:30:00.000Z')
 conferir(um(db, "SELECT minutos_registrados m FROM demanda WHERE id = 'd1'")!.m === 90, 'parar o cronômetro soma os minutos')
 rodar(db, insCrono, 't4', 'u-rafa', T1)
@@ -524,6 +571,11 @@ conferir(um(db, "SELECT minutos_registrados m FROM demanda WHERE id = 'd1'")!.m 
 rodar(db, "UPDATE apontamento SET excluido_em = ? WHERE id = 't5'", agora())
 conferir(um(db, "SELECT minutos_registrados m FROM demanda WHERE id = 'd1'")!.m === 90, 'minutos_registrados ignora excluídos')
 deveFalhar(db, "DELETE FROM apontamento WHERE id = 't1'", [], 'apontamento_nao_se_apaga', 'apontamento não se apaga')
+deveFalhar(db, "UPDATE apontamento SET parado_em = ?, minutos = 5 WHERE id = 't3'", ['2029-12-31T00:00:00.000Z'], 'CHECK',
+  'parar antes de iniciar é recusado')
+rodar(db, "UPDATE apontamento SET parado_em = iniciado_em, minutos = 1 WHERE id = 't3'")
+conferir(um(db, "SELECT minutos m FROM apontamento WHERE id = 't3'")!.m === 1,
+  'ligar e parar no mesmo instante vale (relógio parado dos testes; minutos = max(1, ...))')
 
 // rodadas, versões, envio, aprovação
 rodar(db, "INSERT INTO rodada (id, demanda_id, numero, origem, prazo, prazo_original) VALUES ('r1','d1',1,'inicial','2030-01-11','2030-01-11')")
@@ -541,7 +593,9 @@ rodar(db, "UPDATE demanda SET envio_pendente_em = ?, atualizado_por = 'u-am' WHE
 deveFalhar(db, "UPDATE versao SET enviada_via = 'link' WHERE id = 'v1'", [], 'versao_imutavel', 'primeiro envio não muda')
 deveFalhar(db, "DELETE FROM versao WHERE id = 'v1'", [], 'versao_imutavel', 'versão não se apaga')
 deveFalhar(db, "UPDATE versao_item SET url = 'https://outro' WHERE id = 'vi1'", [], 'versao_item_imutavel', 'item de versão não troca de link')
-rodar(db, "INSERT INTO envio (id, demanda_id, versao_id, via, canal, enviado_por) VALUES ('e1','d1','v1','fora','whatsapp','u-am')")
+deveFalhar(db, "INSERT INTO envio (id, demanda_id, versao_id, via, canal, enviado_por) VALUES ('e0','d1','v1','fora','whatsapp','u-am')",
+  [], 'NOT NULL', 'envio sem o quadro de onde saiu é recusado')
+rodar(db, "INSERT INTO envio (id, demanda_id, quadro_id, versao_id, via, canal, enviado_por) VALUES ('e1','d1','q-soc','v1','fora','whatsapp','u-am')")
 deveFalhar(db, "UPDATE envio SET canal = 'email' WHERE id = 'e1'", [], 'envio_imutavel', 'envio é imutável')
 
 rodar(db, "INSERT INTO cliente_contato (id, cliente_id, nome, padrao) VALUES ('ct1','c-he','Fulana',1)")
@@ -550,6 +604,9 @@ deveFalhar(db, "INSERT INTO cliente_contato (id, cliente_id, nome, padrao) VALUE
 const insApr = `INSERT INTO aprovacao (id, demanda_id, versao_id, decisao, via, canal, contato_id, registrado_por, comentario,
   quadro_antes_id, coluna_antes_id) VALUES (?, 'd1', 'v1', ?, 'manual', 'whatsapp', ?, 'u-am', ?, ?, ?)`
 deveFalhar(db, insApr, ['ap0', 'aprovado', 'ct1', null, 'q-cri', 'k-s-fila'], 'FOREIGN KEY', 'lugar de antes com coluna de outro quadro')
+const insAprEvid = `INSERT INTO aprovacao (id, demanda_id, versao_id, decisao, via, canal, contato_id, registrado_por,
+  evidencia_anexo_id, quadro_antes_id, coluna_antes_id) VALUES (?, 'd1', 'v1', 'aprovado', 'manual', 'whatsapp', 'ct1', 'u-am', ?, 'q-soc', 'k-s-fila')`
+deveFalhar(db, insAprEvid, ['ap0', 'ax-d5'], 'FOREIGN KEY', 'evidência com anexo de outra demanda é recusada')
 rodar(db, insApr, 'ap1', 'aprovado', 'ct1', null, 'q-soc', 'k-s-fila')
 deveFalhar(db, "UPDATE aprovacao SET coluna_antes_id = 'k-s-agendar' WHERE id = 'ap1'", [], 'aprovacao_imutavel',
   'o lugar de antes é imutável (anular devolve para ele)')
@@ -557,8 +614,11 @@ deveFalhar(db, insApr, ['ap2', 'aprovado', 'ct1', null, 'q-soc', 'k-s-fila'], 'U
 deveFalhar(db, insApr, ['ap3', 'ajuste', 'ct1', null, 'q-soc', 'k-s-fila'], 'CHECK', 'ajuste sem comentário é recusado')
 deveFalhar(db, "UPDATE aprovacao SET decisao = 'ajuste' WHERE id = 'ap1'", [], 'aprovacao_imutavel', 'decisão é imutável')
 rodar(db, "UPDATE aprovacao SET anulada_em = ?, anulada_por = 'u-am' WHERE id = 'ap1'", agora())
-rodar(db, insApr, 'ap4', 'aprovado', 'ct1', null, 'q-soc', 'k-s-fila')
+rodar(db, "INSERT INTO anexo (id, demanda_id, finalidade, tipo, nome, url, pos) VALUES ('ax-ev','d1','evidencia','link','Print','https://drive.google.com/p',20)")
+rodar(db, insAprEvid, 'ap4', 'ax-ev')
 conferir(um(db, "SELECT count(*) n FROM aprovacao WHERE versao_id = 'v1'")!.n === 2, 'anular libera nova decisão na versão')
+deveFalhar(db, "UPDATE anexo SET excluido_em = ? WHERE id = 'ax-ev'", [agora()], 'anexo_e_evidencia',
+  'o print de evidência de uma decisão não sai')
 deveFalhar(db, "UPDATE demanda SET aprovada_em = ? WHERE id = 'd1'", [agora()], 'CHECK', 'aprovada_em exige aprovada_versao_id')
 rodar(db, "UPDATE demanda SET aprovada_em = ?, aprovada_versao_id = 'v1', envio_pendente_em = NULL, atualizado_por = 'u-am' WHERE id = 'd1'", agora())
 deveFalhar(db, "UPDATE demanda SET aprovada_versao_id = 'v-inexistente', atualizado_por = 'u-am' WHERE id = 'd1'", [],
@@ -571,20 +631,35 @@ const insLink = 'INSERT INTO link_publico (id, token_hash, token_cifrado, client
 deveFalhar(db, insLink, ['l9', 'h9', 'c9', 'c-he', 'ct9', '2030-01-01', 'u-am'], 'FOREIGN KEY', 'link com contato de outro cliente é recusado')
 rodar(db, insLink, 'l1', 'h1', 'c1', 'c-he', 'ct1', '2030-01-01', 'u-am')
 rodar(db, insLink, 'l2', 'h2', 'c2', 'c-he', null, '2030-01-01', 'u-am')
-deveFalhar(db, "INSERT INTO envio (id, demanda_id, versao_id, via, canal, contato_id, enviado_por) VALUES ('e9','d1','v1','fora','whatsapp','ct9','u-am')",
+rodar(db, insLink, 'l9', 'h9', 'c9', 'c-icc', 'ct9', '2030-01-01', 'u-am')
+const insItemLink = 'INSERT INTO link_publico_item (link_id, demanda_id, pos) VALUES (?, ?, 1)'
+rodar(db, insItemLink, 'l1', 'd1')
+deveFalhar(db, insItemLink, ['l9', 'd1'], 'demanda_de_outro_cliente', 'link não leva demanda de outro cliente')
+deveFalhar(db, "INSERT INTO envio (id, demanda_id, quadro_id, versao_id, via, canal, contato_id, enviado_por) VALUES ('e9','d1','q-soc','v1','fora','whatsapp','ct9','u-am')",
   [], 'contato_de_outro_cliente', 'envio para contato de outro cliente é recusado')
 rodar(db, "INSERT INTO versao (id, demanda_id, numero, rodada_id, criada_por) VALUES ('v2','d1',2,'r1','u-rafa')")
-rodar(db, "INSERT INTO envio (id, demanda_id, versao_id, via, link_id, contato_id, enviado_por) VALUES ('e2','d1','v2','link','l1','ct1','u-am')")
+const insEnvioLink = "INSERT INTO envio (id, demanda_id, quadro_id, versao_id, via, link_id, contato_id, enviado_por) VALUES (?, 'd1', 'q-soc', 'v2', 'link', ?, ?, 'u-am')"
+deveFalhar(db, insEnvioLink, ['e9', 'l2', null], 'FOREIGN KEY', 'envio por um link que não contém a demanda é recusado')
+rodar(db, insEnvioLink, 'e2', 'l1', 'ct1')
 const insAprLink = `INSERT INTO aprovacao (id, demanda_id, versao_id, decisao, via, link_id, contato_id, nome_informado,
   idempotency_key, idempotency_hash, quadro_antes_id, coluna_antes_id) VALUES (?, 'd1', 'v2', 'aprovado', 'link', ?, ?, ?, ?, ?, 'q-soc', 'k-s-fila')`
 deveFalhar(db, insAprLink, ['ap9', 'l1', 'ct9', null, 'k9', 'h'], 'contato_de_outro_cliente', 'decisão com contato de outro cliente é recusada')
 deveFalhar(db, insAprLink, ['ap5', 'l1', null, null, 'k1', 'h'], 'CHECK', 'decisão pelo link sem contato e sem nome é recusada')
 deveFalhar(db, insAprLink, ['ap5', 'l1', 'ct1', null, 'k1', null], 'CHECK', 'chave de idempotência exige o hash do pedido')
+deveFalhar(db, insAprLink, ['ap5', 'l2', null, 'Fulano', 'k5', 'h'], 'FOREIGN KEY', 'decisão por um link que não contém a demanda é recusada')
+rodar(db, insItemLink, 'l2', 'd1')
 rodar(db, insAprLink, 'ap6', 'l1', 'ct1', null, 'k1', 'h')
 rodar(db, "UPDATE aprovacao SET anulada_em = ?, anulada_por = 'u-am' WHERE id = 'ap6'", agora())
 deveFalhar(db, insAprLink, ['ap7', 'l1', 'ct1', null, 'k1', 'h'], 'UNIQUE', 'a mesma chave não se repete no mesmo link')
 rodar(db, insAprLink, 'ap8', 'l2', null, 'Fulano da Silva', 'k1', 'h')
 conferir(um(db, "SELECT count(*) n FROM aprovacao WHERE idempotency_key = 'k1'")!.n === 2, 'a chave vale por link (outro link aceita)')
+
+// o cliente não muda depois do envio; as horas acompanham o cliente da demanda
+deveFalhar(db, "UPDATE demanda SET cliente_id = 'c-icc', atualizado_por = 'u-am' WHERE id = 'd1'", [], 'cliente_fixo_apos_envio',
+  'trocar o cliente de uma demanda já enviada é recusado')
+rodar(db, "INSERT INTO apontamento (id, usuario_id, demanda_id, cliente_id, data, minutos) VALUES ('t6','u-am','d5','c-he','2030-01-02',15)")
+rodar(db, "UPDATE demanda SET cliente_id = 'c-icc', atualizado_por = 'u-am' WHERE id = 'd5'")
+conferir(um(db, "SELECT cliente_id c FROM apontamento WHERE id = 't6'")!.c === 'c-icc', 'as horas acompanham a troca de cliente')
 
 // arquivos em uso não vão para o lixo
 rodar(db, "INSERT INTO arquivo (id, nome, mime, bytes, sha256, enviado_por) VALUES ('a2','arte.png','image/png',10,'y','u-rafa')")
@@ -597,6 +672,12 @@ deveFalhar(db, "UPDATE arquivo SET excluido_em = ? WHERE id = 'a-img5'", [agora(
 rodar(db, "UPDATE anexo SET excluido_em = ? WHERE id = 'ax-pdf'", agora())
 rodar(db, "UPDATE arquivo SET excluido_em = ? WHERE id = 'a-pdf'", agora())
 conferir(um(db, "SELECT excluido_em e FROM arquivo WHERE id = 'a-pdf'")!.e !== null, 'arquivo sem uso vai para o lixo')
+deveFalhar(db, insAnexo, ['ax-lixo', 'd1', 'arquivo', 'ref.pdf', 'a-pdf', null, 30], 'arquivo_no_lixo', 'anexo com arquivo no lixo é recusado')
+deveFalhar(db, "INSERT INTO versao_item (id, versao_id, demanda_id, tipo, nome, arquivo_id, pos) VALUES ('vi9','v2','d1','arquivo','ref.pdf','a-pdf',9)",
+  [], 'arquivo_no_lixo', 'item de versão com arquivo no lixo é recusado')
+deveFalhar(db, "UPDATE cliente SET logo_arquivo_id = 'a-pdf' WHERE id = 'c-icc'", [], 'arquivo_no_lixo', 'logo com arquivo no lixo é recusado')
+deveFalhar(db, "INSERT INTO cliente (id, nome, sigla, logo_arquivo_id) VALUES ('c-x','X','XX','a-pdf')", [], 'arquivo_no_lixo',
+  'cliente novo com logo no lixo é recusado')
 
 // convite/redefinição e tentativas
 const insToken = "INSERT INTO token_acesso (id, usuario_id, finalidade, token_hash, expira_em) VALUES (?, 'u-rafa', ?, ?, '2030-01-01')"

@@ -30,7 +30,8 @@ import type { Equipe, Eu, UsuarioResumo } from './pessoas.ts'
  * - usuario (só o dono): notificacao, quadro_usuario (estrela e seguir)
  * - usuario_admin (o dono + admins): apontamento. Os outros só veem demanda.minutosRegistrados, num evento com
  *   `a` e `t` nulos (não revela quem lançou)
- * Ids: automacao = `${quadroId}:${gatilho}`; quadro_usuario = quadroId; feriado = a data; notificacao = o número.
+ * Ids: automacao = `${quadroId}:${gatilho}` (= AutomacaoQuadro.id); quadro_usuario = quadroId; feriado = a data;
+ * notificacao = o número.
  */
 export interface MapaEntidades {
   quadro: Quadro

@@ -4,7 +4,7 @@ import type { Aprovacao, Envio, LinkPublicoResumo, Rodada, VersaoComItens } from
 import type {
   Cor, DataLocal, HoraLocal, Id, Instante, PapelColuna, PosicaoRelativa, Prioridade, Repeticao,
 } from './nucleo.ts'
-import type { GatilhoAutomacao } from './quadros.ts'
+import type { Coluna, EtiquetasSemPar, GatilhoAutomacao, MembrosAoMover, Quadro } from './quadros.ts'
 
 export const ORIGENS_DEMANDA = ['manual', 'rapida', 'whatsapp', 'copia', 'repeticao', 'importacao'] as const
 export type OrigemDemanda = (typeof ORIGENS_DEMANDA)[number]
@@ -27,7 +27,10 @@ export interface Demanda {
   modeloId: Id | null
   /** Membros/responsáveis ("Pessoas"), na ordem em que entraram. */
   membroIds: Id[]
-  /** Etiquetas do quadro atual, na ordem do quadro. */
+  /**
+   * Etiquetas do quadro atual, na ordem do quadro. As que a demanda tinha em outros quadros ficam guardadas no banco
+   * (demanda_etiqueta com o quadro delas) e voltam se ela voltar para lá (API.md §5.6).
+   */
   etiquetaIds: Id[]
   prioridade: Prioridade
   inicio: DataLocal | null
@@ -46,10 +49,19 @@ export interface Demanda {
   capaUrl: string | null
   concluidaEm: Instante | null
   concluidaPor: Id | null
-  /** Última mudança de coluna (ou de quadro): base do "parado há X dias úteis". */
+  /**
+   * Última mudança de coluna (ou de quadro): base do "parado há X dias úteis". Sempre cresce: cada troca de coluna
+   * grava max(agora, anterior + 1 ms) (API.md §5.1).
+   */
   statusDesde: Instante
   /** Envio ao cliente ainda sem decisão: a bola está com o cliente desde este instante. */
   envioPendenteEm: Instante | null
+  /**
+   * Última decisão válida do cliente (aprovado ou ajuste; link ou registrada). Numa coluna aguardando_cliente, a bola
+   * volta para a equipe quando retornoEm ≥ statusDesde, mesmo sem automação que tire o card dali (API.md §5.4).
+   * Anular a aprovação limpa.
+   */
+  retornoEm: Instante | null
   rodadaAtual: number
   rodadasInclusas: number
   aprovadaEm: Instante | null
@@ -83,8 +95,9 @@ export type EstadoPrazo = (typeof ESTADOS_PRAZO)[number]
 
 export const COM_QUEM = ['equipe', 'cliente', 'concluida'] as const
 /**
- * Com quem está a bola (comQuemEsta() em shared/logica/quadro.ts): 'cliente' quando a demanda está numa coluna
- * aguardando_cliente ou tem envio sem decisão (envioPendenteEm); 'concluida' quando concluída; senão 'equipe'
+ * Com quem está a bola (comQuemEsta() em shared/logica/quadro.ts; API.md §5.4): 'concluida' quando concluída;
+ * 'cliente' quando há envio sem decisão (envioPendenteEm) ou quando a demanda está numa coluna aguardando_cliente e o
+ * cliente ainda não decidiu depois que ela entrou ali (retornoEm nulo ou statusDesde > retornoEm); senão 'equipe'
  * (os membros). O card mostra "parado há N dias úteis" (equipe) ou "com o cliente há N" (cliente).
  */
 export type ComQuem = (typeof COM_QUEM)[number]
@@ -156,6 +169,12 @@ export interface MovimentoDemanda {
 /** GET /api/demandas/:numero: tudo o que o modal mostra, numa ida. */
 export interface DemandaDetalhe {
   demanda: Demanda
+  /**
+   * Quadro e coluna da demanda, mesmo arquivados (a demanda arquivada ou de quadro arquivado não está no bootstrap;
+   * o modal monta o contexto com eles e abre só para leitura).
+   */
+  quadro: Quadro
+  coluna: Coluna
   descricaoMd: string
   /** Texto colado do WhatsApp; exibir só como texto puro. */
   origemTexto: string | null
@@ -208,7 +227,12 @@ export interface MapaDadosAtividade {
   'demanda.criada': { origem: OrigemDemanda; quadroId: Id; colunaId: Id; modeloId: Id | null }
   'demanda.editada': { campos: string[] }
   'demanda.movida': {
-    de: LugarDemanda; para: LugarDemanda; via: ViaMovimento; gatilho?: GatilhoAutomacao; etiquetasRemovidas?: string[]
+    de: LugarDemanda; para: LugarDemanda; via: ViaMovimento; gatilho?: GatilhoAutomacao
+    /** Nomes das etiquetas que ficaram guardadas no quadro de origem. */
+    etiquetasDeixadas?: string[]
+    /** Membros que entraram ou saíram com o movimento (coluna de pessoa, responsavel_destino). */
+    membrosEntraram?: Id[]
+    membrosSairam?: Id[]
   }
   /** via 'checkbox' (marcar), 'coluna' (soltar numa coluna concluida), 'papel' (a coluna virou concluida). */
   'demanda.concluida': { via: 'checkbox' | 'coluna' | 'papel'; proximaId?: Id; proximaNumero?: number }
@@ -364,18 +388,28 @@ export interface MoverEntrada {
   colunaId: Id
   /** Padrão: no fim da coluna ("Enviar para <quadro>": no topo da coluna de entrada, quem chama manda depoisDeId null). */
   posicao?: PosicaoRelativa
-  /** Só quando muda de quadro: o que fazer com as etiquetas sem par de mesmo nome no destino. Padrão 'remover'. */
-  etiquetasSemPar?: 'remover' | 'criar'
-  /** Só quando muda de quadro: substitui as etiquetas por estas (ids do destino). Usado pelo Desfazer. */
+  /** Só quando muda de quadro: o que fazer com as etiquetas sem par de mesmo nome no destino. Padrão 'deixar'. */
+  etiquetasSemPar?: EtiquetasSemPar
+  /** Só quando muda de quadro: as etiquetas no destino passam a ser estas (ids do destino). Usado pelo Desfazer. */
   etiquetaIds?: Id[]
+  /**
+   * Só quando muda de quadro: padrão 'manter'. "Mover para…" e "Enviar para" oferecem 'responsavel_destino' quando o
+   * cliente tem responsável na equipe do destino. Usado também pelo Desfazer com `membroIds`.
+   */
+  membros?: MembrosAoMover
+  /** Substitui os membros por estes (pessoas ativas). Usado pelo Desfazer de um movimento que trocou membros. */
+  membroIds?: Id[]
   /** Rev que o cliente tinha; se vier e não bater, 409 conflito_rev. */
   rev?: number
 }
 
 export interface MoverSaida {
   demanda: Demanda
-  /** Nomes das etiquetas tiradas porque o quadro de destino não tem par (aviso "2 etiquetas ficaram para trás"). */
-  etiquetasRemovidas: string[]
+  /**
+   * Nomes das etiquetas sem par no destino, que ficaram guardadas no quadro de origem (aviso "2 etiquetas ficaram no
+   * quadro Criação"; voltam se a demanda voltar).
+   */
+  etiquetasDeixadas: string[]
   /** Etiquetas criadas no destino com etiquetasSemPar 'criar'. */
   etiquetasCriadas: Id[]
   /** A repetição criada ao soltar numa coluna 'concluida' (se `repetir` ≠ 'nenhuma'). */

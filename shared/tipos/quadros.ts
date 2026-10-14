@@ -48,6 +48,11 @@ export interface Quadro {
   fundo: FundoQuadro
   equipeId: Id | null
   modeloQuadroId: Id | null
+  /**
+   * Uma coluna por pessoa (modelo "Por pessoa"): quem entra na equipe do quadro ganha a própria coluna, com
+   * `responsavelId` (API.md §4.3 e §4.4). Desligar não apaga as colunas que já existem.
+   */
+  colunaPorMembro: boolean
   /** Ordem no menu lateral (dentro do grupo da equipe). */
   pos: number
   arquivadoEm: Instante | null
@@ -62,6 +67,12 @@ export interface Coluna {
   /** Nula = sem cor. Com cor, o fundo da coluna é levemente tingido (tom pastel AA nos dois temas) + ponto no título. */
   cor: Cor | null
   papel: PapelColuna
+  /**
+   * Coluna de uma pessoa ("Rafa" no quadro Por pessoa; só papel normal; uma por pessoa entre as ativas do quadro).
+   * Soltar um card aqui põe a pessoa como membro e, se o card veio da coluna de outra pessoa, tira aquela
+   * (arrastar entre pessoas reatribui, API.md §5.1). Nulo = coluna comum.
+   */
+  responsavelId: Id | null
   /** Só aviso: o contador fica "6/5" em destaque; nada é bloqueado. */
   limiteWip: number | null
   pos: number
@@ -93,11 +104,25 @@ export const ROTULO_GATILHO: Record<GatilhoAutomacao, string> = {
   concluida: 'Ao marcar concluída, mover para',
 }
 
+export const MEMBROS_AO_MOVER = ['manter', 'responsavel_destino'] as const
+/**
+ * O que acontece com os membros quando a demanda muda de quadro (automação, "Mover para", "Enviar para"):
+ * - manter (padrão): os mesmos membros;
+ * - responsavel_destino: os membros passam a ser o responsável do cliente na equipe do quadro de destino
+ *   (cliente_responsavel); sem cliente, sem equipe no destino ou sem responsável ativo cadastrado, mantém.
+ * Uma coluna de destino com responsável ainda acrescenta a pessoa dela (API.md §5.1).
+ */
+export type MembrosAoMover = (typeof MEMBROS_AO_MOVER)[number]
+
 export interface AutomacaoQuadro {
+  /** `${quadroId}:${gatilho}` (o mesmo id do evento `automacao` em tempo-real.ts). */
+  id: string
   quadroId: Id
   gatilho: GatilhoAutomacao
   destinoQuadroId: Id
   destinoColunaId: Id
+  /** Ao levar a outro quadro: manter os membros ou trocar pelo responsável do cliente na equipe de destino. */
+  membros: MembrosAoMover
   /** Arquivar a coluna de destino desliga a automação (o serviço avisa). */
   ativa: boolean
   atualizadoPor: Id | null
@@ -119,11 +144,17 @@ export interface NovaColuna {
   cor?: Cor | null
   papel?: PapelColuna
   limiteWip?: number | null
+  /** Coluna de uma pessoa ativa (só papel normal; 400 validacao se a pessoa já tem coluna ativa no quadro). */
+  responsavelId?: Id | null
+  /** No "Novo quadro": de qual coluna do modelo esta veio (as automações do modelo seguem a coluna; API.md §4.5). */
+  modeloColunaId?: Id | null
 }
 
 /**
- * POST /api/quadros (admin). Colunas: `colunas` se vier (o "Novo quadro" deixa desmarcar e renomear as sugeridas);
- * senão as do modelo, com a coluna por_membro expandida para os membros ativos da equipe. Sem nenhum dos dois: vazio.
+ * POST /api/quadros (admin). Colunas: `colunas` se vier (o "Novo quadro" deixa desmarcar e renomear as sugeridas e
+ * manda as colunas das pessoas já expandidas, com `responsavelId`); senão as do modelo, com a coluna por_membro
+ * expandida para os membros ativos da equipe. Sem nenhum dos dois: vazio. As automações do modelo nascem junto
+ * quando a coluna de destino foi mantida (API.md §4.5).
  */
 export interface CriarQuadroEntrada {
   nome: string
@@ -135,10 +166,20 @@ export interface CriarQuadroEntrada {
   equipeId?: Id | null
   modeloQuadroId?: Id | null
   colunas?: NovaColuna[]
+  /** Padrão: true se o modelo tem coluna por_membro (sem `colunas`) ou se alguma coluna do corpo tem responsavelId. */
+  colunaPorMembro?: boolean
   /** Padrão true com equipe: os membros da equipe passam a seguir o quadro. */
   membrosDaEquipeSeguem?: boolean
   posicao?: PosicaoRelativa
 }
+
+/**
+ * POST /api/quadros/:id/copiar (admin), o "Copiar quadro" do Trello: copia colunas ativas (nome, cor, papel, limite e
+ * responsável), `colunaPorMembro`, etiquetas, automações (as internas apontam para as colunas copiadas; as que levam
+ * a outro quadro continuam apontando para lá) e modelos de demanda do quadro. Sem cards e sem estrelas.
+ * Resposta: 201 QuadroCompleto.
+ */
+export type CopiarQuadroEntrada = Omit<CriarQuadroEntrada, 'colunas' | 'modeloQuadroId' | 'colunaPorMembro'>
 
 export interface QuadroCompleto {
   quadro: Quadro
@@ -154,6 +195,7 @@ export interface EditarQuadroEntrada {
   cor?: Cor
   fundo?: FundoQuadro
   equipeId?: Id | null
+  colunaPorMembro?: boolean
   posicao?: PosicaoRelativa
 }
 
@@ -184,6 +226,8 @@ export interface EditarColunaEntrada {
   /** Virar 'concluida' conclui as demandas abertas da coluna, sem criar repetições (resposta: `concluidas`). */
   papel?: PapelColuna
   limiteWip?: number | null
+  /** Pessoa ativa da coluna (só papel normal) ou null. */
+  responsavelId?: Id | null
   /** Arrastar coluna no quadro. */
   posicao?: PosicaoRelativa
 }
@@ -194,17 +238,33 @@ export interface EditarColunaSaida {
   concluidas: Id[]
 }
 
-/** POST /api/colunas/:id/arquivar: só vazia (409 conflito com cards ativos). Desliga automações que apontam para ela. */
+/**
+ * POST /api/colunas/:id/arquivar: só sem cards (API.md §4.6, "cards da coluna"; senão 409 conflito). As concluídas
+ * antigas, que já saíram do quadro mas ainda apontam para ela, são arquivadas antes, na mesma transação. Desliga as
+ * automações que apontam para ela.
+ */
 export interface ArquivarColunaSaida {
   coluna: Coluna
   automacoesDesligadas: { quadroId: Id; gatilho: GatilhoAutomacao }[]
+  /** Concluídas há mais de quadroConcluidasDias arquivadas junto. */
+  concluidasArquivadas: Id[]
 }
 
-/** POST /api/colunas/:id/mover-cards ("Mover todos os cards desta coluna"). */
+export const ETIQUETAS_SEM_PAR = ['deixar', 'criar'] as const
+/**
+ * Etiquetas da demanda sem par de mesmo nome no quadro de destino (API.md §5.6):
+ * - deixar (padrão): ficam guardadas no quadro de origem e reaparecem se a demanda voltar para lá;
+ * - criar: são criadas no destino com o mesmo nome e cor.
+ */
+export type EtiquetasSemPar = (typeof ETIQUETAS_SEM_PAR)[number]
+
+/** POST /api/colunas/:id/mover-cards ("Mover todos os cards desta coluna"; só os cards da coluna, API.md §4.6). */
 export interface MoverCardsEntrada {
   destinoColunaId: Id
-  /** Etiquetas sem par no quadro de destino (só quando muda de quadro). Padrão 'remover' (API.md §5.6). */
-  etiquetasSemPar?: 'remover' | 'criar'
+  /** Só quando muda de quadro. Padrão 'deixar'. */
+  etiquetasSemPar?: EtiquetasSemPar
+  /** Só quando muda de quadro. Padrão 'manter'. */
+  membros?: MembrosAoMover
 }
 
 export interface MoverCardsSaida {
@@ -248,5 +308,7 @@ export interface EditarEtiquetaEntrada {
 /** PUT /api/quadros/:id/automacoes/:gatilho. O quadro de destino é o da coluna. */
 export interface DefinirAutomacaoEntrada {
   destinoColunaId: Id
+  /** Padrão 'manter'. Só faz diferença quando o destino é outro quadro. */
+  membros?: MembrosAoMover
   ativa?: boolean
 }

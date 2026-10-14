@@ -8,8 +8,9 @@ export const TIPOS_NOTIFICACAO = [
   'versao_entregue', // versão entregue numa demanda do seu atendimento (AM)
   'aprovada',        // o cliente aprovou (membros e AM)
   'ajuste_pedido',   // o cliente pediu ajuste, ou o atendimento pediu ajuste interno (membros e AM)
-  'prazo',           // vence hoje (job diário, 8h; membros, ou o AM se não houver membros)
-  'chegou',          // entrou uma demanda num quadro que você segue (criada ou movida de outro quadro)
+  'prazo',           // vence hoje (job das 8h em dia útil; membros, ou o AM sem membros; nunca com o cliente)
+  'atrasada',        // passou do prazo e segue atrasada (job das 8h em dia útil; uma vez por pessoa, demanda e prazo)
+  'chegou',          // entrou num quadro que você segue uma demanda sem ninguém da equipe do quadro (API.md §5.9)
 ] as const
 export type TipoNotificacao = (typeof TIPOS_NOTIFICACAO)[number]
 

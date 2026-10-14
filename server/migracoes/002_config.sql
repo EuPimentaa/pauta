@@ -46,6 +46,13 @@ INSERT INTO modelo_quadro_coluna (id, modelo_id, nome, cor, papel, por_membro, p
   ('mqc-semana-sex',      'mq-semana',     'Sexta',         NULL,      'normal',             0, 5120),
   ('mqc-semana-concluido','mq-semana',     'Concluído',     'verde',   'concluida',          0, 6144);
 
+-- automações sugeridas: nascem com o quadro se a coluna de destino não for desmarcada no "Novo quadro".
+-- Kanban simples: "Enviar ao cliente" leva a Com o cliente; o ajuste pedido volta para Fazendo. Aprovar não move
+-- (aprovado não é concluído: cada equipe decide, ex.: a Criação manda ao Social).
+INSERT INTO modelo_quadro_automacao (modelo_id, gatilho, destino_coluna_id) VALUES
+  ('mq-kanban', 'enviado_ao_cliente', 'mqc-kanban-cliente'),
+  ('mq-kanban', 'ajuste_pedido',      'mqc-kanban-fazendo');
+
 -- ───────────── equipes (sem pessoas; o modelo é só a sugestão dos Primeiros passos) ─────────────
 INSERT INTO equipe (id, nome, slug, cor, modelo_quadro_id, pos) VALUES
   ('eq-atendimento', 'Atendimento', 'atendimento', 'ambar',    'mq-kanban',     1024),

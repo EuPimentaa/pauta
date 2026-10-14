@@ -36,7 +36,7 @@ export interface ConfigApp {
   quadroConcluidasDias: number
   /** Cronômetro parado depois disso conta só o limite e avisa para conferir. */
   cronometroLimiteHoras: number
-  /** Primeiros passos: quando o admin apertou "Revisei os modelos" (nulo = ainda não). */
+  /** Primeiros passos: quando o admin apertou "Revisei os modelos" (POST /api/modelos-demanda/revisados; nulo = não). */
   modelosRevisadosEm: Instante | null
 }
 
@@ -105,11 +105,9 @@ export interface CriarFeriadoEntrada {
 
 /**
  * PATCH /api/config/app (admin). Números dentro de FAIXAS_CONFIG; `prazoHoraPadrao` em HH:MM.
- * `modelosRevisados: true` grava modelosRevisadosEm = agora (botão "Revisei os modelos" dos Primeiros passos).
+ * O "Revisei os modelos" dos Primeiros passos é POST /api/modelos-demanda/revisados (F4), não este PATCH.
  */
-export type EditarConfigAppEntrada = Partial<Pick<ConfigApp, ParametroNumerico | 'prazoHoraPadrao'>> & {
-  modelosRevisados?: true
-}
+export type EditarConfigAppEntrada = Partial<Pick<ConfigApp, ParametroNumerico | 'prazoHoraPadrao'>>
 
 /** GET/PATCH /api/config/app */
 export interface ConfigAppSaida {
@@ -119,13 +117,18 @@ export interface ConfigAppSaida {
 
 // ─────────────────────────────── Primeiros passos ───────────────────────────────
 
-export const PASSOS_INICIAIS = ['criar_quadros', 'convidar_equipe', 'cadastrar_clientes', 'revisar_modelos'] as const
+/**
+ * Na ordem: convidar antes de criar os quadros, para o modelo "Por pessoa" já nascer com uma coluna por pessoa (quem
+ * entra na equipe depois também ganha a sua: API.md §4.3 e §4.4).
+ */
+export const PASSOS_INICIAIS = ['convidar_equipe', 'criar_quadros', 'cadastrar_clientes', 'revisar_modelos'] as const
 export type PassoInicial = (typeof PASSOS_INICIAIS)[number]
 
 /**
- * "Primeiros passos do admin" no Início enquanto faltar algo (ADAPTACOES). Critério de `feito` (API.md §4.17):
- * - criar_quadros: pelo menos 1 quadro ativo (o atalho cria os das equipes de uma vez a partir do modelo sugerido);
+ * "Primeiros passos do admin" no Início enquanto faltar algo (ADAPTACOES). Critério de `feito` (API.md §4.18):
  * - convidar_equipe: pelo menos 2 usuários ativos (o admin e mais alguém);
+ * - criar_quadros: pelo menos 1 quadro ativo (o atalho cria os das equipes de uma vez a partir do modelo sugerido;
+ *   a tela avisa quando a equipe ainda não tem membros);
  * - cadastrar_clientes: pelo menos 1 cliente fora de 'ex' e nenhum deles com a pendência sem_am;
  * - revisar_modelos: ConfigApp.modelosRevisadosEm preenchido (botão "Revisei os modelos").
  * `concluido` = todos feitos; aí o Início devolve primeirosPassos = null.

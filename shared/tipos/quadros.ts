@@ -4,7 +4,39 @@
  * exclui quadro; qualquer interno mexe em colunas e etiquetas.
  */
 import type { Demanda } from './demandas.ts'
-import type { Cor, FundoQuadro, Id, Instante, PapelColuna, PosicaoRelativa } from './nucleo.ts'
+import type { Cor, FundoQuadro, Id, Instante, PapelColuna, PosicaoRelativa, Prioridade } from './nucleo.ts'
+
+// ─────────────────────────────── filtros e visões do quadro (URL) ───────────────────────────────
+
+export const VISOES_QUADRO = ['quadro', 'lista', 'calendario'] as const
+/** Alternância Quadro | Lista | Calendário em /q/:slug?v=. A escolhida por quadro fica no localStorage. */
+export type VisaoQuadro = (typeof VISOES_QUADRO)[number]
+
+export const FILTROS_PRAZO = ['atrasado', 'hoje', 'semana', 'sem_prazo'] as const
+/** Pelo estadoPrazo() (API.md §5.2): 'atrasado' = estado 'atrasada' (com o cliente nunca é atrasada). */
+export type FiltroPrazo = (typeof FILTROS_PRAZO)[number]
+
+/**
+ * Filtros do quadro (e da Lista e do Calendário dele), na URL `?f=` (base64url do JSON). Todos os campos são E entre
+ * si; listas são OU dentro do campo. aplicarFiltros() em shared/logica/filtros.ts.
+ */
+export interface FiltrosQuadro {
+  /** "Só as minhas" (Q): sou membro ou o AM (ehMinha). */
+  soMinhas?: boolean
+  clientes?: Id[]
+  /** 'nenhum' = sem membros. */
+  membros?: (Id | 'nenhum')[]
+  /** 'nenhuma' = sem etiquetas. */
+  etiquetas?: (Id | 'nenhuma')[]
+  prazo?: FiltroPrazo
+  prioridades?: Prioridade[]
+  /** Só as com o cliente (comQuemEsta = 'cliente'). */
+  comCliente?: boolean
+  /** Padrão 'mostrar'. */
+  concluidas?: 'mostrar' | 'esconder' | 'so'
+  /** Título, número e cliente (sem acento, sem caixa). */
+  texto?: string
+}
 
 export interface Quadro {
   id: Id

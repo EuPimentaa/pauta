@@ -1,36 +1,38 @@
 /**
- * Contrato dos pontos de extensão do front (docs/PLANO.md §3 e §4).
+ * Contrato dos pontos de extensão do front (docs/PLANO.md §3 e §4), para o modelo de QUADROS SEPARADOS POR EQUIPE.
  *
  * Cada funcionalidade cria ARQUIVOS NOVOS nas pastas abaixo; web/src/extensoes/registro.ts (DESIGN-SYSTEM-WEB) os
  * descobre com import.meta.glob('./<pasta>/*.{ts,tsx}', { eager: true }) (TODAS as pastas aceitam .ts e .tsx) e ordena
  * por `ordem` (números combinados no PLANO §4). Ninguém edita arquivo central para "registrar" algo.
  * Nome do arquivo: `<funcionalidade>.ts(x)` ou `<funcionalidade>-<coisa>.ts(x)` (ex.: extensoes/demanda/ciclo-versoes.tsx,
- * extensoes/mover/ciclo.ts); o núcleo usa `nucleo`. Dono de cada arquivo: glob `extensoes/*\/<f>{,-*}.{ts,tsx}`.
+ * extensoes/soltar/ciclo.ts); o núcleo usa `nucleo`. Dono de cada arquivo: glob `extensoes/*\/<f>{,-*}.{ts,tsx}`.
  * Vários módulos podem registrar a mesma entidade, tecla etc.; ids repetidos são erro no console em dev.
  *
- * | Pasta (web/src/...)            | Export obrigatório                         | Quem consome                 |
- * |--------------------------------|--------------------------------------------|------------------------------|
- * | telas/**\/rota.tsx              | rota: ExtensaoRota  (ou rotas: [])         | App.tsx (roteador, lazy)     |
- * | extensoes/global/*.tsx         | global: ExtensaoGlobal                     | App.tsx (montados uma vez)   |
- * | extensoes/menu/*.tsx           | menu: ExtensaoMenu                         | casca: menu lateral          |
- * | extensoes/topo/*.tsx           | topo: ExtensaoTopo                         | casca: barra superior        |
- * | extensoes/avatar/*.tsx         | avatar: ExtensaoAvatar                     | casca: menu do avatar        |
- * | extensoes/celular/*.tsx        | aba: ExtensaoAbaCelular                    | casca: barra de abas móvel   |
- * | extensoes/demanda/*.tsx        | secao: ExtensaoSecaoDemanda                | modal da demanda             |
- * | extensoes/demanda-acoes/*.tsx  | acoes: ExtensaoAcaoDemanda[]               | modal: topo                  |
- * | extensoes/demanda-menu/*.tsx   | itens: ExtensaoMenuDemanda[]               | modal: menu ···              |
- * | extensoes/mover/*.ts(x)        | interceptador: InterceptadorMover          | mover() do front             |
- * | extensoes/dialogos/*.tsx       | dialogo: ExtensaoDialogo<'id'>             | host de diálogos             |
- * | extensoes/comandos/*.ts(x)     | comandos: Comando[]                        | paleta Cmd+K                 |
- * | extensoes/busca/*.ts(x)        | fonte: FontePaleta                         | paleta Cmd+K                 |
- * | extensoes/atalhos/*.ts(x)      | atalhos: Atalho[]                          | despachante de teclado       |
- * | extensoes/eventos/*.ts(x)      | tratador: TratadorEventos                  | cliente SSE                  |
- * | extensoes/layouts/*.tsx        | layout: ExtensaoLayout                     | página da visão              |
- * | extensoes/visao-cabecalho/*.tsx| item: ExtensaoCabecalhoVisao               | página da visão              |
- * | extensoes/coluna-menu/*.tsx    | itens: ExtensaoMenuColuna[]                | quadro: menu da coluna       |
- * | extensoes/coluna-entrada/*.tsx | entrada: ExtensaoEntradaColuna             | quadro: "N" / "+ Adicionar"  |
- * | extensoes/inicio/*.tsx         | secao: ExtensaoSecaoInicio                 | tela Início                  |
- * | extensoes/config/*.tsx         | secao: ExtensaoSecaoConfig                 | tela Configurações           |
+ * | Pasta (web/src/...)              | Export obrigatório                     | Quem consome                         |
+ * |----------------------------------|----------------------------------------|--------------------------------------|
+ * | telas/**\/rota.tsx                | rota: ExtensaoRota  (ou rotas: [])     | App.tsx (roteador, lazy)             |
+ * | extensoes/global/*.tsx           | global: ExtensaoGlobal                 | App.tsx (montados uma vez)           |
+ * | extensoes/menu/*.tsx             | menu: ExtensaoMenu                     | casca: menu lateral (fora os quadros)|
+ * | extensoes/topo/*.tsx             | topo: ExtensaoTopo                     | casca: barra superior                |
+ * | extensoes/avatar/*.tsx           | avatar: ExtensaoAvatar                 | casca: menu do avatar                |
+ * | extensoes/celular/*.tsx          | aba: ExtensaoAbaCelular                | casca: barra de abas do celular      |
+ * | extensoes/quadro-cabecalho/*.tsx | item: ExtensaoCabecalhoQuadro          | página do quadro: cabeçalho          |
+ * | extensoes/quadro-menu/*.tsx      | itens: ExtensaoMenuQuadro[]            | página do quadro: menu ···           |
+ * | extensoes/layouts/*.tsx          | layout: ExtensaoLayout                 | página do quadro: Quadro|Lista|Cal.  |
+ * | extensoes/coluna-menu/*.tsx      | itens: ExtensaoMenuColuna[]            | quadro: menu ··· da coluna           |
+ * | extensoes/coluna-entrada/*.tsx   | entrada: ExtensaoEntradaColuna         | quadro: rodapé da coluna, tecla N    |
+ * | extensoes/card/*.tsx             | selo: ExtensaoSeloCard                 | card (quadro, Lista, Início, Agenda) |
+ * | extensoes/soltar/*.ts(x)         | interceptador: InterceptadorSoltar     | useMover() do núcleo-web             |
+ * | extensoes/demanda/*.tsx          | secao: ExtensaoSecaoDemanda            | modal da demanda                     |
+ * | extensoes/demanda-acoes/*.tsx    | acoes: ExtensaoAcaoDemanda[]           | modal: topo                          |
+ * | extensoes/demanda-menu/*.tsx     | itens: ExtensaoMenuDemanda[]           | modal: menu ···; card: menu de contexto |
+ * | extensoes/dialogos/*.tsx         | dialogo: ExtensaoDialogo<'id'>         | host de diálogos                     |
+ * | extensoes/comandos/*.ts(x)       | comandos: Comando[]                    | paleta Cmd+K                         |
+ * | extensoes/busca/*.ts(x)          | fonte: FontePaleta                     | paleta Cmd+K                         |
+ * | extensoes/atalhos/*.ts(x)        | atalhos: Atalho[]                      | despachante de teclado               |
+ * | extensoes/eventos/*.ts(x)        | tratador: TratadorEventos              | cliente SSE                          |
+ * | extensoes/inicio/*.tsx           | secao: ExtensaoSecaoInicio             | tela Início                          |
+ * | extensoes/config/*.tsx           | secao: ExtensaoSecaoConfig             | tela Configurações                   |
  *
  * Componentes de extensão não recebem utilitários por props (exceto onde o tipo diz): usam os hooks do núcleo-web
  * (useContextoAcao, useAbrirDialogo, useEscopoAtalho, useFocoDemanda, useMover...; assinaturas no PLANO §2.2).
@@ -39,18 +41,24 @@ import type { ComponentType } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import type { LucideIcon } from 'lucide-react'
 import type {
-  AgruparPor, Demanda, DemandaDetalhe, DialogoTransicao, Entidade, Etapa, Eu, EventoTempoReal, FiltrosVisao, Id,
-  ModeloWhatsapp, MoverEntrada, Papel, RelacaoDemanda, TipoPeca, Transicao, Visao,
+  ClienteResumo, Coluna, Demanda, DemandaDetalhe, Entidade, Etiqueta, Eu, EventoTempoReal, FiltrosQuadro, Id,
+  ModeloWhatsapp, MoverEntrada, Papel, PosicaoRelativa, Quadro, VisaoQuadro,
 } from '@shared/tipos/index.ts'
 
 export type Icone = LucideIcon
 
 // ─────────────────────────────── utilitários que o núcleo injeta ───────────────────────────────
 
+export interface OpcoesDialogo {
+  /** Abre como popover ancorado (seletores de membros, etiquetas, datas, capa); no celular vira folha. */
+  ancora?: HTMLElement | null
+}
+
 /** Abre um diálogo registrado e espera o resultado (null = cancelado). Implementado em web/src/dialogos/. */
 export type AbrirDialogo = <K extends keyof MapaDialogos>(
   id: K,
   params: MapaDialogos[K],
+  opcoes?: OpcoesDialogo,
 ) => Promise<MapaResultadosDialogos[K] | null>
 
 /** O que comandos, atalhos e ações recebem. */
@@ -58,14 +66,16 @@ export interface ContextoAcao {
   eu: Eu
   navegar(caminho: string, opcoes?: { novaAba?: boolean }): void
   abrirDialogo: AbrirDialogo
-  /** Card com foco (quadro, Início, Semana: quem desenha o card chama useFocoDemanda), ou a demanda aberta no modal. */
+  /** Card com foco (quadro, Lista, Início, Agenda: quem desenha o card chama useFocoDemanda), ou a demanda do modal. */
   demandaEmFoco: Demanda | null
+  /** Quadro aberto em /q/:slug (ou o da demanda no modal); nulo nas outras telas. */
+  quadroAtual: Quadro | null
 }
 
 // ─────────────────────────────── telas ───────────────────────────────
 
 export interface ExtensaoRota {
-  /** Padrão do react-router: '/inicio', '/v/:slug', '/d/:numero', '/a/:token', '/convite' (token no fragmento #). */
+  /** Padrão do react-router: '/inicio', '/agenda', '/q/:slug', '/d/:numero', '/a/:token', '/convite' (token no #). */
   caminho: string
   /**
    * Carrega a tela sob demanda (o roteador usa React.lazy): `carregar: () => import('./Tela.tsx')`. O rota.tsx fica
@@ -74,9 +84,9 @@ export interface ExtensaoRota {
   carregar: () => Promise<{ default: ComponentType }>
   /** 'publica': sem sessão; nada de bootstrap, SSE nem redirecionamento para /entrar (ex.: /a/:token, /convite). */
   acesso: 'publica' | 'autenticada' | 'admin'
-  /** casca = com menu e barra; vazio = tela cheia (login, página pública); sobreposta = por cima da tela atual (/d/:numero). */
+  /** casca = com menu e barra; vazio = tela cheia; sobreposta = por cima da tela atual (/d/:numero, /quadros/novo). */
   layout: 'casca' | 'vazio' | 'sobreposta'
-  /** Título da aba: "<titulo> · <APP_NOME>". */
+  /** Título da aba: "<titulo> · <APP_NOME>". Telas com título dinâmico (nome do quadro) usam useTituloAba(). */
   titulo?: string
 }
 
@@ -84,8 +94,8 @@ export interface ExtensaoRota {
 
 /**
  * Componente montado uma vez pelo App.tsx (DESIGN-SYSTEM-WEB), dentro do QueryClientProvider e do Router: cliente SSE,
- * host de diálogos, paleta Cmd+K, despachante de atalhos. `autenticada` = só nas rotas com `acesso !== 'publica'`
- * (a página /a/:token não abre SSE nem chama o bootstrap); `raiz` = em todas as rotas. Renderiza null se não desenha nada.
+ * host de diálogos, paleta Cmd+K, despachante de atalhos, cronômetro flutuante. `autenticada` = só nas rotas com
+ * `acesso !== 'publica'`; `raiz` = em todas as rotas. Renderiza null se não desenha nada.
  */
 export interface ExtensaoGlobal {
   id: string
@@ -101,15 +111,20 @@ export interface ItemMenu {
   rotulo: string
   icone: Icone
   caminho: string
-  /** "Triagem (3)". Zero não aparece. */
+  /** "Início (3)". Zero não aparece. */
   contador?: number
   ordem: number
 }
 
-/** Um arquivo pode contribuir vários itens (ex.: uma entrada por visão). `useItens` é um hook (pode ler o cache). */
+/**
+ * Itens do menu lateral fora da seção Quadros. A seção Quadros (Favoritos com estrela e arrastar, quadros por equipe,
+ * "+ Novo quadro" para admin → /quadros/novo) é da própria casca (DESIGN-SYSTEM-WEB), lida de ['bootstrap'].
+ * `useItens` é um hook (pode ler o cache).
+ */
 export interface ExtensaoMenu {
   id: string
-  grupo: 'trabalho' | 'visoes' | 'agencia'
+  /** trabalho: acima dos quadros (Início, Agenda); agencia: abaixo (Clientes, Arquivo, Configurações). */
+  grupo: 'trabalho' | 'agencia'
   ordem: number
   useItens(): ItemMenu[]
 }
@@ -127,11 +142,10 @@ export interface ExtensaoAvatar {
   Componente: ComponentType<{ fechar(): void }>
 }
 
-/** Barra de abas do celular por papel (SPEC §5.15). `destaque` = o "+" central. */
+/** Barra de abas do celular (Início · Agenda · + · Busca · Sino). `destaque` = o "+" central. */
 export interface ExtensaoAbaCelular {
   id: string
   ordem: number
-  papeis: Papel[]
   rotulo: string
   icone: Icone
   caminho?: string
@@ -139,16 +153,159 @@ export interface ExtensaoAbaCelular {
   destaque?: boolean
 }
 
-// ─────────────────────────────── modal da demanda ───────────────────────────────
+// ─────────────────────────────── página do quadro (/q/:slug) ───────────────────────────────
+
+export interface ContextoQuadro {
+  quadro: Quadro
+  /** Ativas, em ordem. */
+  colunas: Coluna[]
+  etiquetas: Etiqueta[]
+  eu: Eu
+}
+
+/** Visões do quadro: Quadro (NÚCLEO-WEB), Lista e Calendário (F6). */
+export interface PropsLayout {
+  quadro: Quadro
+  /** Ativas, em ordem. */
+  colunas: Coluna[]
+  etiquetas: Etiqueta[]
+  filtros: FiltrosQuadro
+  definirFiltros(filtros: FiltrosQuadro): void
+  /** Do quadro, já filtradas (aplicarFiltros), sem arquivadas. */
+  demandas: Demanda[]
+  abrir(numero: number): void
+  /** Largura abaixo de 768 px: colunas com rolagem horizontal e snap; modal em tela cheia. */
+  celular: boolean
+}
+
+export interface ExtensaoLayout {
+  id: VisaoQuadro
+  rotulo: string
+  icone: Icone
+  ordem: number
+  Componente: ComponentType<PropsLayout>
+}
+
+export interface PropsCabecalhoQuadro {
+  quadro: Quadro
+  layout: VisaoQuadro
+  filtros: FiltrosQuadro
+  definirFiltros(filtros: FiltrosQuadro): void
+  /** Demandas visíveis com os filtros. */
+  total: number
+}
+
+/** Slots do cabeçalho do quadro (nome editável, estrela e seletor de visão são do núcleo). */
+export interface ExtensaoCabecalhoQuadro {
+  id: string
+  ordem: number
+  lado: 'esquerda' | 'direita'
+  Componente: ComponentType<PropsCabecalhoQuadro>
+}
+
+/** Itens do menu ··· do quadro (Etiquetas, Automações, Seguir, Arquivar quadro...). */
+export interface ExtensaoMenuQuadro {
+  id: string
+  ordem: number
+  rotulo: string
+  icone?: Icone
+  perigo?: boolean
+  visivel?(ctx: ContextoQuadro): boolean
+  executar(ctx: ContextoQuadro, acao: ContextoAcao): void | Promise<void>
+}
+
+export interface ContextoColuna {
+  quadro: Quadro
+  coluna: Coluna
+  /** Filtros ATIVOS do quadro (a criação rápida pode herdar um cliente de um filtro de um só cliente). */
+  filtros: FiltrosQuadro
+  /** Da coluna, já filtradas, na ordem. */
+  demandas: Demanda[]
+}
+
+/** Itens do menu ··· da coluna (renomear, cor, papel, limite WIP, ordenar, mover todos, arquivar todos, arquivar). */
+export interface ExtensaoMenuColuna {
+  id: string
+  ordem: number
+  rotulo: string
+  icone?: Icone
+  perigo?: boolean
+  visivel?(ctx: ContextoColuna, eu: Eu): boolean
+  executar(ctx: ContextoColuna, acao: ContextoAcao): void | Promise<void>
+}
+
+/**
+ * Campo de criação rápida no rodapé da coluna ("+ Adicionar demanda"; Enter cria e mantém o campo aberto, Esc fecha;
+ * `HE:` = cliente pela sigla/apelido, `@rafa` = membro). A tecla N e o botão são do NÚCLEO-WEB, que abre a entrada da
+ * coluna em foco. Um só é usado: o de menor `ordem`. Sem nenhum registrado (ou `visivel` falso), a coluna não mostra o "+".
+ */
+export interface ExtensaoEntradaColuna {
+  id: string
+  ordem: number
+  visivel?(ctx: ContextoColuna, eu: Eu): boolean
+  Componente: ComponentType<{ ctx: ContextoColuna; fechar(): void }>
+}
+
+/**
+ * Selo no card, desenhado depois dos selos do núcleo (prazo, contadores, membros). Deve ser barato (o quadro tem
+ * centenas de cards) e devolver null quando não houver nada a mostrar. Ex.: cronômetro ligado (F1), "V2 · com o
+ * cliente há 3d" e "R3/2" (F2).
+ */
+export interface ExtensaoSeloCard {
+  id: string
+  ordem: number
+  lugar: 'topo' | 'rodape'
+  Componente: ComponentType<{ demanda: Demanda; coluna: Coluna; quadro: Quadro }>
+}
+
+// ─────────────────────────────── soltar card (arrastar, "Mover para", teclas , e .) ───────────────────────────────
+
+/**
+ * Antes de chamar POST /api/demandas/:id/mover, o núcleo pergunta aos interceptadores, em ordem, e usa o PRIMEIRO cujo
+ * `quando` for true; sem nenhum, move direto. Enquanto o interceptador decide, o card fica pendente no destino
+ * (opacidade 0,6, borda tracejada); Esc ou 'cancelado' devolve em 200 ms. Ex.: soltar numa coluna aguardando_cliente
+ * com versão ainda não enviada oferece "Enviar ao cliente" (F2); soltar numa coluna concluida com `repetir` avisa a
+ * data da próxima (NÚCLEO-WEB).
+ */
+export interface PedidoSoltar {
+  demanda: Demanda
+  de: { quadro: Quadro; coluna: Coluna }
+  para: { quadro: Quadro; coluna: Coluna }
+  posicao: PosicaoRelativa
+  origem: 'arrastar' | 'teclado' | 'menu' | 'dialogo'
+}
+
+export type ResultadoSoltar =
+  /** O núcleo chama POST /mover com estes extras. */
+  | { tipo: 'seguir'; extras?: Pick<MoverEntrada, 'etiquetasSemPar'> }
+  /** O interceptador já fez a mutação (ex.: enviou ao cliente e a automação moveu). */
+  | { tipo: 'feito'; demanda: Demanda }
+  /** O card volta em 200 ms. */
+  | { tipo: 'cancelado' }
+
+export interface InterceptadorSoltar {
+  id: string
+  ordem: number
+  quando(pedido: PedidoSoltar, eu: Eu): boolean
+  executar(pedido: PedidoSoltar): Promise<ResultadoSoltar>
+}
+
+// ─────────────────────────────── modal da demanda (/d/:numero) ───────────────────────────────
 
 export interface ContextoDemanda {
   demanda: Demanda
   /** Chega depois: o modal abre do cache. */
   detalhe: DemandaDetalhe | undefined
   eu: Eu
-  etapa: Etapa
-  tipo: TipoPeca | null
-  relacao: RelacaoDemanda
+  quadro: Quadro
+  coluna: Coluna
+  cliente: ClienteResumo | null
+  /** Sou membro da demanda. */
+  souMembro: boolean
+  /** Sou o AM da demanda. */
+  souAm: boolean
+  /** Papel atendimento ou admin (enviar ao cliente, retorno, extra, comentário visível ao cliente). */
+  atendimento: boolean
 }
 
 export interface UtilModal {
@@ -160,6 +317,7 @@ export interface UtilModal {
 export interface ExtensaoSecaoDemanda {
   id: string
   ordem: number
+  /** principal: descrição, checklists, versões, anexos, comentários; lateral: membros, etiquetas, datas, cliente... */
   coluna: 'principal' | 'lateral'
   visivel?(ctx: ContextoDemanda): boolean
   Componente: ComponentType<{ ctx: ContextoDemanda }>
@@ -181,92 +339,92 @@ export interface ExtensaoAcaoDemanda {
   executar(ctx: ContextoDemanda, util: UtilModal): void | Promise<void>
 }
 
+/**
+ * Itens do menu ··· do modal e do menu de contexto do card (botão direito ou o lápis no hover, como o "Editar" do
+ * Trello). `onde` padrão: os dois. No card, o contexto vem sem `detalhe`.
+ */
 export interface ExtensaoMenuDemanda {
   id: string
   ordem: number
-  rotulo: string
+  rotulo: string | ((ctx: ContextoDemanda) => string)
   icone?: Icone
   atalho?: string
   perigo?: boolean
+  onde?: ('modal' | 'card')[]
+  /** Submenu (ex.: "Enviar para ▸" com os quadros favoritos e depois os outros). */
+  subitens?(ctx: ContextoDemanda): { id: string; rotulo: string; executar(util: UtilModal): void | Promise<void> }[]
   visivel(ctx: ContextoDemanda): boolean
-  executar(ctx: ContextoDemanda, util: UtilModal): void | Promise<void>
-}
-
-// ─────────────────────────────── mover (arrastar, pílula, "," e ".") ───────────────────────────────
-
-/**
- * O núcleo calcula a transição (shared/logica/transicoes.ts). Se ela requer um diálogo (DialogoTransicao), o card fica
- * pendente (fantasma) e o núcleo chama o interceptador registrado para aquele diálogo. Sem interceptador: o card volta
- * e aparece o aviso "Use a ação na demanda".
- */
-export interface PedidoMover {
-  demanda: Demanda
-  de: Etapa
-  para: Etapa
-  transicao: Transicao
-  dialogo: DialogoTransicao
-  origem: 'arrastar' | 'pilula' | 'teclado' | 'acao'
-  extras: Pick<MoverEntrada, 'posicao' | 'responsavelId' | 'planejadaPara'>
-}
-
-export type ResultadoInterceptador =
-  /** O diálogo já fez a mutação (ex.: entregou a versão, enviou ao cliente). */
-  | { tipo: 'feito'; demanda: Demanda }
-  /** O núcleo chama POST /mover com estes extras (ex.: motivo, confirmar). */
-  | { tipo: 'seguir'; extras: Pick<MoverEntrada, 'motivo' | 'confirmar'> }
-  /** O card volta em 200 ms. */
-  | { tipo: 'cancelado' }
-
-export interface InterceptadorMover {
-  id: string
-  dialogos: DialogoTransicao[]
-  executar(pedido: PedidoMover): Promise<ResultadoInterceptador>
+  executar?(ctx: ContextoDemanda, util: UtilModal): void | Promise<void>
 }
 
 // ─────────────────────────────── diálogos globais ───────────────────────────────
 
 /** Diálogos que qualquer parte do app pode abrir por id. Dono de cada um: docs/PLANO.md §3. */
 export interface MapaDialogos {
-  'nova-demanda': { clienteId?: Id; tipoPecaId?: Id; textoColado?: string; focoColar?: boolean }
+  /** F4. Shift+N, o botão laranja e o "+" do celular. */
+  'nova-demanda': { quadroId?: Id; colunaId?: Id; clienteId?: Id; modeloId?: Id; textoColado?: string; focoColar?: boolean }
+  /** F1. "Mover para…": quadro + coluna + posição; mostra as etiquetas sem par e o responsável do cliente na equipe. */
+  'mover-demanda': { demandaId: Id; quadroId?: Id }
+  /** F1. "Copiar…" como no Trello (o que manter, quadro, coluna, posição). */
+  'copiar-demanda': { demandaId: Id }
+  /** F1. Popover de membros (busca por nome/apelido; "Entrar"/"Sair" para mim). */
+  'membros': { demandaId: Id }
+  /** F1. Com demandaId: marcar etiquetas do card. Sem: gerenciar as etiquetas do quadro (criar, renomear, cor, excluir). */
+  'etiquetas': { quadroId: Id; demandaId?: Id }
+  /** F1. Início, prazo (com hora), publicação e repetir. */
+  'datas': { demandaId: Id }
+  /** F1. Cor ou imagem anexada. */
+  'capa': { demandaId: Id }
+  /** F1. */
+  'lancar-tempo': { demandaId: Id }
+  /** F2. */
   'entregar-versao': { demandaId: Id }
   'enviar-ao-cliente': { demandaId: Id }
   'registrar-retorno': { demandaId: Id; decisao?: 'aprovado' | 'ajuste' }
-  'devolver-ajuste': { demandaId: Id }
+  'ajuste-interno': { demandaId: Id }
   'anular-aprovacao': { demandaId: Id }
-  'repetir': { demandaId: Id }
-  'lancar-tempo': { demandaId: Id }
-  'ausencia': { usuarioId?: Id }
-  'atalhos': Record<string, never>
-  'confirmar': { titulo: string; mensagem: string; confirmar: string; perigo?: boolean }
-  'motivo': { titulo: string; rotulo: string; confirmar: string; obrigatorio?: boolean }
-  /** Ciclo (F2): mostra o texto de GET /api/demandas/:id/whatsapp?modelo= e copia. Usado pelo Início (lembrete). */
+  /** F2: mostra o texto de GET /api/demandas/:id/whatsapp?modelo= e copia. Usado pelo Início (lembrete). */
   'copiar-whatsapp': { demandaId: Id; modelo: ModeloWhatsapp }
+  /** F2. As 4 automações do quadro. */
+  'automacoes-quadro': { quadroId: Id }
+  /** F4. Lista do "?" gerada de atalhos(). */
+  'atalhos': Record<string, never>
+  /** NÚCLEO-WEB. `digitar`: exige digitar este texto para confirmar (ex.: o número ao excluir). */
+  'confirmar': { titulo: string; mensagem: string; confirmar: string; perigo?: boolean; digitar?: string }
 }
 
 export interface MapaResultadosDialogos {
   'nova-demanda': { demanda: Demanda }
+  'mover-demanda': { demanda: Demanda }
+  'copiar-demanda': { demanda: Demanda }
+  'membros': { membroIds: Id[] }
+  'etiquetas': { etiquetaIds: Id[] }
+  'datas': { demanda: Demanda }
+  'capa': { demanda: Demanda }
+  'lancar-tempo': { minutos: number }
   'entregar-versao': { demanda: Demanda }
   'enviar-ao-cliente': { demanda: Demanda }
   'registrar-retorno': { demanda: Demanda }
-  'devolver-ajuste': { demanda: Demanda }
+  'ajuste-interno': { demanda: Demanda }
   'anular-aprovacao': { demanda: Demanda }
-  'repetir': { demanda: Demanda }
-  'lancar-tempo': { minutos: number }
-  'ausencia': { salva: true }
+  'copiar-whatsapp': { copiado: true }
+  'automacoes-quadro': { salvo: true }
   'atalhos': { fechado: true }
   'confirmar': { confirmado: true }
-  'motivo': { motivo: string }
-  'copiar-whatsapp': { copiado: true }
 }
 
 export interface PropsDialogo<K extends keyof MapaDialogos> {
   params: MapaDialogos[K]
+  /** Elemento de onde o diálogo foi aberto (quando o host desenha como popover). */
+  ancora: HTMLElement | null
   /** Chame com o resultado, ou com null para cancelar. */
   fechar(resultado: MapaResultadosDialogos[K] | null): void
 }
 
 export interface ExtensaoDialogo<K extends keyof MapaDialogos> {
   id: K
+  /** 'popover' quando aberto com âncora no desktop; 'modal' sempre como modal. Padrão 'modal'. */
+  forma?: 'modal' | 'popover'
   Componente: ComponentType<PropsDialogo<K>>
 }
 
@@ -296,7 +454,7 @@ export interface ResultadoPaleta {
   executar?(ctx: ContextoAcao): void
 }
 
-/** Fonte de resultados da paleta (Demandas, Clientes, Pessoas, Visões). Fontes locais respondem do cache. */
+/** Fonte de resultados da paleta (Quadros, Demandas, Clientes, Pessoas). Fontes locais respondem do cache. */
 export interface FontePaleta {
   id: string
   secao: string
@@ -307,14 +465,14 @@ export interface FontePaleta {
 }
 
 /** Escopos ativos: 'global' sempre; os outros enquanto a tela que os usa chama useEscopoAtalho(escopo) (PLANO §2.2). */
-export type EscopoAtalho = 'global' | 'quadro' | 'card' | 'modal' | 'triagem' | 'semana'
+export type EscopoAtalho = 'global' | 'quadro' | 'card' | 'modal' | 'agenda'
 
 export interface ContextoAtalho extends ContextoAcao {
   escopo: EscopoAtalho
 }
 
 /**
- * `teclas`: 'shift+r', 'mod+k' (Ctrl ou Cmd), ',', 'g i' (acorde de 1,5 s), 'shift+backspace'.
+ * `teclas`: 'shift+n', 'mod+k' (Ctrl ou Cmd), ',', 'g a' (acorde de 1,5 s), 'space'.
  * O despachante ignora teclas de uma letra dentro de campos de texto e quando prefs.atalhos = false.
  */
 export interface Atalho {
@@ -323,7 +481,7 @@ export interface Atalho {
   descricao: string
   escopo: EscopoAtalho
   /** Agrupamento na lista do "?". */
-  grupo: 'navegacao' | 'demanda' | 'quadro' | 'triagem' | 'geral'
+  grupo: 'navegacao' | 'quadro' | 'demanda' | 'geral'
   quando?(ctx: ContextoAtalho): boolean
   executar(ctx: ContextoAtalho, evento: KeyboardEvent): void
 }
@@ -334,82 +492,12 @@ export interface Atalho {
  * Recebe só eventos das entidades listadas, já sem o próprio eco (trace). Deve ser idempotente.
  * Vários tratadores podem assinar a mesma entidade: todos são chamados, em ordem de `id`.
  * Patch parcial (`c` não nulo) de uma demanda que não está no cache é ignorado (o objeto inteiro chega quando ela
- * entra no conjunto do bootstrap: criação, restaurar, reabrir).
+ * entra no conjunto do bootstrap: criação, restaurar, mudar para um quadro ativo).
  */
 export interface TratadorEventos {
   id: string
   entidades: Entidade[]
   tratar(evento: EventoTempoReal, qc: QueryClient): void
-}
-
-// ─────────────────────────────── visões ───────────────────────────────
-
-export interface PropsLayout {
-  visao: Visao
-  agruparPor: AgruparPor
-  filtros: FiltrosVisao
-  /** Já filtradas, sem arquivadas e sem triagem (aplicarFiltros). */
-  demandas: Demanda[]
-  abrir(numero: number): void
-  /** Largura abaixo de 768 px: o quadro vira a Lista agrupada com barra de chips (SPEC §5.15). */
-  celular: boolean
-}
-
-/** Quadro (NÚCLEO-WEB), Lista (LISTA-VISOES), Semana (PAINEIS). */
-export interface ExtensaoLayout {
-  id: 'quadro' | 'lista' | 'semana'
-  rotulo: string
-  ordem: number
-  /** Agrupamentos que o layout aceita. */
-  agrupamentos: AgruparPor[]
-  Componente: ComponentType<PropsLayout>
-}
-
-export interface PropsCabecalhoVisao {
-  visao: Visao
-  filtros: FiltrosVisao
-  definirFiltros(filtros: FiltrosVisao): void
-  total: number
-}
-
-export interface ExtensaoCabecalhoVisao {
-  id: string
-  ordem: number
-  lado: 'esquerda' | 'direita'
-  Componente: ComponentType<PropsCabecalhoVisao>
-}
-
-export interface ContextoColuna {
-  visao: Visao
-  agruparPor: AgruparPor
-  /** Filtros ATIVOS (visão + chips da URL `?f=`): a criação rápida herda cliente/tipo de um filtro de um só valor. */
-  filtros: FiltrosVisao
-  /** Id da etapa, do responsável ('nenhum' = sem responsável), do cliente ou a data. */
-  chave: string
-  etapa: Etapa | null
-  demandas: Demanda[]
-}
-
-export interface ExtensaoMenuColuna {
-  id: string
-  ordem: number
-  rotulo: string
-  icone?: Icone
-  visivel(ctx: ContextoColuna, eu: Eu): boolean
-  executar(ctx: ContextoColuna, acao: ContextoAcao): void | Promise<void>
-}
-
-/**
- * Campo de criação rápida que o quadro abre no topo da coluna. A tecla N e o "+ Adicionar" são do NÚCLEO-WEB (abrem a
- * entrada da coluna em foco); a extensão só desenha o campo. Um só é usado: o de menor `ordem`. Sem nenhum registrado,
- * ou com `visivel` falso para a coluna, a coluna não mostra o "+" e N não faz nada nela.
- */
-export interface ExtensaoEntradaColuna {
-  id: string
-  ordem: number
-  /** Ex.: agrupado por etapa, só Na fila; executor, só na própria coluna (agrupado por responsável). */
-  visivel?(ctx: ContextoColuna, eu: Eu): boolean
-  Componente: ComponentType<{ ctx: ContextoColuna; fechar(): void }>
 }
 
 // ─────────────────────────────── Início e Configurações ───────────────────────────────
@@ -440,19 +528,21 @@ export interface ModulosExtensao {
   topo: { topo: ExtensaoTopo }
   avatar: { avatar: ExtensaoAvatar }
   celular: { aba: ExtensaoAbaCelular }
+  quadroCabecalho: { item: ExtensaoCabecalhoQuadro }
+  quadroMenu: { itens: ExtensaoMenuQuadro[] }
+  layouts: { layout: ExtensaoLayout }
+  colunaMenu: { itens: ExtensaoMenuColuna[] }
+  colunaEntrada: { entrada: ExtensaoEntradaColuna }
+  card: { selo: ExtensaoSeloCard }
+  soltar: { interceptador: InterceptadorSoltar }
   demanda: { secao: ExtensaoSecaoDemanda }
   demandaAcoes: { acoes: ExtensaoAcaoDemanda[] }
   demandaMenu: { itens: ExtensaoMenuDemanda[] }
-  mover: { interceptador: InterceptadorMover }
   dialogos: { dialogo: QualquerExtensaoDialogo }
   comandos: { comandos: Comando[] }
   busca: { fonte: FontePaleta }
   atalhos: { atalhos: Atalho[] }
   eventos: { tratador: TratadorEventos }
-  layouts: { layout: ExtensaoLayout }
-  visaoCabecalho: { item: ExtensaoCabecalhoVisao }
-  colunaMenu: { itens: ExtensaoMenuColuna[] }
-  colunaEntrada: { entrada: ExtensaoEntradaColuna }
   inicio: { secao: ExtensaoSecaoInicio }
   config: { secao: ExtensaoSecaoConfig }
 }

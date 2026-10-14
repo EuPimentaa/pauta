@@ -6,7 +6,8 @@
     "dev": "node --watch --env-file-if-exists=../.env src/index.ts",
     "start": "node --env-file-if-exists=../.env src/index.ts",
     "typecheck": "tsc --noEmit -p .",
-    "test": "node --test \"test/**/*.test.ts\""
+    "test": "node --test \"test/**/*.test.ts\"",
+    "verificar:migracoes": "node scripts/verificar-migracoes.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",

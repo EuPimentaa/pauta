@@ -18,9 +18,6 @@
 @import "./estilos/base.css";
 @import "./estilos/componentes.css";
 @import "./estilos/sobreposicoes.css";
-@import "./estilos/conteudo.css";
-@import "./estilos/casca.css";
-@import "./estilos/auth.css";
 
 @custom-variant dark {
   &:where([data-theme="dark"], [data-theme="dark"] *, .chrome-dark, .chrome-dark *) { @slot; }

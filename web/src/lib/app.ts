@@ -40,6 +40,8 @@ export function useNomeApp(): string {
 export function useTituloAba(titulo?: string | null): void {
   const app = useNomeApp()
   useEffect(() => {
+    const antes = document.title
     document.title = titulo ? `${titulo} · ${app}` : app
+    return () => { document.title = antes }
   }, [titulo, app])
 }

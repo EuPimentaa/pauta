@@ -1,9 +1,19 @@
 /**
  * Contrato dos pontos de extensão do front (docs/PLANO.md §3 e §4), para o modelo de QUADROS SEPARADOS POR EQUIPE.
  *
- * Cada funcionalidade cria ARQUIVOS NOVOS nas pastas abaixo; web/src/extensoes/registro.ts (DESIGN-SYSTEM-WEB) os
- * descobre com import.meta.glob('./<pasta>/*.{ts,tsx}', { eager: true }) (TODAS as pastas aceitam .ts e .tsx) e ordena
- * por `ordem` (números combinados no PLANO §4). Ninguém edita arquivo central para "registrar" algo.
+ * Cada funcionalidade cria ARQUIVOS NOVOS nas pastas abaixo; o DESIGN-SYSTEM-WEB os descobre com
+ * import.meta.glob('./<pasta>/*.{ts,tsx}', { eager: true }) (TODAS as pastas aceitam .ts e .tsx) e ordena por `ordem`
+ * (números combinados no PLANO §4). Ninguém edita arquivo central para "registrar" algo.
+ *
+ * Peso do registro (a página pública e o chunk inicial não levam o app inteiro):
+ * - web/src/extensoes/registro-rotas.ts só descobre telas/**\/rota.tsx (metadados + `carregar`); é o único que o
+ *   App.tsx importa direto. web/src/extensoes/registro.ts (todos os outros pontos) é importado com import() pela casca
+ *   autenticada; /a/:token, /convite e /redefinir nunca o baixam.
+ * - Os módulos de extensão são leves: o que é grande (seções do modal, diálogos, layouts, seções do Início e de
+ *   Configurações, componentes globais) entra por `carregar: () => import('...')`, e o host usa React.lazy + Suspense.
+ *   Selos do card, itens de menu, topo, avatar e abas do celular são pequenos e usam `Componente` direto.
+ * - Contribuições `extensoes/*\/nucleo-exemplo*.{ts,tsx}` (NÚCLEO-WEB) existem só para a tela /dev/extensoes: o
+ *   registro as tira do build de produção (padrão negativo no glob) e, em DEV, só as mostra com a tela de exemplos ligada.
  * Nome do arquivo: `<funcionalidade>.ts(x)` ou `<funcionalidade>-<coisa>.ts(x)` (ex.: extensoes/demanda/ciclo-versoes.tsx,
  * extensoes/soltar/ciclo.ts); o núcleo usa `nucleo`. Dono de cada arquivo: glob `extensoes/*\/<f>{,-*}.{ts,tsx}`.
  * Vários módulos podem registrar a mesma entidade, tecla etc.; ids repetidos são erro no console em dev.
@@ -34,18 +44,26 @@
  * | extensoes/inicio/*.tsx           | secao: ExtensaoSecaoInicio             | tela Início                          |
  * | extensoes/config/*.tsx           | secao: ExtensaoSecaoConfig             | tela Configurações                   |
  *
- * Componentes de extensão não recebem utilitários por props (exceto onde o tipo diz): usam os hooks do núcleo-web
- * (useContextoAcao, useAbrirDialogo, useEscopoAtalho, useFocoDemanda, useMover...; assinaturas no PLANO §2.2).
+ * Componentes de extensão (código React) usam os hooks do núcleo-web (useContextoAcao, useAbrirDialogo, useMover...;
+ * assinaturas no PLANO §2.2). Funções que rodam FORA do render (executar de menus, ações, comandos, atalhos,
+ * interceptadores) recebem ContextoAcao/UtilModal, que já trazem `qc` e `acoes` (as mesmas mutações dos hooks).
+ *
+ * MapaDialogos pode ser aumentado com `declare module` por uma funcionalidade SÓ para diálogos que ela mesma abre;
+ * diálogo usado por outra funcionalidade fica aqui no contrato (a outra worktree não teria o tipo).
  */
 import type { ComponentType } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import type { LucideIcon } from 'lucide-react'
 import type {
-  ClienteResumo, Coluna, Demanda, DemandaDetalhe, Entidade, Etiqueta, Eu, EventoTempoReal, FiltrosQuadro, Id,
-  ModeloWhatsapp, MoverEntrada, Papel, PosicaoRelativa, Quadro, VisaoQuadro,
+  ClienteResumo, Coluna, ConcluirSaida, DataLocal, Demanda, DemandaDetalhe, EditarDemandaEntrada, EditarDemandaSaida,
+  Entidade, Etiqueta, Eu, EventoTempoReal, FiltrosQuadro, Id, ModeloWhatsapp, MoverEntrada, MoverSaida, Papel,
+  PosicaoRelativa, Quadro, VisaoQuadro,
 } from '@shared/tipos/index.ts'
 
 export type Icone = LucideIcon
+
+/** Componente carregado sob demanda (o host usa React.lazy + Suspense com esqueleto). */
+export type Carregar<P = object> = () => Promise<{ default: ComponentType<P> }>
 
 // ─────────────────────────────── utilitários que o núcleo injeta ───────────────────────────────
 
@@ -61,7 +79,30 @@ export type AbrirDialogo = <K extends keyof MapaDialogos>(
   opcoes?: OpcoesDialogo,
 ) => Promise<MapaResultadosDialogos[K] | null>
 
-/** O que comandos, atalhos e ações recebem. */
+/**
+ * As mutações otimistas do núcleo-web (PLANO §2.2), para quem roda fora do render. São as MESMAS funções que os hooks
+ * devolvem (o NÚCLEO-WEB monta uma vez nos hosts e injeta): aplicam no cache na hora, revertem com aviso no erro e
+ * devolvem null quando o usuário cancela. Como o tempo real ignora o próprio eco, uma chamada direta a api() não chega
+ * ao cache de quem clicou: quem chama rota própria atualiza o cache com `qc` (aplicarPatchDemanda etc.).
+ */
+export interface AcoesNucleo {
+  /**
+   * Passa pelos interceptadores (extensoes/soltar), exceto quando chamada de dentro de um interceptador. Resultado
+   * 'feito' de um interceptador: não chama /mover e devolve { demanda, etiquetasDeixadas: [], etiquetasCriadas: [],
+   * proxima: null, avisos: [] }.
+   */
+  mover(d: Demanda, entrada: MoverEntrada, origem: PedidoSoltar['origem']): Promise<MoverSaida | null>
+  editar(d: Demanda, mudancas: EditarDemandaEntrada): Promise<EditarDemandaSaida | null>
+  /** Arrastar no calendário (Agenda e Calendário do quadro): muda o prazo mantendo a hora, com "Prazo: sex, 24/10 · Desfazer". */
+  mudarPrazo(d: Demanda, prazo: DataLocal): Promise<Demanda | null>
+  concluir(d: Demanda, concluida: boolean): Promise<ConcluirSaida | null>
+  membros: { entrar(d: Demanda, usuarioId: Id): Promise<Demanda | null>; sair(d: Demanda, usuarioId: Id): Promise<Demanda | null> }
+  etiquetas: { por(d: Demanda, etiquetaId: Id): Promise<Demanda | null>; tirar(d: Demanda, etiquetaId: Id): Promise<Demanda | null> }
+  arquivar(d: Demanda): Promise<Demanda | null>
+  restaurar(d: Demanda, colunaId?: Id): Promise<Demanda | null>
+}
+
+/** O que comandos, atalhos, itens de menu, interceptadores e abas do celular recebem. */
 export interface ContextoAcao {
   eu: Eu
   navegar(caminho: string, opcoes?: { novaAba?: boolean }): void
@@ -70,6 +111,9 @@ export interface ContextoAcao {
   demandaEmFoco: Demanda | null
   /** Quadro aberto em /q/:slug (ou o da demanda no modal); nulo nas outras telas. */
   quadroAtual: Quadro | null
+  /** Para atualizar o cache depois de uma rota própria (utilitários de web/src/api/cache.ts, PLANO §2.2). */
+  qc: QueryClient
+  acoes: AcoesNucleo
 }
 
 // ─────────────────────────────── telas ───────────────────────────────
@@ -101,7 +145,8 @@ export interface ExtensaoGlobal {
   id: string
   ordem: number
   escopo: 'raiz' | 'autenticada'
-  Componente: ComponentType
+  /** Montado em Suspense com fallback null (ex.: a paleta não põe o cmdk no chunk inicial). */
+  carregar: Carregar
 }
 
 // ─────────────────────────────── casca ───────────────────────────────
@@ -142,7 +187,10 @@ export interface ExtensaoAvatar {
   Componente: ComponentType<{ fechar(): void }>
 }
 
-/** Barra de abas do celular (Início · Agenda · + · Busca · Sino). `destaque` = o "+" central. */
+/**
+ * Barra de abas do celular (Início · Agenda · + · Busca · Sino). `destaque` = o "+" central. Sem `caminho`, a aba
+ * chama `executar` (ex.: o Sino abre o diálogo 'notificacoes' como folha).
+ */
 export interface ExtensaoAbaCelular {
   id: string
   ordem: number
@@ -151,6 +199,8 @@ export interface ExtensaoAbaCelular {
   caminho?: string
   executar?(ctx: ContextoAcao): void
   destaque?: boolean
+  /** Hook (pode ler o cache): número no canto da aba ("3" no Sino). Zero não aparece. */
+  useContador?(): number
 }
 
 // ─────────────────────────────── página do quadro (/q/:slug) ───────────────────────────────
@@ -183,7 +233,7 @@ export interface ExtensaoLayout {
   rotulo: string
   icone: Icone
   ordem: number
-  Componente: ComponentType<PropsLayout>
+  carregar: Carregar<PropsLayout>
 }
 
 export interface PropsCabecalhoQuadro {
@@ -249,13 +299,14 @@ export interface ExtensaoEntradaColuna {
 /**
  * Selo no card, desenhado depois dos selos do núcleo (prazo, contadores, membros). Deve ser barato (o quadro tem
  * centenas de cards) e devolver null quando não houver nada a mostrar. Ex.: cronômetro ligado (F1), "V2 · com o
- * cliente há 3d" e "R3/2" (F2).
+ * cliente há 3d" e "R3/2" (F2). `coluna` e `quadro` são nulos quando o card está fora do bootstrap (Arquivo, extras do
+ * Início e da Agenda, demanda de quadro arquivado).
  */
 export interface ExtensaoSeloCard {
   id: string
   ordem: number
   lugar: 'topo' | 'rodape'
-  Componente: ComponentType<{ demanda: Demanda; coluna: Coluna; quadro: Quadro }>
+  Componente: ComponentType<{ demanda: Demanda; coluna: Coluna | null; quadro: Quadro | null }>
 }
 
 // ─────────────────────────────── soltar card (arrastar, "Mover para", teclas , e .) ───────────────────────────────
@@ -273,12 +324,17 @@ export interface PedidoSoltar {
   para: { quadro: Quadro; coluna: Coluna }
   posicao: PosicaoRelativa
   origem: 'arrastar' | 'teclado' | 'menu' | 'dialogo'
+  /** O que o pedido já trazia (ex.: "Mover para…" com etiquetasSemPar e membros escolhidos). */
+  entrada: MoverEntrada
 }
 
 export type ResultadoSoltar =
-  /** O núcleo chama POST /mover com estes extras. */
-  | { tipo: 'seguir'; extras?: Pick<MoverEntrada, 'etiquetasSemPar'> }
-  /** O interceptador já fez a mutação (ex.: enviou ao cliente e a automação moveu). */
+  /** O núcleo chama POST /mover com estes extras (somados à entrada do pedido). */
+  | { tipo: 'seguir'; extras?: Pick<MoverEntrada, 'etiquetasSemPar' | 'membros'> }
+  /**
+   * O interceptador já fez a mutação e atualizou o cache com ctx.qc (ex.: enviou ao cliente e a automação moveu).
+   * O núcleo não chama /mover e o card fica onde `demanda` diz.
+   */
   | { tipo: 'feito'; demanda: Demanda }
   /** O card volta em 200 ms. */
   | { tipo: 'cancelado' }
@@ -287,7 +343,8 @@ export interface InterceptadorSoltar {
   id: string
   ordem: number
   quando(pedido: PedidoSoltar, eu: Eu): boolean
-  executar(pedido: PedidoSoltar): Promise<ResultadoSoltar>
+  /** Pode abrir diálogos (ctx.abrirDialogo, inclusive de dentro do diálogo do "Mover para…") e chamar ctx.acoes. */
+  executar(pedido: PedidoSoltar, ctx: ContextoAcao): Promise<ResultadoSoltar>
 }
 
 // ─────────────────────────────── modal da demanda (/d/:numero) ───────────────────────────────
@@ -297,8 +354,14 @@ export interface ContextoDemanda {
   /** Chega depois: o modal abre do cache. */
   detalhe: DemandaDetalhe | undefined
   eu: Eu
+  /**
+   * Do cache; para demanda fora do bootstrap (arquivada, de quadro arquivado, concluída antiga), o NÚCLEO-WEB espera o
+   * detalhe e usa detalhe.quadro e detalhe.coluna (o modal mostra esqueleto até lá).
+   */
   quadro: Quadro
   coluna: Coluna
+  /** Demanda arquivada ou de quadro arquivado: as seções mostram e não editam ("Restaure para editar"). */
+  somenteLeitura: boolean
   cliente: ClienteResumo | null
   /** Sou membro da demanda. */
   souMembro: boolean
@@ -312,6 +375,8 @@ export interface UtilModal {
   abrirDialogo: AbrirDialogo
   navegar(caminho: string): void
   fechar(): void
+  qc: QueryClient
+  acoes: AcoesNucleo
 }
 
 export interface ExtensaoSecaoDemanda {
@@ -320,7 +385,7 @@ export interface ExtensaoSecaoDemanda {
   /** principal: descrição, checklists, versões, anexos, comentários; lateral: membros, etiquetas, datas, cliente... */
   coluna: 'principal' | 'lateral'
   visivel?(ctx: ContextoDemanda): boolean
-  Componente: ComponentType<{ ctx: ContextoDemanda }>
+  carregar: Carregar<{ ctx: ContextoDemanda }>
 }
 
 /**
@@ -385,8 +450,17 @@ export interface MapaDialogos {
   'anular-aprovacao': { demandaId: Id }
   /** F2: mostra o texto de GET /api/demandas/:id/whatsapp?modelo= e copia. Usado pelo Início (lembrete). */
   'copiar-whatsapp': { demandaId: Id; modelo: ModeloWhatsapp }
-  /** F2. As 4 automações do quadro. */
+  /** F2. As 4 automações do quadro (destino e "membros: manter | responsável do cliente no destino"). */
   'automacoes-quadro': { quadroId: Id }
+  /**
+   * F2. Soltar numa coluna aguardando_cliente com versão não enviada (atendimento): "[Enviar | Só mover | Cancelar]".
+   * Resultado: enviado (o diálogo já chamou POST /enviar e atualizou o cache) ou só mover; null = cancelar.
+   */
+  'enviar-ao-soltar': { demandaId: Id; colunaId: Id }
+  /** F3. Lista do sino: popover no desktop, folha no celular (aba Sino). */
+  'notificacoes': Record<string, never>
+  /** F5. "Criar cliente XYZ" (sigla + nome; o resto do cadastro depois). Usado por F1 (modal), F4 (Nova demanda, rápida). */
+  'criar-cliente': { sigla?: string; nome?: string }
   /** F4. Lista do "?" gerada de atalhos(). */
   'atalhos': Record<string, never>
   /** NÚCLEO-WEB. `digitar`: exige digitar este texto para confirmar (ex.: o número ao excluir). */
@@ -409,6 +483,9 @@ export interface MapaResultadosDialogos {
   'anular-aprovacao': { demanda: Demanda }
   'copiar-whatsapp': { copiado: true }
   'automacoes-quadro': { salvo: true }
+  'enviar-ao-soltar': { escolha: 'enviado'; demanda: Demanda; automacao: boolean } | { escolha: 'so_mover' }
+  'notificacoes': { fechado: true }
+  'criar-cliente': { cliente: ClienteResumo }
   'atalhos': { fechado: true }
   'confirmar': { confirmado: true }
 }
@@ -425,7 +502,8 @@ export interface ExtensaoDialogo<K extends keyof MapaDialogos> {
   id: K
   /** 'popover' quando aberto com âncora no desktop; 'modal' sempre como modal. Padrão 'modal'. */
   forma?: 'modal' | 'popover'
-  Componente: ComponentType<PropsDialogo<K>>
+  /** Um diálogo pode abrir outro (empilha e devolve o foco ao fechar). */
+  carregar: Carregar<PropsDialogo<K>>
 }
 
 /** Qualquer diálogo registrado (união distribuída, para o registro). */
@@ -506,9 +584,10 @@ export interface ExtensaoSecaoInicio {
   id: string
   ordem: number
   visivel?(eu: Eu): boolean
-  Componente: ComponentType
+  carregar: Carregar
 }
 
+/** Seção da tela /config (host do NÚCLEO-WEB: lista as seções e roteia /config/:caminho). */
 export interface ExtensaoSecaoConfig {
   id: string
   rotulo: string
@@ -517,10 +596,10 @@ export interface ExtensaoSecaoConfig {
   caminho: string
   acesso: Papel[]
   icone?: Icone
-  Componente: ComponentType
+  carregar: Carregar
 }
 
-/** Formato de cada módulo descoberto (para tipar o import.meta.glob em registro.ts). */
+/** Formato de cada módulo descoberto (para tipar o import.meta.glob em registro-rotas.ts e registro.ts). */
 export interface ModulosExtensao {
   rota: { rota?: ExtensaoRota; rotas?: ExtensaoRota[] }
   global: { global: ExtensaoGlobal }

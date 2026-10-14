@@ -1,9 +1,13 @@
-/** Ciclo da peça: rodadas, versões, envio ao cliente, links públicos, retorno e aprovação. */
+/**
+ * Ciclo da peça sem etapas fixas (ADAPTACOES, "Modelo de quadros"): rodadas, versões, envio ao cliente, links
+ * públicos, retorno e aprovação. As 4 automações do quadro (shared/tipos/quadros.ts) movem a demanda nos gatilhos.
+ */
 import type { DriveStatus, ItemBase, NovoItem } from './arquivos.ts'
 import type { ChecklistComItens, Demanda } from './demandas.ts'
 import type { Canal, DataLocal, HoraLocal, Id, Instante, MotivoRodada } from './nucleo.ts'
 
 export const ORIGENS_RODADA = ['inicial', 'cliente', 'interna'] as const
+/** inicial = R1 (nasce com a demanda); cliente = ajuste pedido pelo cliente; interna = "Pedir ajuste interno". */
 export type OrigemRodada = (typeof ORIGENS_RODADA)[number]
 
 export interface Rodada {
@@ -95,8 +99,9 @@ export interface Aprovacao {
   motivo: MotivoRodada | null
   rodadaAbertaId: Id | null
   evidenciaAnexoId: Id | null
-  /** Responsável antes da decisão (o aprovado de um tipo com publicação troca pelo social). Anular restaura. */
-  responsavelAnteriorId: Id | null
+  /** Onde a demanda estava antes da decisão (e da automação): anular devolve para cá se ela não tiver saído do lugar. */
+  quadroAntesId: Id
+  colunaAntesId: Id
   criadoEm: Instante
   anuladaEm: Instante | null
   anuladaPor: Id | null
@@ -104,7 +109,7 @@ export interface Aprovacao {
 
 // ─────────────────────────────── DTOs ───────────────────────────────
 
-/** POST /api/demandas/:id/versoes ("Entregar versão"): cria Vn na rodada atual e move para Revisão. */
+/** POST /api/demandas/:id/versoes ("Entregar versão"): cria Vn na rodada atual. Não muda a demanda de coluna. */
 export interface EntregarVersaoEntrada {
   nota?: string | null
   /** Pelo menos um item. */
@@ -145,7 +150,7 @@ export interface EnviarAoClienteEntrada {
   canal?: Canal
   /** Padrão: contato padrão do cliente. Precisa ser contato ativo do cliente da demanda (400 validacao). */
   contatoId?: Id | null
-  /** Padrão: hoje + 2 dias úteis, limitado à véspera útil da publicação. */
+  /** Padrão: hoje + retornoPrazoDiasUteis, limitado à véspera útil da publicação. */
   prazoRetorno?: DataLocal | null
   prazoRetornoHora?: HoraLocal | null
 }
@@ -156,6 +161,8 @@ export interface EnviarAoClienteSaida {
   /** Com via 'link': link reaproveitado (ativo, mesmo contato) ou novo. */
   link: { id: Id; url: string; expiraEm: Instante } | null
   textoWhatsapp: string
+  /** A automação 'enviado_ao_cliente' moveu a demanda. */
+  automacao: boolean
 }
 
 /** POST /api/demandas/:id/retorno ("Registrar retorno", Shift+R). Mesma regra do link (via 'manual'). */
@@ -168,7 +175,7 @@ export interface RegistrarRetornoEntrada {
   /** Ajuste: padrão 'cliente_mudou'. */
   motivo?: MotivoRodada
   motivoTexto?: string | null
-  /** Ajuste: padrão hoje + tipo.slaAjusteDiasUteis. Vale para a rodada e para a demanda. */
+  /** Ajuste: padrão hoje + ajustePrazoDiasUteis. Vale para a rodada e para a demanda. */
   prazo?: DataLocal
   prazoHora?: HoraLocal | null
   /** Padrão: contato padrão. Precisa ser contato ativo do cliente da demanda (400 validacao). */
@@ -186,24 +193,34 @@ export interface RegistrarRetornoSaida {
   checklist: ChecklistComItens | null
   /** "Rodada 3 · 2 inclusas": sugerir [Marcar como extra]. */
   sugerirExtra: boolean
+  /** A automação 'aprovado' ou 'ajuste_pedido' moveu a demanda. */
+  automacao: boolean
 }
 
-/** POST /api/demandas/:id/aprovado-whatsapp (1 clique em Com o cliente). */
+/** POST /api/demandas/:id/aprovado-whatsapp (1 clique com envio pendente). */
 export interface AprovadoWhatsappEntrada {
   versaoId?: Id
   contatoId?: Id | null
 }
 
-/** POST /api/demandas/:id/devolver (Revisão → Ajustes, rodada interna, pelo aprovador ou AM). */
-export interface DevolverAjusteEntrada {
+/** POST /api/aprovacoes/:id/anular */
+export interface AnularAprovacaoSaida {
+  demanda: Demanda
+  /** true = voltou para a coluna de antes da decisão (quadroAntesId/colunaAntesId). */
+  voltou: boolean
+}
+
+/** POST /api/demandas/:id/ajuste-interno ("Pedir ajuste interno": rodada N+1 de origem interna). */
+export interface AjusteInternoEntrada {
   linhas: string[]
   motivo: MotivoRodada
   motivoTexto?: string | null
+  /** Padrão: hoje + ajustePrazoDiasUteis. */
   prazo?: DataLocal
   prazoHora?: HoraLocal | null
 }
 
-export interface DevolverAjusteSaida {
+export interface AjusteInternoSaida {
   demanda: Demanda
   rodada: Rodada
   checklist: ChecklistComItens

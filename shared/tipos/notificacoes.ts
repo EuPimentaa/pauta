@@ -1,24 +1,21 @@
-/** Sino: notificações no app (só para o destinatário, já resolvido para o substituto). */
+/** Sino: notificações no app (só para o destinatário; nunca para o próprio ator). */
 import type { Id, Instante } from './nucleo.ts'
 
 export const TIPOS_NOTIFICACAO = [
-  'atribuida',            // virou responsável
-  'voltou',               // a bola voltou para você (ex.: Revisão → Ajustes, aprovador recebe Revisão)
-  'mencao',               // @ em comentário ou briefing (só menções novas)
-  'aprovada',             // cliente aprovou (AM e responsável)
-  'ajuste_pedido',        // cliente pediu ajuste (AM e responsável)
-  'triagem',              // chegou item na triagem (atendimento; aprovador da equipe para rascunho de agente)
-  'fila_sem_responsavel', // distribuidor da equipe: chegou demanda em Na fila sem responsável
-  'prazo',                // vence hoje (job diário, 8h)
-  'cobertura',            // você começou a cobrir alguém hoje
+  'membro',          // você entrou como membro de uma demanda (por outra pessoa)
+  'mencao',          // @ em comentário ou na descrição (só menções novas)
+  'comentario',      // comentário novo numa demanda em que você é membro ou AM (sem repetir quem foi mencionado)
+  'versao_entregue', // versão entregue numa demanda do seu atendimento (AM)
+  'aprovada',        // o cliente aprovou (membros e AM)
+  'ajuste_pedido',   // o cliente pediu ajuste (membros e AM)
+  'prazo',           // vence hoje (job diário, 8h; membros, ou o AM se não houver membros)
+  'chegou',          // entrou uma demanda num quadro que você segue (criada ou movida de outro quadro)
 ] as const
 export type TipoNotificacao = (typeof TIPOS_NOTIFICACAO)[number]
 
 export interface Notificacao {
   id: number
   usuarioId: Id
-  /** Preenchido quando a notificação era de quem você cobre ("cobrindo Samara"). */
-  cobrindoId: Id | null
   tipo: TipoNotificacao
   demandaId: Id | null
   /** Número da demanda para montar o link /d/:numero sem consultar o cache. */

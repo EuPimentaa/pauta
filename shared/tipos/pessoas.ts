@@ -1,7 +1,8 @@
-/** Pessoas, sessão, convites, equipes e ausências. */
-import type { Cor, DataLocal, Id, Instante, Papel } from './nucleo.ts'
+/** Pessoas, sessão, convites e equipes. */
+import type { Apontamento } from './horas.ts'
+import type { Cor, Id, Instante, Papel, PosicaoRelativa } from './nucleo.ts'
 
-/** O que todo usuário interno vê de outra pessoa (bootstrap, @menções, avatares). Sem e-mail. */
+/** O que todo usuário interno vê de outra pessoa (bootstrap, @menções, avatares, membros). Sem e-mail. */
 export interface UsuarioResumo {
   id: Id
   nome: string
@@ -15,7 +16,6 @@ export interface UsuarioResumo {
 /** Visão do admin (GET /api/pessoas) e do próprio usuário (Eu). */
 export interface Usuario extends UsuarioResumo {
   email: string
-  horasSemana: number
   /** false até a pessoa aceitar o convite. */
   temSenha: boolean
   /** Convite pendente (só admin vê). */
@@ -24,27 +24,29 @@ export interface Usuario extends UsuarioResumo {
   criadoEm: Instante
 }
 
+/**
+ * Preferências que viajam entre aparelhos. Recolher coluna, a visão escolhida de cada quadro e os quadros recentes
+ * ficam no localStorage (preferência local, como no Trello).
+ */
 export interface Prefs {
   tema?: 'sistema' | 'claro' | 'escuro'
   /** Atalhos de uma tecla ligados (padrão true). */
   atalhos?: boolean
   menuRecolhido?: boolean
-  /** Colunas recolhidas pelo usuário por visão: chave `${slug}:${agruparPor}`, valor = ids das colunas. */
-  colunasRecolhidas?: Record<string, string[]>
-  /** Minha semana mostra a coluna de sábado. */
-  mostrarSabado?: boolean
 }
 
 /** Sessão atual: GET /api/auth/eu e campo `eu` do bootstrap. */
 export interface Eu {
   usuario: Usuario
   prefs: Prefs
-  /** Ids de quem eu cubro hoje (ausências em que sou substituto). */
-  cobrindo: Id[]
-  /** Minha ausência vigente hoje, se houver. */
-  ausenciaAtual: Ausencia | null
-  /** executor → /semana; atendimento e admin → /inicio. */
-  rotaInicial: '/inicio' | '/semana'
+  /** Quadros com estrela, na ordem do menu (quadro_usuario.favorito_pos). */
+  favoritos: Id[]
+  /** Quadros que sigo (recebo 'chegou' quando entra demanda). */
+  seguindo: Id[]
+  /** Meu cronômetro ligado, se houver (no máximo um por pessoa). */
+  cronometro: Apontamento | null
+  /** Sempre '/inicio' no MVP (todas as pessoas veem as próprias demandas de todos os quadros). */
+  rotaInicial: '/inicio'
 }
 
 export interface EquipeMembro {
@@ -58,25 +60,11 @@ export interface Equipe {
   nome: string
   slug: string
   cor: Cor
-  fluxoId: Id
-  /** Recebe demandas (tem fila e visão). Atendimento e Gestão: false. */
-  executora: boolean
-  aprovadorPadraoId: Id | null
-  distribuidorId: Id | null
+  /** Modelo de quadro sugerido nos Primeiros passos ("Criar o quadro da equipe"). */
+  modeloQuadroId: Id | null
   ativa: boolean
   pos: number
   membros: EquipeMembro[]
-}
-
-export interface Ausencia {
-  id: Id
-  usuarioId: Id
-  de: DataLocal
-  ate: DataLocal
-  substitutoId: Id
-  motivo: string | null
-  criadoPor: Id
-  criadoEm: Instante
 }
 
 /**
@@ -123,18 +111,25 @@ export interface EditarEuEntrada {
   nome?: string
   apelido?: string | null
   cor?: Cor
+  /** Mesclado com as prefs atuais. */
   prefs?: Prefs
 }
 
 // ─────────────────────────────── DTOs: pessoas e equipes ───────────────────────────────
 
+export interface ParticipacaoEquipe {
+  equipeId: Id
+  funcao?: string | null
+  principal?: boolean
+}
+
 export interface CriarPessoaEntrada {
   nome: string
   apelido?: string | null
   email: string
-  papel: Exclude<Papel, 'agente'>
-  equipes?: { equipeId: Id; funcao?: string | null; principal?: boolean }[]
-  horasSemana?: number
+  papel: Papel
+  /** Entrar numa equipe também faz a pessoa seguir os quadros dessa equipe (API.md §4.3). */
+  equipes?: ParticipacaoEquipe[]
   cor?: Cor
 }
 
@@ -147,54 +142,29 @@ export interface EditarPessoaEntrada {
   nome?: string
   apelido?: string | null
   email?: string
-  papel?: Exclude<Papel, 'agente'>
+  papel?: Papel
   cor?: Cor
-  horasSemana?: number
   /** false revoga as sessões, os convites e redefinições pendentes e fecha o SSE da pessoa (trocar o e-mail também revoga os tokens). */
   ativo?: boolean
-  equipes?: { equipeId: Id; funcao?: string | null; principal?: boolean }[]
+  /** Substitui as participações. */
+  equipes?: ParticipacaoEquipe[]
 }
 
 export interface CriarEquipeEntrada {
   nome: string
   slug: string
   cor?: Cor
-  executora?: boolean
+  modeloQuadroId?: Id | null
 }
 
 export interface EditarEquipeEntrada {
   nome?: string
   cor?: Cor
-  executora?: boolean
-  aprovadorPadraoId?: Id | null
-  distribuidorId?: Id | null
+  modeloQuadroId?: Id | null
   ativa?: boolean
+  posicao?: PosicaoRelativa
 }
 
 export interface DefinirMembrosEntrada {
   membros: EquipeMembro[]
-}
-
-// ─────────────────────────────── DTOs: ausências ───────────────────────────────
-
-export interface CriarAusenciaEntrada {
-  /** Omitido = eu. Outra pessoa: só admin. */
-  usuarioId?: Id
-  de: DataLocal
-  ate: DataLocal
-  substitutoId: Id
-  motivo?: string | null
-}
-
-export interface EditarAusenciaEntrada {
-  de?: DataLocal
-  ate?: DataLocal
-  substitutoId?: Id
-  motivo?: string | null
-}
-
-export interface ListarAusenciasConsulta {
-  /** Padrão: vigentes e futuras. */
-  desde?: DataLocal
-  usuarioId?: Id
 }

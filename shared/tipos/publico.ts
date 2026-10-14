@@ -2,7 +2,8 @@
  * Página pública de aprovação (/a/:token), sem login. A API fica em /api/publico/a/:token.
  * O cliente vê só as versões enviadas por aquele link e os comentários visíveis (não excluídos) das demandas do link.
  * "Enviada por este link" = existe `envio` com aquela versão e link_id = o link. Nenhuma rota pública lê
- * demanda.versao_atual_id (pode ser trabalho interno ainda não enviado). Demanda excluída ou cancelada some do link.
+ * demanda.versao_atual_id (pode ser trabalho interno ainda não enviado).
+ * Demanda arquivada ou excluída some do link (excluir também revoga o link).
  * Todo texto vindo do cliente é exibido como texto puro.
  */
 import type { Cor, DataLocal, HoraLocal, Id, Instante } from './nucleo.ts'
@@ -49,7 +50,8 @@ export interface ItemAprovacaoPublico {
   demandaId: Id
   numero: number
   titulo: string
-  tipoNome: string | null
+  /** Nome do modelo da demanda ("Post", "Carrossel"), se houver. */
+  modeloNome: string | null
   prazoRetorno: DataLocal | null
   prazoRetornoHora: HoraLocal | null
   /** Última versão enviada por este link. */
@@ -96,7 +98,7 @@ export interface DecisaoPublicaSaida {
 
 /**
  * `detalhes` do 409 versao_desatualizada na página pública ("Chegou a V3"). `versaoAtual` = a versão de maior número
- * enviada por ESTE link. Se a última versão enviada da demanda não foi por este link (ou a demanda saiu de Com o cliente),
+ * enviada por ESTE link. Se a última versão enviada da demanda não foi por este link (ou já não há envio pendente),
  * a resposta é 409 conflito "Esta peça não aguarda mais sua decisão", sem versão.
  */
 export interface DetalhesVersaoDesatualizada {

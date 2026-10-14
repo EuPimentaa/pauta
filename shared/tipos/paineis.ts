@@ -1,92 +1,70 @@
 /**
- * Telas pessoais: Início, Minha semana e Triagem.
- * As listas devolvem ids; os objetos vêm do cache do bootstrap. Demandas fora do cache (ex.: concluídas há mais de
- * 7 dias numa semana passada) vêm em `extras`. O front pode calcular as mesmas listas com shared/logica/paineis.ts.
+ * Telas que juntam todos os quadros: Início (/inicio) e Agenda (/agenda).
+ * As listas devolvem ids; os objetos vêm do cache do bootstrap. Demandas fora do cache (concluídas há mais de
+ * quadroConcluidasDias, de quadro arquivado) vêm em `extras`. O front pode calcular as mesmas listas com
+ * shared/logica/paineis.ts. "Minhas" = sou membro ou o AM da demanda (ehMinha(), shared/logica/quadro.ts).
  */
+import type { Feriado, PrimeirosPassos } from './config.ts'
 import type { Demanda } from './demandas.ts'
-import type { PrimeirosPassos } from './config.ts'
-import type { DataLocal, Id } from './nucleo.ts'
+import type { Notificacao } from './notificacoes.ts'
+import type { DataLocal, HoraLocal, Id } from './nucleo.ts'
 
-export interface ItemComVoce {
-  demandaId: Id
-  /** Preenchido quando a bola é de quem você cobre ("cobrindo Samara"). */
-  cobrindoId: Id | null
+/** Minhas demandas abertas por prazo (estadoPrazo; a semana começa na segunda). Ordem: prazo, hora, prioridade. */
+export interface MinhasPorPrazo {
+  atrasadas: Id[]
+  hoje: Id[]
+  /** Do dia seguinte até domingo desta semana. */
+  semana: Id[]
+  depois: Id[]
+  semPrazo: Id[]
 }
 
 /** GET /api/inicio */
 export interface InicioSaida {
-  /** Planejada para hoje, prazo hoje ou horário marcado hoje (horário primeiro). */
-  hoje: Id[]
-  /** Bola comigo ou com quem eu cubro: prioridade, prazo, hora do prazo, posição. */
-  comVoce: ItemComVoce[]
-  /** Na fila sem responsável das minhas equipes (botão Pegar). */
-  filaEquipe: Id[]
-  /** Só AM: com o cliente há mais de N dias úteis (N = clienteParadoDiasUteis). */
+  minhas: MinhasPorPrazo
+  /** Só quem tem papel atendimento: as do meu atendimento com o cliente há mais de clienteParadoDiasUteis. */
   comClienteParado: Id[]
-  atrasadas: Id[]
-  /** "3 demandas atrasadas · 2 na triagem". */
-  resumo: { atrasadas: number; triagem: number; comVoce: number }
+  /** Minhas menções recentes (últimas 10 notificações 'mencao', lidas ou não). */
+  mencoes: Notificacao[]
+  /** "3 atrasadas · 2 para hoje · 4 com o cliente". */
+  resumo: { atrasadas: number; hoje: number; comCliente: number }
   /** Só admin, enquanto faltar algo. */
   primeirosPassos: PrimeirosPassos | null
-}
-
-export interface SemanaConsulta {
-  /** Outra pessoa: atendimento e admin. Padrão: eu. */
-  usuarioId?: Id
-  /** Segunda-feira da semana. Padrão: a semana atual. */
-  inicio?: DataLocal
-}
-
-/** Como o card foi posicionado: planejada (normal), prazo (borda tracejada) ou horário marcado (topo). */
-export type PosicionadoPor = 'planejada' | 'prazo' | 'horario'
-
-export interface DiaSemana {
-  data: DataLocal
-  feriado: string | null
-  /** Horário marcado primeiro (ordenado por hora), depois as outras. */
-  demandaIds: Id[]
-}
-
-/** GET /api/semana */
-export interface SemanaSaida {
-  usuarioId: Id
-  inicio: DataLocal
-  fim: DataLocal
-  /** Seg a sex, mais sábado. */
-  dias: DiaSemana[]
-  /** Antes de hoje e não concluídas (só na semana atual). */
-  atrasadas: Id[]
-  /** Sem planejada_para nem prazo. */
-  semDia: Id[]
-  posicionadoPor: Record<Id, PosicionadoPor>
-  /** Demandas que não estão no bootstrap. */
   extras: Demanda[]
 }
 
-export interface SugestaoTriagem {
-  id: Id
-  /** 0 a 1. */
-  confianca: number
-  /** Trecho do texto que casou ("hospital evangelico"). */
-  casou: string
+export const CAMPOS_AGENDA = ['prazo', 'inicio', 'publicacao'] as const
+/** Qual data posicionou o item na Agenda. Arrastar só muda o `prazo` (os outros campos são só exibidos). */
+export type CampoAgenda = (typeof CAMPOS_AGENDA)[number]
+
+export interface AgendaConsulta {
+  /** Inclusive. No máximo 62 dias entre `de` e `ate` (400 validacao). */
+  de: DataLocal
+  ate: DataLocal
+  /** "Só as minhas". */
+  soMinhas?: boolean
+  /** Padrão: todos os quadros ativos. */
+  quadroIds?: Id[]
+  /** Padrão ['prazo']. */
+  campos?: CampoAgenda[]
+  /** Padrão true (concluídas aparecem riscadas). */
+  incluirConcluidas?: boolean
 }
 
-export interface ItemTriagem {
+export interface ItemAgenda {
   demandaId: Id
-  origem: Demanda['origem']
-  /** Texto puro. */
-  origemTexto: string | null
-  criadoPor: Id
-  sugestoes: {
-    clientes: SugestaoTriagem[]
-    tipos: SugestaoTriagem[]
-    responsavelId: Id | null
-    equipeId: Id | null
-  }
-  rascunhoAgente: boolean
+  campo: CampoAgenda
+  data: DataLocal
+  hora: HoraLocal | null
 }
 
-/** GET /api/triagem (ordenado do mais antigo para o mais novo). */
-export interface TriagemSaida {
-  itens: ItemTriagem[]
+/** GET /api/agenda: calendário de todos os quadros (mês e semana; a semana começa na segunda). */
+export interface AgendaSaida {
+  de: DataLocal
+  ate: DataLocal
+  /** Ordenados por data, hora (sem hora por último no dia) e número. */
+  itens: ItemAgenda[]
+  feriados: Feriado[]
+  /** Demandas que não estão no bootstrap. */
+  extras: Demanda[]
 }

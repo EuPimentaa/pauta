@@ -1,5 +1,5 @@
-/** Clientes, apelidos, contatos que aprovam e links. */
-import type { Canal, Cor, Id, Instante } from './nucleo.ts'
+/** Clientes, apelidos, responsáveis por equipe, contatos que aprovam e links. */
+import type { Canal, Cor, Id, Instante, PosicaoRelativa } from './nucleo.ts'
 
 export const STATUS_CLIENTE = ['recorrente', 'pontual', 'negociacao', 'ex'] as const
 export type StatusCliente = (typeof STATUS_CLIENTE)[number]
@@ -8,12 +8,18 @@ export const TIPOS_LINK_CLIENTE = ['drive', 'marca', 'acessos', 'site', 'redes',
 /** `acessos` aponta para o cofre de senhas. Nunca a senha. */
 export type TipoLinkCliente = (typeof TIPOS_LINK_CLIENTE)[number]
 
-export const PENDENCIAS_CLIENTE = ['sem_am', 'sem_social', 'sem_criativo', 'sem_contato_padrao'] as const
+export const PENDENCIAS_CLIENTE = ['sem_am', 'sem_contato_padrao'] as const
 /**
  * Cadastro incompleto ("Criar cliente HE" na hora e completar depois). Calculado na leitura; a lista de clientes e o
  * cabeçalho do cliente mostram "Completar cadastro". `sem_am` também conta nos Primeiros passos do admin.
  */
 export type PendenciaCliente = (typeof PENDENCIAS_CLIENTE)[number]
+
+/** "Na Criação, o HE é do Rafa": sugerido como membro ao criar a demanda num quadro da equipe ou ao mover para ele. */
+export interface ResponsavelCliente {
+  equipeId: Id
+  usuarioId: Id
+}
 
 /** Bootstrap e listas. `apelidos` são normalizados (minúsculo, sem acento) e incluem a sigla. */
 export interface ClienteResumo {
@@ -27,11 +33,10 @@ export interface ClienteResumo {
   /** Logo só por upload: /api/arquivos/:id?inline=1 (na página pública vem como URL assinada). Nulo = sem logo. */
   logoUrl: string | null
   atendimentoId: Id | null
-  criativoId: Id | null
-  socialId: Id | null
   rodadasInclusas: number
   pastaSaida: string | null
   apelidos: string[]
+  responsaveis: ResponsavelCliente[]
   pendencias: PendenciaCliente[]
 }
 
@@ -56,6 +61,15 @@ export interface ClienteLink {
   pos: number
 }
 
+export interface ContadoresCliente {
+  /** Não concluídas e não arquivadas, de quadros ativos. */
+  abertas: number
+  /** Com o cliente (coluna aguardando_cliente ou envio pendente). */
+  comCliente: number
+  /** estadoPrazo = 'atrasada' (API.md §5.2). */
+  atrasadas: number
+}
+
 /** GET /api/clientes/:sigla */
 export interface Cliente extends ClienteResumo {
   observacoes: string | null
@@ -65,12 +79,6 @@ export interface Cliente extends ClienteResumo {
   contadores: ContadoresCliente
   criadoEm: Instante
   atualizadoEm: Instante
-}
-
-export interface ContadoresCliente {
-  abertas: number
-  comCliente: number
-  atrasadas: number
 }
 
 /** GET /api/clientes */
@@ -92,8 +100,6 @@ export interface CriarClienteEntrada {
   logoArquivoId?: Id | null
   /** Padrão: o ator, se o papel dele for atendimento (o cliente criado na hora já nasce com AM). */
   atendimentoId?: Id | null
-  criativoId?: Id | null
-  socialId?: Id | null
   rodadasInclusas?: number
   pastaSaida?: string | null
   observacoes?: string | null
@@ -106,6 +112,11 @@ export type EditarClienteEntrada = Partial<Omit<CriarClienteEntrada, 'apelidos'>
 /** Substitui a lista inteira (a sigla é mantida automaticamente). */
 export interface DefinirApelidosEntrada {
   apelidos: string[]
+}
+
+/** PUT /api/clientes/:id/responsaveis: substitui a lista (uma pessoa por equipe). */
+export interface DefinirResponsaveisEntrada {
+  responsaveis: ResponsavelCliente[]
 }
 
 export interface CriarContatoEntrada {
@@ -126,7 +137,7 @@ export interface CriarLinkClienteEntrada {
   url: string
 }
 
-export type EditarLinkClienteEntrada = Partial<CriarLinkClienteEntrada> & { posicao?: { depoisDeId?: Id | null } }
+export type EditarLinkClienteEntrada = Partial<CriarLinkClienteEntrada> & { posicao?: PosicaoRelativa }
 
 /** GET /api/clientes/:id/aprovacoes: a trilha completa (aba Aprovações). */
 export interface ItemTrilhaCliente {

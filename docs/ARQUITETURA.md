@@ -1,7 +1,11 @@
 # Arquitetura
 
-Sistema interno de demandas da Melt Comunicação. Roda numa VPS da agência (Docker), um processo Node
-servindo API + SSE + o front compilado. Banco SQLite em arquivo único.
+Sistema interno de demandas da Melt Comunicação ("Pauta", nome em `APP_NOME`). Roda numa VPS da agência (Docker),
+um processo Node servindo API + SSE + o front compilado. Banco SQLite em arquivo único.
+
+Modelo de trabalho: **quadros separados por equipe, como no Trello** (quadro → colunas coloridas com papel opcional →
+cards), com o ciclo da peça (versões, envio ao cliente, aprovação por link, rodadas) e 4 automações simples por
+quadro por cima. Não há fluxo único de etapas, triagem nem visões semeadas (`docs/ADAPTACOES.md`, decisões 4 e 5).
 
 Produto: `docs/pesquisa/SPEC.md`. Ajustes que valem sobre a SPEC: `docs/ADAPTACOES.md`. Contrato: `docs/API.md`
 (rotas), `shared/tipos/` (formatos), `server/migracoes/001_base.sql` (banco), `web/src/extensoes/tipos.ts` (pontos de
@@ -20,7 +24,7 @@ extensão). Plano de construção paralela, donos de arquivos e faixas de migra�
 | Front | React 19 + Vite 8 + TypeScript + Tailwind 4 (`@tailwindcss/vite`) |
 | Rotas web | react-router 8 |
 | Dados web | TanStack Query 5 (cache é a fonte da verdade; eventos do SSE atualizam o cache) |
-| Arrastar | `@dnd-kit/core` + `@dnd-kit/sortable` |
+| Arrastar | `@dnd-kit/core` + `@dnd-kit/sortable` (cards, colunas, favoritos do menu, dias do calendário) |
 | Texto rico | Markdown. Edição com TipTap 3 (StarterKit + Mention) ou textarea com @; exibição com markdown-it (`html:false`) + DOMPurify |
 | Paleta Cmd+K | `cmdk` |
 | Datas | `date-fns` 4 com locale `ptBR`; fuso de exibição `America/Sao_Paulo` |
@@ -41,26 +45,28 @@ server/
   src/auth.ts             scrypt, sessões, Ator, middlewares exigirUsuario / exigirPapel, validar (zod)
   src/tempo-real.ts       barramento em memória + SSE; eventos gravados na tabela `evento` (seq) na mesma transação
   src/tarefas.ts          jobs diários (backup, poda, lixo); descobre src/tarefas/*.ts
-  src/servicos/*.ts       regras de negócio reutilizáveis (mover, eventos, atividade, notificacoes, mapear, ...)
+  src/servicos/*.ts       regras de negócio reutilizáveis (mover, concluir, automacoes, demandas, horas, eventos,
+                          atividade, notificacoes, permissoes, posicao, mapear, ...)
   src/rotas/*.ts          cada arquivo exporta `export function registrar(app: App): void` (descoberto automaticamente)
   migracoes/NNN_nome.sql  aplicadas em ordem numérica, cada uma numa transação, registradas em `_migracoes`
   scripts/                verificar-migracoes.ts, seed-demo.ts (+ demo/*.ts, só desenvolvimento)
-  test/*.test.ts          test/ajuda.ts monta o ambiente (app + :memory: + pessoas, clientes, criarDemanda, relogio);
+  test/*.test.ts          test/ajuda.ts monta o ambiente (app + :memory: + pessoas, quadros, clientes, criarDemanda, relogio);
                           cada funcionalidade pode ter test/<prefixo>-ajuda.ts
 shared/
   tipos/<area>.ts         tipos de domínio, DTOs da API e eventos de tempo real (um arquivo por área; index.ts reexporta)
   tipos/ext/<func>.ts     tipos acrescentados por uma funcionalidade (importados direto)
-  logica/*.ts             funções puras usadas pelo servidor e pelo front (dias úteis, prazo, transições, bola,
-                          permissões, filtros, criação rápida...)
+  logica/*.ts             funções puras usadas pelo servidor e pelo front (dias úteis, prazo e repetição, com quem
+                          está a bola, etiquetas entre quadros, permissões, filtros, criação rápida...)
 web/src/
   main.tsx, App.tsx       providers + roteador (rotas de telas/**/rota.tsx) + componentes de extensoes/global
   api/cliente.ts          fetch com credenciais, erro tipado, X-Trace-Id, If-Match
   api/<area>.ts           hooks TanStack Query (chaves em api/chaves.ts)
   tempo-real/             cliente SSE (EventSource) com reconexão e aplicação de eventos no cache
-  ui/                     design system (Botao, Campo, Modal, Popover, Menu, Avatar, Etiqueta, Tooltip, Markdown, ...)
-  casca/                  barra superior, menu lateral, abas do celular
-  estilos/tokens.css      tokens claro/escuro (marca Melt)
-  quadro/ demanda/ visoes/ paleta/ dialogos/ teclado/   núcleo do front (quadro, modal, visão, Cmd+K, diálogos, atalhos)
+  ui/                     design system (Botao, Campo, Modal, Popover, Menu, Avatar, ChipEtiqueta, SeletorCor,
+                          GradeCalendario, Tooltip, Markdown, ...)
+  casca/                  barra superior, menu lateral (com a seção Quadros e os favoritos), abas do celular
+  estilos/tokens.css      tokens claro/escuro (marca Melt; tinta das colunas por cor; fundos de quadro; vidro)
+  quadro/ demanda/ paleta/ dialogos/ teclado/   núcleo do front (página do quadro, card, modal, Cmd+K, diálogos, atalhos)
   funcionalidades/<nome>/ código de cada funcionalidade da Onda 3
   telas/<area>/rota.tsx   cada tela exporta `rota: ExtensaoRota` (metadados + `carregar` lazy; descoberta via import.meta.glob)
   extensoes/              tipos.ts (contrato), registro.ts (carregadores) e uma pasta por ponto de extensão (global/ incluso)
@@ -79,14 +85,15 @@ o núcleo usa `nucleo`.
 - **Migrações**: `server/migracoes/NNN_*.sql` com faixa de números reservada por área (`docs/PLANO.md` §3):
   001–002 contrato, 003–019 núcleo, 020–079 funcionalidades (10 por funcionalidade), 090–099 integração.
   Migração de funcionalidade só acrescenta (tabela, coluna anulável, índice).
-- **Front**: 21 pontos com contrato em `web/src/extensoes/tipos.ts` e carregadores em `web/src/extensoes/registro.ts`
-  (todas as pastas aceitam `.ts` e `.tsx`): telas (`telas/**/rota.tsx` → `rota: { caminho, carregar, acesso, layout }`,
-  com `React.lazy`), componentes globais (`extensoes/global`: SSE, host de diálogos, paleta, teclado, montados uma vez
-  pelo App.tsx, só nas rotas autenticadas quando `escopo: 'autenticada'`), menu lateral, barra superior, menu do avatar,
-  abas do celular, seções/ações/menu ··· do modal, interceptadores de mover (arrastar que abre diálogo), diálogos
-  globais (`abrirDialogo(id, params)`), comandos e fontes de busca da paleta, atalhos, tratadores de eventos, layouts e
-  cabeçalho da visão, menu e criação rápida da coluna, seções do Início e de Configurações. A API interna do
-  núcleo-web (hooks e utilitários de cache que as funcionalidades usam) está no `docs/PLANO.md` §2.2.
+- **Front**: 23 pontos + telas, com contrato em `web/src/extensoes/tipos.ts` e carregadores em
+  `web/src/extensoes/registro.ts` (todas as pastas aceitam `.ts` e `.tsx`): telas (`telas/**/rota.tsx` → `rota: {
+  caminho, carregar, acesso, layout }`, com `React.lazy`), componentes globais (`extensoes/global`: SSE, host de
+  diálogos, paleta, teclado), menu lateral (fora a seção Quadros, que é da casca), barra superior, menu do avatar, abas
+  do celular, cabeçalho e menu ··· do quadro, layouts do quadro (Quadro | Lista | Calendário), menu e criação rápida
+  da coluna, selos do card, interceptadores ao soltar card (coluna com papel ou automação), seções/ações/menu ··· do
+  modal (o menu também é o de contexto do card), diálogos globais (`abrirDialogo(id, params, { ancora })`, modal ou
+  popover), comandos e fontes de busca da paleta, atalhos, tratadores de eventos, seções do Início e de
+  Configurações. A API interna do núcleo-web (hooks, `CardDemanda` e utilitários de cache) está no `docs/PLANO.md` §2.2.
 - **Tipos compartilhados**: `shared/tipos/<area>.ts`; `shared/tipos/index.ts` só reexporta. Tipos novos de uma
   funcionalidade vão em `shared/tipos/ext/<funcionalidade>.ts`. Dentro de `shared/**`, imports só por caminho relativo
   com `.ts` (o servidor não tem o alias `@shared`, que é só do web).
@@ -99,17 +106,21 @@ o núcleo usa `nucleo`.
 - Datas: ISO 8601 UTC em texto. Prazos "só dia" guardados como `YYYY-MM-DD` em coluna própria. Todo instante gravado
   pelo app vem de `agora()` (`src/db.ts`), inclusive `criado_em`/`atualizado_em`, para os testes fixarem o relógio
   (`relogio()` do `test/ajuda.ts`); os `DEFAULT now` do SQLite são só rede de segurança.
-- Ordenação: demandas têm `posicao REAL` **global** (o navegador manda `depoisDeId`/`antesDeId` e o servidor calcula;
-  assim os cards escondidos por filtro mantêm o lugar); listas curtas por pai (checklist, itens, anexos, campos,
-  avisos, etapas) têm `pos REAL`. Inserir entre vizinhos = média; fim = último + 1024; se a folga ficar < 1e-6,
-  renormalizar o escopo inteiro (passo 1024) e publicar os eventos.
-- Banco: tabelas `STRICT`; booleanos 0/1; JSON em TEXT com `json_valid`; gatilhos só de integridade (imutabilidade
-  das trilhas, contadores `n_*`, histórico de etapa, `rev`, `atualizado_em`, FTS, identidade na trilha, arquivo em
-  uso). Toda UPDATE em `demanda` grava `atualizado_por` e `atualizado_em`. Regra de negócio fica em `src/servicos/`
-  (ex.: `mover()` é o único caminho de troca de etapa).
+- Ordenação: demandas têm `posicao REAL` **por coluna** (o navegador manda `depoisDeId`/`antesDeId` e o servidor
+  calcula; os cards escondidos por filtro mantêm o lugar); colunas por quadro, quadros no menu e listas curtas por pai
+  (checklist, itens, anexos, etiquetas, favoritos) têm `pos REAL`. Inserir entre vizinhos = média; fim = último + 1024;
+  se a folga ficar < 1e-6, renormalizar o escopo inteiro (passo 1024) e publicar os eventos.
+- Banco: tabelas `STRICT`; booleanos 0/1; JSON em TEXT com `json_valid`; FKs compostas garantem que a coluna e as
+  etiquetas de uma demanda são do quadro dela; gatilhos só de integridade (imutabilidade das trilhas, contadores `n_*`,
+  histórico de movimentação entre colunas e quadros, `rev`, `atualizado_em`, FTS, identidade na trilha, arquivo em uso,
+  coluna `concluida` exige concluída, destino arquivado, capa só de imagem). Toda UPDATE em `demanda` grava
+  `atualizado_por` e `atualizado_em`; mudar de coluna grava `status_desde`. Regra de negócio fica em `src/servicos/`
+  (`mover()` é o único caminho de troca de coluna ou de quadro; `concluir()` cuida da repetição;
+  `executarAutomacao()` dos 4 gatilhos). `verificar-migracoes.ts` confere que as listas fechadas de `shared/tipos`
+  são as mesmas dos CHECK do banco.
 - Concorrência: `PATCH /api/demandas/:id` exige `If-Match: <rev>`; decisão pública exige `Idempotency-Key` (por link).
-- Exclusão: arquivar (`arquivado_em`) por padrão; exclusão definitiva (anonimizar) só por admin e só sem versão,
-  envio ou aprovação.
+- Exclusão: arquivar (`arquivado_em`) por padrão (demanda, coluna vazia, quadro); demanda: anonimizar só por admin e
+  só sem versão, envio ou aprovação; quadro: excluir só se nunca teve demanda.
 - Segurança (detalhes em `docs/API.md` §1): cookie `__Host-sid` em produção (`sid` em dev), httpOnly, SameSite=Lax,
   Secure; tokens de 32 bytes guardados como sha256; mutações exigem `X-Trace-Id` e Origin igual a `APP_URL`
   (anti-CSRF); IP real pelo `X-Forwarded-For` com `TRUST_PROXY_HOPS`; limites de login por e-mail+IP, e-mail e IP;
@@ -121,7 +132,11 @@ o núcleo usa `nucleo`.
 - Tudo em português do Brasil, tom direto e simpático, sem jargão.
 - Atualização otimista nas mutações frequentes (mover card, marcar checklist, renomear); reverter em erro com toast.
 - Acessibilidade: foco visível, navegação por teclado no quadro e no modal, contraste AA nos dois temas.
-- Mobile: menu no topo, quadro com rolagem horizontal por coluna (snap), modal em tela cheia.
+- Mobile: menu no topo, quadro com rolagem horizontal por coluna (snap) e barra de chips das colunas, modal em tela
+  cheia, popovers viram folhas.
+- Visual (ADAPTACOES): colunas com fundo levemente tingido na cor escolhida + ponto no título, cards claros/escuros com
+  sombra suave, vidro fosco só na barra superior, no menu lateral, nos popovers e no modal; laranja só como acento (um
+  primário por tela). Recolher coluna, a visão escolhida por quadro e os quadros recentes ficam no `localStorage`.
 
 ## Portas
 
@@ -131,7 +146,8 @@ o núcleo usa `nucleo`.
 | Vite | 5173 | 5180 + N |
 
 `DATA_DIR` (padrão `./data`) guarda `demandas.db` e `uploads/`; cada agente usa `./data/agente-N`.
-Números dos agentes: 1 núcleo-servidor, 2 design-system-web, 3 núcleo-web, 4–9 funcionalidades F1–F6 (`docs/PLANO.md`).
+Números dos agentes: 1 núcleo-servidor, 2 design-system-web, 3 núcleo-web, 4–9 funcionalidades F1–F6 (modal, ciclo,
+painéis, entrada, cadastros, lista; `docs/PLANO.md` §3).
 Em desenvolvimento, `APP_URL` é a origem do Vite (o anti-CSRF compara o `Origin`).
 
 ## Deploy (EasyPanel)

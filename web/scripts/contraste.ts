@@ -196,6 +196,8 @@ export interface Par {
   sobre?: string[]
   minimo: number
   nota: string
+  /** Só neste tema (a barra superior é sempre escura). */
+  tema?: Tema
 }
 
 const T = 4.5
@@ -203,7 +205,7 @@ const UI = 3
 
 export function pares(): Par[] {
   const lista: Par[] = []
-  const p = (texto: string, fundo: string, minimo: number, nota: string, sobre?: string[]) => lista.push({ texto, fundo, minimo, nota, sobre })
+  const p = (texto: string, fundo: string, minimo: number, nota: string, sobre?: string[], tema?: Tema) => lista.push({ texto, fundo, minimo, nota, sobre, tema })
   for (const f of ['--surface', '--surface-sunken', '--bg', '--surface-raised', '--surface-hover']) {
     p('--text', f, T, 'texto'); p('--text-2', f, T, 'texto secundário'); p('--text-3', f, T, 'metadado')
   }
@@ -242,6 +244,15 @@ export function pares(): Par[] {
   p('--text-2', '--glass-bg', T, 'texto secundário no vidro', extremos)
   p('--glass-text-3', '--glass-bg', T, 'metadado no vidro', extremos)
   p('--text', '--glass-solido', T, 'vidro sem blur', extremos)
+  // camadas (modal, folha, popover, menu) e a barra superior (sempre escura)
+  p('--text', '--glass-bg-camada', T, 'texto na camada', extremos)
+  p('--text-2', '--glass-bg-camada', T, 'texto secundário na camada', extremos)
+  p('--glass-text-3', '--glass-bg-camada', T, 'metadado na camada', extremos)
+  p('--text', '--glass-bg-topo', T, 'texto na barra superior', extremos, 'escuro')
+  p('--text-2', '--glass-bg-topo', T, 'texto secundário na barra superior', extremos, 'escuro')
+  // card selecionado e o sinal do card (véu sobre a superfície)
+  p('--text-2', '--accent-soft', T, 'card selecionado: metadado (sobe para --text-2)')
+  p('--text-2', '--veu-1', T, 'sinal do card (parado há)', ['var(--surface)'])
   return lista
 }
 
@@ -251,7 +262,7 @@ export function conferir(css: string): Resultado[] {
   const tokens = lerTokens(css)
   const saida: Resultado[] = []
   for (const tema of ['claro', 'escuro'] as const) {
-    for (const par of pares()) {
+    for (const par of pares().filter((x) => !x.tema || x.tema === tema)) {
       const texto = avaliar(`var(${par.texto})`, tokens, tema)
       const fundoBase = avaliar(`var(${par.fundo})`, tokens, tema)
       const fundos = fundoBase.a < 1 ? (par.sobre ?? ['var(--bg)']).map((s) => compor(fundoBase, avaliar(s, tokens, tema))) : [fundoBase]

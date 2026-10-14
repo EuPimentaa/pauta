@@ -3,6 +3,7 @@
  * Vidro (marca §8) só aqui e na casca. Entram com animação curta; com reduced-motion as durações viram 0.
  */
 @layer components {
+  .ui-modal.vidro, .ui-folha.vidro, .ui-popover.vidro { --glass-bg: var(--glass-bg-camada); }
   .ui-scrim {
     position: fixed; inset: 0; z-index: var(--z-modal); background: var(--overlay);
     animation: ui-surgir var(--dur-2) var(--ease) both;

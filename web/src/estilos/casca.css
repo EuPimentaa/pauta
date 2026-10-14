@@ -80,8 +80,8 @@
     display: flex; align-items: center; height: 26px; padding: 0 10px 0 11px;
     font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--glass-text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .casca-equipe[data-com-rotulo] > .casca-lista { position: relative; margin-left: 14px; }
-  .casca-equipe[data-com-rotulo] > .casca-lista::before {
+  .casca-equipe[data-com-rotulo] > .casca-lista:has(> li + li) { position: relative; margin-left: 14px; }
+  .casca-equipe[data-com-rotulo] > .casca-lista:has(> li + li)::before {
     content: ''; position: absolute; left: -2px; top: 6px; bottom: 6px; width: 1px; border-radius: 1px; background: var(--border-strong);
   }
 

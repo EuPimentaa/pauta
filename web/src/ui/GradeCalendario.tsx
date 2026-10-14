@@ -12,12 +12,14 @@
  */
 import '../estilos/calendario.css'
 import { createContext, useContext, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDraggable, useDroppable, useSensor, useSensors,
   type Announcements, type DragEndEvent, type DragStartEvent, type KeyboardCoordinateGetter, type UniqueIdentifier,
 } from '@dnd-kit/core'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { DataLocal } from '@shared/tipos/index.ts'
+import { raizCamadas } from '../lib/camadas.ts'
 import { cx } from '../lib/classes.ts'
 import {
   DIAS_CURTOS, DIAS_LONGOS, MESES, diaDaSemana, diasDaSemana, ehFimDeSemana, formatarDiaMes, formatarMesAno, gradeDoMes,
@@ -86,9 +88,13 @@ export function CalendarioArrastar({ aoSoltar, children }: { aoSoltar(idItem: st
         }}
       >
         {children}
-        <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' }}>
-          {ativo !== null ? <div className="ui-cal-fantasma">{conteudos.get(String(ativo))}</div> : null}
-        </DragOverlay>
+        {/* em portal: um ancestral com vidro (backdrop-filter) ou transform deslocaria o position:fixed */}
+        {createPortal(
+          <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' }}>
+            {ativo !== null ? <div className="ui-cal-fantasma">{conteudos.get(String(ativo))}</div> : null}
+          </DragOverlay>,
+          raizCamadas(),
+        )}
       </DndContext>
     </ContextoArrastar.Provider>
   )

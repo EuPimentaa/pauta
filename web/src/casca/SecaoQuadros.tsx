@@ -5,6 +5,7 @@
  * o mouse. Cada subseção recolhe pelo título. "+ Novo quadro" para o admin abre /quadros/novo por cima da tela.
  */
 import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { NavLink } from 'react-router'
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent,
@@ -17,6 +18,7 @@ import { useEu } from '../api/auth.ts'
 import { useBootstrap } from '../api/bootstrap.ts'
 import { useFavoritar } from '../api/menu.ts'
 import { useLocal } from '../lib/armazenamento.ts'
+import { raizCamadas } from '../lib/camadas.ts'
 import { useAbrirSobreposta } from '../sessao/sobreposta.tsx'
 import { Botao, BotaoIcone } from '../ui/Botao.tsx'
 import { Tooltip } from '../ui/Tooltip.tsx'
@@ -145,9 +147,14 @@ function Favoritos({ favoritos, arrastar }: { favoritos: Quadro[]; arrastar: boo
           {favoritos.map((q) => <FavoritoOrdenavel key={q.id} q={q} alternarEstrela={() => favoritar(q.id, false)} bloquearClique={bloquearClique} />)}
         </ul>
       </SortableContext>
-      <DragOverlay dropAnimation={{ duration: 160, easing: 'cubic-bezier(.2,.8,.2,1)' }}>
-        {ativo ? <div className="casca-quadro-fantasma"><LinhaQuadro q={ativo} favorito alternarEstrela={() => {}} /></div> : null}
-      </DragOverlay>
+      {/* em portal: o vidro (backdrop-filter) do menu vira o bloco de contenção do position:fixed e o fantasma
+          (e a colisão do teclado) ficariam deslocados */}
+      {createPortal(
+        <DragOverlay dropAnimation={{ duration: 160, easing: 'cubic-bezier(.2,.8,.2,1)' }}>
+          {ativo ? <div className="casca-quadro-fantasma"><LinhaQuadro q={ativo} favorito alternarEstrela={() => {}} /></div> : null}
+        </DragOverlay>,
+        raizCamadas(),
+      )}
     </DndContext>
   )
 }

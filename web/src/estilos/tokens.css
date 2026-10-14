@@ -149,6 +149,9 @@
   --glass-text-3:    light-dark(#4A4A4A, #B8B7B5);  /* metadado sobre vidro sobe um degrau */
   --glass-solido:    light-dark(rgb(255 255 255 / .96), rgb(17 17 17 / .96)); /* sem backdrop-filter */
   --glass-blur: 24px; --glass-saturate: 160%;
+  /* camadas sobre a página (modal, folha, popover, menu): mais opaco, para não acinzentar sobre o scrim; no escuro,
+     a base é a superfície elevada (#1F1F1F) e não o canvas, para a camada se destacar da página */
+  --glass-bg-camada: light-dark(rgb(255 255 255 / .92), rgb(31 31 31 / .88));
   /* barra superior (sempre .chrome-dark): vidro quase opaco, a âncora escura da marca; brilho de 3,5% no topo */
   --glass-bg-topo:   rgb(17 17 17 / .94);
   --topo-brilho:     linear-gradient(180deg, rgb(255 255 255 / .035), rgb(255 255 255 / 0) 70%);

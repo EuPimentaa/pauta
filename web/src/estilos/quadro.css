@@ -88,6 +88,8 @@
   .ui-cartao:hover { box-shadow: var(--shadow-hover); border-color: var(--border-strong); }
   .ui-cartao:focus-visible { box-shadow: var(--focus-ring), var(--shadow-hover); }
   .ui-cartao[data-selecionado="true"] { background: var(--accent-soft); border-color: var(--accent); }
+  /* sobre o --accent-soft o --text-3 não fecha 4,5:1 no escuro: os metadados sobem para --text-2 */
+  .ui-cartao[data-selecionado="true"] :is(.ui-cartao-numero, .ui-cartao-meta, .ui-prazo[data-estado="em_dia"]) { color: var(--text-2); }
   .ui-cartao[data-arrastando="true"] { box-shadow: var(--shadow-drag); border-color: var(--border-strong); transform: rotate(2deg); cursor: grabbing; }
   .ui-cartao[data-fantasma="true"] { opacity: .35; box-shadow: none; }
   .ui-cartao[data-pendente="true"] { opacity: .6; border-style: dashed; border-color: var(--border-control); }

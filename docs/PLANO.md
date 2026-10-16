@@ -821,8 +821,9 @@ Integração e correções pós-merge: faixa **090–099**.
   `web/src/extensoes/*/paineis{,-*}.{ts,tsx}`.
 - **Rotas (API §4.18, 4):** início, agenda, notificações, marcar lidas. Tarefa diária `paineis-prazo` (8h, só em dia
   útil: `prazo` e `atrasada`, ignorando com o cliente; API §5.9). A tela `/horas` usa a rota do núcleo (§4.20).
-- **Extensões e telas:** `/inicio` com `inicio/paineis-*` (Primeiros passos do admin na ordem e com os critérios e
-  caminhos da API §4.18; Minhas: Atrasadas, Hoje, Esta semana, Depois, Sem prazo, com `CardDemanda` e o quadro de cada
+- **Extensões e telas:** `/inicio` com `inicio/paineis-*` (os Primeiros passos do admin já vieram com o F5 na
+  integração 3A, `inicio/cadastros-primeiros-passos`, ordem 50: o Início só hospeda `secoesInicio()` e não repete o
+  bloco; Minhas: Atrasadas, Hoje, Esta semana, Depois, Sem prazo, com `CardDemanda` e o quadro de cada
   uma; Com o cliente há mais de 2 dias úteis, só atendimento, com "Copiar lembrete" (`copiar-whatsapp`, F2) e
   "Registrar retorno" (F2) só com envio pendente; Menções recentes); `/agenda` (o `CalendarioDemandas` do NÚCLEO-WEB
   alimentado por `GET /api/agenda`: mês e semana, todos os quadros com a cor de cada um, "Só as minhas", filtro de
@@ -971,7 +972,7 @@ Contrato em `web/src/extensoes/tipos.ts`. O DESIGN-SYSTEM-WEB escreve os carrega
 | `extensoes/comandos` · `extensoes/busca` | NW (paleta) | NW, F4 |
 | `extensoes/atalhos` | NW (despachante) | NW, F1, F2, F3, F4, F6 |
 | `extensoes/eventos` | NW (cliente SSE; vários por entidade) | NW, F1, F2, F3 |
-| `extensoes/inicio` | F3 (tela Início) | F3 |
+| `extensoes/inicio` | F3 (tela Início) | F3, F5 (Primeiros passos) |
 | `extensoes/config` | NW (tela `/config`) | F4 (modelos), F5 |
 | `server/src/rotas/*.ts` | NS (`criarApp`) | NS, F1–F5 |
 | `server/src/tarefas/*.ts` | NS (`tarefas.ts`) | NS, F3 |
@@ -998,8 +999,8 @@ DS = DESIGN-SYSTEM-WEB, NS = NÚCLEO-SERVIDOR, NW = NÚCLEO-WEB.
 | menu lateral | grupo `trabalho`: `paineis` (Início 100, Agenda 200, Horas 300); seção Quadros (casca); grupo `agencia`: `cadastros` (Clientes 100, Arquivo 200, Configurações 300) |
 | barra superior | esquerda: `nucleo-busca` 100; direita: `modal-cronometro` 50, `entrada-nova` 100, `paineis-sino` 200 |
 | avatar | `nucleo-tema` 200 · `nucleo-sair` 900 |
-| Início | `paineis-primeiros-passos` 50 · `paineis-minhas` 100 · `paineis-cliente-parado` 200 · `paineis-mencoes` 300 |
-| Configurações | `cadastros-pessoas` 100 · `cadastros-equipes` 200 · `cadastros-quadros` 300 · `entrada-modelos` 400 · `cadastros-feriados` 500 · `cadastros-aparencia` 600 |
+| Início | `cadastros-primeiros-passos` 50 (veio com o F5; o F3 não repete) · `paineis-minhas` 100 · `paineis-cliente-parado` 200 · `paineis-mencoes` 300 |
+| Configurações | `cadastros-pessoas` 100 · `cadastros-equipes` 200 · `cadastros-quadros` 300 · `entrada-modelos` 400 · `cadastros-feriados` 500 · `cadastros-parametros` 550 (Prazos e limites) · `cadastros-aparencia` 600 |
 | globais | `nucleo-tempo-real` 100 · `nucleo-dialogos` 200 · `nucleo-teclado` 300 · `nucleo-paleta` 400 |
 
 ### 4.1 Estados vazios, carregamento e erro: texto e dono

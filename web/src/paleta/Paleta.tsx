@@ -184,7 +184,7 @@ function Busca() {
       </div>
       <Command.List className="paleta-lista">
         {!temAlgo && !carregando && (
-          <div className="paleta-vazio" role="status">{vazio ? 'Digite para buscar.' : `Nada encontrado para "${termo.trim()}".`}</div>
+          <div className="paleta-vazio" role="status">{vazio ? 'Digite para buscar.' : `Nada encontrado para "${termo.trim()}". Tente a sigla do cliente ou o número.`}</div>
         )}
         {grupoRecentes}
         {gruposComando}

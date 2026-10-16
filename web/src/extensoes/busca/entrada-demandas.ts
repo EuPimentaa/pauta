@@ -1,11 +1,10 @@
 /**
  * Fonte "Demandas" da paleta (F4): GET /api/busca ("#12" ou "12" pelo número, "he outubro" filtra o cliente, o resto
- * por palavras sem acento). Cada resultado abre /d/:numero; o detalhe diz o cliente e onde está. Sem nenhuma demanda,
- * e sem nada no resto da paleta, mostra o texto da busca vazia (PLANO §4.1).
+ * por palavras sem acento). Cada resultado abre /d/:numero; o detalhe diz o cliente e onde está. A busca vazia (PLANO
+ * §4.1) é o estado vazio da própria paleta (pedido 2 da Entrada, aplicado na integração).
  */
-import { CircleCheck, Archive, FileText, SearchX } from 'lucide-react'
+import { CircleCheck, Archive, FileText } from 'lucide-react'
 import type { Bootstrap, ResultadoBuscaDemanda } from '@shared/tipos/index.ts'
-import { normalizarAlias } from '@shared/logica/texto.ts'
 import type { FontePaleta, ResultadoPaleta } from '../tipos.ts'
 import { bootstrapAtual, clientePadrao } from '../../api/cache.ts'
 import { buscarDemandas } from '../../funcionalidades/entrada/api.ts'
@@ -20,15 +19,6 @@ function lugar(b: Bootstrap | undefined, d: ResultadoBuscaDemanda): string {
   if (d.arquivado) partes.push('arquivada')
   else if (d.concluida) partes.push('concluída')
   return partes.join(' · ')
-}
-
-/** Algo no resto da paleta casa o termo (quadros, clientes, pessoas)? Então a busca vazia não precisa de aviso. */
-function outrasFontesTem(b: Bootstrap | undefined, termo: string): boolean {
-  if (!b) return false
-  const palavras = normalizarAlias(termo).split(' ').filter(Boolean)
-  const casa = (...t: (string | null | undefined)[]) => { const alvo = normalizarAlias(t.filter(Boolean).join(' ')); return palavras.every((p) => alvo.includes(p)) }
-  return b.quadros.some((q) => casa(q.nome)) || b.clientes.some((c) => casa(c.sigla, c.nome, ...c.apelidos))
-    || b.usuarios.some((u) => casa(u.nome, u.apelido))
 }
 
 export const fonte: FontePaleta = {
@@ -48,9 +38,6 @@ export const fonte: FontePaleta = {
       icone: d.arquivado ? Archive : d.concluida ? CircleCheck : FileText,
       caminho: `/d/${d.numero}`,
     }))
-    if (itens.length === 0 && termo.trim().length >= 2 && !outrasFontesTem(b, termo)) {
-      return [{ id: 'entrada-busca-vazia', rotulo: `Nada encontrado para "${termo.trim()}".`, detalhe: 'Tente a sigla do cliente ou o número.', icone: SearchX }]
-    }
     return itens
   },
 }

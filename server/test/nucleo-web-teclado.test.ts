@@ -65,6 +65,16 @@ describe('despachante', () => {
     assert.equal(decidir(lista, tecla('n'), estado({ ligados: false })), null)
   })
 
+  test('com um botão ou link em foco, Enter e Espaço são dele (o card sob o mouse não abre nem ganha membro)', () => {
+    const comEnter: AtalhoBase[] = [...lista, { id: 'abrir', teclas: 'enter', escopo: 'card' }, { id: 'pegar', teclas: 'shift+space', escopo: 'card' }]
+    assert.equal(decidir(comEnter, tecla(' ', { code: 'Space' }), estado({ emControle: true })), null)
+    assert.equal(decidir(comEnter, tecla('Enter'), estado({ emControle: true })), null)
+    assert.equal(decidir(comEnter, tecla(' ', { code: 'Space', shiftKey: true }), estado({ emControle: true })), null)
+    assert.deepEqual(ids(decidir(comEnter, tecla('Enter'), estado())), ['abrir'], 'sem controle em foco, Enter abre')
+    assert.deepEqual(ids(decidir(comEnter, tecla('n'), estado({ emControle: true }))), ['quadro-n'], 'as outras teclas continuam')
+    assert.deepEqual(ids(decidir(comEnter, tecla('k', { ctrlKey: true }), estado({ emControle: true }))), ['paleta'])
+  })
+
   test('acorde: G arma, a segunda tecla decide', () => {
     assert.deepEqual(decidir(lista, tecla('g'), estado()), { tipo: 'acorde', primeira: 'g' })
     assert.deepEqual(ids(decidir(lista, tecla('a'), estado({ acorde: 'g' }))), ['ir-agenda'])

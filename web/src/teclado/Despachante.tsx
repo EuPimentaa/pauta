@@ -20,6 +20,18 @@ import { escopoLigado, escoposAtivos } from './escopos.ts'
 
 const REPETE = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'j', 'k', 'J', 'K'])
 
+/** Controles que Enter e Espaço acionam (o card, que também recebe foco, não entra: Enter nele abre a demanda). */
+const CONTROLE = [
+  'button', 'a[href]', 'summary', 'select', 'input[type="checkbox"]', 'input[type="radio"]', 'input[type="button"]',
+  'input[type="submit"]', 'input[type="reset"]', '[data-alca]',
+  ...['button', 'link', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'tab', 'checkbox', 'switch', 'radio', 'option']
+    .map((r) => `[role="${r}"]`),
+].join(', ')
+
+function emControle(alvo: EventTarget | null): boolean {
+  return alvo instanceof Element && alvo.matches(CONTROLE) && !alvo.hasAttribute('data-demanda-id')
+}
+
 /** Pode haver atalho agora? Sem camada aberta, sim; com camadas, só dentro do modal da demanda. */
 function livre(e: KeyboardEvent): boolean {
   if (!haCamadaAberta()) return true
@@ -47,7 +59,8 @@ export default function Despachante() {
       if (!b) return
       const pendente = armado && Date.now() < armado.ate ? armado.tecla : null
       const decisao = decidir(reg.atalhos(), e, {
-        escopos: escoposAtivos(), emCampo: emCampoDeTexto(e.target), ligados: b.eu.prefs.atalhos !== false, mac: EH_MAC, acorde: pendente,
+        escopos: escoposAtivos(), emCampo: emCampoDeTexto(e.target), emControle: emControle(e.target),
+        ligados: b.eu.prefs.atalhos !== false, mac: EH_MAC, acorde: pendente,
       })
       if (pendente) desarmar()
       if (!decisao) return

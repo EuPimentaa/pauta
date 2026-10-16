@@ -29,16 +29,40 @@ import { CartaoDemanda } from './CardDemanda.tsx'
 import { editarNomeDaColuna, registrarElementoColuna, useColunaEmEdicao } from './estado.ts'
 import { itensDoMenuColuna, type ItemColunaNucleo } from './menu-coluna.ts'
 
-// ─────────────────────────────── card arrastável ───────────────────────────────
+// ─────────────────────────────── cards ───────────────────────────────
+
+/**
+ * Só os cards perto da tela (a lista da coluna mais 600 px para cima e para baixo) entram no arraste: o dnd-kit
+ * redesenha todo item arrastável a cada mudança de alvo, e um quadro de 500 cards travava ao pegar um card. Os de longe
+ * são o mesmo card sem os ganchos do arraste e viram arrastáveis quando a rolagem (inclusive a automática, durante o
+ * arraste) os aproxima.
+ */
+const MARGEM_PERTO = '600px 0px'
+const INICIAIS = 20
+const nada = () => {}
+
+export const CardParado = memo(function CardParado({ d, tabIndex }: { d: Demanda; tabIndex: number }) {
+  const arrastar = useMemo(() => ({ ref: nada, atributos: {}, fantasma: false, tabIndex }), [tabIndex])
+  return (
+    <div className="cartao-lugar" data-lugar-id={d.id}>
+      <CartaoDemanda demanda={d} arrastar={arrastar} />
+    </div>
+  )
+})
 
 export const CardArrastavel = memo(function CardArrastavel({ d, colunaId, tabIndex }: { d: Demanda; colunaId: Id; tabIndex: number }) {
   const s = useSortable({ id: d.id, data: { tipo: 'card', colunaId } satisfies DadoArraste })
   const transform = CSS.Translate.toString(s.transform)
   const style = useMemo<CSSProperties>(() => ({ transform, transition: s.transition }), [transform, s.transition])
   const arrastar = useMemo(() => ({
-    ref: s.setNodeRef, style, atributos: s.attributes, ouvintes: s.listeners, fantasma: s.isDragging, tabIndex,
-  }), [s.setNodeRef, style, s.attributes, s.listeners, s.isDragging, tabIndex])
-  return <CartaoDemanda demanda={d} arrastar={arrastar} />
+    ref: s.setActivatorNodeRef, atributos: s.attributes, ouvintes: s.listeners, fantasma: s.isDragging, tabIndex,
+  }), [s.setActivatorNodeRef, s.attributes, s.listeners, s.isDragging, tabIndex])
+  // o invólucro anda (transform) e o card dentro dele só redesenha quando o que mostra muda
+  return (
+    <div ref={s.setNodeRef} style={style} className="cartao-lugar" data-lugar-id={d.id}>
+      <CartaoDemanda demanda={d} arrastar={arrastar} />
+    </div>
+  )
 })
 
 // ─────────────────────────────── cabeçalho ───────────────────────────────
@@ -131,6 +155,8 @@ export interface PropsColuna {
   filtros: FiltrosQuadro
   eu: Eu
   alvoTab: Id | null
+  /** O card que está sendo arrastado (fica arrastável mesmo longe da tela). */
+  ativoId: Id | null
   arrastandoCard: boolean
   entradaAberta: boolean
   definirEntrada(colunaId: Id | null): void
@@ -164,6 +190,31 @@ export const ColunaQuadro = memo(function ColunaQuadro(p: PropsColuna) {
   }, [coluna.id])
 
   const lista = useMemo(() => ids.map((id) => demandas.get(id)).filter((d): d is Demanda => !!d), [ids, demandas])
+
+  // quais cards estão perto da tela (os arrastáveis); a cada troca, o observador volta a olhar os elementos novos
+  const cardsEl = useRef<HTMLDivElement | null>(null)
+  const [perto, setPerto] = useState<ReadonlySet<Id>>(() => new Set(ids.slice(0, INICIAIS)))
+  useLayoutEffect(() => {
+    const raiz = cardsEl.current
+    if (!raiz || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver((entradas) => {
+      setPerto((atual) => {
+        let novo: Set<Id> | null = null
+        for (const e of entradas) {
+          const id = (e.target as HTMLElement).dataset.lugarId
+          if (!id || e.isIntersecting === atual.has(id)) continue
+          novo ??= new Set(atual)
+          if (e.isIntersecting) novo.add(id)
+          else novo.delete(id)
+        }
+        return novo ?? atual
+      })
+    }, { root: raiz, rootMargin: MARGEM_PERTO })
+    for (const no of raiz.querySelectorAll('[data-lugar-id]')) io.observe(no)
+    return () => io.disconnect()
+  }, [ids, perto])
+  const sortavel = (id: Id) => perto.has(id) || id === p.ativoId || id === p.alvoTab
+  const sortaveis = useMemo(() => ids.filter((id) => perto.has(id) || id === p.ativoId || id === p.alvoTab), [ids, perto, p.ativoId, p.alvoTab])
   const ctx: ContextoColuna = useMemo(() => ({ quadro, coluna, filtros: p.filtros, demandas: lista }), [quadro, coluna, p.filtros, lista])
   const entrada = entradaDaColuna(reg, ctx, p.eu)
   const EntradaC = entrada?.Componente
@@ -186,9 +237,11 @@ export const ColunaQuadro = memo(function ColunaQuadro(p: PropsColuna) {
       aria-label={`Coluna ${coluna.nome}`}
     >
       <Cabeca coluna={coluna} total={p.total} alca={alca} abrirMenu={abrirMenu} alternarRecolhida={() => p.alternarRecolhida(coluna.id)} />
-      <div ref={area.setNodeRef} className="ui-coluna-cards" data-sobre={area.isOver || undefined}>
-        <SortableContext id={coluna.id} items={ids as Id[]} strategy={verticalListSortingStrategy}>
-          {lista.map((d) => <CardArrastavel key={d.id} d={d} colunaId={coluna.id} tabIndex={d.id === p.alvoTab ? 0 : -1} />)}
+      <div ref={(no) => { area.setNodeRef(no); cardsEl.current = no }} className="ui-coluna-cards" data-sobre={area.isOver || undefined}>
+        <SortableContext id={coluna.id} items={sortaveis} strategy={verticalListSortingStrategy}>
+          {lista.map((d) => (sortavel(d.id)
+            ? <CardArrastavel key={d.id} d={d} colunaId={coluna.id} tabIndex={d.id === p.alvoTab ? 0 : -1} />
+            : <CardParado key={d.id} d={d} tabIndex={-1} />))}
         </SortableContext>
         {lista.length === 0 && p.arrastandoCard && <div className="ui-coluna-soltar">Solte aqui</div>}
       </div>

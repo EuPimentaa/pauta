@@ -169,7 +169,6 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
     if (dado.tipo === 'card') {
       const lista = base[dado.colunaId] ?? []
       inicio.current = { coluna: dado.colunaId, indice: lista.indexOf(String(active.id)) }
-      setOrdem(base)
       setAtivo({ tipo: 'card', id: String(active.id), largura })
     } else {
       setAtivo({ tipo: 'coluna', id: dado.colunaId, largura })
@@ -374,7 +373,9 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
                   filtros={filtros}
                   eu={eu}
                   alvoTab={alvoTab}
-                  arrastandoCard={ativo?.tipo === 'card'}
+                  ativoId={ativo?.tipo === 'card' ? ativo.id : null}
+                  // só a coluna vazia muda ao começar o arraste ("Solte aqui"); as outras não redesenham
+                  arrastandoCard={ativo?.tipo === 'card' && (itens[c.id]?.length ?? 0) === 0}
                   entradaAberta={entrada === c.id}
                   definirEntrada={setEntrada}
                   alternarRecolhida={alternarRecolhida}

@@ -45,7 +45,8 @@
 
   /* ─────────────── card: extras do núcleo ─────────────── */
   /* fora da tela o navegador pula o desenho do card (quadro de 500 cards fluido); o tamanho estimado segura a rolagem */
-  .ui-coluna-cards > .cartao, .ui-coluna-cards > .cartao-lugar { content-visibility: auto; contain-intrinsic-size: auto 96px; }
+  /* no próprio card (não no invólucro do arraste): a contenção de pintura do invólucro cortaria a sombra e o anel */
+  .ui-coluna-cards > .cartao, .cartao-lugar > .cartao { content-visibility: auto; contain-intrinsic-size: auto 96px; }
   /* o card tem overflow: hidden (a capa e a faixa da prioridade): sem isto a lista encolheria os cards para caber */
   .ui-coluna-cards > * { flex-shrink: 0; }
   .cartao { touch-action: manipulation; }

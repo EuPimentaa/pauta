@@ -8,7 +8,7 @@
  * selosCard() de cada funcionalidade. Clique abre o modal; o lápis no hover e o botão direito abrem o menu de
  * contexto (menuDemanda() com `onde` card). Foco e mouse marcam a "demanda em foco" dos atalhos.
  */
-import { memo, Suspense, useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type Ref } from 'react'
+import { memo, Suspense, useCallback, useLayoutEffect, useRef, useState, type HTMLAttributes, type Ref } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   CalendarClock, Check, CheckSquare, Clock3, MessageSquare, Paperclip, Pencil, Repeat2, TriangleAlert,
@@ -205,10 +205,13 @@ export function MenuDoCard({ d, ancora, fechar }: { d: Demanda; ancora: Ancora; 
 
 // ─────────────────────────────── card interativo ───────────────────────────────
 
-/** O que o quadro passa para o card arrastável (useSortable). */
+/**
+ * O que o quadro passa para o card arrastável (useSortable). O nó do arraste (transform e transição) é o invólucro do
+ * quadro (Coluna.tsx): assim o card só redesenha quando o que ele mostra muda, não a cada passo do arraste.
+ */
 export interface ArrastarCard {
+  /** O ativador (setActivatorNodeRef): o próprio card, que recebe o foco e as teclas. */
   ref: Ref<HTMLElement>
-  style?: CSSProperties
   atributos: HTMLAttributes<HTMLElement>
   ouvintes?: HTMLAttributes<HTMLElement>
   /** O original fica como fantasma enquanto a cópia (DragOverlay) anda. */
@@ -260,7 +263,6 @@ export const CartaoDemanda = memo(function CartaoDemanda({ demanda: d, compacto,
       {...arrastar?.atributos}
       {...arrastar?.ouvintes}
       ref={refRaiz}
-      style={arrastar?.style}
       role={undefined}
       tabIndex={arrastar ? arrastar.tabIndex : 0}
       className={cx('ui-cartao', 'cartao')}

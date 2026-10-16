@@ -2,7 +2,7 @@
  * Cabeçalho da página do quadro (PLANO §2, "Página do quadro"): ponto na cor e nome (o admin edita clicando), estrela
  * (useFavoritar do DS), os slots cabecalhoQuadro() à esquerda e à direita, o total de demandas, "Só as minhas" (Q),
  * "Limpar filtros" (X), o seletor Quadro | Lista | Calendário (layouts(); some sem outro layout instalado) e o menu
- * ··· (menuQuadro(): Seguir, Copiar link e o que vier das funcionalidades).
+ * ··· (menuQuadro(): Seguir, Copiar link e o que vier das funcionalidades); a descrição do quadro, quando há, embaixo.
  */
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -129,8 +129,9 @@ export function CabecalhoQuadro(p: Props) {
             aoMudar={(v) => p.mudarVisao(v as VisaoQuadro)} />
         )}
         <BotaoIcone icone={MoreHorizontal} rotulo="Mais ações do quadro" aria-haspopup="menu" aria-expanded={!!menu}
-          onClick={(e) => abrirMenu(e.currentTarget)} />
+          className="quadro-mais" onClick={(e) => abrirMenu(e.currentTarget)} />
       </div>
+      {quadro.descricao.trim() && <p className="quadro-descricao">{quadro.descricao}</p>}
       {menu && <MenuFlutuante aberto aoFechar={() => setMenu(null)} ancora={menu.ancora} itens={menu.itens} rotulo={`Ações do quadro ${quadro.nome}`} alinhar="fim" />}
     </div>
   )

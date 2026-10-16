@@ -7,8 +7,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  DndContext, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors,
-  type Announcements, type DragEndEvent, type DragOverEvent, type DragStartEvent, type UniqueIdentifier,
+  DndContext, DragOverlay, MouseSensor, TouchSensor, defaultDropAnimationSideEffects, useSensor, useSensors,
+  type Announcements, type DragEndEvent, type DragOverEvent, type DragStartEvent, type DropAnimation, type UniqueIdentifier,
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { Columns3, Filter, Inbox, Plus } from 'lucide-react'
@@ -28,7 +28,7 @@ import { lugarAtual, useCardFocadoId } from '../teclado/foco.ts'
 import { pausarEntrega } from '../tempo-real/estado.ts'
 import { Botao } from '../ui/Botao.tsx'
 import { Campo } from '../ui/Campo.tsx'
-import { EstadoVazio } from '../ui/Indicadores.tsx'
+import { Contador, EstadoVazio } from '../ui/Indicadores.tsx'
 import {
   SensorTecladoQuadro, cancelarArrasteEmAndamento, colunaDoId, coordenadasTeclado, deteccaoDoQuadro, ehIdArea, idColuna, type DadoArraste,
 } from './arrastar.ts'
@@ -93,6 +93,32 @@ function NovaColuna({ quadroId, aberta, setAberta }: { quadroId: Id; aberta: boo
 
 // ─────────────────────────────── layout ───────────────────────────────
 
+/**
+ * Largura da calha da barra de rolagem fina (0 com barras sobrepostas, como no macOS) em --calha-rolagem: a lista de
+ * cards reserva a calha (scrollbar-gutter) e completa com padding até 10 px, para os cards ficarem no centro da coluna.
+ */
+function medirCalhaDeRolagem(): void {
+  const raiz = document.documentElement
+  if (raiz.style.getPropertyValue('--calha-rolagem')) return
+  const caixa = document.createElement('div')
+  caixa.style.cssText = 'position:absolute;top:-200px;left:0;width:100px;height:100px;overflow-y:scroll;scrollbar-width:thin;visibility:hidden'
+  document.body.appendChild(caixa)
+  raiz.style.setProperty('--calha-rolagem', `${caixa.offsetWidth - caixa.clientWidth}px`)
+  caixa.remove()
+}
+
+/** Ao soltar, a cópia pousa no lugar e desfaz o giro de quando foi pega (o original fica invisível até ela chegar). */
+const ANIMACAO_SOLTAR: DropAnimation = {
+  duration: 200,
+  easing: 'cubic-bezier(.2,.8,.2,1)',
+  sideEffects: (p) => {
+    const limpar = defaultDropAnimationSideEffects({ styles: { active: { opacity: '0' } } })(p)
+    const copia = p.dragOverlay.node.querySelector<HTMLElement>('.cartao-sobreposto .ui-cartao, .coluna-sobreposta')
+    copia?.animate([{ transform: 'none' }], { duration: 200, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' })
+    return limpar
+  },
+}
+
 const anuncios = (nome: (id: UniqueIdentifier) => string, ondeEsta: (id: UniqueIdentifier) => string): Announcements => ({
   onDragStart: ({ active }) => `${nome(active.id)} pego. Use as setas para escolher o lugar; Espaço solta, Esc cancela.`,
   onDragOver: ({ active, over }) => (over ? `${nome(active.id)} ${ondeEsta(over.id)}.` : undefined),
@@ -112,6 +138,7 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
   const [entrada, setEntrada] = useState<Id | null>(null)
   const [novaColunaAberta, setNovaColunaAberta] = useState(false)
   const raiz = useRef<HTMLDivElement>(null)
+  useLayoutEffect(medirCalhaDeRolagem, [])
 
   const totais = useMemo(() => {
     const t = new Map<Id, number>()
@@ -339,6 +366,8 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
   const filtroSemResultado = !semDemandas && demandas.length === 0 && temFiltros(filtros)
   const ativoCard = ativo?.tipo === 'card' ? porId.get(ativo.id) : undefined
   const ativoColuna = ativo?.tipo === 'coluna' ? colunas.find((c) => c.id === ativo.id) : undefined
+  // a coluna onde o card arrastado vai cair (a ordem local já o pôs nela): ganha o contorno de destino
+  const colunaAlvo = ativo?.tipo === 'card' ? colunaDoCard(itens, ativo.id) : null
 
   if (colunas.length === 0) {
     return (
@@ -392,6 +421,7 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
                   ativoId={ativo?.tipo === 'card' ? ativo.id : null}
                   // só a coluna vazia muda ao começar o arraste ("Solte aqui"); as outras não redesenham
                   arrastandoCard={ativo?.tipo === 'card' && (itens[c.id]?.length ?? 0) === 0}
+                  alvo={colunaAlvo === c.id}
                   entradaAberta={entrada === c.id}
                   definirEntrada={setEntrada}
                   alternarRecolhida={alternarRecolhida}
@@ -404,18 +434,24 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
         </div>
         {createPortal(
           // acima da barra e das abas do celular, abaixo dos popovers e do modal (--z-popover 60, --z-modal 70)
-          <DragOverlay zIndex={55} dropAnimation={{ duration: 200, easing: 'cubic-bezier(.2,.8,.2,1)' }}>
+          <DragOverlay zIndex={55} dropAnimation={ANIMACAO_SOLTAR}>
             {ativoCard ? (
-              <div className="cartao-sobreposto" style={{ ['--largura-arraste' as string]: `${ativo!.largura}px` }}>
+              <div className="cartao-sobreposto" inert style={{ ['--largura-arraste' as string]: `${ativo!.largura}px` }}>
                 <CartaoDemanda demanda={ativoCard} />
               </div>
             ) : ativoColuna ? (
-              <div className="ui-coluna coluna-sobreposta" data-cor={ativoColuna.cor ?? undefined}>
+              // a coluna com o cabeçalho e os primeiros cards, na largura dela (no celular, a da tela)
+              <div className="ui-coluna coluna-sobreposta" inert data-cor={ativoColuna.cor ?? undefined}
+                style={{ ['--coluna-w' as string]: `${ativo!.largura}px` }}>
                 <div className="ui-coluna-cabeca">
                   <span className="ui-coluna-ponto" aria-hidden="true" />
                   <span className="ui-coluna-titulo">{ativoColuna.nome}</span>
+                  <Contador valor={totais.get(ativoColuna.id) ?? 0} limite={ativoColuna.limiteWip} />
                 </div>
-                <p className="coluna-mais-lista">{totais.get(ativoColuna.id) ?? 0} {(totais.get(ativoColuna.id) ?? 0) === 1 ? 'demanda' : 'demandas'}</p>
+                <div className="ui-coluna-cards">
+                  {(base[ativoColuna.id] ?? []).slice(0, 4).map((id) => porId.get(id)).filter((d): d is Demanda => !!d)
+                    .map((d) => <CartaoDemanda key={d.id} demanda={d} />)}
+                </div>
               </div>
             ) : null}
           </DragOverlay>,

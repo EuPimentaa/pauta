@@ -28,7 +28,7 @@
   .quadro-nome-campo { font: 600 var(--fs-h2) / var(--lh-h2) var(--font); width: min(420px, 70vw); }
   .quadro-cabeca-lado { display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex-wrap: wrap; }
   .quadro-cabeca-espaco { flex: 1; }
-  .quadro-total { color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .quadro-total { color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; }
   .quadro-estrela[aria-pressed="true"] svg { fill: var(--warning); stroke: var(--warning-ink); }
   .quadro-aviso {
     display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin: var(--space-3) var(--space-5) 0;
@@ -37,22 +37,35 @@
   }
   .quadro-aviso svg { width: 16px; height: 16px; flex: none; color: var(--text-2); }
   .quadro-ausente { display: grid; place-items: center; flex: 1; padding: var(--space-6); }
+  .quadro-descricao {
+    flex-basis: 100%; max-width: 70ch; margin-top: -4px; color: var(--text-2); font: 400 var(--fs-body) / var(--lh-body) var(--font);
+    overflow-wrap: anywhere;
+  }
+  /* nos fundos coloridos (aurora, berinjela...) a coluna clara se perdia no fundo: contorno na cor dela e sombra leve */
+  .tela-quadro:not([data-fundo="liso"]) .ui-coluna:not([data-alvo="true"], [data-sobre="true"], [data-arrastando="true"]) {
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--cor, var(--border-strong)) 30%, transparent),
+      0 1px 2px var(--shadow-c1), 0 4px 12px var(--shadow-c1);
+  }
   @media (max-width: 767.98px) {
     .quadro-cabeca { padding: var(--space-3) 16px 0; }
     .quadro-nome { font-size: var(--fs-h3); line-height: var(--lh-h3); }
     .quadro-aviso { margin: var(--space-2) 16px 0; }
+    /* segunda linha: total e "Só as minhas" à esquerda, o ··· no canto direito */
+    .quadro-cabeca-espaco { display: none; }
+    .quadro-cabeca > .quadro-cabeca-lado:last-of-type { flex: 1 1 100%; }
+    .quadro-mais { margin-left: auto; }
   }
 
   /* ─────────────── card: extras do núcleo ─────────────── */
   /* fora da tela o navegador pula o desenho do card (quadro de 500 cards fluido); o tamanho estimado segura a rolagem */
   /* no próprio card (não no invólucro do arraste): a contenção de pintura do invólucro cortaria a sombra e o anel */
-  .ui-coluna-cards > .cartao, .cartao-lugar > .cartao { content-visibility: auto; contain-intrinsic-size: auto 96px; }
+  .ui-coluna-cards > .cartao, .cartao-lugar > .cartao { content-visibility: auto; contain-intrinsic-size: auto 80px; }
   /* o card tem overflow: hidden (a capa e a faixa da prioridade): sem isto a lista encolheria os cards para caber */
   .ui-coluna-cards > * { flex-shrink: 0; }
   .cartao { touch-action: manipulation; }
   .cartao-editar {
     position: absolute; top: 6px; right: 6px; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
-    border: 0; border-radius: var(--radius-sm); background: var(--surface); color: var(--text-2);
+    border: 0; border-radius: var(--radius-sm); background: var(--surface-card); color: var(--text-2);
     box-shadow: 0 0 0 1px var(--border-strong), var(--shadow-card); opacity: 0;
     transition: opacity var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
   }
@@ -60,22 +73,36 @@
   .cartao:hover .cartao-editar, .cartao-editar:focus-visible { opacity: 1; }
   .cartao-editar:hover { background: var(--surface-hover); color: var(--text); }
   @media (hover: none) { .cartao-editar { display: none; } }
+  /* o quadro do card (Início, Agenda) vem logo depois do número, que já empurra os dois para a direita */
   .cartao-quadro {
-    display: inline-flex; align-items: center; gap: 5px; min-width: 0; margin-left: auto; overflow: hidden;
+    display: inline-flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden;
     color: var(--text-2); font: 500 var(--fs-meta) / 1 var(--font); white-space: nowrap; text-overflow: ellipsis;
   }
   .cartao-quadro-ponto { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--cor-ponto); }
   .cartao-selos-topo { display: flex; flex-wrap: wrap; gap: 4px; }
+  /* selo de topo que não desenhou nada não deixa faixa vazia */
+  .cartao-selos-topo:empty { display: none; }
   .ui-cartao[data-compacto] { padding: 8px 10px; gap: 6px; }
   .ui-cartao[data-compacto] .ui-cartao-titulo { -webkit-line-clamp: 2; }
 
   /* ─────────────── arrastar ─────────────── */
+  /* a cópia que anda com o ponteiro: levanta (gira 2° e cresce 2%) numa animação curta; ao soltar, o quadro devolve
+     o giro a 0 enquanto ela pousa (LayoutQuadro, animação de soltar) */
   .cartao-sobreposto { cursor: grabbing; width: var(--largura-arraste, 264px); }
-  .cartao-sobreposto .ui-cartao { box-shadow: var(--shadow-drag); border-color: var(--border-strong); transform: rotate(2deg); }
-  .coluna-sobreposta { width: var(--coluna-w, 280px); max-height: 70vh; overflow: hidden; box-shadow: var(--shadow-drag); transform: rotate(1.5deg); }
+  .cartao-sobreposto .ui-cartao {
+    box-shadow: var(--shadow-drag); border-color: var(--border-strong); transform: rotate(2deg) scale(1.02);
+    animation: cartao-pegar var(--dur-1) var(--ease);
+  }
+  .cartao-sobreposto .cartao-editar { display: none; }
+  @keyframes cartao-pegar { from { transform: none; box-shadow: var(--shadow-card); } }
+  .coluna-sobreposta {
+    width: var(--coluna-w, 280px); max-height: 70vh; overflow: hidden; box-shadow: var(--shadow-drag); transform: rotate(1.5deg);
+    animation: coluna-pegar var(--dur-1) var(--ease);
+  }
+  @keyframes coluna-pegar { from { transform: none; box-shadow: none; } }
+  .coluna-sobreposta .ui-coluna-cards { overflow: hidden; }
   .ui-coluna-cabeca[data-alca] { cursor: grab; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
   .ui-coluna-cabeca[data-alca]:active { cursor: grabbing; }
-  .coluna-mais-lista { padding: 0 14px 10px; color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); }
   .coluna-nome-campo { flex: 1; min-width: 0; }
   .coluna-nome-campo input { font: 600 var(--fs-col) / var(--lh-col) var(--font); }
 

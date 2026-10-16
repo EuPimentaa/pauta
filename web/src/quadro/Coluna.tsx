@@ -158,6 +158,8 @@ export interface PropsColuna {
   /** O card que está sendo arrastado (fica arrastável mesmo longe da tela). */
   ativoId: Id | null
   arrastandoCard: boolean
+  /** O card arrastado vai cair nesta coluna (contorno de destino). */
+  alvo: boolean
   entradaAberta: boolean
   definirEntrada(colunaId: Id | null): void
   alternarRecolhida(colunaId: Id): void
@@ -234,10 +236,11 @@ export const ColunaQuadro = memo(function ColunaQuadro(p: PropsColuna) {
       data-cor={coluna.cor ?? undefined}
       data-coluna-id={coluna.id}
       data-arrastando={alca.isDragging ? 'true' : undefined}
+      data-alvo={p.alvo || undefined}
       aria-label={`Coluna ${coluna.nome}`}
     >
       <Cabeca coluna={coluna} total={p.total} alca={alca} abrirMenu={abrirMenu} alternarRecolhida={() => p.alternarRecolhida(coluna.id)} />
-      <div ref={(no) => { area.setNodeRef(no); cardsEl.current = no }} className="ui-coluna-cards" data-sobre={area.isOver || undefined}>
+      <div ref={(no) => { area.setNodeRef(no); cardsEl.current = no }} className="ui-coluna-cards">
         <SortableContext id={coluna.id} items={sortaveis} strategy={verticalListSortingStrategy}>
           {lista.map((d) => (sortavel(d.id)
             ? <CardArrastavel key={d.id} d={d} colunaId={coluna.id} tabIndex={d.id === p.alvoTab ? 0 : -1} />

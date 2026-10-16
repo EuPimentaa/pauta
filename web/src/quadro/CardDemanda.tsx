@@ -11,7 +11,7 @@
 import { memo, Suspense, useCallback, useLayoutEffect, useRef, useState, type HTMLAttributes, type Ref } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  CalendarClock, Check, CheckSquare, Clock3, MessageSquare, Paperclip, Pencil, Repeat2, TriangleAlert,
+  Calendar, Check, CheckSquare, Clock3, MessageSquare, Paperclip, Pencil, Repeat2, TriangleAlert,
 } from 'lucide-react'
 import type { Bootstrap, ClienteResumo, Coluna, Demanda, Etiqueta, EstadoPrazo, Quadro, UsuarioResumo } from '@shared/tipos/index.ts'
 import { ROTULO_REPETICAO } from '@shared/tipos/index.ts'
@@ -70,7 +70,8 @@ export function useDadosCard(d: Demanda): DadosCard | undefined {
 
 // ─────────────────────────────── textos ───────────────────────────────
 
-const ICONE_PRAZO = { atrasada: TriangleAlert, hoje: Clock3, em_dia: CalendarClock, pausado: Clock3, concluida: Check } as const
+// em 13 px o CalendarClock embolava (calendário e relógio juntos): o prazo em dia é só o calendário
+const ICONE_PRAZO = { atrasada: TriangleAlert, hoje: Clock3, em_dia: Calendar, pausado: Clock3, concluida: Check } as const
 
 /** "sex, 24 out" (+ ", 14h" com hora). */
 function dataCurta(data: string, hora: string | null): string {
@@ -126,25 +127,30 @@ export const CorpoCard = memo(function CorpoCard({ d, dados, agora, compacto, mo
   const outroSinal = sinal && sinal.tipo !== 'atrasada' ? sinal : null
   const topo = selos.filter((s) => s.lugar === 'topo')
   const rodape = selos.filter((s) => s.lugar === 'rodape')
-  const temRodape = prazo || outroSinal || d.repetir !== 'nenhuma' || d.nCheckTotal > 0 || d.nAnexos > 0 || d.nComentarios > 0
-    || dados.membros.length > 0 || rodape.length > 0
+  const temMetas = !!prazo || !!outroSinal || (!compacto && (d.repetir !== 'nenhuma' || d.nAnexos > 0 || d.nComentarios > 0))
+    || d.nCheckTotal > 0
+  // sem metas nem selos de rodapé, os avatares sobem para a linha do topo (o card fica com 3 faixas: topo, título)
+  const pilhaNoTopo = !temMetas && rodape.length === 0 && dados.membros.length > 0
+  // o rodapé existe quando pode ter algo; vazio (selo que não desenha nada) o CSS esconde
+  const temRodape = temMetas || rodape.length > 0 || (dados.membros.length > 0 && !pilhaNoTopo)
+  // na coluna `concluida` o "Entregue em…" já diz que está feita (sem o círculo verde repetindo)
+  const marcaFeita = !!d.concluidaEm && dados.coluna?.papel !== 'concluida'
+  const pilha = <PilhaAvatares pessoas={dados.membros} tamanho={20} />
   return (
     <>
       {!compacto && d.capaUrl && <div className="ui-cartao-capa" data-imagem=""><img src={d.capaUrl} alt="" loading="lazy" decoding="async" /></div>}
       {!compacto && !d.capaUrl && d.capaCor && <div className="ui-cartao-capa" data-cor={d.capaCor} aria-hidden="true" />}
       {!compacto && topo.length > 0 && <div className="cartao-selos-topo"><Selos selos={topo} d={d} dados={dados} /></div>}
-      {!compacto && dados.etiquetas.length > 0 && (
-        <div className="ui-cartao-etiquetas">
-          {dados.etiquetas.map((e) => <ChipEtiqueta key={e.id} etiqueta={e} recolhida={recolhidas} aoClicar={alternarEtiquetas} />)}
-        </div>
-      )}
+      {/* etiquetas, cliente e número numa linha só (o card cabe em 88 px com prazo e título de uma linha) */}
       <div className="ui-cartao-topo">
-        {d.concluidaEm && <span className="ui-cartao-feita" role="img" aria-label="Concluída"><Check aria-hidden="true" /></span>}
+        {marcaFeita && <span className="ui-cartao-feita" role="img" aria-label="Concluída"><Check aria-hidden="true" /></span>}
+        {!compacto && dados.etiquetas.map((e) => <ChipEtiqueta key={e.id} etiqueta={e} recolhida={recolhidas} aoClicar={alternarEtiquetas} />)}
         {dados.cliente && <ChipCliente cliente={dados.cliente} />}
         <span className="ui-cartao-numero">#{d.numero}</span>
         {mostrarQuadro && dados.quadro && (
           <span className="cartao-quadro" data-cor={dados.quadro.cor}><span className="cartao-quadro-ponto" aria-hidden="true" />{dados.quadro.nome}</span>
         )}
+        {pilhaNoTopo && pilha}
       </div>
       <p className="ui-cartao-titulo">{d.titulo}</p>
       {temRodape && (
@@ -177,7 +183,7 @@ export const CorpoCard = memo(function CorpoCard({ d, dados, agora, compacto, mo
             )}
             <Selos selos={rodape} d={d} dados={dados} />
           </div>
-          {dados.membros.length > 0 && <PilhaAvatares pessoas={dados.membros} tamanho={24} />}
+          {dados.membros.length > 0 && !pilhaNoTopo && pilha}
         </div>
       )}
     </>

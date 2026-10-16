@@ -4,7 +4,7 @@
  */
 import { useState } from 'react'
 import {
-  CalendarClock, Check, CheckSquare, Clock3, MessageSquare, MoreHorizontal, Paperclip, Plus, Repeat2, TriangleAlert,
+  Calendar, Check, CheckSquare, Clock3, MessageSquare, MoreHorizontal, Paperclip, Plus, Repeat2, TriangleAlert,
 } from 'lucide-react'
 import { FUNDOS_QUADRO, type Cor, type DataLocal, type FundoQuadro, type PapelColuna } from '@shared/tipos/index.ts'
 import { formatarDiaMes, hojeLocal, inicioDaSemana, somarDias } from '../../../lib/datas.ts'
@@ -42,25 +42,27 @@ interface PropsCartao {
 }
 
 const numero = new Intl.NumberFormat('pt-BR')
-const ICONE_PRAZO = { atrasada: TriangleAlert, hoje: Clock3, em_dia: CalendarClock, pausado: Clock3, concluida: Check } as const
+const ICONE_PRAZO = { atrasada: TriangleAlert, hoje: Clock3, em_dia: Calendar, pausado: Clock3, concluida: Check } as const
 
+/** A mesma marcação do CardDemanda do quadro: etiquetas, cliente e número numa linha; avatares sobem sem metas. */
 function CartaoAmostra(p: PropsCartao) {
   const c = p.cliente ? cliente(p.cliente) : null
   const IconePrazo = p.prazo ? ICONE_PRAZO[p.prazo.estado] : null
+  const temMetas = !!(p.prazo || p.sinal || p.checklist || p.anexos || p.comentarios || p.repetir)
+  const pilha = p.membros ? <PilhaAvatares pessoas={p.membros.map(pessoa)} tamanho={20} /> : null
   return (
     <article className="ui-cartao" tabIndex={0} aria-label={`#${p.numero} ${p.titulo}`}
       data-prioridade={p.prioridade} data-selecionado={p.selecionado || undefined} data-concluida={p.concluida || undefined}>
       {p.capa && <div className="ui-cartao-capa" data-cor={p.capa} aria-hidden="true" />}
-      {p.etiquetas && (
-        <div className="ui-cartao-etiquetas">{p.etiquetas.map((n) => <ChipEtiqueta key={n} etiqueta={etiqueta(n)} />)}</div>
-      )}
       <div className="ui-cartao-topo">
         {p.concluida && <span className="ui-cartao-feita" role="img" aria-label="Concluída"><Check aria-hidden="true" /></span>}
+        {p.etiquetas?.map((n) => <ChipEtiqueta key={n} etiqueta={etiqueta(n)} />)}
         {c && <ChipCliente cliente={c} />}
         <span className="ui-cartao-numero">#{numero.format(p.numero)}</span>
+        {!temMetas && pilha}
       </div>
       <p className="ui-cartao-titulo">{p.titulo}</p>
-      {(p.prazo || p.sinal || p.checklist || p.anexos || p.comentarios || p.membros || p.repetir) && (
+      {temMetas && (
         <div className="ui-cartao-rodape">
           <div className="ui-cartao-metas">
             {p.prazo && IconePrazo && <span className="ui-prazo" data-estado={p.prazo.estado}><IconePrazo aria-hidden="true" />{p.prazo.texto}</span>}
@@ -74,7 +76,7 @@ function CartaoAmostra(p: PropsCartao) {
             {p.comentarios ? <span className="ui-cartao-meta"><MessageSquare aria-hidden="true" />{p.comentarios}</span> : null}
             {p.anexos ? <span className="ui-cartao-meta"><Paperclip aria-hidden="true" />{p.anexos}</span> : null}
           </div>
-          {p.membros && <PilhaAvatares pessoas={p.membros.map(pessoa)} tamanho={24} />}
+          {pilha}
         </div>
       )}
     </article>

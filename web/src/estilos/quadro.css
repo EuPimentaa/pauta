@@ -34,8 +34,9 @@
     border-radius: var(--radius-lg); background: var(--cor-coluna, var(--surface-sunken)); color: var(--text);
     box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--cor, var(--border-strong)) 14%, transparent);
   }
+  /* o ponto do título alinha com o texto dos cards (10 da lista + 1 da borda + 12 do card) */
   .ui-coluna-cabeca {
-    display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 6px 4px 14px; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 6px 4px 23px; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
   .ui-coluna-ponto {
     flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--cor-ponto, var(--border-control));
@@ -50,10 +51,17 @@
   .ui-coluna .ui-contador { background: color-mix(in oklab, var(--surface) 72%, transparent); box-shadow: none; color: var(--text-2); }
   .ui-coluna .ui-contador[data-tom="destaque"] { background: var(--accent-soft); color: var(--accent-ink); box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent); }
   .ui-coluna-cabeca .ui-botao-icone { --lado: 28px; --icone: 16px; color: var(--text-2); }
+  /* Cards centrados na coluna: 10 px dos dois lados. A calha reservada (scrollbar-gutter) entra no lado direito; com
+     barras sobrepostas (macOS) ela é 0 e o padding cobre (--calha-rolagem, medida pelo quadro). A barra só aparece com
+     o mouse ou o foco na coluna; a lista termina num degradê curto quando há mais cards abaixo do fim. */
   .ui-coluna-cards {
-    display: flex; flex-direction: column; gap: var(--space-2); min-height: 8px; padding: 4px 8px 4px; overflow-y: auto;
-    overscroll-behavior: contain; scrollbar-gutter: stable;
+    display: flex; flex-direction: column; gap: var(--space-2); min-height: 8px;
+    padding: 4px max(0px, calc(10px - var(--calha-rolagem, 10px))) 12px 10px; overflow-y: auto;
+    overscroll-behavior: contain; scrollbar-gutter: stable; scrollbar-color: transparent transparent;
+    transition: scrollbar-color var(--dur-2) var(--ease);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 8px), transparent);
   }
+  .ui-coluna:hover .ui-coluna-cards, .ui-coluna:focus-within .ui-coluna-cards { scrollbar-color: var(--border-strong) transparent; }
   .ui-coluna-rodape { padding: 4px 8px 8px; }
   .ui-coluna-adicionar {
     display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 8px; border: 0; border-radius: var(--radius-sm);
@@ -67,8 +75,14 @@
     border: 1.5px dashed color-mix(in oklab, var(--cor, var(--text-3)) 45%, var(--border-strong)); color: var(--text-2);
     font: 500 var(--fs-meta) / 1 var(--font);
   }
+  /* coluna de destino de um card arrastado (data-alvo) e a recolhida com o card por cima (data-sobre) */
+  .ui-coluna[data-alvo="true"] { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 55%, transparent); }
   .ui-coluna[data-sobre="true"] { box-shadow: inset 0 0 0 2px var(--accent); }
-  .ui-coluna[data-arrastando="true"] { box-shadow: var(--shadow-drag); transform: rotate(1.5deg); }
+  /* o lugar de onde a coluna saiu (a cópia anda com o ponteiro) */
+  .ui-coluna[data-arrastando="true"] {
+    opacity: .45; box-shadow: none; outline: 2px dashed color-mix(in oklab, var(--cor-ponto, var(--border-control)) 55%, transparent);
+    outline-offset: -2px;
+  }
   .ui-coluna-pe { padding: 2px 14px 10px; color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); }
   .ui-coluna-pe a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
@@ -78,10 +92,11 @@
   .ui-coluna[data-recolhida]:hover { background: color-mix(in oklab, var(--cor-coluna, var(--surface-sunken)), var(--text) 4%); }
 
   /* ─────────────── card ─────────────── */
+  /* topo (etiquetas, cliente, número) 18 + título 19 + rodapé 20, com 6 entre as faixas: 88 px com tudo, 62 sem rodapé */
   .ui-cartao {
-    position: relative; display: flex; flex-direction: column; gap: var(--space-2); min-width: 0;
-    padding: 10px 12px 11px; border-radius: var(--radius-md); overflow: hidden;
-    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0;
+    padding: 8px 12px 9px; border-radius: var(--radius-md); overflow: hidden;
+    background: var(--surface-card); color: var(--text); border: 1px solid var(--border-card);
     box-shadow: var(--shadow-card); cursor: pointer; text-align: left;
     transition: box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--ease), background-color var(--dur-2) var(--ease);
   }
@@ -90,7 +105,12 @@
   /* sobre o --accent-soft o --text-3 não fecha 4,5:1 no escuro: os metadados sobem para --text-2 */
   .ui-cartao[data-selecionado="true"] :is(.ui-cartao-numero, .ui-cartao-meta, .ui-prazo[data-estado="em_dia"]) { color: var(--text-2); }
   .ui-cartao[data-arrastando="true"] { box-shadow: var(--shadow-drag); border-color: var(--border-strong); transform: rotate(2deg); cursor: grabbing; }
-  .ui-cartao[data-fantasma="true"] { opacity: .35; box-shadow: none; }
+  /* o lugar de onde o card saiu (ou onde vai cair): vaga tracejada, sem o texto repetido debaixo da cópia */
+  .ui-cartao[data-fantasma="true"] {
+    background: var(--veu-2); box-shadow: none;
+    border: 1.5px dashed color-mix(in oklab, var(--cor-ponto, var(--border-control)) 55%, transparent);
+  }
+  .ui-cartao[data-fantasma="true"] > * { visibility: hidden; }
   .ui-cartao[data-pendente="true"] { opacity: .6; border-style: dashed; border-color: var(--border-control); }
   .ui-cartao[data-recebido="true"] { animation: ui-cartao-recebido 1.2s var(--ease); }
   @keyframes ui-cartao-recebido { 0%, 35% { background: var(--accent-soft); } }
@@ -101,7 +121,7 @@
   }
   .ui-cartao[data-prioridade="urgente"]::before { background: var(--danger); }
 
-  .ui-cartao-capa { margin: -10px -12px 0; height: 32px; background: var(--cor, var(--border-strong)); }
+  .ui-cartao-capa { margin: -8px -12px 0; height: 32px; background: var(--cor, var(--border-strong)); }
   .ui-cartao-capa[data-imagem] { height: auto; aspect-ratio: 16 / 9; max-height: 160px; background: var(--surface-sunken); }
   .ui-cartao-capa img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .ui-cartao-etiquetas { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -110,28 +130,36 @@
     font: 500 var(--fs-card) / var(--lh-card) var(--font); color: var(--text);
   }
   .ui-cartao[data-concluida="true"] .ui-cartao-titulo { color: var(--text-2); }
-  .ui-cartao-topo { display: flex; align-items: center; gap: 6px; min-width: 0; }
-  .ui-cartao-numero { font: 500 var(--fs-meta) / 1 var(--font); color: var(--text-3); font-variant-numeric: tabular-nums; }
+  /* etiquetas, cliente (texto com ponto, sem pílula: a etiqueta é a pílula) e o número no fim */
+  .ui-cartao-topo { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; min-width: 0; min-height: 18px; }
+  .ui-cartao .ui-etiqueta:not([data-recolhida]) { height: 18px; }
+  .ui-cartao .ui-chip-cliente {
+    height: auto; padding: 0; gap: 5px; background: none; color: var(--cor-ink); font: 600 var(--fs-meta) / var(--lh-meta) var(--font);
+  }
+  .ui-cartao-numero { margin-left: auto; font: 500 var(--fs-meta) / 1 var(--font); color: var(--text-3); font-variant-numeric: lining-nums tabular-nums; }
   .ui-cartao-feita {
     display: inline-grid; place-items: center; flex: none; width: 16px; height: 16px; border-radius: 50%;
     background: var(--success); color: var(--on-accent);
   }
   .ui-cartao-feita svg { width: 11px; height: 11px; stroke-width: 3; }
-  .ui-cartao-rodape { display: flex; align-items: center; gap: 6px; min-height: 22px; }
+  .ui-cartao-rodape { display: flex; align-items: center; gap: 6px; min-height: 20px; }
+  /* rodapé sem nada dentro (só selos que não desenharam nada) não ocupa espaço */
+  .ui-cartao-rodape:not(:has(.ui-cartao-metas > *, .ui-pilha)) { display: none; }
   .ui-cartao-metas { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; flex: 1; min-width: 0; }
   .ui-cartao-meta {
     display: inline-flex; align-items: center; gap: 4px; color: var(--text-3);
-    font: 500 var(--fs-meta) / 1 var(--font); font-variant-numeric: tabular-nums; white-space: nowrap;
+    font: 500 var(--fs-meta) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; white-space: nowrap;
   }
   .ui-cartao-meta svg { width: 13px; height: 13px; }
   .ui-cartao-meta[data-completo="true"] { color: var(--success-ink); }
-  .ui-cartao .ui-pilha { --pilha-borda: var(--surface); margin-left: auto; }
+  .ui-cartao .ui-pilha { --pilha-borda: var(--surface-card); margin-left: auto; }
+  .ui-cartao-numero ~ .ui-pilha { margin-left: 0; }
   .ui-cartao[data-selecionado="true"] .ui-pilha { --pilha-borda: var(--accent-soft); }
 
   /* ─────────────── prazo e sinal ─────────────── */
   .ui-prazo, .ui-sinal {
     display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: var(--radius-xs);
-    font: 500 var(--fs-meta) / 1 var(--font); font-variant-numeric: tabular-nums; white-space: nowrap;
+    font: 500 var(--fs-meta) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; white-space: nowrap;
     background: transparent; color: var(--text-3);
   }
   .ui-prazo svg, .ui-sinal svg { width: 13px; height: 13px; flex: none; }

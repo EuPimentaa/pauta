@@ -982,6 +982,9 @@ Lançar e cronômetro ficam no modal (§4.15).
   - existe arquivada (o Desfazer do concluir arquiva, §5.11) e não excluída → restaura na coluna de entrada do quadro
     de nascimento (abaixo), no topo;
   - existe ativa, ou excluída → nada (concluir, reabrir e concluir de novo não duplica nem para a série).
+  - **Próxima desfeita** (arquivada pelo Desfazer, com a original aberta; `SQL_PROXIMA_DESFEITA`): não aparece no
+    Arquivo e `POST /restaurar` nela dá `409 conflito` ("Ela volta sozinha quando a #N for concluída."); com a
+    original concluída de novo, ela volta pelo caminho acima. Integração 3A, revisão funcional 8.
 - **Onde nasce:** no **quadro de nascimento** da original (o da primeira passagem em `demanda_movimento`), na coluna
   de entrada dele, no topo, se o quadro estiver ativo; senão no quadro atual. Ex.: o post semanal criado na Criação e
   concluído no Social › Publicado gera o próximo na Criação. `origem='repeticao'`, `criado_por` = quem concluiu (sem

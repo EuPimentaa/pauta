@@ -13,7 +13,7 @@ import { normalizarAlias } from '../../../shared/logica/texto.ts'
 import { agoraData, marcadores, todos, um, type Db } from '../db.ts'
 import { validacao } from '../erros.ts'
 import { lerConfig } from './config-app.ts'
-import { carregarDemandas } from './demandas.ts'
+import { SQL_PROXIMA_DESFEITA, carregarDemandas } from './demandas.ts'
 
 const QUANDO = 'coalesce(d.arquivado_em, d.concluida_em)'
 
@@ -66,6 +66,8 @@ export function listarArquivo(db: Db, c: ListarArquivoConsulta): Pagina<Demanda>
   const onde = [
     'd.excluido_em IS NULL AND (d.arquivado_em IS NOT NULL OR d.concluida_em IS NOT NULL)',
     '(d.arquivado_em IS NOT NULL OR d.concluida_em <= ?)',
+    // a próxima da repetição que o Desfazer do concluir arquivou só volta concluindo a original de novo
+    `NOT ${SQL_PROXIMA_DESFEITA}`,
   ]
   const params: unknown[] = [corte]
   if (c.clienteId) { onde.push('d.cliente_id = ?'); params.push(c.clienteId) }

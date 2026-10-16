@@ -697,6 +697,20 @@ export function arquivarDemanda(db: Db, id: Id, ator: Ator): Demanda {
  * trocar de coluna grava status_desde como o mover; coluna `concluida` conclui (sem repetição). `posicao` padrão:
  * o fim da coluna nova (na mesma coluna, mantém).
  */
+/**
+ * "Próxima desfeita" (alias `d`): a repetição que o Desfazer do concluir arquivou (a original voltou a ficar aberta).
+ * Ela fica guardada só para voltar quando a original for concluída de novo (criarRepeticao restaura a mesma, a série
+ * não ganha número novo): não aparece no Arquivo e não se restaura à mão (duplicaria a série).
+ */
+export const SQL_PROXIMA_DESFEITA = `(d.origem = 'repeticao' AND d.arquivado_em IS NOT NULL AND EXISTS (
+  SELECT 1 FROM demanda o WHERE o.id = d.origem_demanda_id AND o.concluida_em IS NULL AND o.excluido_em IS NULL))`
+
+/** Número da original quando a demanda é uma próxima desfeita; senão null. */
+export function origemDaProximaDesfeita(db: Db, id: Id): number | null {
+  return um<{ numero: number }>(db, `SELECT o.numero FROM demanda d JOIN demanda o ON o.id = d.origem_demanda_id
+    WHERE d.id = ? AND ${SQL_PROXIMA_DESFEITA}`, id)?.numero ?? null
+}
+
 export function restaurarDemanda(db: Db, id: Id, e: { colunaId?: Id; posicao?: { depoisDeId?: Id | null } }, ator: Ator): Demanda {
   const antes = demandaViva(db, id)
   if (!antes.arquivadoEm) throw conflito('Esta demanda não está arquivada.')

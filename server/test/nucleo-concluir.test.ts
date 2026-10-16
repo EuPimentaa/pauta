@@ -106,6 +106,12 @@ describe('concluir', () => {
     const p1 = (await eu.post(`/api/demandas/${d.id}/concluir`, { concluida: true })).corpo.proxima
     await eu.post(`/api/demandas/${d.id}/concluir`, { concluida: false })
     await eu.post(`/api/demandas/${p1.id}/arquivar`)
+    // a próxima desfeita não aparece no Arquivo (nem pelo número) e não se restaura à mão (duplicaria a série)
+    assert.deepEqual((await eu.get('/api/arquivo')).corpo.itens.map((x: { id: string }) => x.id), [])
+    assert.deepEqual((await eu.get(`/api/arquivo?q=%23${p1.numero}`)).corpo.itens, [])
+    const restaurar = await eu.post(`/api/demandas/${p1.id}/restaurar`, {})
+    assert.equal(restaurar.status, 409)
+    assert.match(restaurar.corpo.erro.mensagem, new RegExp(`#${d.numero} for concluída`))
     const seq = ultimoSeq(a.db)
     const r = await eu.post(`/api/demandas/${d.id}/concluir`, { concluida: true })
     assert.equal(r.status, 200)
@@ -117,6 +123,10 @@ describe('concluir', () => {
     // concluir de novo com a próxima ativa: nada
     await eu.post(`/api/demandas/${d.id}/concluir`, { concluida: false })
     assert.equal((await eu.post(`/api/demandas/${d.id}/concluir`, { concluida: true })).corpo.proxima, null)
+    // uma próxima arquivada de verdade (original concluída) continua no Arquivo e se restaura
+    await eu.post(`/api/demandas/${p1.id}/arquivar`)
+    assert.deepEqual((await eu.get(`/api/arquivo?q=%23${p1.numero}`)).corpo.itens.map((x: { id: string }) => x.id), [p1.id])
+    assert.equal((await eu.post(`/api/demandas/${p1.id}/restaurar`, {})).status, 200)
   })
 
   test('concluir para o cronômetro; desmarcar uma concluída antiga devolve ao quadro (objeto inteiro)', async () => {

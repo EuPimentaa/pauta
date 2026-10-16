@@ -5,12 +5,12 @@
 import { HEADER_IF_MATCH } from '../../../shared/tipos/index.ts'
 import { corpoJson, exigirUsuario, validar, type App } from '../auth.ts'
 import { tx } from '../db.ts'
-import { validacao } from '../erros.ts'
+import { conflito, validacao } from '../erros.ts'
 import * as esquema from '../esquemas.ts'
 import { concluir } from '../servicos/concluir.ts'
 import {
   adicionarEtiqueta, adicionarMembro, arquivarDemanda, atualizarDemanda, carregarDetalhe, criarDemanda, demandaViva,
-  excluirDemanda, removerEtiqueta, removerMembro, restaurarDemanda,
+  excluirDemanda, origemDaProximaDesfeita, removerEtiqueta, removerMembro, restaurarDemanda,
 } from '../servicos/demandas.ts'
 import { mover } from '../servicos/mover.ts'
 import { exigir, exigirCamposPermitidos } from '../servicos/permissoes.ts'
@@ -95,7 +95,11 @@ export function registrar(app: App): void {
   app.post('/api/demandas/:id/restaurar', exigirUsuario, async (c) => {
     const e = validar(esquema.restaurar, await corpoJson(c))
     const db = c.get('db')
-    return c.json({ demanda: tx(db, () => restaurarDemanda(db, c.req.param('id'), { colunaId: e.colunaId }, c.get('ator'))) })
+    return c.json({ demanda: tx(db, () => {
+      const origem = origemDaProximaDesfeita(db, c.req.param('id'))
+      if (origem !== null) throw conflito(`Esta é a próxima de uma repetição desfeita. Ela volta sozinha quando a #${origem} for concluída.`)
+      return restaurarDemanda(db, c.req.param('id'), { colunaId: e.colunaId }, c.get('ator'))
+    }) })
   })
 
   app.post('/api/demandas/:id/excluir', exigirUsuario, async (c) => {

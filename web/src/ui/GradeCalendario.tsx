@@ -248,7 +248,9 @@ function Dia({ dia, hoje, foco, fora, feriado, itens, limite, aoVerMais, aoFocar
       data-hoje={dia === hoje || undefined}
       data-fora={fora || undefined}
       data-fim-de-semana={ehFimDeSemana(dia) || undefined}
+      data-feriado={feriado ? true : undefined}
       data-sobre={isOver || undefined}
+      title={feriado}
       onFocus={(e) => { if (e.target === e.currentTarget) aoFocar() }}
       onDoubleClick={(e) => { if (aoAtivar && !(e.target as HTMLElement).closest('.ui-cal-item')) aoAtivar(dia) }}
     >
@@ -262,8 +264,9 @@ function Dia({ dia, hoje, foco, fora, feriado, itens, limite, aoVerMais, aoFocar
         </div>
       )}
       {resto > 0 && (
-        <button type="button" className="ui-cal-mais" onClick={() => (aoVerMais ? aoVerMais(dia) : setExpandido(true))}>
-          +{resto} {resto === 1 ? 'outro' : 'outros'}
+        <button type="button" className="ui-cal-mais" aria-label={`+${resto} ${resto === 1 ? 'outro' : 'outros'}`}
+          onClick={() => (aoVerMais ? aoVerMais(dia) : setExpandido(true))}>
+          +{resto}<span className="ui-cal-mais-texto"> {resto === 1 ? 'outro' : 'outros'}</span>
         </button>
       )}
     </div>

@@ -27,7 +27,7 @@
   .ui-cal-dia[data-hoje="true"] .ui-cal-num { background: var(--accent); color: var(--on-accent); }
   .ui-cal-feriado {
     min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 6px; border-radius: var(--radius-xs);
-    background: var(--danger-bg); color: var(--danger-ink); font: 500 11px / 16px var(--font);
+    background: var(--danger-bg); color: var(--danger-ink); font: 500 var(--fs-meta) / 16px var(--font);
   }
   .ui-cal-itens { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .ui-cal-mais { align-self: flex-start; padding: 2px 6px; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--text-2); font: 500 var(--fs-meta) / 1.2 var(--font); }
@@ -39,10 +39,27 @@
   .ui-cal-fantasma { cursor: grabbing; transform: rotate(2deg); box-shadow: var(--shadow-drag); border-radius: var(--radius-md); }
   .ui-cal[data-modo="semana"] .ui-cal-semana > div { display: flex; align-items: baseline; gap: 6px; }
   @media (max-width: 767.98px) {
+    /* cabeçalho em duas linhas: o título em cima; o segmento Mês | Semana ocupa o que sobra ao lado de Hoje e das setas */
+    .ui-cal-topo { flex-wrap: wrap; row-gap: var(--space-2); padding: var(--space-3); }
+    .ui-cal-titulo { flex-basis: 100%; margin-right: 0; }
+    .ui-cal-topo > .ui-abas { flex: 1; }
+    .ui-cal-topo > .ui-abas .ui-aba { flex: 1; justify-content: center; }
     .ui-cal-semana > div { padding: 6px 4px; text-align: center; letter-spacing: .04em; }
     .ui-cal-grade { grid-auto-rows: minmax(var(--altura-dia-celular, 64px), auto); }
-    .ui-cal-dia { padding: 4px 2px; align-items: center; }
+    /* a célula tem ~46 px: os itens ocupam a largura dela e cortam o que passar (antes saíam por cima dos vizinhos) */
+    .ui-cal-dia { padding: 4px 2px; align-items: stretch; overflow: hidden; }
+    .ui-cal-cabeca { justify-content: center; }
+    .ui-cal-itens, .ui-cal-item { width: 100%; min-width: 0; overflow: hidden; }
+    .ui-cal-mais { align-self: stretch; padding: 2px; text-align: center; }
+    .ui-cal-mais-texto { display: none; }
+    /* feriado: o nome não cabe; o número fica na cor de perigo com um ponto embaixo (o nome está no rótulo da célula) */
     .ui-cal-feriado { display: none; }
+    .ui-cal-dia[data-feriado="true"] .ui-cal-num { position: relative; color: var(--danger-ink); }
+    .ui-cal-dia[data-feriado="true"] .ui-cal-num::after {
+      content: ''; position: absolute; left: 50%; bottom: 1px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--danger);
+    }
+    .ui-cal-dia[data-feriado="true"][data-hoje="true"] .ui-cal-num { color: var(--on-accent); }
+    .ui-cal-dia[data-feriado="true"][data-hoje="true"] .ui-cal-num::after { background: var(--on-accent); }
   }
 }
 

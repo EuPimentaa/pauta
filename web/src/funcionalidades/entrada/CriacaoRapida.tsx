@@ -151,7 +151,7 @@ export default function CriacaoRapida({ ctx, fechar }: { ctx: ContextoColuna; fe
   }
 
   function criar() {
-    if (linhas) return
+    if (linhas) { criarLinhas(linhas); return }
     if (!analise.titulo) {
       setAviso(chips.length || texto.trim() ? 'Falta o título: escreva o que é a demanda.' : null)
       return

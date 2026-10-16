@@ -131,7 +131,8 @@ describe('colar-whatsapp (puro)', () => {
   test('prazo pedido na conversa: o dia da semana seguinte, amanhã, a data (sem voltar no tempo) e a última menção', () => {
     const p = (s: string, hoje = '2026-10-14') => prazoDaConversa(lerConversa(s, hoje), hoje)
     assert.deepEqual(p('Precisamos de um reels para sexta'), { data: '2026-10-16', casou: 'para sexta' })
-    assert.equal(p('Consegue até quarta-feira?')!.data, '2026-10-21', 'hoje é quarta: a próxima')
+    assert.deepEqual(p('Consegue até quarta-feira?'), { data: '2026-10-21', casou: 'até quarta-feira' }, 'hoje é quarta: a próxima')
+    assert.equal(tituloDaConversa(lerConversa('Preciso de uns stories da promoção, até sexta', '2026-10-14')), 'Stories da promoção')
     assert.equal(p('pode entregar amanhã')!.data, '2026-10-15')
     assert.equal(p('Prazo: dia 24/10')!.data, '2026-10-24')
     assert.equal(p('para 10/01')!.data, '2027-01-10', 'janeiro já passou: o do ano que vem')

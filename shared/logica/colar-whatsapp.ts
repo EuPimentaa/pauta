@@ -112,6 +112,8 @@ export function tituloDaConversa(msgs: readonly MensagemConversa[]): string {
   }
   if (!escolhida) escolhida = linhas[0] ?? ''
   let t = escolhida.replace(PEDIDO, '').replace(/^[\s:,;–—-]+/, '')
+    // o prazo no fim ("…, até sexta") vai para o campo Prazo, não para o título
+    .replace(/[\s,;–—-]+(?:at[eé]|para|pra)\s+(?:(?:o\s+)?dia\s+)?(?:hoje|amanh[ãa]|depois de amanh[ãa]|segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)(?:-feira)?\s*[.!?]*$/i, '')
   const fimFrase = /[.!?;](\s|$)/.exec(t)
   if (fimFrase && fimFrase.index >= 12) t = t.slice(0, fimFrase.index)
   t = t.replace(/[\s.,;:!?–—-]+$/, '').replace(/\s+/g, ' ').trim()
@@ -288,7 +290,15 @@ export function analisarConversa(texto: string, ctx: ContextoAnalise): AnaliseTe
 // ─────────────────────────────── prazo pedido na conversa ───────────────────────────────
 
 const DIAS = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado']
-const PRAZO = /\b(?:ate|para|pra|prazo|entreg\w*)\b[^.\n?!]{0,24}?\b(hoje|depois de amanha|amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/g
+const PRAZO = /\b(?:ate|para|pra|prazo|entreg\w*)\b[^.\n?!]{0,24}?\b(hoje|depois de amanha|amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)(?:-feira)?\b/g
+
+/** Minúsculo e sem acento caractere a caractere: o mesmo tamanho do original (as posições valem nos dois). */
+function semAcentoMesmoTamanho(s: string): string {
+  return Array.from(s, (c) => {
+    const n = c.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+    return n.length === c.length ? n : c
+  }).join('')
+}
 
 /**
  * Prazo que a conversa pede ("até sexta", "para amanhã", "entrega dia 24/10"): a última menção com "até", "para",
@@ -298,7 +308,8 @@ const PRAZO = /\b(?:ate|para|pra|prazo|entreg\w*)\b[^.\n?!]{0,24}?\b(hoje|depois
 export function prazoDaConversa(msgs: readonly MensagemConversa[], hoje: DataLocal): { data: DataLocal; casou: string } | null {
   let achado: { data: DataLocal; casou: string } | null = null
   for (const m of msgs) {
-    const n = normalizarAlias(m.texto.replace(/-feira/gi, ''))
+    const original = m.texto.normalize('NFC')
+    const n = semAcentoMesmoTamanho(original)
     for (const x of n.matchAll(PRAZO)) {
       const alvo = x[1]!
       let data: DataLocal | null = null
@@ -316,7 +327,7 @@ export function prazoDaConversa(msgs: readonly MensagemConversa[], hoje: DataLoc
         if (c && !a && c < hoje) c = `${ano + 1}-${dois(mes!)}-${dois(d!)}`
         if (c && ehDataLocal(c) && c >= hoje) data = c
       }
-      if (data) achado = { data, casou: x[0].trim() }
+      if (data) achado = { data, casou: original.slice(x.index!, x.index! + x[0].length).replace(/\s+/g, ' ').trim() }
     }
   }
   return achado

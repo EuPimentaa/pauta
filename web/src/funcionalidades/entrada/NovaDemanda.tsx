@@ -367,6 +367,12 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
           )}
         </section>
 
+        {!b.quadros.some((q) => q.arquivadoEm === null) && (
+          <p className="entrada-alerta" role="alert">
+            <AlertTriangle aria-hidden="true" />
+            {eu.usuario.papel === 'admin' ? 'Nenhum quadro ainda. Crie os quadros das equipes antes (Primeiros passos).' : 'Nenhum quadro ainda. Peça ao admin para criar os quadros.'}
+          </p>
+        )}
         <div className="entrada-colunas">
           {/* ─── principal ─── */}
           <div className="entrada-principal">

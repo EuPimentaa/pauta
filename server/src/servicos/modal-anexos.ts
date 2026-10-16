@@ -25,7 +25,8 @@ export function criarAnexo(db: Db, demandaId: Id, e: CriarAnexoEntrada, ator: At
   if (e.tipo === 'arquivo' && !um(db, 'SELECT 1 FROM arquivo WHERE id = ?', e.arquivoId)) {
     throw validacao('Arquivo inexistente. Envie de novo.', { arquivoId: 'arquivo inexistente' })
   }
-  const anexo = inserirAnexo(db, demandaId, e, ator)
+  // sempre referência: a evidência de uma decisão nasce só pelo ciclo (F2), ligada à aprovação
+  const anexo = inserirAnexo(db, demandaId, { ...e, finalidade: 'referencia' }, ator)
   registrarAtividade(db, { tipo: 'anexo.adicionado', ator, demandaId, dados: { anexoId: anexo.id, nome: anexo.nome, tipo: anexo.tipo } })
   emitirContadores(db, demandaId, ator, antes)
   return anexo

@@ -677,7 +677,8 @@ quem agiu (quem arquiva a demanda e para o cronômetro de outra pessoa não vê 
 
 #### `POST /api/demandas/:id/anexos`
 - **Corpo:** `CriarAnexoEntrada` (link https, caminho de rede ou arquivo já enviado). Provedor detectado pelo host.
-  **Resposta:** `201 Anexo`. **Atividade:** `anexo.adicionado`. **SSE:** `anexo`, `demanda` (`nAnexos`).
+  Sempre `finalidade: 'referencia'`: a chave `finalidade` é ignorada aqui (o print de evidência nasce só pelas rotas
+  do ciclo, ligado à aprovação; o modal decide "Print do retorno" e o Remover por essa ligação). **Resposta:** `201 Anexo`. **Atividade:** `anexo.adicionado`. **SSE:** `anexo`, `demanda` (`nAnexos`).
 - Comentário, checklist (e itens) e anexo numa demanda arquivada ou de quadro arquivado → `422 estado_invalido` (o
   modal abre só para leitura). Lançar tempo numa arquivada continua permitido.
 

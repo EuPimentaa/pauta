@@ -60,7 +60,8 @@ function CartaoAnexo({ a, ctx }: { a: Anexo; ctx: ContextoDemanda }) {
   useEscLocal(renomeando, () => { setNome(a.nome); setRenomeando(false) })
   const d = ctx.demanda
   const so = ctx.somenteLeitura
-  const evidencia = a.finalidade === 'evidencia'
+  // print de uma decisão do cliente: o que vale é a ligação com a aprovação (como no servidor), não a finalidade
+  const evidencia = !!ctx.detalhe?.aprovacoes.some((ap) => ap.evidenciaAnexoId === a.id)
   const imagem = !!a.arquivo?.imagem
   const capa = d.capaAnexoId === a.id
   const quem = a.enviadoPor ? usuarios.find((u) => u.id === a.enviadoPor) : undefined

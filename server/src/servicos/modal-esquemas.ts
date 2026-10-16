@@ -8,7 +8,6 @@ import type {
   CriarItensEntrada, EditarAnexoEntrada, EditarChecklistEntrada, EditarComentarioEntrada, EditarItemEntrada,
   ListarHistoricoConsulta,
 } from '../../../shared/tipos/index.ts'
-import { FINALIDADES_ANEXO } from '../../../shared/tipos/index.ts'
 import { ehDataLocal } from '../../../shared/logica/datas.ts'
 
 z.config(z.locales.ptBR())
@@ -64,12 +63,15 @@ export const editarItem: z.ZodType<EditarItemEntrada> = z.object({
 // ─────────────────────────────── anexos ───────────────────────────────
 
 const nomeItem = z.string().max(200).optional()
-const finalidade = z.enum(FINALIDADES_ANEXO).optional()
 
+/**
+ * Anexo pelo modal é sempre de referência: `finalidade` (de CriarAnexoEntrada) não entra pelo HTTP (o zod descarta a
+ * chave). O print de evidência nasce só pelas rotas do ciclo, ligado à aprovação (integração 3A, segurança 5).
+ */
 export const criarAnexo: z.ZodType<CriarAnexoEntrada> = z.discriminatedUnion('tipo', [
-  z.object({ tipo: z.literal('link'), url: z.string().trim().max(2000), nome: nomeItem, finalidade }),
-  z.object({ tipo: z.literal('caminho'), caminho: z.string().trim().min(1).max(1000), nome: nomeItem, finalidade }),
-  z.object({ tipo: z.literal('arquivo'), arquivoId: id, nome: nomeItem, finalidade }),
+  z.object({ tipo: z.literal('link'), url: z.string().trim().max(2000), nome: nomeItem }),
+  z.object({ tipo: z.literal('caminho'), caminho: z.string().trim().min(1).max(1000), nome: nomeItem }),
+  z.object({ tipo: z.literal('arquivo'), arquivoId: id, nome: nomeItem }),
 ])
 
 export const editarAnexo: z.ZodType<EditarAnexoEntrada> = z.object({

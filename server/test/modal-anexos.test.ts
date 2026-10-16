@@ -50,6 +50,19 @@ describe('POST /api/demandas/:id/anexos', () => {
     const det = (await a.como(a.pessoas.am).get(`/api/demandas/${d.numero}`)).corpo
     assert.deepEqual(det.anexos.map((z: Anexo) => z.id), [y.id, x.id])
   })
+
+  test('finalidade "evidencia" pelo HTTP é ignorada: o anexo do modal é sempre de referência e sai normalmente', async () => {
+    const a = await ambiente()
+    const d = await a.criarDemanda()
+    const equipe = a.como(a.pessoas.design)
+    const r = await equipe.post(`/api/demandas/${d.id}/anexos`, {
+      tipo: 'link', url: 'https://drive.google.com/file/d/print-aprovacao', nome: 'Print: cliente aprovou', finalidade: 'evidencia',
+    })
+    assert.equal(r.status, 201)
+    assert.equal(r.corpo.finalidade, 'referencia')
+    assert.equal(um<{ f: string }>(a.db, 'SELECT finalidade AS f FROM anexo WHERE id = ?', r.corpo.id)!.f, 'referencia')
+    assert.equal((await equipe.del(`/api/anexos/${r.corpo.id}`)).status, 204, 'quem enviou remove')
+  })
 })
 
 describe('DELETE /api/anexos/:id', () => {

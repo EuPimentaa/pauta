@@ -82,6 +82,13 @@ describe('Arquivo', () => {
     assert.deepEqual(await q('nada "parecido" *'), [])
     assert.deepEqual(await q('acao - !!'), [d.d4.numero], 'pontuação solta não zera a busca')
     assert.deepEqual(await q('excluída'), [])
+    // caracteres de controle não chegam ao FTS (o NUL dentro das aspas dava 500)
+    for (const texto of ['\u0000x', 'carros\u0000sel', 'banner\u0001', '\u0000']) {
+      const r = await eu.get(`/api/arquivo?q=${encodeURIComponent(texto)}`)
+      assert.equal(r.status, 200, JSON.stringify(texto))
+    }
+    assert.deepEqual(await q('banner\u0000'), [d.d2.numero])
+    assert.deepEqual(await q('institucional-carrossel'), [d.d1.numero], 'hífen corta como o tokenizador')
   })
 
   test('cursor: páginas sem repetir nem pular; cursor inválido → 400', async () => {

@@ -38,11 +38,12 @@ function limitesDoMes(mes: string): [string, string] {
 }
 
 /**
- * Termo do FTS5 para cada palavra (aspas protegem a sintaxe; * = prefixo). Palavra só de pontuação ("#", "-") sai: o
- * tokenizador a apagaria e o E com um termo vazio não acharia nada.
+ * Termo do FTS5 para cada pedaço de letras e números (aspas protegem a sintaxe; * = prefixo), cortado como o
+ * tokenizador corta: "pós-venda" vira "pós" e "venda". Pontuação solta ("#", "-") e caracteres de controle saem (o NUL
+ * dentro das aspas truncava a consulta e dava 500).
  */
-function termosFts(palavras: string[]): string | null {
-  const termos = palavras.map((p) => p.replace(/["*^:()]/g, '').trim()).filter((p) => /[\p{L}\p{N}]/u.test(p)).map((p) => `"${p}"*`)
+export function termosFts(palavras: string[]): string | null {
+  const termos = palavras.flatMap((p) => p.split(/[^\p{L}\p{N}]+/u)).filter(Boolean).map((p) => `"${p}"*`)
   return termos.length ? termos.join(' AND ') : null
 }
 

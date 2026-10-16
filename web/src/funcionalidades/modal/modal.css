@@ -309,6 +309,8 @@
     background: var(--cor-bg); color: var(--cor-ink); box-shadow: inset 4px 0 0 var(--cor); font: 600 var(--fs-body) / 1 var(--font);
   }
   .mdl-etiqueta-barra > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* a prévia do formulário (coluna) não cresce nem encolhe: com flex: 1 ela ficava com a altura do texto */
+  .mdl-formulario > .mdl-etiqueta-barra { flex: none; }
   .mdl-capas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .mdl-capa-opcao {
     position: relative; height: 56px; overflow: hidden; border: 0; padding: 0; border-radius: var(--radius-sm); cursor: pointer;

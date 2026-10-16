@@ -14,7 +14,7 @@ import { entre } from '@shared/logica/posicao.ts'
 import { formatarDuracao } from '@shared/logica/modal-texto.ts'
 import { avisarErro } from '../../api/acoes.ts'
 import { enviarArquivo } from '../../api/arquivos.ts'
-import { aplicarPatchDemanda, atualizarDetalhe, demandaConhecida, inserirDemanda } from '../../api/cache.ts'
+import { aplicarPatchDemanda, atualizarDetalhe, bootstrapDe, demandaConhecida, inserirDemanda } from '../../api/cache.ts'
 import { chaves } from '../../api/chaves.ts'
 import { api, comConsulta, type ErroDaApi } from '../../api/cliente.ts'
 import { navegar } from '../../dialogos/estado.ts'
@@ -305,11 +305,29 @@ function criarAcoes(qc: QueryClient) {
 
   // ─────────── tempo ───────────
 
-  /** Soma minutos meus ao detalhe aberto da demanda (o total vem do evento de minutosRegistrados). */
-  function somarMeus(demandaId: Id, minutos: number) {
-    atualizarDetalhe(qc, demandaId, (det) => ({ ...det, tempo: { totalMin: det.tempo.totalMin + minutos, meusMin: det.tempo.meusMin + minutos } }))
+  /** O tempo da demanda antes da chamada (o retrato que somarMeus usa). */
+  function retratoTempo(demandaId: Id | null | undefined) {
+    if (!demandaId) return null
+    const det = detalheDe(qc, demandaId)
+    return {
+      demandaId, registrados: demandaConhecida(qc, demandaId)?.minutosRegistrados ?? null,
+      total: det?.tempo.totalMin ?? null, meus: det?.tempo.meusMin ?? null,
+    }
+  }
+
+  /**
+   * Soma os minutos meus à demanda e ao detalhe aberto a partir do retrato de antes da chamada. O evento da demanda
+   * (minutosRegistrados absoluto, sem trace, que não é eco) pode chegar antes da resposta: somar ao valor da hora
+   * contava os minutos duas vezes ("Total 6 min · meu 3 min" com 3 gravados).
+   */
+  function somarMeus(demandaId: Id, minutos: number, antes: ReturnType<typeof retratoTempo>) {
+    const base = antes?.demandaId === demandaId ? antes : null
+    const mais = (atual: number, deAntes: number | null | undefined) => (deAntes == null ? atual + minutos : Math.max(atual, deAntes + minutos))
+    atualizarDetalhe(qc, demandaId, (det) => ({
+      ...det, tempo: { totalMin: mais(det.tempo.totalMin, base?.total), meusMin: mais(det.tempo.meusMin, base?.meus) },
+    }))
     const d = demandaConhecida(qc, demandaId)
-    if (d) aplicarPatchDemanda(qc, demandaId, { minutosRegistrados: d.minutosRegistrados + minutos })
+    if (d) aplicarPatchDemanda(qc, demandaId, { minutosRegistrados: mais(d.minutosRegistrados, base?.registrados) })
   }
 
   function avisarParado(parado: Apontamento, avisos: CronometroSaida['avisos'], ligouOutro: boolean) {
@@ -328,12 +346,13 @@ function criarAcoes(qc: QueryClient) {
       id: `provisorio-${d.id}`, usuarioId: '', demandaId: d.id, clienteId: d.clienteId, data: '', minutos: null,
       iniciadoEm: new Date().toISOString(), paradoEm: null, origem: 'cronometro', nota: null, criadoEm: new Date().toISOString(),
     }
+    const antes = retratoTempo(bootstrapDe(qc)?.eu.cronometro?.demandaId)
     definirCronometro(qc, (atual, euId) => { anterior = atual; return { ...provisorio, usuarioId: euId } })
     try {
       const s = await api<CronometroSaida>('POST', `${de(d.id)}/cronometro`)
       definirCronometro(qc, () => s.ativo)
       if (s.parado) {
-        somarMeus(s.parado.demandaId, s.parado.minutos ?? 0)
+        somarMeus(s.parado.demandaId, s.parado.minutos ?? 0, antes)
         avisarParado(s.parado, s.avisos, true)
       }
       return s
@@ -346,11 +365,12 @@ function criarAcoes(qc: QueryClient) {
 
   async function pararCronometro(): Promise<CronometroSaida | null> {
     let anterior: Apontamento | null = null
+    const antes = retratoTempo(bootstrapDe(qc)?.eu.cronometro?.demandaId)
     definirCronometro(qc, (atual) => { anterior = atual; return null })
     try {
       const s = await api<CronometroSaida>('POST', '/api/cronometro/parar')
       if (s.parado) {
-        somarMeus(s.parado.demandaId, s.parado.minutos ?? 0)
+        somarMeus(s.parado.demandaId, s.parado.minutos ?? 0, antes)
         avisarParado(s.parado, s.avisos, false)
       }
       return s
@@ -362,9 +382,10 @@ function criarAcoes(qc: QueryClient) {
   }
 
   async function lancarTempo(d: Demanda, e: CriarApontamentoEntrada): Promise<Apontamento | null> {
+    const antes = retratoTempo(d.id)
     try {
       const a = await api<Apontamento>('POST', `${de(d.id)}/apontamentos`, { corpo: e })
-      somarMeus(d.id, a.minutos ?? 0)
+      somarMeus(d.id, a.minutos ?? 0, antes)
       avisar(`${formatarDuracao(a.minutos ?? 0)} lançados em #${d.numero}.`, { tipo: 'sucesso' })
       return a
     } catch (erro) {

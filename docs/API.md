@@ -23,9 +23,11 @@ Sumário: [1 Convenções](#1-convenções) · [2 Permissões](#2-permissões) �
 - **Anti-CSRF:** toda mutação (POST, PATCH, PUT, DELETE), inclusive login e página pública, exige o header
   `X-Trace-Id` (uuid v4 gerado pelo navegador por mutação) e `Origin` igual a `APP_URL`. Falta ou diferença:
   `403 csrf`. O `X-Trace-Id` volta no evento SSE (`t`) para o navegador ignorar o próprio eco e vai para `atividade.trace_id`.
-- **IP do cliente** (`Ator.ip`, limites, `ip_hmac`): atrás do Traefik do EasyPanel, `TRUST_PROXY_HOPS=1` (env; 0 em
-  desenvolvimento). Com N > 0, o IP é o N-ésimo item **a partir do fim** de `X-Forwarded-For` (com 1, o último, que o
-  Traefik acrescentou); nunca o primeiro, que o cliente forja. Sem o header (ou N = 0): o endereço do socket.
+- **IP do cliente** (`Ator.ip`, limites, `ip_hmac`): em produção a Cloudflare fica na frente do Traefik do EasyPanel,
+  então `TRUST_PROXY_HOPS=2` (env; 1 só com o Traefik; 0 em desenvolvimento). Com N > 0, o IP é o N-ésimo item **a
+  partir do fim** de `X-Forwarded-For` (com 2, o penúltimo: o IP do visitante que a Cloudflare acrescentou; o último é o
+  da Cloudflare, que o Traefik acrescentou); nunca o primeiro, que o cliente forja. Sem o header (ou N = 0): o
+  endereço do socket.
 - **Limite de corpo:** `bodyLimit` (`hono/body-limit`) antes de qualquer parse, recusando pelo `Content-Length` sem
   ler o corpo: `POST /api/arquivos` até 10 MiB + 64 KiB (`413 arquivo_grande`); o resto de `/api`, 1 MiB (`413 corpo_grande`).
 - **Cabeçalhos** (produção, no HTML e na API): `Content-Security-Policy: default-src 'self'; script-src 'self';

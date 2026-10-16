@@ -164,9 +164,11 @@ VPS da agência com EasyPanel (Ubuntu 24.04), domínio `demandas.meltcomunicacao
 - Serviço do tipo **App**, origem Git, build pelo `Dockerfile` da raiz (multi-stage: compila `web/dist`, imagem final
   `node:24-slim` só com dependências de produção do servidor).
 - **Mount** (volume) em `/app/data` → `DATA_DIR=/app/data` (banco + anexos). Sem o volume, os dados somem a cada deploy.
-- Porta do container: `7300`. O EasyPanel (Traefik) termina o HTTPS; o SSE precisa de `Cache-Control: no-cache` e `X-Accel-Buffering: no`.
+- Porta do container: `7300`. A Cloudflare (proxy laranja) fica na frente e o EasyPanel (Traefik) termina o HTTPS na
+  VPS; o SSE sai com `Cache-Control: no-cache` e `X-Accel-Buffering: no`, sem compressão, e o ping de 25 s mantém a
+  conexão abaixo do corte de 100 s da Cloudflare. Configuração da Cloudflare: `README.md`.
 - Variáveis: `APP_NOME`, `SEGREDO` (32+ bytes, assina links), `NODE_ENV=production`, `DATA_DIR=/app/data`, `APP_URL=https://demandas.meltcomunicacao.com.br`,
-  `TRUST_PROXY_HOPS=1` (o Traefik é o único proxy; com Cloudflare na frente, 2),
+  `TRUST_PROXY_HOPS=2` (Cloudflare + Traefik; seria 1 só com o Traefik),
   `ADMIN_EMAIL` e `ADMIN_SENHA` (só no primeiro boot, para criar o admin; depois remova).
 - Health check: `GET /api/saude`.
 - Backup: `VACUUM INTO` diário dentro de `/app/data/backups` (mantém 14), feito pelo próprio servidor.

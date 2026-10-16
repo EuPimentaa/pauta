@@ -301,7 +301,7 @@ detectarSenha(texto: string): boolean
 - login certo/errado; 6ª falha em 15 min no mesmo e-mail+IP → 429; 21ª falha no mesmo e-mail em 1 h vinda de IPs
   diferentes → 429; 30 logins em paralelo (`Promise.all`) → no máximo 5 respostas 401 e a senha certa no meio da
   rajada → 429; e-mail inexistente leva o mesmo tempo; `X-Forwarded-For: 1.1.1.1, 2.2.2.2` com
-  `TRUST_PROXY_HOPS=1` → IP 2.2.2.2 (e com 2, o da Cloudflare: o penúltimo); `/auth/senha` errada 6× → 429 e 20 em
+  `TRUST_PROXY_HOPS=1` → IP 2.2.2.2 (com 2, atrás da Cloudflare, o penúltimo: o do visitante); `/auth/senha` errada 6× → 429 e 20 em
   paralelo → no máximo 5 respostas 401; convite usado 2× → 410; convite de pessoa desativada → 410; convite pendente
   + redefinição usada → convite 410; `X-Trace-Id` que não é uuid v4 → 403 csrf; desativar revoga os tokens pendentes e para o cronômetro; redefinição revoga sessões antigas;
   sessão de pessoa desativada → 401; mutação sem `X-Trace-Id` ou com `Origin` errado → 403 csrf; corpo JSON de 2 MiB →
@@ -1089,7 +1089,7 @@ Para cada funcionalidade, o integrador:
     `no-store`/`noindex`/`no-referrer`, `/a/:token` sem baixar `registro.ts`, convite sem token na URL depois de
     aberto, backup diário em `DATA_DIR/backups`.
 13. `docker build` e o container sobem com o volume em `/app/data` e respondem em `/api/saude`; atrás do Traefik, o
-    limite de login conta o IP real (`TRUST_PROXY_HOPS=1`).
+    limite de login conta o IP real (`TRUST_PROXY_HOPS=2`, com a Cloudflare na frente; `docs/pedidos/dono.md`).
 
 ---
 
@@ -1134,7 +1134,8 @@ Decisões tomadas no contrato que o dono do produto deve confirmar (nenhuma bloq
     aparece como "com o cliente há N" e no Início do AM.
 20. **Feriados:** Carnaval e Corpus Christi entram como facultativos e contam como dia não útil; os municipais da sede
     não foram semeados (falta a cidade).
-21. **Proxy:** `TRUST_PROXY_HOPS=1` supõe o Traefik do EasyPanel como único proxy; com Cloudflare na frente, 2.
+21. **Proxy:** confirmado pelo dono em 16/10/2026: a Cloudflare fica na frente do Traefik, então produção usa
+    `TRUST_PROXY_HOPS=2` (1 só valeria com o Traefik sozinho).
 22. **`style-src 'unsafe-inline'`** na CSP: o sonner e o TipTap injetam `<style>` em tempo de execução. Scripts
     continuam só `'self'`.
 

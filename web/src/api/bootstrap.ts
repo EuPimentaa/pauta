@@ -6,6 +6,7 @@
 import { useQuery, type QueryClient, type UseQueryResult } from '@tanstack/react-query'
 import type { Bootstrap } from '@shared/tipos/index.ts'
 import { definirNomeApp } from '../lib/app.ts'
+import { marcarPessoaLocal } from '../lib/armazenamento.ts'
 import { api, type ErroDaApi } from './cliente.ts'
 
 export const CHAVE_BOOTSTRAP = ['bootstrap'] as const
@@ -13,6 +14,8 @@ export const CHAVE_BOOTSTRAP = ['bootstrap'] as const
 export async function buscarBootstrap(sinal?: AbortSignal): Promise<Bootstrap> {
   const b = await api<Bootstrap>('GET', '/api/bootstrap', { sinal, redirecionar401: false })
   definirNomeApp(b.app?.nome)
+  // outra pessoa neste navegador: os rascunhos da anterior saem antes de qualquer tela os ler
+  marcarPessoaLocal(b.eu.usuario.id)
   return b
 }
 

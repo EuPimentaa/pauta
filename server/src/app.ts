@@ -61,6 +61,38 @@ function semReferer(caminho: string): boolean {
   return caminho.startsWith('/a/') || caminho.startsWith('/api/publico/') || caminho === '/convite' || caminho === '/redefinir'
 }
 
+/** Até quanto e por quanto tempo o servidor lê (e descarta) o corpo de um upload grande antes de responder o 413. */
+const DRENAR_MAX_BYTES = 64 * 1024 * 1024
+const DRENAR_MAX_MS = 30_000
+
+/**
+ * Lê e descarta o corpo que o bodyLimit recusou pelo Content-Length. O navegador só olha a resposta depois de mandar o
+ * corpo inteiro: se o servidor responde sem ler e o @hono/node-server fecha a conexão com dados por ler (ele drena só
+ * 500 ms), o sistema manda um RST e o fetch vê só "conexão caiu" (o aviso dizia "Sem conexão com o servidor" num PDF de
+ * 11 MB). Lê pelo corpo da Request (o próprio bodyLimit já o abriu: o IncomingMessage fica pausado por ele). Passou do
+ * limite de bytes ou de tempo: desiste e responde mesmo assim.
+ */
+export async function drenarCorpo(corpo: ReadableStream<Uint8Array> | null): Promise<void> {
+  if (!corpo || corpo.locked) return
+  const leitor = corpo.getReader()
+  let lidos = 0
+  let relogio: ReturnType<typeof setTimeout> | undefined
+  const esgotou = new Promise<null>((pronto) => { relogio = setTimeout(() => pronto(null), DRENAR_MAX_MS) })
+  try {
+    for (;;) {
+      const r = await Promise.race([leitor.read(), esgotou])
+      if (!r || r.done) break
+      lidos += r.value.byteLength
+      if (lidos > DRENAR_MAX_BYTES) break
+    }
+  } catch {
+    // a conexão caiu no meio: não há mais o que ler
+  } finally {
+    clearTimeout(relogio)
+    void leitor.cancel().catch(() => {})
+  }
+}
+
 function erroJson(c: Context, e: ErroHttp): Response {
   return c.json(e.corpo(), e.status as 400)
 }
@@ -82,7 +114,11 @@ export function criarApp(db: Db): App {
 
   // bodyLimit antes de qualquer parse: recusa pelo Content-Length sem ler o corpo
   const limiteUpload = bodyLimit({
-    maxSize: LIMITE_UPLOAD_CORPO, onError: () => { throw new ErroHttp(413, 'arquivo_grande', 'O arquivo passa de 10 MB.') },
+    maxSize: LIMITE_UPLOAD_CORPO,
+    onError: async (c) => {
+      await drenarCorpo(c.req.raw.body)
+      throw new ErroHttp(413, 'arquivo_grande', 'O arquivo passa de 10 MB.')
+    },
   })
   const limiteJson = bodyLimit({
     maxSize: LIMITE_JSON, onError: () => { throw new ErroHttp(413, 'corpo_grande', 'O conteúdo enviado é grande demais.') },

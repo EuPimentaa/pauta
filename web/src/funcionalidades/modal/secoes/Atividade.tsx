@@ -16,7 +16,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { ContextoDemanda } from '../../../extensoes/tipos.ts'
 import { chaves } from '../../../api/chaves.ts'
 import { useDoBootstrap } from '../../../api/seletores.ts'
-import { enviarArquivo } from '../../../api/arquivos.ts'
+import { enviarArquivo, limiteUpload } from '../../../api/arquivos.ts'
 import { abrirDialogo } from '../../../dialogos/estado.ts'
 import { formatarData } from '../../../lib/datas.ts'
 import { useLocal } from '../../../lib/armazenamento.ts'
@@ -44,8 +44,10 @@ function Compositor({ ctx, aberto, abrir, fechar, prefixo }: {
   ctx: ContextoDemanda; aberto: boolean; abrir(): void; fechar(): void; prefixo: string | null
 }) {
   const acoes = useAcoesModal()
+  const qc = useQueryClient()
   const buscarPessoas = useBuscarPessoas()
-  const [rascunho, setRascunho] = useLocal<string>(`rascunho-comentario:${ctx.demanda.id}`, '')
+  // o id de quem escreve na chave: no mesmo navegador, outra pessoa não vê o rascunho (e o Sair apaga todos)
+  const [rascunho, setRascunho] = useLocal<string>(`rascunho-comentario:${ctx.eu.usuario.id}:${ctx.demanda.id}`, '')
   const [visivel, setVisivel] = useState(false)
   const [anexos, setAnexos] = useState<Anexo[]>([])
   const [enviando, setEnviando] = useState(false)
@@ -68,7 +70,7 @@ function Compositor({ ctx, aberto, abrir, fechar, prefixo }: {
     setSubindo((n) => n + arquivos.length)
     for (const f of arquivos) {
       try {
-        const info = await enviarArquivo(f)
+        const info = await enviarArquivo(f, undefined, limiteUpload(qc))
         const a = await acoes.criarAnexo(ctx.demanda, { tipo: 'arquivo', arquivoId: info.id, nome: f.name || info.nome })
         if (a) setAnexos((l) => [...l, a])
       } catch (erro) {

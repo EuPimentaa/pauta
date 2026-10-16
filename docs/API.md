@@ -29,7 +29,10 @@ Sumário: [1 Convenções](#1-convenções) · [2 Permissões](#2-permissões) �
   da Cloudflare, que o Traefik acrescentou); nunca o primeiro, que o cliente forja. Sem o header (ou N = 0): o
   endereço do socket.
 - **Limite de corpo:** `bodyLimit` (`hono/body-limit`) antes de qualquer parse, recusando pelo `Content-Length` sem
-  ler o corpo: `POST /api/arquivos` até 10 MiB + 64 KiB (`413 arquivo_grande`); o resto de `/api`, 1 MiB (`413 corpo_grande`).
+  interpretar o corpo: `POST /api/arquivos` até 10 MiB + 64 KiB (`413 arquivo_grande`); o resto de `/api`, 1 MiB (`413 corpo_grande`).
+  No upload recusado, o servidor lê e descarta o corpo (até 64 MB e 30 s, `drenarCorpo`) antes de responder: o
+  navegador só lê a resposta depois de mandar tudo e, com a conexão derrubada no meio, via "conexão caiu" em vez do 413.
+  O front confere `config.uploadLimiteBytes` antes de enviar (`enviarArquivo`).
 - **Cabeçalhos** (produção, no HTML e na API): `Content-Security-Policy: default-src 'self'; script-src 'self';
   style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://drive.google.com https://*.googleusercontent.com;
   frame-src https://drive.google.com https://www.youtube-nocookie.com https://www.figma.com; connect-src 'self';

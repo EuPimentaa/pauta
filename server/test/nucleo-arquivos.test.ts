@@ -2,6 +2,8 @@
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
+import { request } from 'node:http'
+import { serve } from '@hono/node-server'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { config } from '../src/config.ts'
 import { rodar, tx, um } from '../src/db.ts'
@@ -93,24 +95,56 @@ describe('POST /api/arquivos', () => {
     assert.equal(semCsrf.status, 403)
   })
 
-  test('limites: Content-Length acima de 10 MiB + 64 KiB → 413 sem ler o corpo; 2 MiB (acima do limite de JSON) passa', async () => {
+  test('limites: Content-Length acima de 10 MiB + 64 KiB → 413 sem parse (o corpo só é descartado); 2 MiB (acima do limite de JSON) passa', async () => {
     const a = await ambiente()
     const eu = a.como(a.pessoas.am)
-    let lido = false
-    const corpo = new ReadableStream<Uint8Array>({ pull() { lido = true; throw new Error('não devia ler') } }, { highWaterMark: 0 })
+    // o corpo que quebra ao ser lido não derruba o 413: o servidor só o descarta (drenarCorpo), nunca o interpreta
+    const corpo = new ReadableStream<Uint8Array>({ pull() { throw new Error('conexão caiu') } }, { highWaterMark: 0 })
     const r = await eu.bruto('/api/arquivos', {
       method: 'POST', body: corpo, duplex: 'half',
       headers: { 'Content-Type': 'multipart/form-data; boundary=x', 'Content-Length': String(11 * 1024 * 1024) },
     } as RequestInit)
     assert.equal(r.status, 413)
     assert.equal((await r.json()).erro.codigo, 'arquivo_grande')
-    assert.equal(lido, false)
 
     const grande = new Uint8Array(2 * 1024 * 1024)
     grande.set(AMOSTRAS.pdf)
     const ok = await enviar(eu, grande, 'manual.pdf')
     assert.equal(ok.status, 201)
     assert.equal(ok.corpo.bytes, grande.byteLength)
+  })
+
+  test('upload de 11 MB lento (servidor de verdade): o servidor lê e descarta o corpo e responde 413 sem derrubar a conexão', async () => {
+    // o navegador só lê a resposta depois de mandar tudo: com a conexão derrubada no meio (RST), o aviso dizia
+    // "Sem conexão com o servidor" em vez de "passa de 10 MB" (revisão funcional da integração 3A, achado 6)
+    const a = await ambiente()
+    const srv = serve({ fetch: a.app.fetch, port: 0, hostname: '127.0.0.1' })
+    try {
+      await new Promise((pronto) => srv.once('listening', pronto))
+      const porta = (srv.address() as { port: number }).port
+      const total = 11 * 1024 * 1024
+      const pedaco = Buffer.alloc(512 * 1024)
+      const saida = await new Promise<{ status: number | null; enviados: number; erro: string | null }>((pronto) => {
+        let status: number | null = null
+        let erro: string | null = null
+        let enviados = 0
+        const req = request({ host: '127.0.0.1', port: porta, path: '/api/arquivos', method: 'POST',
+          headers: { 'Content-Type': 'multipart/form-data; boundary=x', 'Content-Length': String(total) } })
+        req.on('response', (r) => { status = r.statusCode ?? null; r.resume() })
+        req.on('error', (e) => { erro = e.message })
+        // 22 pedaços a cada 40 ms: quase 1 s, mais que os 500 ms que o @hono/node-server drena sozinho
+        const passo = () => {
+          if (erro || enviados >= total) { req.end(); setTimeout(() => pronto({ status, enviados, erro }), 200); return }
+          req.write(pedaco, (e) => { if (e) erro = e.message; else enviados += pedaco.length; setTimeout(passo, 40) })
+        }
+        passo()
+      })
+      assert.equal(saida.erro, null)
+      assert.equal(saida.enviados, total)
+      assert.equal(saida.status, 413)
+    } finally {
+      srv.close()
+    }
   })
 
   test('acima de uploadLimiteBytes (configurável) → 413 arquivo_grande e nada fica no disco', async () => {

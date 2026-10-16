@@ -13,7 +13,7 @@ import type {
 import { entre } from '@shared/logica/posicao.ts'
 import { formatarDuracao } from '@shared/logica/modal-texto.ts'
 import { avisarErro } from '../../api/acoes.ts'
-import { enviarArquivo } from '../../api/arquivos.ts'
+import { enviarArquivo, limiteUpload, tamanhoLegivel } from '../../api/arquivos.ts'
 import { aplicarPatchDemanda, atualizarDetalhe, bootstrapDe, demandaConhecida, inserirDemanda } from '../../api/cache.ts'
 import { chaves } from '../../api/chaves.ts'
 import { api, comConsulta, type ErroDaApi } from '../../api/cliente.ts'
@@ -187,7 +187,7 @@ function criarAcoes(qc: QueryClient) {
     }
   }
 
-  /** Envia os arquivos (até 10 MB cada) e anexa à demanda, na ordem; devolve os anexos criados. */
+  /** Envia os arquivos (até o limite da configuração, no máximo 10 MB cada) e anexa à demanda, na ordem; devolve os anexos criados. */
   async function enviarArquivos(d: Demanda, arquivos: File[]): Promise<Anexo[]> {
     if (arquivos.length === 0) return []
     const id = avisar(arquivos.length === 1 ? `Enviando ${arquivos[0]!.name || 'o arquivo'}…` : `Enviando ${arquivos.length} arquivos…`,
@@ -196,12 +196,12 @@ function criarAcoes(qc: QueryClient) {
     const falhas: string[] = []
     for (const f of arquivos) {
       try {
-        const info = await enviarArquivo(f)
+        const info = await enviarArquivo(f, undefined, limiteUpload(qc))
         const a = await criarAnexo(d, { tipo: 'arquivo', arquivoId: info.id, nome: f.name || info.nome }, true)
         if (a) feitos.push(a)
       } catch (e) {
         const erro = e as ErroDaApi
-        falhas.push(erro?.codigo === 'arquivo_grande' ? `${f.name}: passa de 10 MB`
+        falhas.push(erro?.codigo === 'arquivo_grande' ? `${f.name}: passa de ${tamanhoLegivel(Number(erro.detalhes?.limiteBytes) || limiteUpload(qc))}`
           : erro?.codigo === 'tipo_arquivo' ? `${f.name}: use imagem, PDF ou ZIP` : `${f.name}: ${erro?.mensagem ?? 'falhou'}`)
       }
     }

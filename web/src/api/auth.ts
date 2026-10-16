@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient, type UseQueryR
 import type {
   Bootstrap, DefinirSenhaEntrada, EditarEuEntrada, Eu, LoginEntrada, TokenAcessoInfo, TrocarSenhaEntrada,
 } from '@shared/tipos/index.ts'
+import { apagarRascunhosLocais } from '../lib/armazenamento.ts'
 import { avisar } from '../ui/avisos.tsx'
 import { api, mensagemDeErro, type ErroDaApi } from './cliente.ts'
 import { CHAVE_BOOTSTRAP, opcoesBootstrap } from './bootstrap.ts'
@@ -66,6 +67,8 @@ export function useSair(): () => Promise<void> {
   return async () => {
     try { await api('POST', '/api/auth/logout', { redirecionar401: false }) } catch { /* já sem sessão */ }
     qc.clear()
+    // rascunhos não enviados não ficam para a próxima pessoa deste navegador
+    apagarRascunhosLocais()
     window.location.assign('/entrar')
   }
 }

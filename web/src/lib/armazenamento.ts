@@ -66,3 +66,35 @@ export function useLocal<T>(chave: string, padrao: T): [T, (v: T | ((atual: T) =
   }, [chave, padrao])
   return [valor, definir]
 }
+
+/**
+ * Rascunhos (texto que a pessoa ainda não mandou: comentário, Nova demanda) ficam com o prefixo `rascunho-` e o id de
+ * quem escreveu na chave; saem no Sair e quando outra pessoa entra no mesmo navegador (computador compartilhado da
+ * agência), para ninguém ver nem publicar o texto da anterior.
+ */
+export const PREFIXO_RASCUNHO = 'rascunho-'
+
+export function apagarRascunhosLocais(): void {
+  try {
+    const chaves: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k?.startsWith(PREFIXO + PREFIXO_RASCUNHO)) chaves.push(k)
+    }
+    for (const k of chaves) {
+      localStorage.removeItem(k)
+      avisar(k.slice(PREFIXO.length))
+    }
+  } catch {
+    // sem armazenamento: não há rascunho guardado
+  }
+}
+
+/** Chamado a cada bootstrap: se quem entrou não é quem usou este navegador por último, os rascunhos saem. */
+export function marcarPessoaLocal(usuarioId: string): void {
+  const anterior = lerLocal<string | null>('ultima-pessoa', null)
+  if (anterior !== usuarioId) {
+    apagarRascunhosLocais()
+    gravarLocal('ultima-pessoa', usuarioId)
+  }
+}

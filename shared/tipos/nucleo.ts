@@ -99,7 +99,7 @@ export const CODIGOS_ERRO = [
   'conflito',               // 409 outro conflito de estado (sigla repetida, coluna com cards, quadro com histórico)
   'link_inativo',           // 410 link público expirado ou revogado
   'token_invalido',         // 410 convite/redefinição usado, revogado, expirado, inexistente ou de pessoa inativa
-  'arquivo_grande',         // 413 upload acima de 10 MB (recusado pelo Content-Length, sem ler o corpo)
+  'arquivo_grande',         // 413 upload acima de 10 MB (recusado pelo Content-Length, sem parse; o corpo é descartado)
   'corpo_grande',           // 413 corpo JSON acima de 1 MiB
   'tipo_arquivo',           // 415 magic number fora da allowlist
   'estado_invalido',        // 422 a ação não vale no estado atual (enviar sem versão ou sem cliente, destino arquivado)

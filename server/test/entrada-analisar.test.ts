@@ -142,6 +142,10 @@ describe('colar-whatsapp (puro)', () => {
     assert.equal(p('[14/10 10:00] A: para sexta\n[14/10 10:05] B: combinado, entrego até segunda')!.data, '2026-10-19')
     assert.equal(p('um carrossel para o Dia do Médico'), null)
     assert.equal(p('o evento é sexta'), null, 'sem "até/para/prazo/entrega" não é prazo')
+    // colada dias depois: o dia da semana e o "amanhã" contam do dia da mensagem (integração da Onda 3)
+    assert.equal(p('[14/10 15:33] Marina: 5 lâminas. Até sexta, por favor', '2026-10-16')!.data, '2026-10-16')
+    assert.equal(p('[14/10 15:33] Marina: para segunda', '2026-10-16')!.data, '2026-10-19')
+    assert.equal(p('[12/10 10:00] A: pode entregar amanhã', '2026-10-16'), null, 'prazo que já passou não é sugerido')
   })
 
   test('sem cliente conhecido e sem sigla: nada sugerido', () => {

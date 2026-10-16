@@ -304,24 +304,27 @@ function semAcentoMesmoTamanho(s: string): string {
 
 /**
  * Prazo que a conversa pede ("até sexta", "para amanhã", "entrega dia 24/10"): a última menção com "até", "para",
- * "pra", "prazo" ou "entrega" antes do dia. Dia da semana = o próximo depois de hoje; data sem ano = a próxima (não
- * volta no tempo). Nada disso na conversa: null (vale o prazo do modelo).
+ * "pra", "prazo" ou "entrega" antes do dia. Dia da semana = o próximo depois do dia da mensagem (ou de hoje, sem data);
+ * data sem ano = a próxima (não volta no tempo); prazo que já passou não é sugerido. Nada disso na conversa: null (vale
+ * o prazo do modelo).
  */
 export function prazoDaConversa(msgs: readonly MensagemConversa[], hoje: DataLocal): { data: DataLocal; casou: string } | null {
   let achado: { data: DataLocal; casou: string } | null = null
   for (const m of msgs) {
     const original = m.texto.normalize('NFC')
     const n = semAcentoMesmoTamanho(original)
+    // "amanhã" e "sexta" contam do dia da mensagem (colada dias depois, "até sexta" de quarta é a sexta daquela semana)
+    const base = m.data && m.data <= hoje ? m.data : hoje
     for (const x of n.matchAll(PRAZO)) {
       const alvo = x[1]!
       let data: DataLocal | null = null
-      if (alvo === 'hoje') data = hoje
-      else if (alvo === 'amanha') data = somarDias(hoje, 1)
-      else if (alvo === 'depois de amanha') data = somarDias(hoje, 2)
+      if (alvo === 'hoje') data = base
+      else if (alvo === 'amanha') data = somarDias(base, 1)
+      else if (alvo === 'depois de amanha') data = somarDias(base, 2)
       else if (DIAS.includes(alvo)) {
         const alvoDia = DIAS.indexOf(alvo)
-        const hojeDia = new Date(`${hoje}T12:00:00Z`).getUTCDay()
-        data = somarDias(hoje, ((alvoDia - hojeDia + 7) % 7) || 7)
+        const baseDia = new Date(`${base}T12:00:00Z`).getUTCDay()
+        data = somarDias(base, ((alvoDia - baseDia + 7) % 7) || 7)
       } else {
         const [d, mes, a] = alvo.split('/')
         const ano = Number(hoje.slice(0, 4))
@@ -329,7 +332,7 @@ export function prazoDaConversa(msgs: readonly MensagemConversa[], hoje: DataLoc
         if (c && !a && c < hoje) c = `${ano + 1}-${dois(mes!)}-${dois(d!)}`
         if (c && ehDataLocal(c) && c >= hoje) data = c
       }
-      if (!data) continue
+      if (!data || data < hoje) continue                // prazo que já passou não é sugerido
       // o gatilho mais perto do dia ("para a Clínica Aurora, até sexta" → "até sexta")
       const ultimo = [...x[0].matchAll(/\b(?:ate|para|pra|prazo|entreg\w*)\b/g)].at(-1)!.index!
       achado = { data, casou: original.slice(x.index! + ultimo, x.index! + x[0].length).replace(/\s+/g, ' ').trim() }

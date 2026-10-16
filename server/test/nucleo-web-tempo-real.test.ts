@@ -7,7 +7,7 @@ import { QueryObserver } from '@tanstack/query-core'
 import assert from 'node:assert/strict'
 import type { EventoDe, EventoTempoReal, SyncSaida } from '../../shared/tipos/index.ts'
 import { aplicarDemandaDoServidor, aplicarNoBootstrap, aplicarPatchDemanda, inserirDemanda, inserirOuAtualizar, removerDemanda } from '../../web/src/api/cache.ts'
-import { conectarTempoReal, esperaDaTentativa, type EstadoLigacao, type Tratador } from '../../web/src/tempo-real/conexao.ts'
+import { conectarTempoReal, esperaDaTentativa, SILENCIO_MAX, type EstadoLigacao, type Tratador } from '../../web/src/tempo-real/conexao.ts'
 import { pausarEntrega, recebidoEm } from '../../web/src/tempo-real/estado.ts'
 import { ecoIgnorado, tratarCadastros, tratarDemanda, tratarQuadros } from '../../web/src/tempo-real/tratar.ts'
 import { EU, bootDe, bootstrap, cacheCom, coluna, demanda, etiqueta, evento, quadro } from './nucleo-web-ajuda.ts'
@@ -285,6 +285,25 @@ describe('cliente SSE', () => {
     qc.setQueryDefaults(['bootstrap'], { queryFn: () => bootstrap({ seq: 151, demandas: [demanda()] }) })
     await qc.fetchQuery({ queryKey: ['bootstrap'], staleTime: 0 })
     assert.deepEqual(entregues.filter((e) => e.id === 'd1').map((e) => e.s), [152])
+  })
+
+  test('fluxo aberto e calado (proxy que segurou a ligação): fecha, mostra a faixa e reabre do último seq', () => {
+    ligar()
+    const primeiro = ultimo()
+    primeiro.emitir('open')
+    primeiro.emitir('d', ev(104))
+    mock.timers.tick(SILENCIO_MAX - 1000)
+    primeiro.emitir('ping', { seq: 104 })          // o ping rearma a vigia
+    mock.timers.tick(SILENCIO_MAX - 1000)
+    assert.equal(primeiro.fechado, false)
+    assert.equal(estados.at(-1), 'online')
+    mock.timers.tick(1000)
+    assert.equal(primeiro.fechado, true)
+    assert.equal(estados.at(-1), 'reconectando')
+    assert.equal(FluxoFalso.abertos.length, 2)
+    assert.equal(ultimo().url, '/api/eventos?desde=104')
+    ultimo().emitir('open')
+    assert.equal(estados.at(-1), 'online')
   })
 
   test('três falhas seguidas: consulta /api/sync até o SSE voltar', async () => {

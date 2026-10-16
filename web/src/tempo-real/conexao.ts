@@ -5,6 +5,8 @@
  *   Se falhar de novo, este cliente assume com espera crescente de 1 s a 30 s (× 4 com a aba oculta) e reabre com
  *   ?desde=<último seq visto> (o servidor trata os dois do mesmo jeito).
  * - Depois de 3 falhas seguidas do SSE, consulta /api/sync de 5 s a 60 s até o SSE voltar (proxy que segura o fluxo).
+ * - Fluxo "aberto" e calado por 45 s (o servidor manda ping a cada 25 s) está morto: um proxy pode segurar a ligação
+ *   depois que o servidor caiu sem avisar o navegador (o do Vite faz isso). Fecha, mostra a faixa e reabre.
  * - `resync` (histórico podado, papel alterado, servidor reiniciado): recarrega o bootstrap. Toda recarga do bootstrap
  *   reaplica os eventos recentes com seq maior que o dele (nada se perde entre a leitura e a chegada).
  * - Ignora o próprio eco (ecoIgnorado), segura os eventos durante um arraste e entrega aos tratadores (vários por
@@ -38,6 +40,8 @@ export interface DepsConexao {
 
 export const ESPERA_SSE = { min: 1000, max: 30_000, ocultaVezes: 4 } as const
 export const ESPERA_SYNC = { min: 5000, max: 60_000 } as const
+/** Sem evento nem ping por este tempo, o fluxo aberto é dado como morto (ping do servidor: 25 s). */
+export const SILENCIO_MAX = 45_000
 const FALHAS_PARA_SYNC = 3
 const RECENTES_MAX = 400
 // readyState do EventSource (os números do padrão; sem depender do global, que o Node não tem)
@@ -60,6 +64,7 @@ export function conectarTempoReal(deps: DepsConexao, seqInicial: number): () => 
   let falhas = 0
   let timerSse: ReturnType<typeof setTimeout> | null = null
   let timerSync: ReturnType<typeof setTimeout> | null = null
+  let vigia: ReturnType<typeof setTimeout> | null = null
   let esperaSync: number = ESPERA_SYNC.min
   let consultando = false
   let parado = false
@@ -107,6 +112,22 @@ export function conectarTempoReal(deps: DepsConexao, seqInicial: number): () => 
 
   // ─────────── SSE ───────────
 
+  /** Rearma a cada sinal do fluxo; se disparar, o fluxo calou (ver o cabeçalho). */
+  function vigiar(es: EventSource) {
+    if (vigia) clearTimeout(vigia)
+    vigia = setTimeout(() => {
+      vigia = null
+      if (parado || fluxo !== es || es.readyState !== ABERTO) return
+      console.info(`[tempo real] nada do servidor há ${SILENCIO_MAX / 1000} s: reabrindo o fluxo`)
+      es.close()
+      fluxo = null
+      falhas++
+      deps.definirEstado(semRede() ? 'offline' : 'reconectando')
+      if (falhas >= FALHAS_PARA_SYNC) iniciarSync()
+      abrir()
+    }, SILENCIO_MAX)
+  }
+
   function abrir() {
     if (parado) return
     timerSse = null
@@ -117,14 +138,17 @@ export function conectarTempoReal(deps: DepsConexao, seqInicial: number): () => 
       if (fluxo !== es) return
       falhas = 0
       pararSync()
+      vigiar(es)
       deps.definirEstado('online')
     })
     es.addEventListener('d', (m) => {
       if (fluxo !== es) return
+      vigiar(es)
       try { receber(JSON.parse((m as MessageEvent<string>).data) as EventoTempoReal) } catch (e) { console.error('[tempo real] evento ilegível', e) }
     })
     es.addEventListener('resync', (m) => {
       if (fluxo !== es) return
+      vigiar(es)
       let motivo = '?'
       try { motivo = (JSON.parse((m as MessageEvent<string>).data) as EventoResync).motivo } catch { /* sem corpo */ }
       console.info(`[tempo real] resync (${motivo}): recarregando o bootstrap`)
@@ -132,6 +156,7 @@ export function conectarTempoReal(deps: DepsConexao, seqInicial: number): () => 
     })
     es.addEventListener('ping', (m) => {
       if (fluxo !== es) return
+      vigiar(es)
       try {
         // o seq do ping é o atual do servidor: o que veio antes dele e não chegou aqui não era para esta pessoa
         const { seq } = JSON.parse((m as MessageEvent<string>).data) as EventoPing
@@ -219,6 +244,7 @@ export function conectarTempoReal(deps: DepsConexao, seqInicial: number): () => 
     fluxo?.close()
     fluxo = null
     if (timerSse) clearTimeout(timerSse)
+    if (vigia) clearTimeout(vigia)
     pararSync()
     pararRetomada()
     pararCache()

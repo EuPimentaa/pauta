@@ -60,7 +60,7 @@
   .modal-demanda-campo dd { font: 400 var(--fs-body) / var(--lh-body) var(--font); color: var(--text); }
   @media (max-width: 899.98px) {
     .modal-demanda-corpo { grid-template-columns: minmax(0, 1fr); }
-    .modal-demanda-topo { flex-direction: column-reverse; }
+    .modal-demanda-topo { flex-direction: column-reverse; align-items: stretch; }
     .modal-demanda-acoes { max-width: none; justify-content: flex-start; width: 100%; }
   }
   @media (max-width: 767.98px) {

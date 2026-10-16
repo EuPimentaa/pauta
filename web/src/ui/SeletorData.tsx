@@ -1,7 +1,8 @@
 /**
  * Seletor de data (com hora opcional) e de hora. O calendário é uma grade navegável pelo teclado:
  * ← → um dia, ↑ ↓ uma semana, PageUp/PageDown um mês, Home/End início e fim da semana, Enter escolhe.
- * Semana começa na segunda; feriados marcados (nome no title). Mudanças valem na hora (não há "Aplicar").
+ * Semana começa na segunda; feriados marcados (nome no title). Mudanças valem na hora (não há "Aplicar"). A hora
+ * digitada vale também ao sair do campo e no Pronto ("15h30" sem Enter); hora inválida segura o Pronto com o erro.
  *
  *   <SeletorData rotulo="Prazo" valor={prazo} hora={prazoHora} comHora aoMudar={(d, h) => …} feriados={feriados} />
  *   <SeletorHora valor={h} aoMudar={setH} />
@@ -145,7 +146,9 @@ export function SeletorData({
   valor, hora = null, comHora, aoMudar, feriados, rotulo, placeholder = 'Sem data', permitirLimpar = true, desabilitado, id,
   className, ...aria
 }: PropsSeletorData) {
-  const [aberto, setAberto] = useState(false)
+  const [aberto, setAbertoEstado] = useState(false)
+  const [horaInvalida, setHoraInvalida] = useState(false)
+  const setAberto = (v: boolean | ((a: boolean) => boolean)) => { setHoraInvalida(false); setAbertoEstado(v) }
   const [ancora, setAncora] = useState<HTMLButtonElement | null>(null)
   const hoje = hojeLocal()
   const rapidos: { rotulo: string; data: DataLocal }[] = [
@@ -189,15 +192,19 @@ export function SeletorData({
             <div className="ui-data-rodape">
               {comHora && (
                 <div className="ui-data-hora">
-                  <SeletorHora valor={hora} aoMudar={(h) => aoMudar(valor ?? hoje, h)} aria-label="Hora" permitirLimpar />
+                  <SeletorHora valor={hora} aoMudar={(h) => aoMudar(valor ?? hoje, h)} aria-label="Hora" permitirLimpar
+                    aoInvalido={setHoraInvalida} aria-describedby={horaInvalida ? 'ui-data-hora-erro' : undefined} />
                 </div>
               )}
               <span className="flex-1" />
               {permitirLimpar && valor && (
                 <Botao variante="ghost" tamanho="p" onClick={() => { aoMudar(null, null); setAberto(false) }}>Limpar</Botao>
               )}
-              {comHora && <Botao variante="secundario" tamanho="p" onClick={() => setAberto(false)}>Pronto</Botao>}
+              {comHora && <Botao variante="secundario" tamanho="p" onClick={() => { if (!horaInvalida) setAberto(false) }}>Pronto</Botao>}
             </div>
+          )}
+          {comHora && horaInvalida && (
+            <p id="ui-data-hora-erro" className="ui-campo-erro px-3 pb-2" role="alert">Hora que não deu para ler. Use 18h, 18h30 ou 9:15.</p>
           )}
         </div>
       </Popover>
@@ -215,6 +222,8 @@ const HORARIOS: HoraLocal[] = Array.from({ length: 31 }, (_, i) => {
 export interface PropsSeletorHora {
   valor: HoraLocal | null
   aoMudar(h: HoraLocal | null): void
+  /** O texto digitado não é uma hora (fica no campo, marcado); false quando volta a valer. */
+  aoInvalido?(invalido: boolean): void
   permitirLimpar?: boolean
   placeholder?: string
   desabilitado?: boolean
@@ -224,15 +233,25 @@ export interface PropsSeletorHora {
 }
 
 /** Sugestões de 30 em 30 min (7h às 22h) e qualquer hora digitada ("18", "18h30", "1830"). */
-export function SeletorHora({ valor, aoMudar, permitirLimpar, placeholder = '18h', desabilitado, ...aria }: PropsSeletorHora) {
+export function SeletorHora({ valor, aoMudar, aoInvalido, permitirLimpar, placeholder = '18h', desabilitado, ...aria }: PropsSeletorHora) {
   const opcoes = useMemo(() => (valor && !HORARIOS.includes(valor) ? [...HORARIOS, valor].sort() : HORARIOS), [valor])
+  const [invalido, setInvalido] = useState(false)
+  const marcar = (v: boolean) => { setInvalido(v); aoInvalido?.(v) }
   return (
     <Combobox<HoraLocal>
       {...aria}
+      aria-invalid={invalido || undefined}
+      aoSairComTexto={(t) => {
+        const h = lerHora(t)
+        if (!h) { marcar(true); return false }
+        marcar(false)
+        if (h !== valor) aoMudar(h)
+        return true
+      }}
       tamanho="p"
       opcoes={opcoes}
       valor={valor}
-      aoMudar={aoMudar}
+      aoMudar={(h) => { marcar(false); aoMudar(h) }}
       idDe={(h) => h}
       rotuloDe={formatarHora}
       filtrar={(h, t) => formatarHora(h).startsWith(t.replace(':', 'h')) || h.startsWith(t) || h.replace(':', '').startsWith(t)}

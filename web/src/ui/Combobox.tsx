@@ -32,6 +32,11 @@ export interface PropsCombobox<T> {
   placeholder?: string
   vazio?: string
   extra?(termo: string): { rotulo: string; executar(): void } | null
+  /**
+   * Texto digitado e não escolhido quando o campo perde o foco (Tab, clique fora, blur). Sem isto, o texto some. Devolve
+   * true se usou o texto (ele sai do campo) ou false para mantê-lo no campo (inválido: quem chama mostra o erro).
+   */
+  aoSairComTexto?(texto: string): boolean
   permitirLimpar?: boolean
   /** Máximo de opções na lista. */
   limite?: number
@@ -46,7 +51,7 @@ export interface PropsCombobox<T> {
 
 export function Combobox<T>({
   opcoes, valor, aoMudar, idDe, rotuloDe, detalheDe, iconeDe, filtrar, placeholder, vazio = 'Nada encontrado.', extra,
-  permitirLimpar, limite = 50, desabilitado, tamanho = 'm', id: idDado, className, ...aria
+  aoSairComTexto, permitirLimpar, limite = 50, desabilitado, tamanho = 'm', id: idDado, className, ...aria
 }: PropsCombobox<T>) {
   const gerado = useId()
   const id = idDado ?? gerado
@@ -55,8 +60,20 @@ export function Combobox<T>({
   const input = useRef<HTMLInputElement>(null)
   const lista = useRef<HTMLDivElement>(null)
   const [aberta, setAberta] = useState(false)
-  const [termo, setTermo] = useState<string | null>(null)   // null = mostrando o valor escolhido
+  const [termo, setTermoEstado] = useState<string | null>(null)   // null = mostrando o valor escolhido
   const [ativa, setAtiva] = useState(0)
+  // o termo também num ref: o clique fora e o blur chegam juntos, antes de o estado mudar
+  const termoAtual = useRef<string | null>(null)
+  const setTermo = (t: string | null) => { termoAtual.current = t; setTermoEstado(t) }
+  const aoSair = useRef(aoSairComTexto)
+  aoSair.current = aoSairComTexto
+  /** Saiu do campo sem escolher: oferece o texto a quem chama (aoSairComTexto); senão, volta a mostrar o valor. */
+  function sair() {
+    setAberta(false)
+    const t = termoAtual.current?.trim()
+    if (t && aoSair.current && !aoSair.current(t)) return
+    setTermo(null)
+  }
 
   const texto = termo ?? (valor ? rotuloDe(valor) : '')
   const filtradas = useMemo(() => {
@@ -83,8 +100,7 @@ export function Combobox<T>({
     const fora = (e: PointerEvent) => {
       const alvo = e.target as Node
       if (caixa.current?.contains(alvo) || lista.current?.contains(alvo)) return
-      setAberta(false)
-      setTermo(null)
+      sair()
     }
     document.addEventListener('pointerdown', fora, true)
     return () => document.removeEventListener('pointerdown', fora, true)
@@ -105,7 +121,7 @@ export function Combobox<T>({
     if (e.key === 'ArrowUp') { e.preventDefault(); setAtiva((a) => Math.max(0, a - 1)); return }
     if (e.key === 'Enter' && aberta) { e.preventDefault(); if (total > 0) escolher(ativa); return }
     if (e.key === 'Escape' && !aberta && termo !== null) { e.preventDefault(); setTermo(null) }
-    if (e.key === 'Tab' && aberta) { setAberta(false); setTermo(null) }
+    if (e.key === 'Tab' && (aberta || termo !== null)) sair()
   }
 
   const idAtiva = aberta && total > 0 ? `${id}-op-${ativa}` : undefined
@@ -132,7 +148,7 @@ export function Combobox<T>({
         onChange={(e) => { setTermo(e.target.value); setAtiva(0); setAberta(true) }}
         onKeyDown={aoTeclar}
         onClick={() => setAberta(true)}
-        onBlur={(e) => { if (!lista.current?.contains(e.relatedTarget as Node)) { setAberta(false); setTermo(null) } }}
+        onBlur={(e) => { if (!lista.current?.contains(e.relatedTarget as Node) && termoAtual.current !== null) sair(); else if (!lista.current?.contains(e.relatedTarget as Node)) setAberta(false) }}
       />
       {permitirLimpar && valor && !desabilitado ? (
         <button type="button" className="ui-botao-icone" data-tamanho="p" aria-label="Limpar" onClick={() => { aoMudar(null); setTermo(null); input.current?.focus() }}>

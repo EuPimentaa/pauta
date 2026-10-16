@@ -71,13 +71,13 @@
     display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 600 var(--fs-meta) / var(--lh-meta) var(--font);
   }
   .entrada-modelo-descricao {
-    color: var(--text-2); font: 400 var(--fs-micro) / var(--lh-micro) var(--font);
+    color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font);
     display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .entrada-modelo[aria-checked="true"] .entrada-modelo-descricao { color: var(--text); }
   .entrada-selo {
     padding: 0 6px; border-radius: var(--radius-full); background: var(--success-bg); color: var(--success-ink);
-    font: 600 var(--fs-micro) / 18px var(--font);
+    font: 600 var(--fs-meta) / 18px var(--font);
   }
 
   /* ─────────────── segmentos (prioridade) ─────────────── */
@@ -97,7 +97,7 @@
     background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); font: 500 var(--fs-meta) / 1 var(--font); color: var(--text);
   }
   .entrada-chip[data-fixa] { padding-right: 10px; }
-  .entrada-chip-nota { color: var(--text-3); font: 400 var(--fs-micro) / 1 var(--font); }
+  .entrada-chip-nota { color: var(--text-2); font: 400 var(--fs-meta) / 1 var(--font); }
   .entrada-chip-tirar {
     display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: var(--text-2);
   }

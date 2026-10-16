@@ -22,7 +22,7 @@
   .rapida-chip[data-tipo="cliente"] { background: var(--cor-bg, var(--veu-1)); color: var(--cor-ink, var(--text)); }
   .rapida-chip[data-tipo="membro"] { padding-left: 3px; font-weight: 500; }
   .rapida-chip-ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--cor-ink, var(--text-2)); }
-  .rapida-chip-nota { font: 400 var(--fs-micro) / 1 var(--font); }
+  .rapida-chip-nota { font: 400 var(--fs-meta) / 1 var(--font); }
   .rapida-chip-tirar {
     display: grid; place-items: center; width: 20px; height: 20px; border: 0; border-radius: 50%; background: transparent; color: inherit;
   }
@@ -35,7 +35,7 @@
   .rapida-previa-texto { color: var(--text); font-weight: 500; }
   .rapida-dica { display: inline-flex; align-items: center; gap: 4px; }
   .rapida-dica svg { width: 13px; height: 13px; }
-  .rapida-dica code, .rapida-tab { font: 600 var(--fs-micro) / 1 var(--font); }
+  .rapida-dica code { font: 600 var(--fs-meta) / 1 var(--font); }
   .rapida-tab { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; font-size: var(--fs-meta); color: var(--text); }
   .rapida-aviso { color: var(--danger-ink); font-weight: 500; }
   .rapida-sigla { align-self: flex-start; }

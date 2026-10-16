@@ -112,11 +112,12 @@ export function tituloDaConversa(msgs: readonly MensagemConversa[]): string {
   }
   if (!escolhida) escolhida = linhas[0] ?? ''
   let t = escolhida.replace(PEDIDO, '').replace(/^[\s:,;–—-]+/, '')
-    // o prazo no fim ("…, até sexta") vai para o campo Prazo, não para o título
-    .replace(/[\s,;–—-]+(?:at[eé]|para|pra)\s+(?:(?:o\s+)?dia\s+)?(?:hoje|amanh[ãa]|depois de amanh[ãa]|segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)(?:-feira)?\s*[.!?]*$/i, '')
   const fimFrase = /[.!?;](\s|$)/.exec(t)
   if (fimFrase && fimFrase.index >= 12) t = t.slice(0, fimFrase.index)
-  t = t.replace(/[\s.,;:!?–—-]+$/, '').replace(/\s+/g, ' ').trim()
+  t = t
+    // o prazo no fim ("…, até sexta") vai para o campo Prazo, não para o título
+    .replace(/[\s,;–—-]+(?:at[eé]|para|pra)\s+(?:(?:o\s+)?dia\s+)?(?:hoje|amanh[ãa]|depois de amanh[ãa]|segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)(?:-feira)?\s*[.!?]*$/i, '')
+    .replace(/[\s.,;:!?–—-]+$/, '').replace(/\s+/g, ' ').trim()
   if (t.length > 80) {
     const corte = t.lastIndexOf(' ', 80)
     t = t.slice(0, corte > 40 ? corte : 80).replace(/[\s,;:–—-]+$/, '')
@@ -327,7 +328,10 @@ export function prazoDaConversa(msgs: readonly MensagemConversa[], hoje: DataLoc
         if (c && !a && c < hoje) c = `${ano + 1}-${dois(mes!)}-${dois(d!)}`
         if (c && ehDataLocal(c) && c >= hoje) data = c
       }
-      if (data) achado = { data, casou: original.slice(x.index!, x.index! + x[0].length).replace(/\s+/g, ' ').trim() }
+      if (!data) continue
+      // o gatilho mais perto do dia ("para a Clínica Aurora, até sexta" → "até sexta")
+      const ultimo = [...x[0].matchAll(/\b(?:ate|para|pra|prazo|entreg\w*)\b/g)].at(-1)!.index!
+      achado = { data, casou: original.slice(x.index! + ultimo, x.index! + x[0].length).replace(/\s+/g, ' ').trim() }
     }
   }
   return achado

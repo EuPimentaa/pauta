@@ -94,7 +94,8 @@
     background: var(--cor-bg); color: var(--cor-ink); font: 500 var(--fs-meta) / 16px var(--font);
   }
   .cat-agenda-item > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cat-agenda-item b { font-weight: 500; opacity: .8; font-variant-numeric: tabular-nums; }
+  /* a hora vai na tinta cheia (com opacidade ficava abaixo de AA); o que a separa do título são os números tabulares */
+  .cat-agenda-item b { font-weight: 500; font-variant-numeric: tabular-nums; }
   .cat-menu-contexto {
     display: grid; place-items: center; height: 96px; border-radius: var(--radius-md); border: 1.5px dashed var(--border-strong);
     color: var(--text-2); font-size: var(--fs-meta); text-align: center; padding: 0 var(--space-4); user-select: none;

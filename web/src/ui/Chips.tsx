@@ -54,7 +54,8 @@ export function ChipCliente({ cliente, tamanho = 'p', comNome, className }: Prop
       aria-label={comNome ? undefined : `Cliente ${cliente.nome} (${cliente.sigla})`} role={comNome ? undefined : 'img'}>
       {cliente.logoUrl && <img src={cliente.logoUrl} alt="" />}
       <span aria-hidden={comNome ? undefined : true}>{cliente.sigla}</span>
-      {comNome && <span className="font-normal opacity-90">· {cliente.nome}</span>}
+      {/* o nome se separa da sigla só pelo peso (400 x 600), na tinta cheia: com opacidade ficava abaixo de AA */}
+      {comNome && <span className="font-normal">· {cliente.nome}</span>}
     </span>
   )
   return comNome ? el : <Tooltip texto={cliente.nome}>{el}</Tooltip>

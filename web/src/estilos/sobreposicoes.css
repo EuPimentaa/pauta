@@ -146,7 +146,8 @@
     font: 500 13px / 1 var(--font); font-variant-numeric: tabular-nums;
   }
   .ui-data-dia:hover { background: var(--veu-1); }
-  .ui-data-dia[data-fora="true"] { color: var(--text-disabled); }
+  /* dias de outro mês: clicáveis, então AA (--text-3), só mais apagados que os do mês */
+  .ui-data-dia[data-fora="true"] { color: var(--text-3); }
   .ui-data-dia[data-fim-de-semana="true"]:not([aria-selected="true"]) { color: var(--text-2); }
   .ui-data-dia[data-hoje="true"]::after { content: ''; position: absolute; left: 50%; bottom: 5px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--accent); }
   .ui-data-dia[data-feriado="true"] { color: var(--danger-ink); }

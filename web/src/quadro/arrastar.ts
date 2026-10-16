@@ -46,6 +46,15 @@ export class SensorTecladoQuadro extends KeyboardSensor {
   static activators = [{ eventName: 'onKeyDown' as const, handler: ativar }]
 }
 
+/**
+ * Cancela o arraste em andamento como o Esc (o item volta em 200 ms). O dnd-kit não expõe "cancelar", mas todos os
+ * sensores dele (mouse, toque, teclado) cancelam quando a janela recebe `visibilitychange`; disparado só na janela, o
+ * evento não chega a quem ouve no document (o tempo real).
+ */
+export function cancelarArrasteEmAndamento(): void {
+  window.dispatchEvent(new Event('visibilitychange'))
+}
+
 const DIRECOES: Record<string, [number, number]> = { ArrowDown: [0, 1], ArrowUp: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }
 
 /** Setas: o lugar mais perto naquela direção, entre cards e colunas vazias (card) ou entre colunas (coluna). */

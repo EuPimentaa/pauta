@@ -30,7 +30,7 @@ import { Botao } from '../ui/Botao.tsx'
 import { Campo } from '../ui/Campo.tsx'
 import { EstadoVazio } from '../ui/Indicadores.tsx'
 import {
-  SensorTecladoQuadro, colunaDoId, coordenadasTeclado, deteccaoDoQuadro, ehIdArea, idColuna, type DadoArraste,
+  SensorTecladoQuadro, cancelarArrasteEmAndamento, colunaDoId, coordenadasTeclado, deteccaoDoQuadro, ehIdArea, idColuna, type DadoArraste,
 } from './arrastar.ts'
 import { CartaoDemanda, marcarFimDoArraste } from './CardDemanda.tsx'
 import { ColunaQuadro, ColunaRecolhida, entradaDaColuna } from './Coluna.tsx'
@@ -53,8 +53,11 @@ const colunaDoCard = (ordem: Ordem, id: Id): Id | null => {
 
 // ─────────────────────────────── "+ Adicionar coluna" ───────────────────────────────
 
-function NovaColuna({ quadroId, abertaDeInicio }: { quadroId: Id; abertaDeInicio?: boolean }) {
-  const [aberta, setAberta] = useState(!!abertaDeInicio)
+/**
+ * Aberto/fechado vem do layout: a mesma escolha vale para o "+ Adicionar coluna" do estado vazio e o do fim do quadro.
+ * Assim, depois da primeira coluna, o formulário do fim já nasce aberto e com o foco no campo (como no Trello).
+ */
+function NovaColuna({ quadroId, aberta, setAberta }: { quadroId: Id; aberta: boolean; setAberta(a: boolean): void }) {
   const [nome, setNome] = useState('')
   const [salvando, setSalvando] = useState(false)
   const colunas = useColunasMutacoes()
@@ -107,6 +110,7 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
   const todas = useDemandasDoQuadro(quadro.id)
   const [recolhidas, alternarRecolhida, recolherVarias] = useColunasRecolhidas()
   const [entrada, setEntrada] = useState<Id | null>(null)
+  const [novaColunaAberta, setNovaColunaAberta] = useState(false)
   const raiz = useRef<HTMLDivElement>(null)
 
   const totais = useMemo(() => {
@@ -122,7 +126,7 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
   const ordemRef = useRef<Ordem | null>(null)
   ordemRef.current = ordem
   const itens = ordem ?? base
-  const [ativo, setAtivo] = useState<{ tipo: 'card' | 'coluna'; id: Id; largura: number } | null>(null)
+  const [ativo, setAtivo] = useState<{ tipo: 'card' | 'coluna'; id: Id; largura: number; teclado: boolean } | null>(null)
   const inicio = useRef<{ coluna: Id; indice: number } | null>(null)
   const soltarPausa = useRef<(() => void) | null>(null)
   const ultimoAlvo = useRef<UniqueIdentifier | null>(null)
@@ -160,18 +164,30 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
 
   useEffect(() => () => { soltarPausa.current?.(); document.documentElement.removeAttribute('data-arrastando') }, [])
 
-  function aoComecar({ active }: DragStartEvent) {
+  // Pego pelo teclado (Shift+Espaço), o card fica pego até Espaço ou Esc. Se a pessoa vai para o mouse, o primeiro
+  // clique em qualquer lugar cancela (o clique logo depois de um arraste não abre o card: marcarFimDoArraste), senão o
+  // card ficaria preso no modo arraste, com os eventos em espera e os atalhos parados.
+  const arrasteDeTeclado = !!ativo?.teclado
+  useEffect(() => {
+    if (!arrasteDeTeclado) return
+    const aoApertar = () => cancelarArrasteEmAndamento()
+    window.addEventListener('pointerdown', aoApertar, true)
+    return () => window.removeEventListener('pointerdown', aoApertar, true)
+  }, [arrasteDeTeclado])
+
+  function aoComecar({ active, activatorEvent }: DragStartEvent) {
     const dado = active.data.current as DadoArraste | undefined
     if (!dado) return
     soltarPausa.current = pausarEntrega()
     document.documentElement.setAttribute('data-arrastando', '')
     const largura = active.rect.current.initial?.width ?? 264
+    const teclado = activatorEvent instanceof KeyboardEvent
     if (dado.tipo === 'card') {
       const lista = base[dado.colunaId] ?? []
       inicio.current = { coluna: dado.colunaId, indice: lista.indexOf(String(active.id)) }
-      setAtivo({ tipo: 'card', id: String(active.id), largura })
+      setAtivo({ tipo: 'card', id: String(active.id), largura, teclado })
     } else {
-      setAtivo({ tipo: 'coluna', id: dado.colunaId, largura })
+      setAtivo({ tipo: 'coluna', id: dado.colunaId, largura, teclado })
     }
   }
 
@@ -328,7 +344,7 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
     return (
       <div className="quadro-ausente">
         <EstadoVazio icone={Columns3} titulo="Este quadro ainda não tem colunas." texto="Crie a primeira: os cards vivem nelas."
-          acoes={<NovaColuna quadroId={quadro.id} />} />
+          acoes={<NovaColuna quadroId={quadro.id} aberta={novaColunaAberta} setAberta={setNovaColunaAberta} />} />
       </div>
     )
   }
@@ -384,10 +400,11 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
                 />
               )))}
           </SortableContext>
-          <NovaColuna quadroId={quadro.id} />
+          <NovaColuna quadroId={quadro.id} aberta={novaColunaAberta} setAberta={setNovaColunaAberta} />
         </div>
         {createPortal(
-          <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(.2,.8,.2,1)' }}>
+          // acima da barra e das abas do celular, abaixo dos popovers e do modal (--z-popover 60, --z-modal 70)
+          <DragOverlay zIndex={55} dropAnimation={{ duration: 200, easing: 'cubic-bezier(.2,.8,.2,1)' }}>
             {ativoCard ? (
               <div className="cartao-sobreposto" style={{ ['--largura-arraste' as string]: `${ativo!.largura}px` }}>
                 <CartaoDemanda demanda={ativoCard} />

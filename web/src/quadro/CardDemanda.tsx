@@ -262,7 +262,10 @@ export const CartaoDemanda = memo(function CartaoDemanda({ demanda: d, compacto,
 
   if (!dados) return null
   const noBootstrap = !!dados.coluna && !!dados.quadro
-  const abrir = () => { if (Date.now() - fimDoArraste > 250) abrirSobreposta(`/d/${d.numero}`) }
+  // durante um arraste (o do teclado deixa o mouse livre) e logo depois dele, o clique não abre o modal
+  const abrir = () => {
+    if (Date.now() - fimDoArraste > 250 && !document.documentElement.hasAttribute('data-arrastando')) abrirSobreposta(`/d/${d.numero}`)
+  }
 
   return (
     <>

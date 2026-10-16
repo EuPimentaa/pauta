@@ -97,12 +97,14 @@
   --coluna-azul-ponto: var(--label-azul);           --coluna-grafite-ponto: var(--label-grafite);
   --coluna-sem-cor-bg: var(--surface-sunken);
 
-  /* ---------- fundos de quadro (FUNDOS_QUADRO; gradientes da marca, claros no tema claro) ----------
-     -a/-b = paradas (o contraste.ts confere --text sobre cada uma). 'liso' = --bg. */
-  --fundo-grafite-a:   light-dark(#F4F4F4, #1C1C1C); --fundo-grafite-b:   light-dark(#E0E0E0, #0A0A0A);
-  --fundo-berinjela-a: light-dark(#F3EFF6, #3C2254); --fundo-berinjela-b: light-dark(#E3DBEA, #120B19);
-  --fundo-cobalto-a:   light-dark(#EEF5FC, #133A6B); --fundo-cobalto-b:   light-dark(#D9E7F6, #0A1324);
-  --fundo-aurora-a:    light-dark(#FFF0E8, #3A1A10); --fundo-aurora-b:    light-dark(#F6E7F1, #2A0F2A); --fundo-aurora-c: light-dark(#ECE6F6, #160E24);
+  /* ---------- fundos de quadro (FUNDOS_QUADRO; gradientes da marca) ----------
+     -a/-b = paradas (o contraste.ts confere --text e --text-2 sobre cada uma). 'liso' = --bg. No claro as paradas têm
+     croma de verdade (0,04–0,07 em OKLCH), para o quadro se reconhecer pelo fundo como no Trello; as colunas tingidas
+     e os cards vão por cima com o AA garantido pelo contraste.ts. */
+  --fundo-grafite-a:   light-dark(#F4F4F4, #1C1C1C); --fundo-grafite-b:   light-dark(#D9D9D9, #0A0A0A);
+  --fundo-berinjela-a: light-dark(#F1E7F8, #3C2254); --fundo-berinjela-b: light-dark(#D8C6E8, #120B19);
+  --fundo-cobalto-a:   light-dark(#E2F0FD, #133A6B); --fundo-cobalto-b:   light-dark(#C3DAF5, #0A1324);
+  --fundo-aurora-a:    light-dark(#FFDCC8, #3A1A10); --fundo-aurora-b:    light-dark(#F8CDE6, #2A0F2A); --fundo-aurora-c: light-dark(#DCD0F6, #160E24);
   --fundo-liso: var(--bg);
   --fundo-grafite:   radial-gradient(120% 90% at 0% 0%, var(--fundo-grafite-a), var(--fundo-grafite-b));
   --fundo-berinjela: radial-gradient(130% 100% at 100% 0%, var(--fundo-berinjela-a), var(--fundo-berinjela-b));
@@ -158,15 +160,17 @@
   /* camadas sobre a página (modal, folha, popover, menu): mais opaco, para não acinzentar sobre o scrim; no escuro,
      a base é a superfície elevada (#1F1F1F) e não o canvas, para a camada se destacar da página */
   --glass-bg-camada: light-dark(rgb(255 255 255 / .92), rgb(31 31 31 / .88));
-  /* barra superior (sempre .chrome-dark): vidro quase opaco, a âncora escura da marca; brilho de 3,5% no topo */
+  /* barra superior (sempre .chrome-dark): vidro quase opaco, a âncora escura da marca; brilho de 3,5% no topo. Dentro
+     do .chrome-dark o light-dark() sempre cai no escuro, então o tema da página troca a barra por seletor (abaixo):
+     no escuro ela fica um degrau acima do menu, senão barra, menu e conteúdo viram a mesma parede preta (marca §1 e §6) */
   --glass-bg-topo:   rgb(17 17 17 / .94);
+  --glass-bg-topo-escuro: rgb(36 36 36 / .94);
+  /* menu lateral e abas do celular: no escuro, sobre a --surface (#181818), um degrau acima do conteúdo (--bg) */
+  --glass-bg-menu:   light-dark(rgb(255 255 255 / .80), rgb(24 24 24 / .92));
   --topo-brilho:     linear-gradient(180deg, rgb(255 255 255 / .035), rgb(255 255 255 / 0) 70%);
 
   /* ---------- movimento ---------- */
   --ease: cubic-bezier(.2, .8, .2, 1);
-  --glass-bg-topo-escuro: rgb(36 36 36 / .94);
-  /* menu lateral e abas do celular: no escuro, sobre a --surface (#181818), um degrau acima do conteúdo (--bg) */
-  --glass-bg-menu:   light-dark(rgb(255 255 255 / .80), rgb(24 24 24 / .92));
   --dur-1: 120ms; --dur-2: 200ms; --dur-3: 320ms;
 
   /* ---------- véus de interação (hover e pressionado sobre qualquer superfície, inclusive vidro e coluna) ---------- */
@@ -174,14 +178,14 @@
   --veu-2: color-mix(in oklab, var(--text) 9%, transparent);
   --fs-rotulo: 13px; --lh-rotulo: 18px;  /* rótulo de campo */
 
-  /* ---------- casca e camadas ---------- */
-  --topo-h: 56px; --menu-w: 264px; --menu-w-recolhido: 64px; --abas-h: 64px;
-  --z-menu: 30; --z-topo: 40; --z-faixa: 45; --z-abas: 50; --z-popover: 60; --z-modal: 70; --z-aviso: 80; --z-tooltip: 90;
-}
   /* ---------- telas de acesso: lado do formulário (no escuro, um degrau acima do palco, com o pontilhado visível) ---------- */
   --auth-lado:   light-dark(#F3F3F3, #111111);
   --auth-pontos: light-dark(rgb(17 17 17 / .13), rgb(237 236 234 / .17));
 
+  /* ---------- casca e camadas ---------- */
+  --topo-h: 56px; --menu-w: 264px; --menu-w-recolhido: 64px; --abas-h: 64px;
+  --z-menu: 30; --z-topo: 40; --z-faixa: 45; --z-abas: 50; --z-popover: 60; --z-modal: 70; --z-aviso: 80; --z-tooltip: 90;
+}
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"]  { color-scheme: dark; --glass-bg-topo: var(--glass-bg-topo-escuro); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --glass-bg-topo: var(--glass-bg-topo-escuro); } }

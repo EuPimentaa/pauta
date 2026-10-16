@@ -5,7 +5,7 @@
  * Arquivo: com um intervalo de 1,5 s para não buscar a cada arraste.
  */
 import type { QueryClient } from '@tanstack/react-query'
-import type { EventoTempoReal } from '@shared/tipos/index.ts'
+import type { ConfigApp, ConfigAppSaida, EventoTempoReal } from '@shared/tipos/index.ts'
 import type { TratadorEventos } from '../tipos.ts'
 import { chaves } from '../../api/chaves.ts'
 
@@ -33,6 +33,11 @@ function tratar(ev: EventoTempoReal, qc: QueryClient): void {
     case 'feriado':
       void qc.invalidateQueries({ queryKey: ['feriados'] })
       return
+    case 'config':
+      if (ev.op === 'upsert') {
+        qc.setQueryData<ConfigAppSaida>(chaves.configApp, (s) => (s ? { ...s, config: { ...s.config, ...(ev.p as Partial<ConfigApp>) } } : s))
+      }
+      return
     case 'quadro':
       void qc.invalidateQueries({ queryKey: chaves.quadrosArquivados })
       void qc.invalidateQueries({ queryKey: chaves.quadro(ev.id) })
@@ -59,6 +64,6 @@ function tratar(ev: EventoTempoReal, qc: QueryClient): void {
 
 export const tratador: TratadorEventos = {
   id: 'cadastros',
-  entidades: ['cliente', 'cliente_contato', 'cliente_link', 'usuario', 'equipe', 'feriado', 'quadro', 'coluna', 'etiqueta', 'automacao', 'aprovacao', 'demanda'],
+  entidades: ['cliente', 'cliente_contato', 'cliente_link', 'usuario', 'equipe', 'feriado', 'config', 'quadro', 'coluna', 'etiqueta', 'automacao', 'aprovacao', 'demanda'],
   tratar,
 }

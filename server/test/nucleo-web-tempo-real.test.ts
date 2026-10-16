@@ -237,6 +237,14 @@ describe('tratadores do núcleo', () => {
     assert.equal(bootDe(qc).clientes[0].nome, 'HE Novo')
     assert.equal(qc.getQueryData<{ nome: string }>(['cliente', 'HE'])!.nome, 'HE Novo')
   })
+
+  test('config: o objeto inteiro troca a configuração do bootstrap (outra janela salvou)', () => {
+    const qc = cacheCom(bootstrap())
+    const config = { ...bootDe(qc).config, quadroConcluidasDias: 12, modelosRevisadosEm: '2026-10-14T13:00:00.000Z' }
+    tratarCadastros(evento({ e: 'config', id: 'app', d: null, t: 'x', a: 'u-admin', op: 'upsert', p: config, c: null }), qc)
+    assert.equal(bootDe(qc).config.quadroConcluidasDias, 12)
+    assert.equal(bootDe(qc).config.modelosRevisadosEm, '2026-10-14T13:00:00.000Z')
+  })
 })
 
 // ─────────────────────────────── cliente SSE ───────────────────────────────

@@ -25,13 +25,13 @@ import type { Equipe, Eu, UsuarioResumo } from './pessoas.ts'
  * Entidade do evento → objeto. Público de cada uma:
  * - interno (todos os usuários ativos): quadro, coluna, etiqueta, automacao, modelo_demanda, demanda, checklist,
  *   checklist_item, comentario, anexo, rodada, versao, envio, aprovacao, cliente, cliente_contato, cliente_link,
- *   usuario, equipe, feriado
+ *   usuario, equipe, feriado, config
  * - gestao (atendimento e admin; filtrado no servidor): link_publico
  * - usuario (só o dono): notificacao, quadro_usuario (estrela e seguir)
  * - usuario_admin (o dono + admins): apontamento. Os outros só veem demanda.minutosRegistrados, num evento com
  *   `a` e `t` nulos (não revela quem lançou)
  * Ids: automacao = `${quadroId}:${gatilho}` (= AutomacaoQuadro.id); quadro_usuario = quadroId; feriado = a data;
- * notificacao = o número.
+ * notificacao = o número; config = 'app' (sempre o objeto inteiro, `c` nulo).
  */
 export interface MapaEntidades {
   quadro: Quadro
@@ -58,6 +58,8 @@ export interface MapaEntidades {
   feriado: Feriado
   notificacao: Notificacao
   apontamento: Apontamento
+  /** Acrescentada na integração da Onda 3 (pedido 3 do F5): PATCH /api/config/app e "Revisei os modelos". */
+  config: ConfigApp
 }
 
 export type Entidade = keyof MapaEntidades
@@ -65,7 +67,7 @@ export type Entidade = keyof MapaEntidades
 export const ENTIDADES = [
   'quadro', 'coluna', 'etiqueta', 'automacao', 'quadro_usuario', 'modelo_demanda', 'demanda', 'checklist',
   'checklist_item', 'comentario', 'anexo', 'rodada', 'versao', 'envio', 'aprovacao', 'link_publico', 'cliente',
-  'cliente_contato', 'cliente_link', 'usuario', 'equipe', 'feriado', 'notificacao', 'apontamento',
+  'cliente_contato', 'cliente_link', 'usuario', 'equipe', 'feriado', 'notificacao', 'apontamento', 'config',
 ] as const satisfies readonly Entidade[]
 
 /** interno = todos; gestao = atendimento + admin; usuario = só usuario_id; usuario_admin = usuario_id + admins; admin. */

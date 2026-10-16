@@ -123,6 +123,20 @@ describe('configuração da aplicação', () => {
     assert.equal(convite.corpo.convite.expiraEm, '2026-10-17T13:00:00.000Z')
   })
 
+  test('mudança emite a entidade config (objeto inteiro, público interno); nada mudado não emite', async () => {
+    const a = await ambiente()
+    const admin = a.como(a.pessoas.admin)
+    const seq = ultimoSeq(a.db)
+    assert.equal((await admin.patch('/api/config/app', { quadroConcluidasDias: 10 })).status, 200)
+    const ev = eventos(a.db, seq)
+    assert.deepEqual(ev.map((e) => [e.entidade, e.entidade_id, e.op, e.publico, e.campos]), [['config', 'app', 'upsert', 'interno', null]])
+    assert.equal(ev[0]!.patch!.quadroConcluidasDias, 10)
+    assert.equal(ev[0]!.patch!.prazoHoraPadrao, '18:00', 'o objeto inteiro')
+    const seq2 = ultimoSeq(a.db)
+    assert.equal((await admin.patch('/api/config/app', { quadroConcluidasDias: 10 })).status, 200)
+    assert.deepEqual(eventos(a.db, seq2), [], 'o mesmo valor não é mudança')
+  })
+
   test('demandaNumeroInicial menor que o maior número → 400; o mesmo valor não muda nada; maior vale na próxima demanda', async () => {
     const a = await ambiente()
     const admin = a.como(a.pessoas.admin)

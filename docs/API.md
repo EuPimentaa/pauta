@@ -136,6 +136,8 @@ com o motivo ("Só o atendimento envia ao cliente."). Nenhuma rota decide papel 
   - Membros e etiquetas viajam como `membroIds` e `etiquetaIds` da `demanda` (a lista inteira).
   - **Quadro arquivado** (`quadro` com `arquivadoEm` preenchido): o navegador tira do cache as colunas, etiquetas e
     demandas dele. **Quadro restaurado** (`arquivadoEm` volta a nulo): o tratador recarrega o bootstrap.
+  - **Configuração** (`config`, id `app`, público `interno`): sempre o objeto inteiro (`ConfigApp`), emitido pelo
+    `PATCH /api/config/app` com alguma mudança e pelo "Revisei os modelos"; o tratador troca `['bootstrap'].config`.
 
 ### `GET /api/sync?desde=N` · núcleo
 Alternativa ao SSE (polling 5 s → 60 s com backoff). Resposta `SyncSaida`: até 500 eventos `seq > N` com o mesmo filtro;
@@ -450,7 +452,8 @@ Qualquer usuário. `200 Cliente` (contatos, links, apelidos, responsáveis, cont
   **SSE:** `cliente_link` (upsert/delete).
 
 #### `GET /api/clientes/:id/aprovacoes` · cadastros
-Qualquer usuário. `200 ItemTrilhaCliente[]` (mais novas primeiro), inclusive anuladas.
+Qualquer usuário. `200 ItemTrilhaCliente[]` (mais novas primeiro), inclusive anuladas. Pelo **id** (a sigla dá `404`);
+`quem` = o contato, o nome informado no link ou "registrado por <apelido>".
 
 ### 4.11 Configuração · cadastros
 
@@ -459,12 +462,19 @@ Qualquer usuário. `200 ItemTrilhaCliente[]` (mais novas primeiro), inclusive an
   `201 Feriado`, `204`. Feriado não recalcula prazos já gravados (não há prazo automático depois da criação); vale
   para os próximos cálculos (prazo do modelo, repetição, rodadas, "parado há"). **Erros:** `409 conflito` data
   repetida. **SSE:** `feriado`.
+- `GET` sem `ano` devolve o ano corrente de São Paulo; `ano` fora de 2000–2100 → `400`. `POST` sem `tipo` grava o
+  padrão do banco (`nacional`).
 
 #### `GET /api/config/app` · `PATCH /api/config/app`
 - **Quem:** GET qualquer usuário; PATCH admin. **Resposta:** `200 ConfigAppSaida`.
 - **Corpo:** `EditarConfigAppEntrada`: cada número dentro de `FAIXAS_CONFIG` (fora: `400 validacao`).
   `demandaNumeroInicial` só aceita valor maior que o maior número existente. O "Revisei os modelos" é
   `POST /api/modelos-demanda/revisados` (§4.9).
+- Grava só o que mudou: mandar o **mesmo** `demandaNumeroInicial` que já está gravado não é mudança (`200`; o formulário
+  pode mandar a configuração inteira); diferente do atual, precisa ser maior que o maior número já usado (`400
+  validacao` com `detalhes.campos.demandaNumeroInicial`). Campos fora de `EditarConfigAppEntrada` (como
+  `modelosRevisadosEm`) são descartados; um campo fora da faixa recusa o corpo inteiro (nada é gravado).
+  **SSE:** `config` (objeto inteiro, só quando algo mudou).
 
 ### 4.12 Demandas · núcleo
 
@@ -882,6 +892,9 @@ Qualquer usuário. **Consulta:** `ListarArquivoConsulta` (cliente, quadro, mês,
   `demanda_arquivo_ix`/`demanda_arquivo_cli_ix` (a consulta repete o `WHERE` deles).
 - Restaurar (só arquivadas) usa `POST /api/demandas/:id/restaurar`; desmarcar uma concluída antiga usa
   `POST /api/demandas/:id/concluir` com `concluida: false` (ela volta ao quadro, objeto inteiro no SSE).
+- **Texto (`q`):** `#12` ou `12` acha pelo número; o maior começo do texto que for apelido ou sigla de um cliente filtra
+  o cliente ("he outubro", "hospital evangelico carrossel"); o resto procura no título e na descrição pelo FTS5 por
+  prefixo, sem acento. O mês é o de São Paulo (23h30 de 30/09 é setembro). Cursor inválido → `400`.
 
 ### 4.20 Horas · núcleo
 

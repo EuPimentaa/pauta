@@ -5,7 +5,7 @@
  */
 import type { QueryClient } from '@tanstack/react-query'
 import type {
-  Bootstrap, Cliente, ClienteContato, ClienteLink, ClienteResumo, Coluna, Demanda, Entidade, Equipe, Etiqueta, Eu,
+  Bootstrap, Cliente, ClienteContato, ClienteLink, ClienteResumo, Coluna, ConfigApp, Demanda, Entidade, Equipe, Etiqueta, Eu,
   EventoDe, EventoTempoReal, Feriado, Id, AutomacaoQuadro, ModeloDemanda, Quadro, QuadroUsuario, UsuarioResumo,
 } from '../../../shared/tipos/index.ts'
 import {
@@ -266,6 +266,13 @@ export function tratarCadastros(ev: EventoTempoReal, qc: QueryClient): void {
         ...x,
         feriados: [...x.feriados.filter((y) => y.data !== f.data), f].sort((a, z) => (a.data < z.data ? -1 : 1)),
       }))
+      return
+    }
+    case 'config': {
+      // sempre o objeto inteiro (PATCH /api/config/app e "Revisei os modelos")
+      if (ev.op === 'delete') return
+      const config = { ...b.config, ...(ev.p as Partial<ConfigApp>) }
+      mudarBootstrap(qc, (x) => ({ ...x, config }))
       return
     }
     default:

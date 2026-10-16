@@ -3,7 +3,7 @@
  * - Feriado é sempre dia não útil e vale só para os próximos cálculos (prazo do modelo, repetição, rodadas, "parado
  *   há"): nenhum prazo já gravado muda (não há prazo automático depois da criação).
  * - Parâmetros dentro de FAIXAS_CONFIG (o zod confere); `demandaNumeroInicial` só sobe acima do maior número usado.
- *   Sem entidade de tempo real para a configuração: quem muda atualiza o próprio cache pela resposta.
+ *   Toda mudança emite a entidade `config` (o objeto inteiro): as outras janelas atualizam o bootstrap.
  */
 import {
   CHAVES_CONFIG, type ConfigApp, type ConfigAppSaida, type CriarFeriadoEntrada, type EditarConfigAppEntrada, type Feriado,
@@ -75,5 +75,7 @@ export function editarConfig(db: Db, e: EditarConfigAppEntrada, ator: Ator): Con
     }
   }
   for (const [campo, valor] of mudancas) gravarConfig(db, campo, valor, ator.usuario?.id ?? null)
-  return configSaida(db)
+  const saida = configSaida(db)
+  if (mudancas.length) emitirObjeto(db, 'config', 'app', saida.config, ator)
+  return saida
 }

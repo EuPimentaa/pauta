@@ -9,13 +9,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Command } from 'cmdk'
 import { Clock, CornerDownLeft, Loader2, Search } from 'lucide-react'
 import type { Comando, ContextoAcao, FontePaleta, ResultadoPaleta } from '../extensoes/tipos.ts'
+import { useDemanda } from '../api/seletores.ts'
 import { useContextoAcao } from '../dialogos/contexto.ts'
 import { lerLocal, gravarLocal } from '../lib/armazenamento.ts'
 import { useRegistro } from '../sessao/registro.ts'
 import { Kbd } from '../ui/Kbd.tsx'
 import { Modal } from '../ui/Modal.tsx'
 import { casaTermo } from './casar.ts'
-import { fecharPaleta, termoInicialPaleta, usePaletaAberta } from './estado.ts'
+import { demandaNaAberturaPaleta, fecharPaleta, termoInicialPaleta, usePaletaAberta } from './estado.ts'
 
 const MAX_RECENTES = 8
 const ESPERA_MS = 110
@@ -67,7 +68,11 @@ function visivel(c: Comando, ctx: ContextoAcao): boolean {
 
 function Busca() {
   const reg = useRegistro()
-  const ctx = useContextoAcao()
+  const ctxAgora = useContextoAcao()
+  // o card em foco é o de quando a paleta abriu (ver paleta/estado.ts)
+  const [focoId] = useState(demandaNaAberturaPaleta)
+  const focoNaAbertura = useDemanda(focoId)
+  const ctx = useMemo(() => (focoNaAbertura ? { ...ctxAgora, demandaEmFoco: focoNaAbertura } : ctxAgora), [ctxAgora, focoNaAbertura])
   const [termo, setTermo] = useState(termoInicialPaleta)
   const [selecionado, setSelecionado] = useState('')
   const fontes = useMemo(() => reg.fontesBusca(), [reg])

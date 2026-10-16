@@ -1,0 +1,41 @@
+/* CalendarioDemandas: os chips das demandas na grade do DS, a faixa "Sem prazo" e a lista por dia do celular. */
+@layer components {
+  .cal-demandas { display: flex; align-items: flex-start; gap: var(--space-4); min-width: 0; }
+  .cal-demandas > .cal-grade { flex: 1; min-width: 0; }
+  .cal-sem-prazo {
+    flex: none; width: 220px; max-height: 70vh; overflow-y: auto; padding: var(--space-3); border-radius: var(--radius-lg);
+    background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .cal-sem-prazo-titulo {
+    display: flex; justify-content: space-between; margin-bottom: var(--space-2);
+    font: 700 var(--fs-micro) / var(--lh-micro) var(--font); letter-spacing: var(--tracking-micro); text-transform: uppercase; color: var(--text-2);
+  }
+  .cal-sem-prazo-itens { display: flex; flex-direction: column; gap: 4px; }
+  .cal-sem-prazo-vazio { color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+
+  .cal-chip {
+    display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; padding: 3px 6px; border: 0; border-radius: var(--radius-xs);
+    background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1px var(--border);
+    font: 500 var(--fs-meta) / 16px var(--font); text-align: left; cursor: pointer;
+  }
+  .cal-chip:hover { background: var(--surface-hover); }
+  .cal-chip svg { width: 12px; height: 12px; flex: none; color: var(--text-2); }
+  .cal-chip-ponto { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--cor-ponto); }
+  .cal-chip-hora { flex: none; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .cal-chip-titulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cal-chip[data-concluida="true"] .cal-chip-titulo { text-decoration: line-through; color: var(--text-2); }
+  .cal-chip[data-campo="inicio"], .cal-chip[data-campo="publicacao"] { background: var(--surface-sunken); }
+
+  /* celular: lista por dia */
+  .cal-lista { border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 0 0 1px var(--border); overflow: hidden; }
+  .cal-lista-vazia { padding: var(--space-6) var(--space-4); text-align: center; color: var(--text-2); }
+  .cal-lista-dia { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); }
+  .cal-lista-data { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: var(--space-2); font: 600 var(--fs-body) / var(--lh-body) var(--font); }
+  .cal-lista-data::first-letter { text-transform: uppercase; }
+  .cal-lista-hoje { padding: 0 6px; border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent-ink); font: 600 var(--fs-meta) / 18px var(--font); }
+  .cal-lista-itens { display: flex; flex-direction: column; gap: 6px; }
+  .cal-lista .cal-chip { padding: 8px 10px; font-size: var(--fs-body); line-height: var(--lh-body); }
+}
+@layer foco {
+  .cal-chip:focus-visible { box-shadow: var(--focus-ring); }
+}

@@ -1,0 +1,24 @@
+/* Configurações: menu das seções à esquerda e o conteúdo; no celular, as seções numa folha. Só tokens da marca. */
+@layer components {
+  .tela-config { display: flex; align-items: flex-start; gap: var(--space-6); padding: var(--space-6); min-width: 0; }
+  .config-menu { position: sticky; top: calc(var(--topo-h) + var(--space-6)); flex: none; width: 220px; }
+  .config-titulo { padding: 0 10px var(--space-3); font: 600 var(--fs-h2) / var(--lh-h2) var(--font); letter-spacing: var(--tracking-titulo); }
+  .config-lista { display: flex; flex-direction: column; gap: 2px; }
+  .config-item {
+    display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: var(--radius-sm);
+    color: var(--text); text-decoration: none; font: 500 var(--fs-body) / 1 var(--font);
+  }
+  .config-item svg { width: 17px; height: 17px; flex: none; color: var(--text-2); }
+  .config-item:hover { background: var(--veu-1); }
+  .config-item[aria-current="page"] { background: var(--accent-soft); }
+  .config-item[aria-current="page"] svg { color: var(--accent-ink); }
+  .config-conteudo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+  .config-conteudo > .ui-vazio { margin-top: var(--space-10); }
+  .config-carregando { padding: var(--space-4) 0; }
+  .config-topo-celular { display: flex; }
+  .ui-folha .config-item { height: 44px; font-size: 15px; }
+  @media (max-width: 767.98px) { .tela-config { padding: var(--space-4) 16px; } }
+}
+@layer foco {
+  .config-item:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+}

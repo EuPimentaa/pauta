@@ -1,0 +1,370 @@
+/*
+ * Modal completo (F1): seções da coluna principal (descrição, checklists, anexos, comentários e atividade), as linhas
+ * de propriedade do painel lateral (rótulo com ícone à esquerda, valor clicável à direita) e os diálogos do F1.
+ * Prefixo `mdl-`. Só tokens da marca; o anel de foco de cada controle próprio fica em @layer foco.
+ */
+@layer components {
+  /* ─────────────── seção da coluna principal ─────────────── */
+  .mdl-secao { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+  .mdl-secao-cabeca { display: flex; align-items: center; gap: 10px; min-height: 32px; }
+  .mdl-secao-icone {
+    flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-sm);
+    background: var(--veu-1); color: var(--text-2);
+  }
+  .mdl-secao-icone svg { width: 16px; height: 16px; }
+  .mdl-secao-titulo { font: 600 var(--fs-col) / var(--lh-col) var(--font); letter-spacing: var(--tracking-titulo); color: var(--text); }
+  .mdl-secao-meta { color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); font-variant-numeric: lining-nums tabular-nums; }
+  .mdl-secao-acoes { margin-left: auto; display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .mdl-secao-corpo { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+  @media (min-width: 900px) { .mdl-secao-corpo { padding-left: 38px; } }
+  .mdl-vazio { color: var(--text-2); font: 400 var(--fs-body) / var(--lh-body) var(--font); }
+
+  /* ─────────────── descrição ─────────────── */
+  .mdl-descricao-ler {
+    position: relative; display: block; width: 100%; padding: 10px 12px; margin: -10px -12px; border: 0; border-radius: var(--radius-md);
+    background: transparent; color: inherit; text-align: left; cursor: text;
+    transition: background-color var(--dur-1) var(--ease);
+  }
+  .mdl-descricao-ler:hover { background: var(--veu-1); }
+  .mdl-descricao-ler .ui-md { max-width: 72ch; }
+  .mdl-descricao-vazia {
+    display: flex; align-items: center; gap: 8px; width: 100%; min-height: 64px; padding: 12px 14px; border-radius: var(--radius-md);
+    border: 1px dashed var(--border-strong); background: transparent; color: var(--text-2); text-align: left; cursor: text;
+    font: 400 var(--fs-body) / var(--lh-body) var(--font);
+  }
+  .mdl-descricao-vazia:hover { background: var(--veu-1); border-color: var(--border-control); color: var(--text); }
+  .mdl-editor-rodape { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .mdl-editor-dica { margin-left: auto; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .mdl-original { border-radius: var(--radius-md); background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--border); }
+  .mdl-original > summary {
+    display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer; list-style: none; border-radius: var(--radius-md);
+    color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font);
+  }
+  .mdl-original > summary::-webkit-details-marker { display: none; }
+  .mdl-original > summary svg { width: 15px; height: 15px; flex: none; transition: transform var(--dur-1) var(--ease); }
+  .mdl-original[open] > summary svg.mdl-seta { transform: rotate(90deg); }
+  .mdl-original > summary:hover { color: var(--text); }
+  .mdl-original .ui-texto-puro { padding: 0 14px 12px; color: var(--text); font: 400 var(--fs-body) / 1.55 var(--font); max-height: 320px; overflow-y: auto; }
+
+  /* ─────────────── checklists ─────────────── */
+  .mdl-checklist { display: flex; flex-direction: column; gap: 6px; }
+  .mdl-checklist + .mdl-checklist { margin-top: var(--space-3); }
+  .mdl-checklist-cabeca { display: flex; align-items: center; gap: 8px; min-height: 32px; flex-wrap: wrap; }
+  .mdl-checklist-titulo {
+    min-width: 0; padding: 2px 6px; margin: -2px -6px; border: 0; border-radius: var(--radius-xs); background: transparent;
+    color: var(--text); font: 600 var(--fs-body) / var(--lh-body) var(--font); text-align: left; cursor: text; overflow-wrap: anywhere;
+  }
+  .mdl-checklist-titulo:hover:not(:disabled) { background: var(--veu-1); }
+  .mdl-checklist-titulo:disabled { cursor: default; }
+  .mdl-selo-rodada {
+    display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: var(--radius-full);
+    background: var(--label-roxo-bg); color: var(--label-roxo-ink); font: 600 var(--fs-meta) / 1 var(--font); white-space: nowrap;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  .mdl-selo-rodada svg { width: 13px; height: 13px; }
+  .mdl-checklist-acoes { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+  .mdl-progresso { display: flex; align-items: center; gap: 10px; }
+  .mdl-progresso .ui-progresso { flex: 1; }
+  .mdl-progresso-pct {
+    min-width: 36px; text-align: right; color: var(--text-2); font: 600 var(--fs-meta) / 1 var(--font);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  .mdl-progresso[data-completo] .mdl-progresso-pct { color: var(--success-ink); }
+  .mdl-itens { display: flex; flex-direction: column; }
+  .mdl-item {
+    position: relative; display: grid; grid-template-columns: 18px 22px minmax(0, 1fr) auto; align-items: start; gap: 4px;
+    min-height: 36px; padding: 6px 4px 6px 0; margin: 0 -4px; border-radius: var(--radius-sm);
+    transition: background-color var(--dur-1) var(--ease);
+  }
+  .mdl-item:hover, .mdl-item:focus-within { background: var(--veu-1); }
+  .mdl-item[data-arrastando] { opacity: .45; }
+  .mdl-item[data-sobreposto] { background: var(--surface-raised); box-shadow: var(--shadow-drag); opacity: 1; }
+  .mdl-item-alca {
+    display: grid; place-items: center; width: 18px; height: 24px; border: 0; padding: 0; border-radius: 5px; background: transparent;
+    color: var(--text-3); cursor: grab; opacity: 0; touch-action: none;
+  }
+  .mdl-item:hover .mdl-item-alca, .mdl-item-alca:focus-visible { opacity: 1; }
+  .mdl-item-alca svg { width: 14px; height: 14px; }
+  .mdl-item .ui-check-caixa { margin-top: 2px; }
+  .mdl-item-texto {
+    min-width: 0; padding: 1px 6px; margin: 0 -2px; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--text);
+    font: 400 var(--fs-body) / var(--lh-body) var(--font); text-align: left; cursor: text; overflow-wrap: anywhere; white-space: pre-wrap;
+  }
+  .mdl-item-texto:disabled { cursor: default; }
+  .mdl-item[data-feito] .mdl-item-texto { color: var(--text-2); text-decoration: line-through; text-decoration-color: var(--text-3); }
+  .mdl-item-quem { display: block; margin-top: 1px; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); text-decoration: none; }
+  .mdl-item-acoes { display: flex; gap: 2px; opacity: 0; }
+  .mdl-item:hover .mdl-item-acoes, .mdl-item:focus-within .mdl-item-acoes { opacity: 1; }
+  @media (hover: none) { .mdl-item-acoes, .mdl-item-alca { opacity: 1; } }
+  .mdl-item-campo, .mdl-titulo-campo {
+    width: 100%; resize: none; padding: 4px 8px; border: 1px solid var(--border-control); border-radius: var(--radius-sm);
+    background: var(--surface); color: var(--text); font: 400 var(--fs-body) / var(--lh-body) var(--font); field-sizing: content; min-height: 34px;
+  }
+  .mdl-titulo-campo { font-weight: 600; }
+  .mdl-novo-item { display: flex; flex-direction: column; gap: 8px; padding-left: 44px; }
+  .mdl-novo-item-botao {
+    align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; margin-left: 34px;
+    border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-2); font: 500 var(--fs-body) / 1 var(--font); cursor: pointer;
+  }
+  .mdl-novo-item-botao:hover { background: var(--veu-1); color: var(--text); }
+  .mdl-novo-item-botao svg { width: 15px; height: 15px; }
+  .mdl-escondidos { margin-left: 44px; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+
+  /* ─────────────── anexos ─────────────── */
+  .mdl-anexos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 8px; }
+  .mdl-anexo {
+    position: relative; display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+    min-height: 64px; padding: 6px 6px 6px 6px; border-radius: var(--radius-md); background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--border); min-width: 0;
+  }
+  .mdl-anexo:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
+  .mdl-anexo[data-capa] { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 55%, transparent); }
+  .mdl-anexo-miniatura {
+    display: grid; place-items: center; width: 52px; height: 52px; overflow: hidden; border-radius: var(--radius-sm);
+    background: var(--surface-sunken); color: var(--text-2);
+  }
+  .mdl-anexo-miniatura img { width: 100%; height: 100%; object-fit: cover; }
+  .mdl-anexo-miniatura svg { width: 22px; height: 22px; }
+  .mdl-anexo-miniatura[data-cor] { background: var(--cor-bg); color: var(--cor-ink); }
+  .mdl-anexo-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .mdl-anexo-nome {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text);
+    font: 500 var(--fs-body) / var(--lh-body) var(--font); text-decoration: none; border-radius: 3px;
+  }
+  a.mdl-anexo-nome:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .mdl-anexo-detalhe {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font);
+    font-variant-numeric: lining-nums tabular-nums; min-width: 0;
+  }
+  .mdl-anexo-detalhe > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mdl-anexo-marca {
+    display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 6px; border-radius: var(--radius-full);
+    background: var(--accent-soft); color: var(--accent-ink); font: 600 var(--fs-micro) / 1 var(--font); letter-spacing: .02em;
+  }
+  .mdl-anexo-marca[data-tom="evidencia"] { background: var(--info-bg); color: var(--info-ink); }
+  .mdl-anexo .ui-copiar { padding: 2px 2px 2px 8px; }
+  .mdl-anexo-caminho { grid-column: 2 / -1; }
+  .mdl-anexo[data-tipo="caminho"] { grid-column: 1 / -1; }
+  .mdl-soltar {
+    display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; padding: 10px; border-radius: var(--radius-md);
+    border: 1px dashed var(--border-strong); color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); text-align: center;
+  }
+  .mdl-soltar svg { width: 16px; height: 16px; flex: none; }
+  .mdl-soltar[data-ativo] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+  .mdl-formulario { display: flex; flex-direction: column; gap: 12px; }
+  .mdl-formulario-botoes { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+
+  /* ─────────────── comentários e atividade ─────────────── */
+  .mdl-compositor { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start; }
+  .mdl-compositor-falso {
+    display: flex; align-items: center; width: 100%; min-height: 40px; padding: 8px 12px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border-control); background: var(--surface); color: var(--text-2); text-align: left; cursor: text;
+    font: 400 var(--fs-body) / var(--lh-body) var(--font);
+  }
+  .mdl-compositor-falso:hover { border-color: var(--text-3); }
+  .mdl-compositor-corpo { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .mdl-pendentes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mdl-pendente {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 8px; border-radius: var(--radius-full);
+    background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--border); color: var(--text); font: 500 var(--fs-meta) / 1 var(--font);
+    max-width: 220px;
+  }
+  .mdl-pendente > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mdl-comentarios { display: flex; flex-direction: column; gap: var(--space-4); }
+  .mdl-comentario { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start; }
+  .mdl-comentario-cabeca { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; min-height: 24px; }
+  .mdl-comentario-autor { color: var(--text); font: 600 var(--fs-body) / var(--lh-body) var(--font); }
+  .mdl-comentario-quando { color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .mdl-comentario-balao {
+    margin-top: 4px; padding: 10px 12px; border-radius: 4px var(--radius-md) var(--radius-md) var(--radius-md); background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--border); min-width: 0;
+  }
+  .mdl-comentario[data-cliente] .mdl-comentario-balao { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--info) 45%, transparent); background: color-mix(in oklab, var(--info-bg) 60%, var(--surface)); }
+  .mdl-comentario[data-excluido] .mdl-comentario-balao { background: transparent; color: var(--text-2); font-style: italic; }
+  .mdl-comentario-acoes { display: flex; gap: 12px; margin-top: 4px; }
+  .mdl-link {
+    padding: 0; border: 0; background: transparent; color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font);
+    text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; cursor: pointer; border-radius: 3px;
+  }
+  .mdl-link:hover { color: var(--text); text-decoration-color: currentColor; }
+  .mdl-link[data-perigo]:hover { color: var(--danger-ink); }
+  .mdl-selo-cliente {
+    display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: var(--radius-full);
+    background: var(--info-bg); color: var(--info-ink); font: 600 var(--fs-meta) / 1 var(--font);
+  }
+  .mdl-selo-cliente svg { width: 12px; height: 12px; }
+  .mdl-comentario-anexos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .mdl-comentario-anexos a { display: block; width: 88px; height: 64px; overflow: hidden; border-radius: var(--radius-sm); box-shadow: inset 0 0 0 1px var(--border); }
+  .mdl-comentario-anexos img { width: 100%; height: 100%; object-fit: cover; }
+  .mdl-atividades { display: flex; flex-direction: column; }
+  .mdl-atividade { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start; padding: 7px 0; }
+  .mdl-atividade-icone {
+    display: grid; place-items: center; width: 28px; height: 28px; margin: 0 2px; border-radius: 50%; background: var(--veu-1); color: var(--text-2);
+  }
+  .mdl-atividade-icone svg { width: 14px; height: 14px; }
+  .mdl-atividade-texto { color: var(--text); font: 400 var(--fs-body) / var(--lh-body) var(--font); overflow-wrap: anywhere; padding-top: 3px; }
+  .mdl-atividade-texto strong { font-weight: 600; }
+  .mdl-atividade-quando { color: var(--text-2); white-space: nowrap; font-size: var(--fs-meta); }
+  .mdl-abas-linha { display: flex; align-items: center; gap: 12px; }
+
+  /* ─────────────── painel lateral: linhas de propriedade ─────────────── */
+  .modal-demanda-lateral:has(> .mdl-prop) { gap: 2px; }
+  .mdl-prop { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 36px; min-width: 0; }
+  .mdl-prop[data-grupo] { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .mdl-prop-rotulo {
+    display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font);
+  }
+  .mdl-prop-rotulo svg { flex: none; width: 14px; height: 14px; }
+  .mdl-prop-valor { display: flex; align-items: center; gap: 4px; min-width: 0; color: var(--text); font: 400 var(--fs-body) / var(--lh-body) var(--font); }
+  .mdl-prop-botao {
+    flex: 1 1 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-height: 32px; padding: 4px 8px; margin: 0 0 0 -8px;
+    border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); text-align: left; cursor: pointer;
+    font: 400 var(--fs-body) / var(--lh-body) var(--font); min-width: 0;
+  }
+  .mdl-prop-botao:hover:not(:disabled) { background: var(--veu-1); }
+  .mdl-prop-botao:disabled, .mdl-prop-botao[data-fixo] { cursor: default; }
+  .mdl-prop-botao > span { min-width: 0; overflow-wrap: anywhere; }
+  .mdl-prop-vazio { color: var(--text-2); }
+  .mdl-prop-sub { display: block; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .mdl-pontos { display: inline-flex; align-items: center; }
+  .mdl-ponto { width: 12px; height: 12px; border-radius: 50%; background: var(--cor); box-shadow: 0 0 0 2px var(--surface-raised); }
+  .mdl-ponto + .mdl-ponto { margin-left: -3px; }
+  .mdl-bandeira { display: inline-flex; align-items: center; gap: 6px; }
+  .mdl-bandeira svg { width: 15px; height: 15px; }
+  .mdl-bandeira[data-prioridade="baixa"] svg { color: var(--text-3); }
+  .mdl-bandeira[data-prioridade="media"] svg { color: var(--info-ink); }
+  .mdl-bandeira[data-prioridade="alta"] svg { color: var(--warning-ink); }
+  .mdl-bandeira[data-prioridade="urgente"] svg { color: var(--danger-ink); fill: currentColor; }
+  .mdl-estado {
+    display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; margin-left: -2px; border-radius: var(--radius-xs);
+    font: 500 var(--fs-body) / 1 var(--font); white-space: nowrap; font-variant-numeric: lining-nums tabular-nums;
+  }
+  .mdl-estado svg { width: 14px; height: 14px; flex: none; }
+  .mdl-estado[data-estado="atrasada"] { background: var(--danger-bg); color: var(--danger-ink); }
+  .mdl-estado[data-estado="hoje"] { background: var(--warning-bg); color: var(--warning-ink); }
+  .mdl-estado[data-estado="pausado"] { background: var(--info-bg); color: var(--info-ink); }
+  .mdl-estado[data-estado="concluida"] { background: var(--success-bg); color: var(--success-ink); }
+  .mdl-entrar {
+    height: 24px; padding: 0 8px; border: 0; border-radius: var(--radius-full); background: var(--veu-1); color: var(--text);
+    font: 600 var(--fs-meta) / 1 var(--font); cursor: pointer;
+  }
+  .mdl-entrar:hover { background: var(--veu-2); }
+  .mdl-cliente-extra { display: flex; flex-direction: column; gap: 6px; padding: 2px 0 6px 104px; min-width: 0; }
+  .mdl-cliente-links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .mdl-cliente-links a {
+    display: inline-flex; align-items: center; gap: 4px; color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font);
+    text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; border-radius: 3px;
+  }
+  .mdl-cliente-links a:hover { color: var(--text); text-decoration-color: currentColor; }
+  .mdl-cliente-links svg { width: 12px; height: 12px; }
+  .mdl-capa-previa { width: 100%; height: 44px; border-radius: var(--radius-sm); background: var(--cor); overflow: hidden; }
+  .mdl-capa-previa img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .mdl-progresso-mini { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+
+  /* ─────────────── cronômetro (painel, topo e card) ─────────────── */
+  .mdl-tempo {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 12px; margin-top: 10px; padding: 12px;
+    border-radius: var(--radius-md); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .mdl-tempo-play {
+    grid-row: span 2; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; cursor: pointer;
+    background: var(--surface-inverse); color: var(--text-inverse); transition: transform var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
+  }
+  .mdl-tempo-play:hover:not(:disabled) { transform: scale(1.05); }
+  .mdl-tempo-play:disabled { opacity: .5; cursor: default; }
+  .mdl-tempo-play svg { width: 18px; height: 18px; fill: currentColor; }
+  .mdl-tempo[data-ligado] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--success) 55%, transparent); background: color-mix(in oklab, var(--success-bg) 70%, var(--surface)); }
+  .mdl-tempo[data-ligado] .mdl-tempo-play { background: var(--success-ink); color: var(--surface); }
+  .mdl-tempo-relogio { color: var(--text); font: 600 22px / 26px var(--font); font-variant-numeric: lining-nums tabular-nums; letter-spacing: -.01em; }
+  .mdl-tempo-sub { color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); font-variant-numeric: lining-nums tabular-nums; }
+  .mdl-tempo-rodape {
+    grid-column: 1 / -1; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 8px; padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .mdl-tempo-rodape .ui-botao { margin-left: -10px; }
+  /* ─────────────── diálogos ─────────────── */
+  .mdl-lista { display: flex; flex-direction: column; gap: 2px; max-height: min(320px, 50dvh); overflow-y: auto; margin: 0 -4px; padding: 2px 4px; }
+  .mdl-opcao {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 6px 8px; border: 0; border-radius: var(--radius-sm);
+    background: transparent; color: var(--text); text-align: left; cursor: pointer; font: 400 var(--fs-body) / var(--lh-body) var(--font);
+  }
+  .mdl-opcao:hover { background: var(--veu-1); }
+  .mdl-opcao[aria-checked="true"], .mdl-opcao[aria-pressed="true"] { background: var(--accent-soft); }
+  .mdl-opcao-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mdl-opcao-detalhe { color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); white-space: nowrap; }
+  .mdl-opcao-check { width: 16px; height: 16px; color: var(--accent-ink); flex: none; }
+  .mdl-grupo-rotulo { padding: 8px 8px 2px; color: var(--text-2); font: 700 var(--fs-micro) / var(--lh-micro) var(--font); letter-spacing: var(--tracking-micro); text-transform: uppercase; }
+  .mdl-etiqueta-linha { display: flex; align-items: center; gap: 4px; }
+  .mdl-etiqueta-alternar {
+    flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 36px; padding: 4px 6px; border: 0; border-radius: var(--radius-sm);
+    background: transparent; cursor: pointer; text-align: left;
+  }
+  .mdl-etiqueta-alternar:hover { background: var(--veu-1); }
+  .mdl-etiqueta-barra {
+    flex: 1; display: flex; align-items: center; min-width: 0; height: 30px; padding: 0 10px; border-radius: var(--radius-xs);
+    background: var(--cor-bg); color: var(--cor-ink); box-shadow: inset 4px 0 0 var(--cor); font: 600 var(--fs-body) / 1 var(--font);
+  }
+  .mdl-etiqueta-barra > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mdl-capas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .mdl-capa-opcao {
+    position: relative; height: 56px; overflow: hidden; border: 0; padding: 0; border-radius: var(--radius-sm); cursor: pointer;
+    background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .mdl-capa-opcao img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .mdl-capa-opcao[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 4px var(--accent); }
+  .mdl-sem-par { padding: 10px 12px; border-radius: var(--radius-md); background: var(--warning-bg); color: var(--warning-ink); font: 400 var(--fs-body) / var(--lh-body) var(--font); }
+  .mdl-sem-par strong { font-weight: 600; }
+  .mdl-escolhas { display: flex; flex-direction: column; gap: 6px; }
+  .mdl-escolha {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: var(--radius-md); cursor: pointer;
+    box-shadow: inset 0 0 0 1px var(--border); background: var(--surface); color: var(--text); font: 400 var(--fs-body) / var(--lh-body) var(--font);
+  }
+  .mdl-escolha:has(input:checked) { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-soft); }
+  .mdl-escolha input { margin-top: 4px; accent-color: var(--accent); }
+  .mdl-escolha small { display: block; color: var(--text-2); font-size: var(--fs-meta); line-height: var(--lh-meta); }
+  .mdl-duas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  @media (max-width: 479.98px) { .mdl-duas { grid-template-columns: minmax(0, 1fr); } }
+  .mdl-datas { display: flex; flex-direction: column; gap: 10px; }
+  .mdl-data-linha { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 8px; }
+  .mdl-data-linha > label, .mdl-data-linha > span { color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .mdl-data-linha .ui-data-gatilho { width: 100%; justify-content: flex-start; }
+  .mdl-sugestoes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mdl-chip {
+    height: 28px; padding: 0 10px; border: 0; border-radius: var(--radius-full); background: var(--veu-1); color: var(--text);
+    font: 500 var(--fs-meta) / 1 var(--font); cursor: pointer;
+  }
+  .mdl-chip:hover { background: var(--veu-2); }
+
+  /* ─────────────── celular ─────────────── */
+  .mdl-campos { display: none; }
+  @media (max-width: 767.98px) {
+    /* as linhas sem valor saem do caminho (a descrição sobe); "Mostrar todos os campos" traz de volta */
+    .modal-demanda-lateral:has(.mdl-campos[data-mdl-campos="preenchidos"]) .mdl-prop[data-vazio] { display: none; }
+    .modal-demanda-lateral:has(.mdl-prop[data-vazio]) .mdl-campos, .mdl-campos[data-mdl-campos="todos"] {
+      display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; height: 32px; margin-top: 6px; padding: 0 10px 0 8px;
+      border: 0; border-radius: var(--radius-sm); background: var(--veu-1); color: var(--text); font: 500 var(--fs-meta) / 1 var(--font); cursor: pointer;
+    }
+    .mdl-campos svg { width: 15px; height: 15px; transition: transform var(--dur-1) var(--ease); }
+    .mdl-campos[aria-expanded="true"] svg { transform: rotate(180deg); }
+    .mdl-cliente-extra { padding-left: 0; }
+    .mdl-anexos { grid-template-columns: minmax(0, 1fr); }
+    /* sem alça no celular (arrastar o item é pelo toque longo): a grade fica com caixa, texto e ações */
+    .mdl-item-alca, .mdl-item > .mdl-item-vaga { display: none; }
+    .mdl-item { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 6px; padding-left: 4px; }
+    .mdl-novo-item, .mdl-escondidos { padding-left: 28px; margin-left: 0; }
+    .mdl-novo-item-botao { margin-left: 20px; }
+  }
+}
+
+@layer foco {
+  .mdl-descricao-ler:focus-visible, .mdl-descricao-vazia:focus-visible, .mdl-checklist-titulo:focus-visible, .mdl-item-texto:focus-visible,
+  .mdl-item-alca:focus-visible, .mdl-novo-item-botao:focus-visible, .mdl-compositor-falso:focus-visible, .mdl-link:focus-visible,
+  .mdl-prop-botao:focus-visible, .mdl-entrar:focus-visible, .mdl-tempo-play:focus-visible, .mdl-opcao:focus-visible,
+  .mdl-etiqueta-alternar:focus-visible, .mdl-capa-opcao:focus-visible, .mdl-chip:focus-visible, .mdl-campos:focus-visible, .mdl-cliente-links a:focus-visible,
+  a.mdl-anexo-nome:focus-visible, .mdl-comentario-anexos a:focus-visible, .mdl-original > summary:focus-visible {
+    box-shadow: var(--focus-ring);
+  }
+  .mdl-item-campo:focus-visible, .mdl-titulo-campo:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+  .mdl-escolha:has(input:focus-visible) { box-shadow: var(--focus-ring); }
+  .mdl-escolha input:focus-visible { box-shadow: none; }
+}

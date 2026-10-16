@@ -5,8 +5,10 @@
  *   const abrir = useAbrirSobreposta(); abrir(`/d/${numero}`)
  *   const fechar = useFecharSobreposta(); <Modal aoFechar={fechar}>…
  * Aberta direto pela URL (sem fundo), a tela de baixo é a rota inicial (eu.rotaInicial) e fechar leva para lá.
+ * O App desenha a sobreposta fora da árvore de rotas, quando a área autenticada avisa que está pronta (bootstrap e
+ * registro carregados): um <Routes> dentro da rota de layout geraria o aviso de "descendant <Routes>" do react-router.
  */
-import { createContext, useContext, type ReactNode } from 'react'
+import { createContext, useContext, useSyncExternalStore } from 'react'
 import { useLocation, useNavigate, type Location } from 'react-router'
 
 export interface EstadoFundo { fundo?: Location }
@@ -14,13 +16,29 @@ export interface EstadoFundo { fundo?: Location }
 interface CtxSobreposta {
   /** Tela de baixo quando há uma sobreposta aberta; null quando não há. */
   fundo: Location | null
-  /** A rota sobreposta casada (desenhada pela área autenticada por cima do Outlet). */
-  sobreposta: ReactNode
   /** O fundo veio do estado da navegação (fechar = voltar no histórico). */
   fundoDoHistorico: boolean
 }
 
-export const ContextoSobreposta = createContext<CtxSobreposta>({ fundo: null, sobreposta: null, fundoDoHistorico: false })
+export const ContextoSobreposta = createContext<CtxSobreposta>({ fundo: null, fundoDoHistorico: false })
+
+let areaPronta = false
+const ouvintesArea = new Set<() => void>()
+
+/** A área autenticada marca quando montou (bootstrap e registro prontos) e desmarca ao sair. */
+export function marcarAreaPronta(pronta: boolean): void {
+  if (areaPronta === pronta) return
+  areaPronta = pronta
+  ouvintesArea.forEach((f) => f())
+}
+
+export function useAreaPronta(): boolean {
+  return useSyncExternalStore(
+    (f) => { ouvintesArea.add(f); return () => { ouvintesArea.delete(f) } },
+    () => areaPronta,
+    () => false,
+  )
+}
 
 export function useFundo(): Location | null {
   return useContext(ContextoSobreposta).fundo

@@ -13,7 +13,7 @@ import { rotas } from './extensoes/registro-rotas.ts'
 import type { ExtensaoRota } from './extensoes/tipos.ts'
 import type { Eu } from '@shared/tipos/index.ts'
 import { Globais } from './sessao/Globais.tsx'
-import { ContextoSobreposta, type EstadoFundo } from './sessao/sobreposta.tsx'
+import { ContextoSobreposta, useAreaPronta, type EstadoFundo } from './sessao/sobreposta.tsx'
 import { Tela } from './sessao/Tela.tsx'
 import { Avisos } from './ui/avisos.tsx'
 
@@ -65,14 +65,12 @@ function Raiz() {
     ? fundoDoEstado ?? { pathname: ROTA_INICIAL, search: '', hash: '', state: null, key: 'fundo' }
     : null
 
-  const sobreposta = emSobreposta ? (
-    <Routes location={location}>
-      {grupos.sobrepostas.map((r) => <Route key={r.caminho} path={r.caminho} element={<Tela rota={r} esqueleto={null} />} />)}
-    </Routes>
-  ) : null
+  // a sobreposta fica fora da árvore de rotas (um <Routes> dentro da rota de layout gera aviso do react-router) e só
+  // aparece com a área autenticada pronta (sessão, bootstrap e registro), por cima da tela de baixo
+  const areaPronta = useAreaPronta()
 
   return (
-    <ContextoSobreposta.Provider value={{ fundo, sobreposta, fundoDoHistorico: !!fundoDoEstado }}>
+    <ContextoSobreposta.Provider value={{ fundo, fundoDoHistorico: !!fundoDoEstado }}>
       <Routes location={fundo ?? location}>
         {grupos.publicas.map((r) => <Route key={r.caminho} path={r.caminho} element={<Tela rota={r} esqueleto={null} />} />)}
         <Route element={<Suspense fallback={<Canvas />}><AreaAutenticada /></Suspense>}>
@@ -84,6 +82,11 @@ function Raiz() {
           </Route>
         </Route>
       </Routes>
+      {emSobreposta && areaPronta && (
+        <Routes location={location}>
+          {grupos.sobrepostas.map((r) => <Route key={r.caminho} path={r.caminho} element={<Tela rota={r} esqueleto={null} />} />)}
+        </Routes>
+      )}
       <Globais escopo="raiz" />
     </ContextoSobreposta.Provider>
   )

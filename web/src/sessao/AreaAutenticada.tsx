@@ -1,8 +1,9 @@
 /**
  * Área autenticada (rota de layout sem caminho): carrega o bootstrap e o registro de extensões, aplica o tema da pessoa,
- * monta os globais 'autenticada' e desenha a rota sobreposta (se houver) por cima do Outlet. Sem sessão → /entrar?volta=.
+ * monta os globais 'autenticada' e avisa o App que já pode desenhar a rota sobreposta (se houver). Sem sessão →
+ * /entrar?volta=.
  */
-import { Suspense, useContext } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Navigate, Outlet } from 'react-router'
 import { RefreshCw, WifiOff } from 'lucide-react'
 import { useBootstrap } from '../api/bootstrap.ts'
@@ -11,18 +12,21 @@ import { Botao } from '../ui/Botao.tsx'
 import { EstadoVazio } from '../ui/Indicadores.tsx'
 import { Globais } from './Globais.tsx'
 import { useRegistro } from './registro.ts'
-import { ContextoSobreposta } from './sobreposta.tsx'
+import { marcarAreaPronta } from './sobreposta.tsx'
 import { useSincronizarTema } from './tema.ts'
 
 function ComRegistro() {
   useRegistro()          // suspende até o registro carregar (uma vez por sessão)
   useSincronizarTema()
-  const { sobreposta } = useContext(ContextoSobreposta)
+  // daqui em diante o App desenha a rota sobreposta por cima de tudo
+  useEffect(() => {
+    marcarAreaPronta(true)
+    return () => marcarAreaPronta(false)
+  }, [])
   return (
     <>
       <Globais escopo="autenticada" />
       <Outlet />
-      {sobreposta}
     </>
   )
 }

@@ -102,6 +102,23 @@ describe('front em produção (web/dist)', () => {
     assert.equal((await app.request('/api/saude')).status, 200)
   })
 
+  test('index.html sai com o APP_NOME (escapado) no <title> e no application-name, inclusive em /index.html', async () => {
+    const a = await ambiente()
+    restaurar = configurar({ producao: true, appNome: 'Fila & <Cia> "M"' })
+    const pasta = distFalso()
+    writeFileSync(join(pasta, 'index.html'),
+      '<!doctype html><head><meta name="application-name" content="Pauta" /><title>Pauta</title></head><body>Pauta</body>')
+    const app = criarApp(a.db)
+    servirWeb(app, pasta)
+    const esperado = '<!doctype html><head><meta name="application-name" content="Fila &amp; &lt;Cia&gt; &quot;M&quot;" />'
+      + '<title>Fila &amp; &lt;Cia&gt; &quot;M&quot;</title></head><body>Pauta</body>'
+    for (const caminho of ['/entrar', '/index.html', '/']) {
+      const r = await app.request(caminho)
+      assert.equal(r.headers.get('cache-control'), 'no-cache', caminho)
+      assert.equal(await r.text(), esperado, caminho)
+    }
+  })
+
   test('não sai da pasta (../ codificado) e sem web/dist não registra nada', async () => {
     const a = await ambiente()
     const app = criarApp(a.db)

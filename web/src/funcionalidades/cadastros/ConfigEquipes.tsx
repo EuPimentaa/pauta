@@ -39,7 +39,7 @@ function DialogoEquipe({ equipe, aoFechar }: { equipe: Equipe | null; aoFechar()
   const [erro, setErro] = useState<unknown>(null)
   const [enviando, setEnviando] = useState(false)
   const [tentou, setTentou] = useState(false)
-  const slugFinal = equipe ? equipe.slug : (slugTocado ? slug : slugDe(nome).replace(/^[^a-z]+/, ''))
+  const slugFinal = equipe ? equipe.slug : (slugTocado ? slug : slugDe(nome).replace(/^[^a-z]+/, '').slice(0, 40).replace(/-+$/, ''))
 
   async function salvar() {
     setTentou(true)
@@ -142,16 +142,18 @@ function DialogoMembros({ equipe, aoFechar }: { equipe: Equipe; aoFechar(): void
             const m = membros.get(u.id)
             return (
               <li key={u.id} className="cad-membro">
-                <Checkbox checked={!!m} aria-label={`${u.nome} na equipe`}
-                  onChange={(e) => mudar(u.id, e.target.checked ? { usuarioId: u.id, funcao: null, principal: false } : null)} />
-                <span className="cad-pessoa"><Avatar pessoa={u} tamanho={26} /><span>{u.nome}{!u.ativo ? ' (sem acesso)' : ''}</span></span>
+                <span className="cad-membro-check">
+                  <Checkbox checked={!!m} aria-label={`${u.nome} na equipe`}
+                    onChange={(e) => mudar(u.id, e.target.checked ? { usuarioId: u.id, funcao: null, principal: false } : null)} />
+                </span>
+                <span className="cad-pessoa cad-membro-pessoa"><Avatar pessoa={u} tamanho={26} /><span>{u.nome}{!u.ativo ? ' (sem acesso)' : ''}</span></span>
                 {m ? (
                   <Campo classeGrupo="cad-membro-funcao" rotulo={`Função de ${u.nome}`} rotuloOculto tamanho="p" placeholder="Função (opcional)"
                     value={m.funcao ?? ''} maxLength={40} onChange={(e) => mudar(u.id, { ...m, funcao: e.target.value })} />
                 ) : <span className="cad-membro-funcao" />}
-                {m ? (
-                  <Checkbox checked={m.principal} onChange={(e) => mudar(u.id, { ...m, principal: e.target.checked })}>Principal</Checkbox>
-                ) : <span />}
+                <span className="cad-membro-principal">
+                  {m && <Checkbox checked={m.principal} onChange={(e) => mudar(u.id, { ...m, principal: e.target.checked })}>Principal</Checkbox>}
+                </span>
               </li>
             )
           })}

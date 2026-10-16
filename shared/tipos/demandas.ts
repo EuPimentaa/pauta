@@ -205,6 +205,7 @@ export const TIPOS_ATIVIDADE = [
   'comentario.criado', 'comentario.editado', 'comentario.excluido',
   'anexo.adicionado', 'anexo.removido',
   'checklist.criado', 'checklist.removido', 'checklist.item_feito', 'checklist.item_desfeito',
+  'checklist.editado', 'checklist.item_editado', 'checklist.item_removido',
   'tempo.lancado',
   'cliente.criado', 'cliente.editado',
 ] as const
@@ -266,6 +267,10 @@ export interface MapaDadosAtividade {
   'checklist.removido': { checklistId: Id; titulo: string }
   'checklist.item_feito': { itemId: Id; texto: string }
   'checklist.item_desfeito': { itemId: Id; texto: string }
+  /** Renomeado (integração 3A: a trilha do checklist de rodada, que é o pedido do cliente). */
+  'checklist.editado': { checklistId: Id; titulo: string; tituloAntes: string }
+  'checklist.item_editado': { itemId: Id; texto: string; textoAntes: string }
+  'checklist.item_removido': { itemId: Id; texto: string }
   /** O histórico só mostra esta linha ao próprio ator e ao admin (horas individuais). */
   'tempo.lancado': { apontamentoId: Id; minutos: number; origem: 'manual' | 'cronometro' }
   'cliente.criado': { clienteId: Id; sigla: string }

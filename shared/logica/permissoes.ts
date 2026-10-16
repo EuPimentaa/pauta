@@ -14,7 +14,7 @@ export type AcaoPermissao =
   | 'quadro.administrar' | 'automacao.editar' | 'modelo.global' | 'modelos.revisados' | 'cliente.criar'
   | 'cliente.editar' | 'pessoas' | 'config' | 'versao.entregar' | 'versao.editar' | 'ciclo.cliente'
   | 'comentario.visivel_cliente' | 'comentario.editar' | 'comentario.excluir' | 'anexo.excluir'
-  | 'checklist_rodada.excluir' | 'apontamento.editar' | 'demanda.excluir' | 'horas.outros'
+  | 'checklist_rodada.excluir' | 'checklist_rodada.editar' | 'apontamento.editar' | 'demanda.excluir' | 'horas.outros'
 
 export interface AlvoPermissao {
   demanda?: Pick<Demanda, 'membroIds' | 'atendimentoId'>
@@ -38,7 +38,8 @@ const gestao = (p: Papel) => p === 'admin' || p === 'atendimento'
  * - cliente.editar: admin; atendimento nos da carteira (atendimentoId = eu) e nos sem AM;
  * - versao.entregar: atendimento, admin e, da equipe, quem é membro ou o AM da demanda;
  * - versao.editar: o autor, atendimento, admin; comentario.editar: o autor; comentario.excluir: o autor ou admin;
- * - anexo.excluir: quem enviou, atendimento, admin; checklist_rodada.excluir: atendimento, admin (checklist comum:
+ * - anexo.excluir: quem enviou, atendimento, admin; checklist_rodada.excluir e checklist_rodada.editar (renomear,
+ *   acrescentar, mudar o texto e tirar itens; marcar e reordenar são livres): atendimento, admin (checklist comum:
  *   todos); apontamento.editar: o dono ou admin.
  */
 export function pode(acao: AcaoPermissao, eu: QuemPede, alvo: AlvoPermissao = {}): boolean {
@@ -63,7 +64,7 @@ export function pode(acao: AcaoPermissao, eu: QuemPede, alvo: AlvoPermissao = {}
       return alvo.comentario !== undefined && alvo.comentario.autorId === eu.id
     case 'anexo.excluir':
       return gestao(eu.papel) || (alvo.anexo !== undefined && alvo.anexo.enviadoPor === eu.id)
-    case 'checklist_rodada.excluir':
+    case 'checklist_rodada.excluir': case 'checklist_rodada.editar':
       return gestao(eu.papel) || alvo.checklist?.rodadaId === null
     case 'apontamento.editar':
       return alvo.apontamento !== undefined && alvo.apontamento.usuarioId === eu.id
@@ -87,6 +88,7 @@ const MOTIVOS: Record<AcaoPermissao, string> = {
   'comentario.excluir': 'Só quem escreveu e o admin excluem o comentário.',
   'anexo.excluir': 'Só quem enviou, o atendimento e o admin excluem o anexo.',
   'checklist_rodada.excluir': 'Só o atendimento e o admin apagam o checklist de uma rodada.',
+  'checklist_rodada.editar': 'O checklist da rodada é o pedido do cliente: só o atendimento e o admin mudam os itens. Marque o que fizer.',
   'apontamento.editar': 'Só o dono das horas e o admin mudam o lançamento.',
   'demanda.excluir': 'Só o admin exclui demandas.',
   'horas.outros': 'Só o admin vê as horas de outra pessoa.',

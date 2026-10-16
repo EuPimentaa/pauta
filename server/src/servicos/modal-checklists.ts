@@ -1,7 +1,9 @@
 /**
  * Checklists e itens (API.md §4.15): vários por demanda, ordem por `pos`, marcar com quem e quando. O checklist de
- * rodada ("Ajustes R2") só sai por atendimento e admin (pode('checklist_rodada.excluir')). Contadores n_check_* por
- * gatilho; o patch da demanda sai por emitirContadores().
+ * rodada ("Ajustes R2", o pedido do cliente) só sai por atendimento e admin (pode('checklist_rodada.excluir')), e só
+ * eles o renomeiam e acrescentam, reescrevem ou tiram itens (pode('checklist_rodada.editar')); marcar e reordenar são
+ * livres. Renomear, reescrever e tirar item ficam no histórico. Contadores n_check_* por gatilho; o patch da demanda
+ * sai por emitirContadores().
  */
 import type {
   Checklist, ChecklistComItens, ChecklistItem, CriarChecklistEntrada, CriarItensEntrada, EditarChecklistEntrada,
@@ -37,6 +39,12 @@ function carregarItem(db: Db, id: Id): ChecklistItem {
   return mapear.checklistItem(l)
 }
 
+/** O checklist de rodada só muda de conteúdo por atendimento e admin (o de rodada nula: todos). */
+function exigirEditarConteudo(db: Db, checklistId: Id, ator: Ator): void {
+  const c = um<{ rodada_id: string | null }>(db, 'SELECT rodada_id FROM checklist WHERE id = ?', checklistId)
+  exigir(ator, 'checklist_rodada.editar', { checklist: { rodadaId: c?.rodada_id ?? null } })
+}
+
 function semItens(c: ChecklistComItens): Checklist {
   const { itens: _, ...checklist } = c
   return checklist
@@ -60,9 +68,13 @@ export function editarChecklist(db: Db, id: Id, e: EditarChecklistEntrada, ator:
   demandaEditavel(db, atual.demandaId)
   const sets: string[] = []
   const params: unknown[] = []
+  let renomeado: string | null = null
   if (e.titulo !== undefined) {
     const titulo = tituloValido(e.titulo)
-    if (titulo !== atual.titulo) { sets.push('titulo = ?'); params.push(titulo) }
+    if (titulo !== atual.titulo) {
+      exigir(ator, 'checklist_rodada.editar', { checklist: atual })
+      sets.push('titulo = ?'); params.push(titulo); renomeado = titulo
+    }
   }
   if (e.posicao) {
     sets.push('pos = ?')
@@ -70,6 +82,10 @@ export function editarChecklist(db: Db, id: Id, e: EditarChecklistEntrada, ator:
   }
   if (sets.length === 0) return atual
   rodar(db, `UPDATE checklist SET ${sets.join(', ')} WHERE id = ?`, ...params, id)
+  if (renomeado !== null) {
+    registrarAtividade(db, { tipo: 'checklist.editado', ator, demandaId: atual.demandaId,
+      dados: { checklistId: id, titulo: renomeado, tituloAntes: atual.titulo } })
+  }
   const c = carregarChecklistComItens(db, id)
   emitirObjeto(db, 'checklist', id, semItens(c), ator, { demandaId: c.demandaId })
   return c
@@ -92,6 +108,7 @@ export function excluirChecklist(db: Db, id: Id, ator: Ator): void {
 /** POST /api/checklists/:id/itens: cada texto vira um item, na posição pedida (padrão: no fim), na ordem dada. */
 export function criarItens(db: Db, checklistId: Id, e: CriarItensEntrada, ator: Ator): ChecklistItem[] {
   const checklist = carregarChecklistComItens(db, checklistId)
+  exigir(ator, 'checklist_rodada.editar', { checklist })
   const antes = demandaEditavel(db, checklist.demandaId)
   const textos = textosValidos(e.textos)
   if (textos.length === 0) throw validacao('Escreva o item.', { textos: 'vazio' })
@@ -119,10 +136,14 @@ export function editarItem(db: Db, id: Id, e: EditarItemEntrada, ator: Ator): Ch
   const antes = demandaEditavel(db, atual.demandaId)
   const sets: string[] = []
   const params: unknown[] = []
+  let reescrito = false
   if (e.texto !== undefined) {
     const texto = e.texto.trim().slice(0, 2000)
     if (!texto) throw validacao('Escreva o item.', { texto: 'vazio' })
-    if (texto !== atual.texto) { sets.push('texto = ?'); params.push(texto) }
+    if (texto !== atual.texto) {
+      exigirEditarConteudo(db, atual.checklistId, ator)
+      sets.push('texto = ?'); params.push(texto); reescrito = true
+    }
   }
   const mudouFeito = e.feito !== undefined && e.feito !== (atual.feitoEm !== null)
   if (mudouFeito) {
@@ -139,6 +160,10 @@ export function editarItem(db: Db, id: Id, e: EditarItemEntrada, ator: Ator): Ch
   if (mudouFeito && e.feito && !ator.usuario) throw new Error('editarItem: marcar precisa de um usuário')
   rodar(db, `UPDATE checklist_item SET ${sets.join(', ')} WHERE id = ?`, ...params, id)
   const item = carregarItem(db, id)
+  if (reescrito) {
+    registrarAtividade(db, { tipo: 'checklist.item_editado', ator, demandaId: item.demandaId,
+      dados: { itemId: id, texto: item.texto, textoAntes: atual.texto } })
+  }
   if (mudouFeito) {
     registrarAtividade(db, { tipo: e.feito ? 'checklist.item_feito' : 'checklist.item_desfeito', ator, demandaId: item.demandaId,
       dados: { itemId: id, texto: item.texto } })
@@ -151,8 +176,10 @@ export function editarItem(db: Db, id: Id, e: EditarItemEntrada, ator: Ator): Ch
 /** DELETE /api/checklist-itens/:id. */
 export function excluirItem(db: Db, id: Id, ator: Ator): void {
   const atual = carregarItem(db, id)
+  exigirEditarConteudo(db, atual.checklistId, ator)
   const antes = demandaEditavel(db, atual.demandaId)
   rodar(db, 'DELETE FROM checklist_item WHERE id = ?', id)
+  registrarAtividade(db, { tipo: 'checklist.item_removido', ator, demandaId: atual.demandaId, dados: { itemId: id, texto: atual.texto } })
   emitirDelete(db, 'checklist_item', id, ator, { demandaId: atual.demandaId })
   emitirContadores(db, atual.demandaId, ator, antes)
 }

@@ -100,6 +100,7 @@ Papéis: `admin`, `atendimento`, `equipe` (`shared/tipos/nucleo.ts`). **Admin po
 | Editar comentário (`comentario.editar`) / excluir (`comentario.excluir`) | excluir de qualquer um | o próprio | o próprio |
 | Excluir anexo (`anexo.excluir`; o de evidência nunca sai) | sim | sim | só quem enviou |
 | Apagar checklist de rodada "Ajustes R2" (`checklist_rodada.excluir`) | sim | sim | não |
+| Renomear o checklist de rodada e acrescentar, reescrever ou tirar itens dele (`checklist_rodada.editar`; marcar e reordenar são livres) | sim | sim | não |
 | Editar e excluir apontamento (`apontamento.editar`) | sim | o próprio | o próprio |
 | Clientes: criar | sim | sim | só sigla e nome (`CAMPOS_CLIENTE_EQUIPE`; nasce com a pendência `sem_am`) |
 | Clientes: editar (dados, apelidos, responsáveis, contatos, links) | todos | os da carteira (`atendimentoId` = eu) e os sem AM | não |
@@ -629,9 +630,10 @@ pelo número). Arquivadas e de quadros arquivados só com `incluirArquivadas`. M
 
 ### 4.15 Modal da demanda · modal
 
-Checklists, anexos e comentários: qualquer usuário interno (o checklist de rodada, "Ajustes R2", só atendimento e
-admin apagam). Toda regra de papel aqui passa por `pode()` (§2: `anexo.excluir`, `comentario.editar`,
-`comentario.excluir`, `checklist_rodada.excluir`). Horas (listar, editar, excluir): §4.20.
+Checklists, anexos e comentários: qualquer usuário interno (o checklist de rodada, "Ajustes R2", é o pedido do
+cliente: só atendimento e admin o apagam, renomeiam e acrescentam, reescrevem ou tiram itens; a equipe marca e
+reordena). Toda regra de papel aqui passa por `pode()` (§2: `anexo.excluir`, `comentario.editar`,
+`comentario.excluir`, `checklist_rodada.excluir`, `checklist_rodada.editar`). Horas (listar, editar, excluir): §4.20.
 
 #### `GET /api/demandas/:id/comentarios`
 Qualquer usuário. `200 Comentario[]` em ordem de criação (excluídos chegam com `corpoMd` vazio e `excluidoEm`).
@@ -661,7 +663,7 @@ quem agiu (quem arquiva a demanda e para o cronômetro de outra pessoa não vê 
 
 #### `PATCH /api/checklists/:id` · `DELETE /api/checklists/:id`
 - **Corpo:** `EditarChecklistEntrada`. **Resposta:** `200 ChecklistComItens`. `DELETE` apaga com os itens (`204`).
-  **Atividade:** `checklist.removido`. **SSE:** `checklist` (upsert/delete), `checklist_item` (delete de cada item, no
+  **Atividade:** `checklist.editado` (renomear, com `tituloAntes`) / `checklist.removido`. **SSE:** `checklist` (upsert/delete), `checklist_item` (delete de cada item, no
   `DELETE`), `demanda` (contadores).
 
 #### `POST /api/checklists/:id/itens`
@@ -670,7 +672,8 @@ quem agiu (quem arquiva a demanda e para o cronômetro de outra pessoa não vê 
 
 #### `PATCH /api/checklist-itens/:id` · `DELETE /api/checklist-itens/:id`
 - **Corpo:** `EditarItemEntrada` (`feito` grava `feitoEm`/`feitoPor`). **Resposta:** `200 ChecklistItem` / `204`.
-- **Atividade:** `checklist.item_feito` / `checklist.item_desfeito`. **SSE:** `checklist_item`, `demanda` (contadores).
+- **Atividade:** `checklist.item_feito` / `checklist.item_desfeito` / `checklist.item_editado` (texto, com `textoAntes`) /
+  `checklist.item_removido` (`DELETE`). **SSE:** `checklist_item`, `demanda` (contadores).
 
 #### `POST /api/demandas/:id/anexos`
 - **Corpo:** `CriarAnexoEntrada` (link https, caminho de rede ou arquivo já enviado). Provedor detectado pelo host.

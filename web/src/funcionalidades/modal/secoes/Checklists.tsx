@@ -1,8 +1,9 @@
 /**
  * Checklists (seção principal 200): vários por demanda, cada um com barra e porcentagem, "Esconder marcados" (no
  * aparelho), itens que se marcam, editam no lugar e se arrastam pela alça (no teclado: ↑ e ↓ na alça). O de uma
- * rodada mostra "Ajustes R2 · prazo sex, 17/10" e só atendimento e admin apagam. Colar várias linhas no campo de item
- * cria um item por linha. Converter item em demanda fica para a v1.
+ * rodada mostra "Ajustes R2 · prazo sex, 17/10" e, por ser o pedido do cliente, só atendimento e admin o apagam,
+ * renomeiam e mexem no texto dos itens (a equipe marca e reordena). Colar várias linhas no campo de item cria um item
+ * por linha. Converter item em demanda fica para a v1.
  */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import {
@@ -69,7 +70,11 @@ function useFocoDeVolta(editando: boolean) {
   return botao
 }
 
-function Item({ item, ctx, mover, podeArrastar }: { item: ChecklistItem; ctx: ContextoDemanda; mover(i: ChecklistItem, passo: -1 | 1): void; podeArrastar: boolean }) {
+function Item({ item, ctx, mover, podeArrastar, travado }: {
+  item: ChecklistItem; ctx: ContextoDemanda; mover(i: ChecklistItem, passo: -1 | 1): void; podeArrastar: boolean
+  /** Item do pedido do cliente (checklist de rodada) para quem não é do atendimento: marca, mas não muda o texto. */
+  travado: boolean
+}) {
   const acoes = useAcoesModal()
   const usuarios = useUsuarios()
   const [editando, setEditando] = useState(false)
@@ -103,15 +108,16 @@ function Item({ item, ctx, mover, podeArrastar }: { item: ChecklistItem; ctx: Co
           aoSalvar={(t) => { setEditando(false); void acoes.editarItem(item, { texto: t.replace(/\s+/g, ' ').trim() }, euId) }}
           aoCancelar={() => setEditando(false)} />
       ) : (
-        <button ref={voltar} type="button" className="mdl-item-texto" disabled={so} onClick={() => setEditando(true)} title={so ? undefined : 'Editar o item'}
-          aria-label={`Editar o item ${item.texto}`}>
+        <button ref={voltar} type="button" className="mdl-item-texto" disabled={so || travado} onClick={() => setEditando(true)}
+          title={so ? undefined : travado ? 'Pedido do cliente: só o atendimento muda o texto.' : 'Editar o item'}
+          aria-label={so || travado ? item.texto : `Editar o item ${item.texto}`}>
           <span className="mdl-item-rotulo">{item.texto}</span>
           {item.feitoEm && (
             <span className="mdl-item-quem">{quem ? `${nomeCurto(quem)} marcou ` : 'Marcado '}{tempoRelativo(item.feitoEm)}</span>
           )}
         </button>
       )}
-      {!so && !editando ? (
+      {!so && !travado && !editando ? (
         <span className="mdl-item-acoes">
           <BotaoIcone icone={Trash2} rotulo="Apagar o item" tamanho="p" onClick={() => void acoes.excluirItem(item, euId)} />
         </span>
@@ -166,7 +172,10 @@ function Checklist({ c, ctx, rodada, novoAberto, abrirNovo }: {
   const pct = total ? Math.round((feitos / total) * 100) : 0
   const visiveis = esconder ? c.itens.filter((i) => !i.feitoEm) : c.itens
   const so = ctx.somenteLeitura
-  const podeApagar = pode('checklist_rodada.excluir', { id: ctx.eu.usuario.id, papel: ctx.eu.usuario.papel }, { checklist: c })
+  const eu = { id: ctx.eu.usuario.id, papel: ctx.eu.usuario.papel }
+  const podeApagar = pode('checklist_rodada.excluir', eu, { checklist: c })
+  // o checklist de rodada é o pedido do cliente: a equipe marca e reordena, mas não renomeia nem mexe nos itens
+  const travado = !pode('checklist_rodada.editar', eu, { checklist: c })
   const sensores = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }),
@@ -193,7 +202,7 @@ function Checklist({ c, ctx, rodada, novoAberto, abrirNovo }: {
   }
 
   const itensMenu: ItemMenuUi[] = [
-    { id: 'renomear', rotulo: 'Renomear', executar: () => setRenomeando(true) },
+    ...(travado ? [] : [{ id: 'renomear', rotulo: 'Renomear', executar: () => setRenomeando(true) } satisfies ItemMenuUi]),
     ...(podeApagar ? [{
       id: 'apagar', rotulo: 'Apagar o checklist…', icone: Trash2, perigo: true,
       executar: async () => {
@@ -215,8 +224,8 @@ function Checklist({ c, ctx, rodada, novoAberto, abrirNovo }: {
             aoSalvar={(t) => { setRenomeando(false); void acoes.editarChecklist(c, { titulo: t.replace(/\s+/g, ' ').trim() }) }}
             aoCancelar={() => setRenomeando(false)} />
         ) : (
-          <button ref={voltarTitulo} type="button" className="mdl-checklist-titulo" disabled={so} onClick={() => setRenomeando(true)}
-            aria-label={so ? c.titulo : `Renomear o checklist ${c.titulo}`}>{c.titulo}</button>
+          <button ref={voltarTitulo} type="button" className="mdl-checklist-titulo" disabled={so || travado} onClick={() => setRenomeando(true)}
+            aria-label={so || travado ? c.titulo : `Renomear o checklist ${c.titulo}`}>{c.titulo}</button>
         )}
         {rodada && (
           <span className="mdl-selo-rodada">
@@ -230,7 +239,7 @@ function Checklist({ c, ctx, rodada, novoAberto, abrirNovo }: {
               {esconder ? `Mostrar marcados (${feitos})` : 'Esconder marcados'}
             </Botao>
           )}
-          {!so && (
+          {!so && itensMenu.length > 0 && (
             <Menu rotulo={`Checklist ${c.titulo}`} itens={itensMenu} alinhar="fim">
               {(g) => <BotaoIcone {...g} icone={MoreHorizontal} rotulo={`Mais ações do checklist ${c.titulo}`} tamanho="p" />}
             </Menu>
@@ -246,12 +255,13 @@ function Checklist({ c, ctx, rodada, novoAberto, abrirNovo }: {
       <DndContext sensors={sensores} collisionDetection={closestCenter} onDragEnd={aoSoltar}>
         <SortableContext items={ids} strategy={verticalListSortingStrategy}>
           <ul className="mdl-itens" aria-label={`Itens de ${c.titulo}`}>
-            {visiveis.map((i) => <Item key={i.id} item={i} ctx={ctx} mover={moverUm} podeArrastar={visiveis.length > 1} />)}
+            {visiveis.map((i) => <Item key={i.id} item={i} ctx={ctx} mover={moverUm} podeArrastar={visiveis.length > 1} travado={travado} />)}
           </ul>
         </SortableContext>
       </DndContext>
       {esconder && feitos > 0 && <p className="mdl-escondidos">{feitos === 1 ? '1 item marcado escondido.' : `${feitos} itens marcados escondidos.`}</p>}
-      {!so && <NovoItem c={c} aberto={novoAberto} abrir={() => abrirNovo(c.id)} fechar={() => abrirNovo(null)} />}
+      {!so && !travado && <NovoItem c={c} aberto={novoAberto} abrir={() => abrirNovo(c.id)} fechar={() => abrirNovo(null)} />}
+      {!so && travado && <p className="mdl-escondidos">Pedido do cliente: só o atendimento muda os itens. Marque o que fizer.</p>}
     </div>
   )
 }

@@ -148,6 +148,15 @@ export function fraseAtividade(a: Atividade, n: NomesAtividade): FraseAtividade 
     case 'checklist.removido': return f(`apagou o checklist ${aspas((d as MapaDadosAtividade['checklist.removido']).titulo)}`, 'checklist')
     case 'checklist.item_feito': return f(`marcou ${aspas((d as MapaDadosAtividade['checklist.item_feito']).texto)}`, 'checklist')
     case 'checklist.item_desfeito': return f(`desmarcou ${aspas((d as MapaDadosAtividade['checklist.item_desfeito']).texto)}`, 'checklist')
+    case 'checklist.editado': {
+      const x = d as MapaDadosAtividade['checklist.editado']
+      return f(`renomeou o checklist ${aspas(x.tituloAntes)} para ${aspas(x.titulo)}`, 'checklist')
+    }
+    case 'checklist.item_editado': {
+      const x = d as MapaDadosAtividade['checklist.item_editado']
+      return f(`trocou o item ${aspas(x.textoAntes)} por ${aspas(x.texto)}`, 'checklist')
+    }
+    case 'checklist.item_removido': return f(`tirou o item ${aspas((d as MapaDadosAtividade['checklist.item_removido']).texto)}`, 'checklist')
     case 'tempo.lancado': {
       const x = d as MapaDadosAtividade['tempo.lancado']
       return f(x.origem === 'cronometro' ? `registrou ${formatarDuracao(x.minutos)} no cronômetro` : `lançou ${formatarDuracao(x.minutos)}`, 'tempo')

@@ -93,6 +93,49 @@ describe('checklists', () => {
     assert.equal((await a.como(a.pessoas.design).del(`/api/checklists/${comum.id}`)).status, 204)
   })
 
+  test('o checklist de rodada: a equipe não renomeia, não acrescenta, não reescreve e não tira itens; tudo vai ao histórico', async () => {
+    const a = await ambiente()
+    const d = await a.criarDemanda()
+    const ajustes = abrirAjustes(a, d.id)
+    const equipe = a.como(a.pessoas.design)
+    const itens = (): ChecklistItem[] => a.db.prepare('SELECT id, texto FROM checklist_item WHERE checklist_id = ? ORDER BY pos')
+      .all(ajustes) as unknown as ChecklistItem[]
+    const [i1, i2] = itens()
+    const tentativas = [
+      await equipe.patch(`/api/checklists/${ajustes}`, { titulo: 'Lista qualquer' }),
+      await equipe.post(`/api/checklists/${ajustes}/itens`, { textos: ['Item da equipe'] }),
+      await equipe.patch(`/api/checklist-itens/${i1!.id}`, { texto: 'texto trocado pela equipe' }),
+      await equipe.del(`/api/checklist-itens/${i2!.id}`),
+    ]
+    for (const r of tentativas) {
+      assert.equal(r.status, 403)
+      assert.equal(r.corpo.erro.codigo, 'sem_permissao')
+      assert.match(r.corpo.erro.mensagem, /pedido do cliente/)
+    }
+    assert.deepEqual(itens().map((i) => i.texto), [i1!.texto, i2!.texto], 'nada mudou')
+    // marcar e reordenar continuam livres
+    assert.equal((await equipe.patch(`/api/checklist-itens/${i1!.id}`, { feito: true })).status, 200)
+    assert.equal((await equipe.patch(`/api/checklist-itens/${i2!.id}`, { posicao: { antesDeId: i1!.id } })).status, 200)
+    assert.equal((await equipe.patch(`/api/checklists/${ajustes}`, { titulo: 'Ajustes R2' })).status, 200, 'o mesmo título não é mudança')
+    // o atendimento muda, e cada mudança fica no histórico
+    const am = a.como(a.pessoas.am)
+    const seq = Number(um<{ m: number }>(a.db, 'SELECT max(id) AS m FROM atividade')!.m)
+    assert.equal((await am.patch(`/api/checklists/${ajustes}`, { titulo: 'Ajustes do cliente' })).status, 200)
+    assert.equal((await am.patch(`/api/checklist-itens/${i1!.id}`, { texto: 'Trocar a foto da fachada (a nova)' })).status, 200)
+    assert.equal((await am.del(`/api/checklist-itens/${i2!.id}`)).status, 204)
+    assert.equal((await am.post(`/api/checklists/${ajustes}/itens`, { textos: ['Mais um ajuste'] })).status, 201)
+    const novas = a.db.prepare('SELECT tipo, dados FROM atividade WHERE id > ? AND demanda_id = ? ORDER BY id').all(seq, d.id) as { tipo: string; dados: string }[]
+    assert.deepEqual(novas.map((n) => n.tipo), ['checklist.editado', 'checklist.item_editado', 'checklist.item_removido'])
+    assert.deepEqual(JSON.parse(novas[0]!.dados), { checklistId: ajustes, titulo: 'Ajustes do cliente', tituloAntes: 'Ajustes R2' })
+    assert.equal(JSON.parse(novas[1]!.dados).textoAntes, i1!.texto)
+    // no checklist comum a equipe continua mexendo em tudo
+    const comum: ChecklistComItens = (await equipe.post(`/api/demandas/${d.id}/checklists`, { titulo: 'Comum', itens: ['a', 'b'] })).corpo
+    assert.equal((await equipe.patch(`/api/checklists/${comum.id}`, { titulo: 'Comum 2' })).status, 200)
+    assert.equal((await equipe.patch(`/api/checklist-itens/${comum.itens[0]!.id}`, { texto: 'a2' })).status, 200)
+    assert.equal((await equipe.del(`/api/checklist-itens/${comum.itens[1]!.id}`)).status, 204)
+    assert.equal((await equipe.post(`/api/checklists/${comum.id}/itens`, { textos: ['c'] })).status, 201)
+  })
+
   test('demanda arquivada → 422; de quadro arquivado → 422', async () => {
     const a = await ambiente()
     const d = await a.criarDemanda()

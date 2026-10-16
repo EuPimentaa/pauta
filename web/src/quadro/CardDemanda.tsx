@@ -28,7 +28,7 @@ import { DIAS_CURTOS, diaDaSemana, formatarDiaMes, formatarHora } from '../lib/d
 import type { Ancora } from '../lib/posicao.ts'
 import { useAbrirSobreposta } from '../sessao/sobreposta.tsx'
 import { useRegistro } from '../sessao/registro.ts'
-import { definirCardFocado, definirCardSobMouse, desfocarCard, sairDoCard } from '../teclado/foco.ts'
+import { definirCardFocado, definirCardSobMouse, desfocarCard, lugarAtual, sairDoCard } from '../teclado/foco.ts'
 import { useRecebido } from '../tempo-real/estado.ts'
 import { PilhaAvatares } from '../ui/Avatar.tsx'
 import { ChipCliente, ChipEtiqueta } from '../ui/Chips.tsx'
@@ -245,6 +245,13 @@ export const CartaoDemanda = memo(function CartaoDemanda({ demanda: d, compacto,
   const el = useRef<HTMLElement | null>(null)
 
   useLayoutEffect(() => { animarVoltaSeHouver(d.id, el.current) })
+  // o card focado que mudou de coluna (vírgula, ponto, soltar pelo teclado) volta a ser outro nó: o foco caiu no
+  // corpo e volta para ele, para o teclado seguir de onde estava
+  useLayoutEffect(() => {
+    const no = el.current
+    const ativo = document.activeElement
+    if (no && lugarAtual().focado === d.id && (!ativo || ativo === document.body) && !arrastar?.fantasma) no.focus({ preventScroll: true })
+  }, [d.id]) // só ao montar (e se a demanda do nó mudar)
 
   const refRaiz = useCallback((no: HTMLElement | null) => {
     el.current = no

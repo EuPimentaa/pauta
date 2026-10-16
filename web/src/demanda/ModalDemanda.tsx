@@ -25,7 +25,7 @@ import { useAbrirSobreposta } from '../sessao/sobreposta.tsx'
 import { useRegistro, type ModuloRegistro } from '../sessao/registro.ts'
 import { definirControleModal } from '../teclado/controles.ts'
 import { useEscopoAtalho } from '../teclado/escopos.ts'
-import { definirModal } from '../teclado/foco.ts'
+import { definirModal, lugarAtual } from '../teclado/foco.ts'
 import { Botao, BotaoIcone } from '../ui/Botao.tsx'
 import { Checkbox } from '../ui/Checkbox.tsx'
 import { ChipEtiqueta } from '../ui/Chips.tsx'
@@ -127,6 +127,18 @@ export interface PropsModalDemanda {
   fechar(): void
 }
 
+/**
+ * Ao fechar o modal, o foco vai para o card da demanda que estava aberta: com ←/→ ela pode não ser a que abriu (o
+ * Modal devolve o foco a quem abriu). Só troca o foco que está no corpo ou no card de outra demanda.
+ */
+function focarCardAoFechar(id: string) {
+  if (lugarAtual().modal) return // passou para a vizinha: o modal continua aberto
+  const ativo = document.activeElement
+  const noCardDeOutra = ativo instanceof HTMLElement && !!ativo.dataset.demandaId && ativo.dataset.demandaId !== id
+  if (ativo && ativo !== document.body && !noCardDeOutra) return
+  document.querySelector<HTMLElement>(`article[data-demanda-id="${CSS.escape(id)}"]`)?.focus()
+}
+
 export function ConteudoModal({ demanda, detalhe, fechar }: PropsModalDemanda) {
   const reg = useRegistro()
   const qc = useQueryClient()
@@ -147,6 +159,10 @@ export function ConteudoModal({ demanda, detalhe, fechar }: PropsModalDemanda) {
     definirModal(demanda.id, demanda.quadroId)
     return () => definirModal(null)
   }, [demanda.id, demanda.quadroId])
+  useEffect(() => {
+    const id = demanda.id
+    return () => { requestAnimationFrame(() => focarCardAoFechar(id)) }
+  }, [demanda.id])
 
   // vizinhas da mesma coluna (a ordem do quadro), para ←/→ e J/K
   const vizinhas = useMemo(() => {

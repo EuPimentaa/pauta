@@ -1,7 +1,7 @@
 /**
  * Pilha das camadas sobrepostas (modal, folha, popover, menu). Só a camada do topo recebe o Esc, que para aí (o
  * despachante de atalhos do NÚCLEO-WEB não vê esse Esc). Modal e folha travam a rolagem da página e deixam o #root
- * `inert` (leitor de tela e Tab ficam na camada). As camadas renderizam em #camadas (portal irmão do #root).
+ * `inert` (leitor de tela e Tab ficam na camada). As camadas renderizam em #pauta-camadas (portal irmão do #root).
  */
 import { useEffect, useId, useRef } from 'react'
 
@@ -32,15 +32,21 @@ export function haCamadaAberta(): boolean {
   return pilha.length > 0
 }
 
-/** Contêiner dos portais das camadas (criado sob demanda, irmão do #root). */
+/** Id do contêiner das camadas. Prefixado: uma seção de tela com id="camadas" não pode ser confundida com ele. */
+export const ID_CAMADAS = 'pauta-camadas'
+
+let caixa: HTMLElement | null = null
+
+/**
+ * Contêiner dos portais das camadas (criado sob demanda, filho direto do <body>, irmão do #root). Guardado em módulo:
+ * nunca é procurado por id dentro da página (se ficasse dentro do #root, ficaria inert junto com o fundo).
+ */
 export function raizCamadas(): HTMLElement {
-  let el = document.getElementById('camadas')
-  if (!el) {
-    el = document.createElement('div')
-    el.id = 'camadas'
-    document.body.appendChild(el)
-  }
-  return el
+  if (caixa?.isConnected && caixa.parentElement === document.body) return caixa
+  caixa = document.createElement('div')
+  caixa.id = ID_CAMADAS
+  document.body.appendChild(caixa)
+  return caixa
 }
 
 /**

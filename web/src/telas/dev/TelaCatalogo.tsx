@@ -4,7 +4,7 @@
  */
 import '../../estilos/catalogo.css'
 import '../../estilos/casca.css'
-import { useEffect, useState, type JSX, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type JSX, type KeyboardEvent, type RefObject } from 'react'
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { useTituloAba } from '../../lib/app.ts'
 import { lerPreferenciaTema, type PreferenciaTema } from '../../lib/tema.ts'
@@ -34,7 +34,7 @@ const SECOES: (DefSecao & { descricao: string; Corpo: () => JSX.Element })[] = [
     descricao: 'Contadores com números tabulares, progresso, esqueleto (nada de spinner na tela toda), estado vazio e abas com foco itinerante.' },
   { id: 'cores-datas', titulo: 'Cor e data', Corpo: SecaoCoresEDatas,
     descricao: 'Paleta CORES como radiogroup. Datas com atalhos (Hoje, Amanhã, Sexta), hora opcional e feriados.' },
-  { id: 'camadas', titulo: 'Modal, folha, popover e menu', Corpo: SecaoCamadas,
+  { id: 'sobreposicoes', titulo: 'Modal, folha, popover e menu', Corpo: SecaoCamadas,
     descricao: 'Vidro fosco só aqui, na barra superior e no menu lateral (sólido com transparência reduzida ou alto contraste).' },
   { id: 'avisos', titulo: 'Avisos', Corpo: SecaoAvisos,
     descricao: 'Avisos curtos, com número e sem exclamação. Desfazer só quando não há efeito fora do sistema.' },
@@ -78,7 +78,7 @@ function useSecaoAtual(): string {
       }
       const primeira = SECOES.find((s) => visiveis.has(s.id))
       if (primeira) setAtual(primeira.id)
-    }, { rootMargin: '-64px 0px -55% 0px' })
+    }, { rootMargin: '-120px 0px -55% 0px' })
     for (const s of SECOES) { const el = document.getElementById(s.id); if (el) obs.observe(el) }
     return () => obs.disconnect()
   }, [])
@@ -110,10 +110,24 @@ function SeletorTema({ tema, mudar }: { tema: PreferenciaTema; mudar(t: Preferen
   )
 }
 
+/** No celular o índice é uma faixa que rola na horizontal: mantém a pílula da seção atual à vista (sem rolar a página). */
+function useSeguirSecao(lista: RefObject<HTMLOListElement | null>, atual: string) {
+  useEffect(() => {
+    const ol = lista.current
+    if (!ol || ol.scrollWidth <= ol.clientWidth) return
+    const a = ol.querySelector<HTMLElement>('[aria-current="true"]')
+    if (!a) return
+    const alvo = a.offsetLeft - (ol.clientWidth - a.offsetWidth) / 2
+    ol.scrollTo({ left: Math.max(0, alvo), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+  }, [lista, atual])
+}
+
 export default function TelaCatalogo() {
   useTituloAba('Design system')
   const [tema, setTema] = useTemaDaPagina()
   const atual = useSecaoAtual()
+  const lista = useRef<HTMLOListElement>(null)
+  useSeguirSecao(lista, atual)
   return (
     <div className="cat">
       <a href="#cat-conteudo" className="pular-conteudo">Pular para o conteúdo</a>
@@ -125,7 +139,7 @@ export default function TelaCatalogo() {
       <div className="cat-corpo">
         <nav className="cat-nav" aria-label="Seções do catálogo">
           <p className="cat-nav-titulo">Componentes</p>
-          <ol>
+          <ol ref={lista}>
             {SECOES.map((s, i) => (
               <li key={s.id}>
                 <a href={`#${s.id}`} aria-current={atual === s.id ? 'true' : undefined}>

@@ -1,6 +1,6 @@
 /**
  * Modal (vidro, raio 20, tela cheia abaixo de 768 px) e Folha (painel que sobe do rodapé, desce do topo ou entra pela
- * esquerda; é como popovers e menus aparecem no celular). Os dois: portal em #camadas, Esc fecha (só a camada do topo),
+ * esquerda; é como popovers e menus aparecem no celular). Os dois: portal em #pauta-camadas, Esc fecha (só a camada do topo),
  * foco preso dentro e devolvido a quem abriu, fundo travado e inert.
  *
  *   <Modal aberto={a} aoFechar={fechar} titulo="Excluir demanda" rodape={<>…botões…</>}>…</Modal>

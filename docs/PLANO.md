@@ -299,9 +299,11 @@ detectarSenha(texto: string): boolean
 
 **Critérios de aceite (testes `node:test` com `app.request()` e banco `:memory:`):**
 - login certo/errado; 6ª falha em 15 min no mesmo e-mail+IP → 429; 21ª falha no mesmo e-mail em 1 h vinda de IPs
-  diferentes → 429; e-mail inexistente leva o mesmo tempo; `X-Forwarded-For: 1.1.1.1, 2.2.2.2` com
-  `TRUST_PROXY_HOPS=1` → IP 2.2.2.2; `/auth/senha` errada 6× → 429; convite usado 2× → 410; convite de pessoa
-  desativada → 410; desativar revoga os tokens pendentes e para o cronômetro; redefinição revoga sessões antigas;
+  diferentes → 429; 30 logins em paralelo (`Promise.all`) → no máximo 5 respostas 401 e a senha certa no meio da
+  rajada → 429; e-mail inexistente leva o mesmo tempo; `X-Forwarded-For: 1.1.1.1, 2.2.2.2` com
+  `TRUST_PROXY_HOPS=1` → IP 2.2.2.2 (e com 2, o da Cloudflare: o penúltimo); `/auth/senha` errada 6× → 429 e 20 em
+  paralelo → no máximo 5 respostas 401; convite usado 2× → 410; convite de pessoa desativada → 410; convite pendente
+  + redefinição usada → convite 410; `X-Trace-Id` que não é uuid v4 → 403 csrf; desativar revoga os tokens pendentes e para o cronômetro; redefinição revoga sessões antigas;
   sessão de pessoa desativada → 401; mutação sem `X-Trace-Id` ou com `Origin` errado → 403 csrf; corpo JSON de 2 MiB →
   413 `corpo_grande` sem ler o corpo; cookie `__Host-sid` com `NODE_ENV=production`.
 - quadros: equipe com modelo Por pessoa e 3 membros → colunas Fila + 3 (nome = apelido, cor da pessoa,

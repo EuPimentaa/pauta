@@ -42,7 +42,8 @@ export const CSP = [
 export const LIMITE_UPLOAD_CORPO = 10 * 1024 * 1024 + 64 * 1024
 export const LIMITE_JSON = 1024 * 1024
 const MUTACOES = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
-const TRACE = /^[A-Za-z0-9-]{8,64}$/
+/** X-Trace-Id: uuid v4 gerado pelo navegador por mutação (API.md §1); vai para atividade.trace_id e para o `t` do SSE. */
+export const TRACE_UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 /**
  * Caminho para o log (API.md §1): sem query; /a/*, /api/publico/*, /api/auth/convite* e /api/auth/redefinicao* saem
@@ -108,7 +109,7 @@ export function criarApp(db: Db): App {
     if (MUTACOES.has(c.req.method)) {
       const trace = c.req.header(HEADER_TRACE)
       const origem = c.req.header('origin')
-      if (!trace || !TRACE.test(trace) || origem !== origemApp()) {
+      if (!trace || !TRACE_UUID_V4.test(trace) || origem !== origemApp()) {
         throw new ErroHttp(403, 'csrf', 'Requisição recusada. Recarregue a página e tente de novo.')
       }
     }

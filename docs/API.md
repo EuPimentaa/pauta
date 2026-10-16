@@ -165,7 +165,10 @@ Público. `200 { ok: true, versao }`. Usado pelo health check do EasyPanel.
 - **Erros:** `401 credenciais_invalidas` (e-mail inexistente, senha errada, pessoa sem senha ou inativa: mesma
   mensagem e mesmo tempo, porque sem usuário o scrypt roda contra um hash fictício), `429 muitas_tentativas`.
 - **Limites** (falhas em `login_tentativa` com `tipo='login'`, somados; o primeiro que estourar responde 429 com espera
-  progressiva): e-mail+IP 5 em 15 min; e-mail 20 em 1 h; IP 50 em 15 min. Atualiza `usuario.ultimo_acesso_em`.
+  progressiva): e-mail+IP 5 em 15 min; e-mail 20 em 1 h; IP 50 em 15 min. A tentativa é **reservada** antes do
+  scrypt (conferir o limite e gravar a linha com `ok = 0` na mesma transação; no acerto, `ok = 1`): numa rajada em
+  paralelo as tentativas em andamento já contam, e a 6ª do mesmo e-mail+IP leva 429 mesmo com a senha certa.
+  Atualiza `usuario.ultimo_acesso_em`.
 
 #### `POST /api/auth/logout`
 Revoga a sessão atual e apaga o cookie. `204`.
@@ -178,24 +181,28 @@ Revoga a sessão atual e apaga o cookie. `204`.
 - **Erros:** `409 conflito` apelido já usado por pessoa ativa. **SSE:** `usuario` (interno) se nome/apelido/cor mudaram.
 
 #### `POST /api/auth/senha`
-- **Corpo:** `TrocarSenhaEntrada`. **Resposta:** `204`. Revoga as outras sessões da pessoa.
+- **Corpo:** `TrocarSenhaEntrada`. **Resposta:** `204`. Revoga as outras sessões da pessoa e os links de convite e
+  redefinição pendentes.
 - **Erros:** `401 credenciais_invalidas` (senha atual), `422 senha_fraca` (menos de 10 caracteres ou na lista de óbvias),
-  `429 muitas_tentativas` (5 falhas em 15 min por pessoa; `login_tentativa` com `tipo='senha'`).
+  `429 muitas_tentativas` (5 falhas em 15 min por pessoa; `login_tentativa` com `tipo='senha'`, reservada antes do
+  scrypt como no login).
 
 O link de convite e o de redefinição levam o token no **fragmento** (`/convite#<token>`, `/redefinir#<token>`): o
 navegador não o envia ao servidor nem ao `Referer`, e ele não cai em log. A tela lê `location.hash`, apaga o fragmento
 com `history.replaceState` e manda o token no corpo.
 
 #### `POST /api/auth/convite/consultar` e `POST /api/auth/redefinicao/consultar`
-Públicos. **Corpo:** `TokenEntrada`. `200 TokenAcessoInfo`. Não consomem o token. `410 token_invalido` se usado,
-revogado, expirado ou de pessoa inativa. Limite: o do login por IP.
+Públicos. **Corpo:** `TokenEntrada`. `200 TokenAcessoInfo` (com a cor da pessoa, para o avatar). Não consomem o
+token. `410 token_invalido` se usado, revogado, expirado, de pessoa inativa ou, no convite, de quem já definiu a senha
+(`senha_definida_em` preenchido). Limite: o do login por IP.
 
 #### `POST /api/auth/convite` e `POST /api/auth/redefinicao`
 - Públicos. **Corpo:** `DefinirSenhaEntrada`. **Resposta:** `200 Eu` + cookie (já entra).
 - Consome numa transação: `UPDATE token_acesso SET usado_em = ? WHERE token_hash = ? AND finalidade = ? AND usado_em IS
   NULL AND revogado_em IS NULL AND expira_em > ?`, exigindo `changes = 1` e `usuario.ativo = 1`; grava `senha_hash`
-  (scrypt) e `senha_definida_em`. A redefinição revoga todas as sessões anteriores.
-- **Erros:** `410 token_invalido` (inclusive pessoa inativa), `422 senha_fraca`.
+  (scrypt) e `senha_definida_em`; o convite exige ainda `senha_definida_em` nulo. Na mesma transação revoga os outros
+  links pendentes da pessoa (as duas finalidades). A redefinição revoga todas as sessões anteriores.
+- **Erros:** `410 token_invalido` (inclusive pessoa inativa e convite de quem já tem senha), `422 senha_fraca`.
 
 ### 4.3 Pessoas · núcleo (telas em cadastros)
 
@@ -226,10 +233,11 @@ Admin. `200 Usuario[]` (com e-mail e convite pendente). Os outros papéis usam `
 
 #### `POST /api/pessoas/:id/convite`
 - **Quem:** admin. Só para quem ainda não definiu senha e está ativo (`409 conflito` se já tem senha ou está inativo).
-  Revoga o convite anterior na mesma transação (`token_acesso_pendente_uk`). **Resposta:** `200 LinkAcesso`.
+  Revoga os links pendentes da pessoa (convite e redefinição) na mesma transação. **Resposta:** `200 LinkAcesso`.
 
 #### `POST /api/pessoas/:id/redefinicao`
-- **Quem:** admin. Link de redefinição de 1 h (revoga o anterior). Pessoa inativa → `409 conflito`. **Resposta:** `200 LinkAcesso`.
+- **Quem:** admin. Link de redefinição de 1 h (revoga a redefinição anterior **e o convite pendente**: nunca há dois links
+  que trocam a senha da mesma pessoa). Pessoa inativa → `409 conflito`. **Resposta:** `200 LinkAcesso`.
 
 ### 4.4 Equipes · núcleo
 

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { configurar, type Config } from '../src/config.ts'
 import { atorDe } from '../src/auth.ts'
-import { tx, um } from '../src/db.ts'
+import { todos, tx, um } from '../src/db.ts'
 import { gerarLinkAcesso } from '../src/servicos/pessoas.ts'
 import { ORIGEM, SENHA_TESTE, ambiente, clienteHttp, sessaoPara } from './ajuda.ts'
 
@@ -106,6 +106,33 @@ describe('login', () => {
     tx(a.db, () => a.db.prepare('UPDATE usuario SET ativo = 0 WHERE id = ?').run(a.pessoas.web.id))
     assert.equal((await login(a.app, 'web@melt.test', SENHA_TESTE)).status, 401)
   })
+
+  test('rajada em paralelo também para no limite: 30 tentativas → no máximo 5 conferidas, a certa no meio leva 429', async () => {
+    const a = await ambiente()
+    const senhas = Array.from({ length: 30 }, (_, i) => (i === 24 ? SENHA_TESTE : `errada-${i}-123456`))
+    const respostas = await Promise.all(senhas.map((s) => login(a.app, 'design@melt.test', s)))
+    const status = respostas.map((r) => r.status)
+    assert.equal(status.filter((s) => s === 401).length, 5, status.join(','))
+    assert.equal(status.filter((s) => s === 429).length, 25, status.join(','))
+    assert.equal(status[24], 429)
+    const gravadas = um<{ falhas: number; acertos: number }>(a.db, `SELECT sum(ok = 0) AS falhas, sum(ok = 1) AS acertos
+      FROM login_tentativa WHERE email = 'design@melt.test'`)!
+    assert.deepEqual({ ...gravadas }, { falhas: 5, acertos: 0 })
+    assert.equal((await login(a.app, 'design@melt.test', SENHA_TESTE)).status, 429)
+  })
+
+  test('com a Cloudflare na frente (TRUST_PROXY_HOPS=2) o limite conta o IP real do visitante, não o forjado', async () => {
+    const a = await ambiente()
+    restaurar = configurar({ trustProxyHops: 2 })
+    // o visitante forja o primeiro item; a Cloudflare acrescenta o IP dele; o Traefik, o da Cloudflare
+    for (let i = 0; i < 5; i++) {
+      assert.equal((await login(a.app, 'am@melt.test', 'errada-123456', `9.9.9.${i}, 7.7.7.7, 172.68.0.1`)).status, 401)
+    }
+    assert.equal((await login(a.app, 'am@melt.test', SENHA_TESTE, '9.9.9.200, 7.7.7.7, 172.68.0.1')).status, 429)
+    assert.equal((await login(a.app, 'am@melt.test', SENHA_TESTE, '7.7.7.8, 172.68.0.1')).status, 200)
+    assert.deepEqual(todos<{ ip: string }>(a.db, "SELECT DISTINCT ip FROM login_tentativa WHERE email = 'am@melt.test' ORDER BY ip")
+      .map((l) => l.ip), ['7.7.7.7', '7.7.7.8'])
+  })
 })
 
 describe('sessão e eu', () => {
@@ -173,6 +200,25 @@ describe('troca de senha', () => {
     const r = await design.post('/api/auth/senha', { senhaAtual: SENHA_TESTE, senhaNova: NOVA })
     assert.equal(r.status, 429)
   })
+
+  test('rajada em paralelo com a senha atual errada (sessão roubada) → no máximo 5 conferidas, o resto 429', async () => {
+    const a = await ambiente()
+    const web = a.como(a.pessoas.web)
+    const respostas = await Promise.all(Array.from({ length: 20 }, (_, i) =>
+      web.post('/api/auth/senha', { senhaAtual: `errada-${i}-123456`, senhaNova: NOVA })))
+    const status = respostas.map((r) => r.status)
+    assert.equal(status.filter((s) => s === 401).length, 5, status.join(','))
+    assert.equal(status.filter((s) => s === 429).length, 15, status.join(','))
+    assert.equal((await web.post('/api/auth/senha', { senhaAtual: SENHA_TESTE, senhaNova: NOVA })).status, 429)
+  })
+
+  test('trocar a senha revoga a redefinição que estava pendente', async () => {
+    const a = await ambiente()
+    const link = await a.como(a.pessoas.admin).post(`/api/pessoas/${a.pessoas.am.id}/redefinicao`)
+    const token = (link.corpo.url as string).split('#')[1]!
+    assert.equal((await a.como(a.pessoas.am).post('/api/auth/senha', { senhaAtual: SENHA_TESTE, senhaNova: NOVA })).status, 204)
+    assert.equal((await clienteHttp(a.app, '').post('/api/auth/redefinicao/consultar', { token })).status, 410)
+  })
 })
 
 describe('convite e redefinição', () => {
@@ -187,7 +233,7 @@ describe('convite e redefinição', () => {
     const anonimo = clienteHttp(a.app, '')
     const info = await anonimo.post('/api/auth/convite/consultar', { token })
     assert.equal(info.status, 200)
-    assert.deepEqual(info.corpo, { nome: 'Nina Nova', email: 'nina@melt.test', expiraEm: '2026-10-21T13:00:00.000Z' })
+    assert.deepEqual(info.corpo, { nome: 'Nina Nova', email: 'nina@melt.test', cor: 'azul', expiraEm: '2026-10-21T13:00:00.000Z' })
     assert.equal((await anonimo.post('/api/auth/convite', { token, senha: 'curta' })).status, 422)
     const def = await anonimo.post('/api/auth/convite', { token, senha: NOVA })
     assert.equal(def.status, 200)
@@ -242,6 +288,58 @@ describe('convite e redefinição', () => {
     assert.equal((await login(a.app, 'social@melt.test', SENHA_TESTE)).status, 401)
   })
 
+  test('convite pendente + redefinição usada → o convite antigo vale 410 (consultar e definir) e a sessão continua dela', async () => {
+    const a = await ambiente()
+    const admin = a.como(a.pessoas.admin)
+    const criada = await admin.post('/api/pessoas', { nome: 'Teste Tres', email: 'tres@melt.test', papel: 'equipe', cor: 'turquesa' })
+    const convite = (criada.corpo.convite.url as string).split('#')[1]!
+    const anonimo = clienteHttp(a.app, '')
+    assert.equal((await anonimo.post('/api/auth/convite/consultar', { token: convite })).corpo.cor, 'turquesa')
+    const red = await admin.post(`/api/pessoas/${criada.corpo.usuario.id}/redefinicao`)
+    const redefinicao = (red.corpo.url as string).split('#')[1]!
+    const entrou = await anonimo.post('/api/auth/redefinicao', { token: redefinicao, senha: NOVA })
+    assert.equal(entrou.status, 200)
+    const sessao = clienteHttp(a.app, /sid=([^;]+)/.exec(entrou.headers.get('set-cookie')!)![1]!)
+
+    assert.equal((await anonimo.post('/api/auth/convite/consultar', { token: convite })).status, 410)
+    const atacante = await anonimo.post('/api/auth/convite', { token: convite, senha: `${NOVA}-outra` })
+    assert.equal(atacante.status, 410)
+    assert.equal((await login(a.app, 'tres@melt.test', NOVA)).status, 200)
+    assert.equal((await login(a.app, 'tres@melt.test', `${NOVA}-outra`)).status, 401)
+    assert.equal((await sessao.get('/api/auth/eu')).status, 200)
+  })
+
+  test('convite só vale para quem ainda não definiu senha; definir pelo convite revoga a redefinição pendente', async () => {
+    const a = await ambiente()
+    // convite gerado direto pelo serviço (a rota recusa com 409) para quem já tem senha: 410, mesmo sem revogação
+    const doWeb = tx(a.db, () => gerarLinkAcesso(a.db, a.pessoas.web.id, 'convite', atorDe(a.pessoas.admin)))
+    const anonimo = clienteHttp(a.app, '')
+    assert.equal((await anonimo.post('/api/auth/convite/consultar', { token: doWeb.url.split('#')[1] })).status, 410)
+    assert.equal((await anonimo.post('/api/auth/convite', { token: doWeb.url.split('#')[1], senha: NOVA })).status, 410)
+
+    // pessoa nova com uma redefinição e um convite pendentes (gravados direto): usar um revoga o outro
+    const criada = await a.como(a.pessoas.admin).post('/api/pessoas', { nome: 'Rui', email: 'rui@melt.test', papel: 'equipe' })
+    const id = criada.corpo.usuario.id as string
+    const convite = (criada.corpo.convite.url as string).split('#')[1]!
+    const red = tx(a.db, () => {
+      const l = gerarLinkAcesso(a.db, id, 'redefinicao', atorDe(a.pessoas.admin))
+      a.db.prepare("UPDATE token_acesso SET revogado_em = NULL WHERE usuario_id = ? AND finalidade = 'convite'").run(id)
+      return l.url.split('#')[1]!
+    })
+    assert.equal((await anonimo.post('/api/auth/convite', { token: convite, senha: NOVA })).status, 200)
+    assert.equal((await anonimo.post('/api/auth/redefinicao/consultar', { token: red })).status, 410)
+    assert.equal(um<{ n: number }>(a.db, 'SELECT count(*) AS n FROM token_acesso WHERE usuario_id = ? AND usado_em IS NULL AND revogado_em IS NULL', id)!.n, 0)
+  })
+
+  test('gerar a redefinição revoga o convite pendente', async () => {
+    const a = await ambiente()
+    const admin = a.como(a.pessoas.admin)
+    const criada = await admin.post('/api/pessoas', { nome: 'Lia', email: 'lia@melt.test', papel: 'equipe' })
+    const convite = (criada.corpo.convite.url as string).split('#')[1]!
+    assert.equal((await admin.post(`/api/pessoas/${criada.corpo.usuario.id}/redefinicao`)).status, 200)
+    assert.equal((await clienteHttp(a.app, '').post('/api/auth/convite/consultar', { token: convite })).status, 410)
+  })
+
   test('tokens inválidos contam no limite do IP', async () => {
     const a = await ambiente()
     const anonimo = clienteHttp(a.app, '')
@@ -258,8 +356,13 @@ describe('proteções da API', () => {
     assert.equal(sem.corpo.erro.codigo, 'csrf')
     const origem = await a.como(a.pessoas.am).post('/api/clientes', { sigla: 'XX', nome: 'X' }, { headers: { Origin: 'https://evil.example' } })
     assert.equal(origem.status, 403)
-    const traceRuim = await a.como(a.pessoas.am).post('/api/clientes', { sigla: 'XX', nome: 'X' }, { headers: { 'X-Trace-Id': 'a b' } })
-    assert.equal(traceRuim.status, 403)
+    // X-Trace-Id tem de ser uuid v4 (vai para atividade.trace_id e para o `t` do SSE)
+    for (const trace of ['a b', 'aaaaaaaa', 'b3f0c7a2-1d2e-11ef-9a3b-0242ac120002', `${randomUUID()}x`]) {
+      const traceRuim = await a.como(a.pessoas.am).post('/api/clientes', { sigla: 'XX', nome: 'X' }, { headers: { 'X-Trace-Id': trace } })
+      assert.equal(traceRuim.status, 403, trace)
+    }
+    const maiusculo = await a.como(a.pessoas.am).post('/api/clientes', { sigla: 'XX', nome: 'X' }, { headers: { 'X-Trace-Id': randomUUID().toUpperCase() } })
+    assert.equal(maiusculo.status, 201)
     const r = await a.app.request('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'am@melt.test', senha: SENHA_TESTE }) })
     assert.equal(r.status, 403)

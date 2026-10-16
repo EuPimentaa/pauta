@@ -1,6 +1,6 @@
 /** Autenticação e sessão (API.md §4.2): login, logout, eu, troca de senha, convite e redefinição. */
 import type { Context } from 'hono'
-import type { Eu, Usuario } from '../../../shared/tipos/index.ts'
+import type { Cor, Eu, TokenAcessoInfo, Usuario } from '../../../shared/tipos/index.ts'
 import { ehSenhaFraca } from '../../../shared/logica/senha.ts'
 import {
   apagarCookie, conferirSenha, corpoJson, criarSessao, exigirUsuario, hashSenha, revogarSessoes, sessaoDaRequisicao,
@@ -9,10 +9,14 @@ import {
 import { agora, rodar, tx, um, type Db } from '../db.ts'
 import { ErroHttp, conflito } from '../erros.ts'
 import * as esquema from '../esquemas.ts'
-import { exigirLimiteIp, exigirLimiteSenha, exigirLimitesLogin, registrarTentativa } from '../servicos/acesso.ts'
+import {
+  confirmarTentativa, exigirLimiteIp, registrarFalhaIp, reservarTentativaLogin, reservarTentativaSenha,
+} from '../servicos/acesso.ts'
 import { hashToken } from '../servicos/cripto.ts'
 import { emitirObjeto } from '../servicos/eventos.ts'
-import { carregarUsuario, montarEu } from '../servicos/pessoas.ts'
+import { carregarUsuario, montarEu, revogarTokens } from '../servicos/pessoas.ts'
+
+type Finalidade = 'convite' | 'redefinicao'
 
 const credenciaisInvalidas = () => new ErroHttp(401, 'credenciais_invalidas', 'E-mail ou senha incorretos.')
 const tokenInvalido = () => new ErroHttp(410, 'token_invalido', 'Este link não vale mais. Peça um novo ao admin.')
@@ -29,28 +33,46 @@ interface LinhaToken {
   revogado_em: string | null
   expira_em: string
   ativo: number
+  senha_definida_em: string | null
   nome: string
   email: string
+  cor: Cor
 }
 
-/** Token válido (não usado, não revogado, não vencido, pessoa ativa) ou 410 (conta como falha do IP). */
-function tokenValido(c: Context<Ambiente>, finalidade: 'convite' | 'redefinicao', token: string): LinhaToken {
+function lerToken(db: Db, finalidade: Finalidade, token: string): LinhaToken | undefined {
+  return um<LinhaToken>(db, `
+    SELECT t.usuario_id, t.usado_em, t.revogado_em, t.expira_em, u.ativo, u.senha_definida_em, u.nome, u.email, u.cor
+      FROM token_acesso t JOIN usuario u ON u.id = t.usuario_id WHERE t.token_hash = ? AND t.finalidade = ?`,
+  hashToken(token), finalidade)
+}
+
+/**
+ * Não usado, não revogado, não vencido e de pessoa ativa. O convite, além disso, só vale para quem ainda não definiu
+ * senha: definida a senha (pelo convite ou por uma redefinição), um link de convite antigo não troca mais a senha.
+ */
+function linhaValida(l: LinhaToken | undefined, finalidade: Finalidade, instante: string): l is LinhaToken {
+  return !!l && !l.usado_em && !l.revogado_em && l.expira_em > instante && l.ativo === 1
+    && (finalidade === 'redefinicao' || l.senha_definida_em === null)
+}
+
+/** Token válido ou 410 (conta como falha do IP). */
+function tokenValido(c: Context<Ambiente>, finalidade: Finalidade, token: string): LinhaToken {
   const db = c.get('db')
   const ip = c.get('ator').ip
   exigirLimiteIp(db, ip)
-  const l = um<LinhaToken>(db, `
-    SELECT t.usuario_id, t.usado_em, t.revogado_em, t.expira_em, u.ativo, u.nome, u.email
-      FROM token_acesso t JOIN usuario u ON u.id = t.usuario_id WHERE t.token_hash = ? AND t.finalidade = ?`,
-  hashToken(token), finalidade)
-  if (!l || l.usado_em || l.revogado_em || l.expira_em <= agora() || l.ativo !== 1) {
-    registrarTentativa(db, 'login', '', ip, false)
+  const l = lerToken(db, finalidade, token)
+  if (!linhaValida(l, finalidade, agora())) {
+    registrarFalhaIp(db, ip)
     throw tokenInvalido()
   }
   return l
 }
 
-/** Consome o token, grava a senha e já entra (convite e redefinição; a redefinição revoga as sessões antigas). */
-async function definirSenha(c: Context<Ambiente>, finalidade: 'convite' | 'redefinicao'): Promise<Response> {
+/**
+ * Consome o token, grava a senha e já entra (convite e redefinição; a redefinição revoga as sessões antigas). Na mesma
+ * transação revoga os outros links pendentes da pessoa, das duas finalidades.
+ */
+async function definirSenha(c: Context<Ambiente>, finalidade: Finalidade): Promise<Response> {
   const db = c.get('db')
   const e = validar(esquema.definirSenha, await corpoJson(c))
   const t = tokenValido(c, finalidade, e.token)
@@ -58,11 +80,13 @@ async function definirSenha(c: Context<Ambiente>, finalidade: 'convite' | 'redef
   const hash = await hashSenha(e.senha)
   const eu = tx(db, () => {
     const instante = agora()
+    // de novo dentro da transação: durante o scrypt a pessoa pode ter sido desativada ou definido a senha por outro link
+    if (!linhaValida(lerToken(db, finalidade, e.token), finalidade, instante)) throw tokenInvalido()
     const r = rodar(db, `UPDATE token_acesso SET usado_em = ? WHERE token_hash = ? AND finalidade = ? AND usado_em IS NULL
                           AND revogado_em IS NULL AND expira_em > ?`, instante, hashToken(e.token), finalidade, instante)
-    const ativo = um<{ ativo: number }>(db, 'SELECT ativo FROM usuario WHERE id = ?', t.usuario_id)?.ativo === 1
-    if (r.changes !== 1 || !ativo) throw tokenInvalido()
+    if (r.changes !== 1) throw tokenInvalido()
     rodar(db, 'UPDATE usuario SET senha_hash = ?, senha_definida_em = ?, atualizado_em = ? WHERE id = ?', hash, instante, instante, t.usuario_id)
+    revogarTokens(db, t.usuario_id)
     if (finalidade === 'redefinicao') revogarSessoes(db, t.usuario_id)
     criarSessao(db, c, t.usuario_id, c.get('ator').ip)
     return montarEu(db, t.usuario_id)
@@ -81,15 +105,13 @@ export function registrar(app: App): void {
     const db = c.get('db')
     const ip = c.get('ator').ip
     const e = validar(esquema.login, await corpoJson(c))
-    exigirLimitesLogin(db, e.email, ip)
+    // reserva antes do scrypt: numa rajada em paralelo, as tentativas em andamento já contam no limite
+    const tentativa = reservarTentativaLogin(db, e.email, ip)
     const u = um<{ id: string; senha_hash: string | null; ativo: number }>(db, 'SELECT id, senha_hash, ativo FROM usuario WHERE email = ?', e.email)
     const ok = await conferirSenha(e.senha, u && u.ativo === 1 ? u.senha_hash : null)
-    if (!ok || !u) {
-      registrarTentativa(db, 'login', e.email, ip, false)
-      throw credenciaisInvalidas()
-    }
+    if (!ok || !u) throw credenciaisInvalidas()
     const eu = tx(db, () => {
-      registrarTentativa(db, 'login', e.email, ip, true)
+      confirmarTentativa(db, tentativa)
       criarSessao(db, c, u.id, ip)
       return montarEu(db, u.id)
     })
@@ -131,20 +153,21 @@ export function registrar(app: App): void {
     const ator = c.get('ator')
     const u = ator.usuario!
     const e = validar(esquema.trocarSenha, await corpoJson(c))
-    exigirLimiteSenha(db, u.email)
+    // reserva antes do scrypt (mesma regra do login): com uma sessão roubada, a rajada para na 5ª falha
+    const tentativa = reservarTentativaSenha(db, u.email, ator.ip)
     const hashAtual = um<{ senha_hash: string | null }>(db, 'SELECT senha_hash FROM usuario WHERE id = ?', u.id)!.senha_hash
     if (!(await conferirSenha(e.senhaAtual, hashAtual))) {
-      registrarTentativa(db, 'senha', u.email, ator.ip, false)
       throw new ErroHttp(401, 'credenciais_invalidas', 'A senha atual não confere.')
     }
+    confirmarTentativa(db, tentativa)
     exigirSenhaForte(e.senhaNova, u)
     const hash = await hashSenha(e.senhaNova)
     const sessao = sessaoDaRequisicao(c)
     tx(db, () => {
       const instante = agora()
       rodar(db, 'UPDATE usuario SET senha_hash = ?, senha_definida_em = ?, atualizado_em = ? WHERE id = ?', hash, instante, instante, u.id)
-      registrarTentativa(db, 'senha', u.email, ator.ip, true)
       revogarSessoes(db, u.id, sessao?.id)
+      revogarTokens(db, u.id)
     })
     return c.body(null, 204)
   })
@@ -153,7 +176,7 @@ export function registrar(app: App): void {
     app.post(`/api/auth/${finalidade}/consultar`, async (c) => {
       const e = validar(esquema.token, await corpoJson(c))
       const t = tokenValido(c, finalidade, e.token)
-      return c.json({ nome: t.nome, email: t.email, expiraEm: t.expira_em })
+      return c.json({ nome: t.nome, email: t.email, cor: t.cor, expiraEm: t.expira_em } satisfies TokenAcessoInfo)
     })
     app.post(`/api/auth/${finalidade}`, (c) => definirSenha(c, finalidade))
   }

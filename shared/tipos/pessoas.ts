@@ -93,6 +93,8 @@ export interface TokenEntrada {
 export interface TokenAcessoInfo {
   nome: string
   email: string
+  /** Cor da pessoa (o avatar do convite sai na mesma cor que dentro do app). */
+  cor: Cor
   expiraEm: Instante
 }
 

@@ -89,13 +89,15 @@ function emitirUsuario(db: Db, id: Id, ator: Ator): void {
 
 // ─────────────────────────────── convite e redefinição ───────────────────────────────
 
-/** Gera o link de uso único (revoga o pendente da mesma finalidade). O token vai só no fragmento da URL. */
+/**
+ * Gera o link de uso único. Revoga os links pendentes da pessoa, das duas finalidades: uma redefinição nova invalida
+ * o convite que ainda circula (e vice-versa), então nunca há dois links que trocam a senha da mesma pessoa. O token vai
+ * só no fragmento da URL.
+ */
 export function gerarLinkAcesso(db: Db, usuarioId: Id, finalidade: 'convite' | 'redefinicao', ator: Ator): LinkAcesso {
   const cfg = lerConfig(db)
   const instante = agora()
-  rodar(db, `UPDATE token_acesso SET revogado_em = ?
-              WHERE usuario_id = ? AND finalidade = ? AND usado_em IS NULL AND revogado_em IS NULL`,
-    instante, usuarioId, finalidade)
+  revogarTokens(db, usuarioId)
   const validadeMs = finalidade === 'convite' ? cfg.conviteValidadeDias * 86_400_000 : cfg.redefinicaoValidadeHoras * 3_600_000
   const expiraEm = new Date(Date.parse(instante) + validadeMs).toISOString()
   const { token, hash } = gerarToken()
@@ -104,7 +106,8 @@ export function gerarLinkAcesso(db: Db, usuarioId: Id, finalidade: 'convite' | '
   return { url: `${config.appUrl}/${finalidade === 'convite' ? 'convite' : 'redefinir'}#${token}`, expiraEm }
 }
 
-function revogarTokens(db: Db, usuarioId: Id): void {
+/** Revoga todos os links pendentes (convite e redefinição) da pessoa. */
+export function revogarTokens(db: Db, usuarioId: Id): void {
   rodar(db, 'UPDATE token_acesso SET revogado_em = ? WHERE usuario_id = ? AND usado_em IS NULL AND revogado_em IS NULL',
     agora(), usuarioId)
 }

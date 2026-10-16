@@ -30,6 +30,7 @@ function ItensGrupo({ exts, rotulo, recolhido }: { exts: ExtensaoMenu[]; rotulo:
             <Tooltip key={i.id} texto={i.contador ? `${i.rotulo} (${i.contador})` : i.rotulo} lado="direita">
               <NavLink to={i.caminho} className="casca-item" aria-label={i.contador ? `${i.rotulo}, ${i.contador}` : i.rotulo}>
                 <I aria-hidden="true" />
+                {i.contador ? <span className="casca-trilho-num tabular" aria-hidden="true">{i.contador > 99 ? '99+' : i.contador}</span> : null}
               </NavLink>
             </Tooltip>
           )

@@ -42,7 +42,12 @@
     display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden;
     transition: width var(--dur-3) var(--ease);
   }
-  .casca-menu-rolagem { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: var(--space-3) var(--space-3) var(--space-4); scrollbar-gutter: stable; }
+  .casca-menu-rolagem {
+    flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: var(--space-3) var(--space-3) var(--space-4);
+    scrollbar-gutter: stable; scrollbar-color: transparent transparent; transition: scrollbar-color var(--dur-2) var(--ease);
+  }
+  /* a barra de rolagem do menu só aparece quando a pessoa está nele (mouse ou teclado) */
+  .casca-menu:hover .casca-menu-rolagem, .casca-menu:focus-within .casca-menu-rolagem { scrollbar-color: var(--border-strong) transparent; }
   .casca-menu-rodape { flex: none; padding: var(--space-2) var(--space-3) var(--space-3); border-top: 1px solid var(--border); }
   .casca-grupo + .casca-grupo { margin-top: var(--space-4); }
   .casca-grupo-titulo {
@@ -121,6 +126,12 @@
   .casca[data-menu="recolhido"] .casca-menu-rolagem { padding: var(--space-3) 10px; scrollbar-width: none; }
   .casca-trilho { display: flex; flex-direction: column; align-items: center; gap: 4px; }
   .casca-trilho .casca-item { width: 44px; height: 40px; justify-content: center; padding: 0; }
+  /* contador do item ("Início 3") no canto do ícone, como nas abas do celular */
+  .casca-trilho-num {
+    position: absolute; top: 3px; left: calc(50% + 3px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+    background: var(--surface-inverse); color: var(--text-inverse); font: 700 10px / 16px var(--font); text-align: center;
+    box-shadow: 0 0 0 2px var(--surface);
+  }
   .casca-trilho-sep { width: 24px; height: 1px; margin: 8px 0; background: var(--border-strong); }
   /* grupo sem itens (nenhuma extensão de menu ainda): nada de divisória sobrando no começo, no fim ou dobrada */
   .casca-trilho-sep:first-child, .casca-trilho-sep:last-child, .casca-trilho-sep + .casca-trilho-sep { display: none; }

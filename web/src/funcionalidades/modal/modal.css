@@ -212,7 +212,7 @@
 
   /* ─────────────── painel lateral: linhas de propriedade ─────────────── */
   .modal-demanda-lateral:has(> .mdl-prop) { gap: 2px; }
-  .mdl-prop { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 36px; min-width: 0; }
+  .mdl-prop { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 36px; min-width: 0; }
   .mdl-prop[data-grupo] { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
   .mdl-prop-rotulo {
     display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font);
@@ -252,7 +252,7 @@
     font: 600 var(--fs-meta) / 1 var(--font); cursor: pointer;
   }
   .mdl-entrar:hover { background: var(--veu-2); }
-  .mdl-cliente-extra { display: flex; flex-direction: column; gap: 6px; padding: 2px 0 6px 104px; min-width: 0; }
+  .mdl-cliente-extra { display: flex; flex-direction: column; gap: 6px; padding: 2px 0 6px 112px; min-width: 0; }
   .mdl-cliente-links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
   .mdl-cliente-links a {
     display: inline-flex; align-items: center; gap: 4px; color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font);

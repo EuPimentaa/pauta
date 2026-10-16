@@ -42,6 +42,21 @@ esperado é só sair da edição do título).
 comentário, nome de anexo, "Link ou caminho") usam `useEscLocal()` (`web/src/funcionalidades/modal/comum.tsx`), que
 faz exatamente isso. O título é do núcleo e segue com o problema.
 
+## 4. O topo do modal mostra a coluna e o quadro de quando o detalhe foi lido (NÚCLEO-WEB · `web/src/demanda/ModalDemanda.tsx`)
+
+**Pedido:** em `ConteudoModal`, montar o contexto com o quadro e a coluna do bootstrap quando a demanda está nele
+(`detalhe.quadro`/`detalhe.coluna` só para a demanda fora do bootstrap), ou invalidar `['demanda', numero]` quando
+`quadroId`/`colunaId` mudam.
+
+**Por quê:** `montarContextoDemanda(boot, demanda, { quadro: detalhe?.quadro, coluna: detalhe?.coluna })` dá
+preferência ao que veio do detalhe, que não muda com o mover. Medido: com o modal aberto, "Mover para…" levou a #125
+para Social › Fila e o topo continuou "na coluna Fila do quadro Criação" (e o `ctx.quadro` das seções também). O
+mesmo acontece ao arrastar um card e abrir o modal antes de o detalhe ficar velho (30 s), e quando a automação do
+"Concluída" move a demanda.
+
+**Contorno no F1:** a seção Descrição busca o detalhe de novo quando o quadro ou a coluna dele não batem com os da
+demanda; o painel lateral usa `demanda.quadroId` e a coluna do bootstrap.
+
 ## Avisos (não são pedidos)
 
 - **Painel lateral:** as linhas do F1 são filhas diretas de `.modal-demanda-lateral` (que tem `gap: 20px` para seções

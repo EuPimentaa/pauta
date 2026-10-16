@@ -6,6 +6,7 @@ import { CalendarCheck, CalendarClock, CalendarPlus, Check, Clock3, Repeat2, Sen
 import { ROTULO_REPETICAO } from '@shared/tipos/index.ts'
 import { estadoPrazo } from '@shared/logica/prazo.ts'
 import type { ContextoDemanda } from '../../../extensoes/tipos.ts'
+import { useColuna } from '../../../api/seletores.ts'
 import { abrirDialogo } from '../../../dialogos/estado.ts'
 import { formatarData } from '../../../lib/datas.ts'
 import { Propriedade, Vazio } from '../comum.tsx'
@@ -31,7 +32,9 @@ export default function Datas({ ctx }: { ctx: ContextoDemanda }) {
   const d = ctx.demanda
   const so = ctx.somenteLeitura
   const abrir = (ancora: HTMLElement) => void abrirDialogo('datas', { demandaId: d.id }, { ancora })
-  const estado = estadoPrazo(d, ctx.coluna, new Date())
+  // a coluna do bootstrap (o ctx.coluna vem do detalhe e pode estar velho depois de um mover)
+  const coluna = useColuna(d.colunaId) ?? ctx.coluna
+  const estado = estadoPrazo(d, coluna, new Date())
   return (
     <>
       <Propriedade id="inicio" icone={CalendarPlus} rotulo="Início" grupo desabilitado={so} abrir={abrir} vazio={!d.inicio}>

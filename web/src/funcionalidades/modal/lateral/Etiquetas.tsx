@@ -9,12 +9,13 @@ import { abrirDialogo } from '../../../dialogos/estado.ts'
 import { Propriedade, Vazio } from '../comum.tsx'
 
 export default function Etiquetas({ ctx }: { ctx: ContextoDemanda }) {
-  const doQuadro = useEtiquetas(ctx.quadro.id)
   const d = ctx.demanda
+  // o quadro da demanda agora (o ctx.quadro vem do detalhe e pode estar velho depois de um mover)
+  const doQuadro = useEtiquetas(d.quadroId)
   const minhas = doQuadro.filter((e) => d.etiquetaIds.includes(e.id))
   return (
     <Propriedade id="etiquetas" icone={Tag} rotulo="Etiquetas" atalho="L" desabilitado={ctx.somenteLeitura} vazio={minhas.length === 0}
-      abrir={(ancora) => void abrirDialogo('etiquetas', { quadroId: ctx.quadro.id, demandaId: d.id }, { ancora })}>
+      abrir={(ancora) => void abrirDialogo('etiquetas', { quadroId: d.quadroId, demandaId: d.id }, { ancora })}>
       {minhas.length ? (
         <>
           <span className="mdl-pontos" aria-hidden="true">

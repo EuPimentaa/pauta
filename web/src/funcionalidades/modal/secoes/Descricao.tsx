@@ -5,7 +5,9 @@
  */
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { ChevronRight, MessageSquareText, TextQuote } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { Demanda } from '@shared/tipos/index.ts'
+import { invalidarDetalhe } from '../../../api/cache.ts'
 import type { ContextoDemanda } from '../../../extensoes/tipos.ts'
 import { useAcoes } from '../../../api/demandas.ts'
 import { Botao } from '../../../ui/Botao.tsx'
@@ -34,6 +36,12 @@ export default function Descricao({ ctx }: { ctx: ContextoDemanda }) {
 
   // outra demanda (←/→ no modal): descarta a edição desta
   useEffect(() => { setEditando(null) }, [ctx.demanda.id])
+  // a demanda mudou de coluna ou de quadro (arrastar, Mover para, automação): o detalhe aberto traz o quadro e a coluna
+  // de quando foi lido, e o topo do modal ("na coluna X do quadro Y") usa os dele; busca de novo (pedido 4 do F1)
+  const qc = useQueryClient()
+  const det = ctx.detalhe
+  const velho = !!det && !ctx.somenteLeitura && (det.coluna.id !== ctx.demanda.colunaId || det.quadro.id !== ctx.demanda.quadroId)
+  useEffect(() => { if (velho) invalidarDetalhe(qc, ctx.demanda.id) }, [velho, qc, ctx.demanda.id])
   // Esc salva e fecha o editor (como sair dele); "Cancelar" descarta
   const salvarRef = useRef(async () => {})
   useEscLocal(!!editando, () => { void salvarRef.current() })

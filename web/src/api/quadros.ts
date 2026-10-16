@@ -15,6 +15,7 @@ import { entre } from '@shared/logica/posicao.ts'
 import { ehCardDaColuna } from '@shared/logica/quadro.ts'
 import { avisar } from '../ui/avisos.tsx'
 import { avisarErro } from './acoes.ts'
+import { atualizarEu, euEmCache } from './auth.ts'
 import { aplicarNoBootstrap, bootstrapDe, comItem, inserirDemanda, mudarBootstrap } from './cache.ts'
 import { chaves } from './chaves.ts'
 import { api } from './cliente.ts'
@@ -323,6 +324,29 @@ export function editarQuadro(qc: QueryClient) {
 export function useEditarQuadro(): (q: Quadro, e: EditarQuadroEntrada) => Promise<Quadro | null> {
   const qc = useQueryClient()
   return useMemo(() => editarQuadro(qc), [qc])
+}
+
+/**
+ * "Seguir"/"Deixar de seguir" fora do render (menu ··· do quadro), com o mesmo efeito do useSeguir do DS: otimista
+ * sobre eu.seguindo, PUT /api/quadros/:id/seguir, volta e avisa no erro.
+ */
+export async function seguirQuadro(qc: QueryClient, quadroId: Id, seguindo: boolean): Promise<boolean> {
+  const antes = euEmCache(qc)?.seguindo
+  atualizarEu(qc, (eu) => ({
+    ...eu,
+    seguindo: seguindo ? (eu.seguindo.includes(quadroId) ? eu.seguindo : [...eu.seguindo, quadroId]) : eu.seguindo.filter((x) => x !== quadroId),
+  }))
+  try {
+    await api('PUT', `/api/quadros/${encodeURIComponent(quadroId)}/seguir`, { corpo: { seguindo } })
+    avisar(seguindo ? 'Você está seguindo este quadro.' : 'Você deixou de seguir este quadro.', {
+      descricao: seguindo ? 'Avisamos quando chegar demanda sem ninguém da equipe.' : undefined,
+    })
+    return true
+  } catch (erro) {
+    if (antes) atualizarEu(qc, (eu) => ({ ...eu, seguindo: antes }))
+    avisarErro(erro)
+    return false
+  }
 }
 
 /** POST /api/quadros/:id/copiar (admin; o F5 usa no menu do quadro). O quadro novo entra no bootstrap com o resto. */

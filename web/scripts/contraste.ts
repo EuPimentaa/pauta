@@ -247,13 +247,17 @@ export function pares(): Par[] {
   }
   for (const c of CORES) {
     p(`--label-${c}-ink`, `--label-${c}-bg`, T, `etiqueta ${c}`)
-    p(`--label-${c}-ink`, '--surface', T, `etiqueta ${c} no card`)
-    // Na coluna tingida só entram --text e --text-2; o card (--surface) leva o --text-3 e as etiquetas.
+    p(`--label-${c}-ink`, '--surface', T, `etiqueta ${c} na superfície`)
+    // no card do quadro o cliente é texto na tinta da cor, direto sobre o card
+    p(`--label-${c}-ink`, '--surface-card', T, `cliente ${c} no card`)
+    // Na coluna tingida só entram --text e --text-2; o card (--surface-card) leva o --text-3 e as etiquetas.
     p('--text', `--coluna-${c}-bg`, T, `coluna ${c}: título`)
     p('--text-2', `--coluna-${c}-bg`, T, `coluna ${c}: rodapé e ícones`)
-    p('--text', '--surface', T, `card sobre a coluna ${c}: título`)
-    p('--text-3', '--surface', T, `card sobre a coluna ${c}: metadado`)
   }
+  p('--text', '--surface-card', T, 'card do quadro: título')
+  p('--text-2', '--surface-card', T, 'card do quadro: texto secundário')
+  p('--text-3', '--surface-card', T, 'card do quadro: metadado')
+  for (const e of ['success', 'danger', 'info']) p(`--${e}-ink`, '--surface-card', T, `card do quadro: ${e} (checklist completo, prazo)`)
   // pílula do contador da coluna (--surface) e o destaque do limite WIP
   p('--text-2', '--surface', T, 'contador da coluna')
   p('--accent-ink', '--accent-soft', T, 'contador acima do limite WIP')

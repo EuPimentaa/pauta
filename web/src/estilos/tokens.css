@@ -23,11 +23,16 @@
   /* ---------- superfícies ---------- */
   --bg:              light-dark(#F3F3F3, #0A0A0A);  /* canvas do quadro sem imagem */
   --surface-sunken:  light-dark(#EBEBEB, #111111);  /* corpo da coluna, trilhos */
-  --surface:         light-dark(#FFFFFF, #181818);  /* card, input, sidebar */
+  --surface:         light-dark(#FFFFFF, #181818);  /* input, sidebar, painel */
   --surface-raised:  light-dark(#FFFFFF, #1F1F1F);  /* popover, menu, modal */
   --surface-hover:   light-dark(#F7F7F7, #222222);  /* linha de menu, item de lista */
   --surface-inverse: light-dark(#111111, #EDECEA);  /* tooltip, toast */
+  /* card do quadro: no escuro um degrau acima da coluna tingida (1,08–1,19:1 sobre ela; com a --surface ficava
+     1,03–1,05 e o card sumia), sem perder o --text-3 (4,6:1) nem as tintas de etiqueta */
+  --surface-card:    light-dark(#FFFFFF, #222222);
+  --border-card:     light-dark(#E6E6E6, #303030);
   --overlay:         light-dark(rgb(10 10 10 / .40), rgb(0 0 0 / .60)); /* scrim de modal */
+  --overlay-leitura: light-dark(rgb(10 10 10 / .48), rgb(0 0 0 / .64)); /* scrim do modal da demanda (quadro colorido atrás) */
 
   /* ---------- texto ---------- */
   --text:          light-dark(#111111, #EDECEA);  /* #EDECEA = branco do logo */
@@ -62,8 +67,8 @@
   --label-amarelo:   #FFCC33; --label-amarelo-bg:   light-dark(#FFF8E2, #4B401E); --label-amarelo-ink:   light-dark(#896C16, #FFCC33);
   --label-rosa:      #FF3366; --label-rosa-bg:      light-dark(#FFE2EA, #4B1E29); --label-rosa-ink:      light-dark(#C4254D, #FF5A79);
   --label-magenta:   #CA2177; --label-magenta-bg:   light-dark(#F8E0EC, #3F1A2D); --label-magenta-ink:   light-dark(#BF1F70, #DE6697);
-  --label-roxo:      light-dark(#660099, #844AB1); --label-roxo-bg:      light-dark(#EADBF1, #291334); --label-roxo-ink:      light-dark(#660099, #9F74C4);
-  --label-berinjela: light-dark(#3C2254, #6F5D84); --label-berinjela-bg: light-dark(#E4E0E7, #201A25); --label-berinjela-ink: light-dark(#3C2254, #8E7F9F);
+  --label-roxo:      light-dark(#660099, #844AB1); --label-roxo-bg:      light-dark(#EADBF1, #291334); --label-roxo-ink:      light-dark(#660099, #A378C9);
+  --label-berinjela: light-dark(#3C2254, #6F5D84); --label-berinjela-bg: light-dark(#E4E0E7, #201A25); --label-berinjela-ink: light-dark(#3C2254, #9384A5);
   --label-verde:     #33CC66; --label-verde-bg:     light-dark(#E2F8EA, #1E4029); --label-verde-ink:     light-dark(#1B7B3B, #33CC66);
   --label-turquesa:  #33B2B1; --label-turquesa-bg:  light-dark(#E2F4F4, #1E3A3A); --label-turquesa-ink:  light-dark(#1F7877, #33B2B1);
   --label-azul:      #3399FF; --label-azul-bg:      light-dark(#E2F1FF, #1E344B); --label-azul-ink:      light-dark(#226CB7, #419FFF);
@@ -71,25 +76,27 @@
   /* o laranja NÃO é etiqueta: fica reservado para acento, foco e seleção */
 
   /* ---------- colunas tingidas (ADAPTACOES, "Visual") ----------
-     Pastel calculado em OKLCH com a MATIZ exata do hex da marca (--label-<cor>) e claridade/croma fixas por tema:
-     claro L 0,915–0,935 (amarelo mais claro, rosa e azul um pouco mais baixos para caber croma na gama sRGB), croma
-     0,028–0,068; escuro L 0,19, entre o canvas (#0A0A0A) e o card (#181818, que fica acima da coluna), croma
-     0,03–0,05. A mistura OKLab com --surface-sunken (versão anterior) deixava as cores escuras quase cinza (berinjela
+     Pastel calculado em OKLCH com a MATIZ exata do hex da marca (--label-<cor>); claridade e croma por cor:
+     claro L 0,895–0,945, croma 0,018–0,068; escuro L 0,185–0,225, croma 0,025–0,065 (perto do limite da gama sRGB),
+     entre o canvas (#0A0A0A) e o card (--surface-card, um degrau acima). As vizinhas de matiz se separam pela
+     claridade e pelo croma (ΔE OKLab de 0,024 ou mais; abaixo de ~0,02 o olho não distingue): rosa (mais clara) ×
+     magenta (mais funda), roxo (saturado) × berinjela (quase cinza e mais clara), âmbar × amarelo (mais claro).
+     A mistura OKLab com --surface-sunken (versão anterior) deixava as cores escuras quase cinza (berinjela
      com croma 0,005, igual ao grafite): assim cada cor se reconhece com o mesmo peso. Grafite é o cinza (croma 0).
      O contraste.ts confere: dentro da gama, matiz igual à do hex da marca e AA de --text e --text-2 na coluna.
      Na coluna use --text e --text-2; o --text-3 fica dentro do card. Destaque sobre a coluna (limite WIP) vai em
      pílula --accent-soft/--accent-ink, nunca laranja solto no fundo tingido.
      -ponto = bolinha no título (a cor cheia; com contorno sutil no componente). */
-  --coluna-ambar-bg:     light-dark(oklch(0.925 0.054 70.7),  oklch(0.19 0.035 70.7));
-  --coluna-amarelo-bg:   light-dark(oklch(0.935 0.068 88.7),  oklch(0.19 0.034 88.7));
-  --coluna-rosa-bg:      light-dark(oklch(0.915 0.042 13.3),  oklch(0.19 0.045 13.3));
-  --coluna-magenta-bg:   light-dark(oklch(0.915 0.045 356.5), oklch(0.19 0.045 356.5));
-  --coluna-roxo-bg:      light-dark(oklch(0.92 0.046 307.9),  oklch(0.19 0.05 307.9));
-  --coluna-berinjela-bg: light-dark(oklch(0.925 0.028 305.9), oklch(0.19 0.03 305.9));
-  --coluna-verde-bg:     light-dark(oklch(0.93 0.05 149.6),   oklch(0.19 0.04 149.6));
-  --coluna-turquesa-bg:  light-dark(oklch(0.93 0.042 194.2),  oklch(0.19 0.03 194.2));
-  --coluna-azul-bg:      light-dark(oklch(0.915 0.04 252.3),  oklch(0.19 0.045 252.3));
-  --coluna-grafite-bg:   light-dark(oklch(0.91 0 0),          oklch(0.19 0 0));
+  --coluna-ambar-bg:     light-dark(oklch(0.915 0.058 70.7),  oklch(0.195 0.042 70.7));
+  --coluna-amarelo-bg:   light-dark(oklch(0.945 0.064 88.7),  oklch(0.225 0.042 88.7));
+  --coluna-rosa-bg:      light-dark(oklch(0.915 0.042 13.3),  oklch(0.21 0.06 13.3));
+  --coluna-magenta-bg:   light-dark(oklch(0.895 0.058 356.5), oklch(0.185 0.06 356.5));
+  --coluna-roxo-bg:      light-dark(oklch(0.905 0.052 307.9), oklch(0.2 0.065 307.9));
+  --coluna-berinjela-bg: light-dark(oklch(0.94 0.018 305.9),  oklch(0.215 0.025 305.9));
+  --coluna-verde-bg:     light-dark(oklch(0.93 0.05 149.6),   oklch(0.2 0.05 149.6));
+  --coluna-turquesa-bg:  light-dark(oklch(0.93 0.042 194.2),  oklch(0.2 0.033 194.2));
+  --coluna-azul-bg:      light-dark(oklch(0.915 0.04 252.3),  oklch(0.2 0.055 252.3));
+  --coluna-grafite-bg:   light-dark(oklch(0.91 0 0),          oklch(0.2 0 0));
   --coluna-ambar-ponto: var(--label-ambar);         --coluna-amarelo-ponto: var(--label-amarelo);
   --coluna-rosa-ponto: var(--label-rosa);           --coluna-magenta-ponto: var(--label-magenta);
   --coluna-roxo-ponto: var(--label-roxo);           --coluna-berinjela-ponto: var(--label-berinjela);

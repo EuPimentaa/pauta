@@ -80,6 +80,7 @@ describe('Arquivo', () => {
     assert.deepEqual(await q(`#${d.d7.numero}`), [], 'a anonimizada nunca, nem pelo número')
     assert.deepEqual(await q(`#${d.d5.numero}`), [], 'a recente ainda está no quadro')
     assert.deepEqual(await q('nada "parecido" *'), [])
+    assert.deepEqual(await q('acao - !!'), [d.d4.numero], 'pontuação solta não zera a busca')
     assert.deepEqual(await q('excluída'), [])
   })
 

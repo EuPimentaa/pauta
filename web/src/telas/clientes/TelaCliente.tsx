@@ -107,12 +107,15 @@ export default function TelaCliente() {
 
       <Abas rotulo="Seções do cliente" variante="linha" idBase="cad-cliente" ativa={aba} aoMudar={mudarAba}
         abas={abas.map((a) => ({ ...a, contador: a.id === 'demandas' ? c.contadores.abertas : undefined }))} />
-      <div {...painelAba('cad-cliente', aba, aba)}>
-        {aba === 'demandas' && <AbaDemandas cliente={c} />}
-        {aba === 'aprovacoes' && <AbaAprovacoes cliente={c} />}
-        {aba === 'horas' && gestao && <AbaHoras cliente={c} admin={admin} />}
-        {aba === 'configuracoes' && <AbaConfiguracoes key={`${c.id}:${c.atualizadoEm}`} cliente={c} podeEditar={podeEditar} />}
-      </div>
+      {/* um painel por aba (o aria-controls de cada aba aponta para o seu); só o da aba aberta tem conteúdo */}
+      {abas.map((a) => (
+        <div key={a.id} {...painelAba('cad-cliente', a.id, aba)}>
+          {a.id === aba && aba === 'demandas' && <AbaDemandas cliente={c} />}
+          {a.id === aba && aba === 'aprovacoes' && <AbaAprovacoes cliente={c} />}
+          {a.id === aba && aba === 'horas' && gestao && <AbaHoras cliente={c} admin={admin} />}
+          {a.id === aba && aba === 'configuracoes' && <AbaConfiguracoes key={`${c.id}:${c.atualizadoEm}`} cliente={c} podeEditar={podeEditar} />}
+        </div>
+      ))}
     </div>
   )
 }

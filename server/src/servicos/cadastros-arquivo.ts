@@ -37,9 +37,12 @@ function limitesDoMes(mes: string): [string, string] {
   return [instanteSP(`${mes}-01`, '00:00').toISOString(), instanteSP(`${seguinte}-01`, '00:00').toISOString()]
 }
 
-/** Termo do FTS5 para cada palavra (aspas protegem a sintaxe; * = prefixo). */
+/**
+ * Termo do FTS5 para cada palavra (aspas protegem a sintaxe; * = prefixo). Palavra só de pontuação ("#", "-") sai: o
+ * tokenizador a apagaria e o E com um termo vazio não acharia nada.
+ */
 function termosFts(palavras: string[]): string | null {
-  const termos = palavras.map((p) => p.replace(/["*^:()]/g, '').trim()).filter(Boolean).map((p) => `"${p}"*`)
+  const termos = palavras.map((p) => p.replace(/["*^:()]/g, '').trim()).filter((p) => /[\p{L}\p{N}]/u.test(p)).map((p) => `"${p}"*`)
   return termos.length ? termos.join(' AND ') : null
 }
 

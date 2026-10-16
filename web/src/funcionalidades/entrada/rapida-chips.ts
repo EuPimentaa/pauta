@@ -92,12 +92,12 @@ export function mencaoEmAndamento(texto: string, cursor: number): { inicio: numb
 
 /**
  * Cliente sendo digitado no começo ("he|", "hosp|"): os clientes cujo apelido ou sigla começa assim (Tab completa).
- * Só antes de qualquer espaço e sem chip de cliente.
+ * Só enquanto o campo tem só essa palavra, com o cursor no fim dela.
  */
 export function clientesEmAndamento(texto: string, cursor: number, clientes: readonly { id: Id; sigla: string; nome: string; apelidos: readonly string[] }[]):
   { id: Id; sigla: string; nome: string }[] {
   const antes = texto.slice(0, cursor)
-  if (!/^\S{2,12}$/.test(antes) || antes !== texto.trimEnd().slice(0, cursor) || /[@:[\]]/.test(antes)) return []
+  if (!/^\S{2,12}$/.test(antes) || texto.trim() !== antes || /[@:[\]]/.test(antes)) return []
   const n = normalizarAlias(antes)
   return clientes.filter((c) => [normalizarAlias(c.sigla), ...c.apelidos].some((a) => a.startsWith(n))).slice(0, 5)
 }

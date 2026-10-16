@@ -1,7 +1,7 @@
 /**
  * O quadro aberto para quem roda sem o ContextoAcao (fontes da paleta): /q/:slug, ou o quadro da demanda de /d/:numero.
  */
-import type { Bootstrap, Id } from '@shared/tipos/index.ts'
+import type { Bootstrap, Id } from '../../../../shared/tipos/index.ts'
 
 export function quadroAtualDaUrl(b: Bootstrap, caminho: string = window.location.pathname): Id | null {
   const q = /^\/q\/([^/?#]+)/.exec(caminho)

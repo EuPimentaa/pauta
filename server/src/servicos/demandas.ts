@@ -15,6 +15,7 @@ import { ehDataLocal, somarDiasUteis } from '../../../shared/logica/datas.ts'
 import { prazoDoModelo } from '../../../shared/logica/prazo.ts'
 import { colunaDeEntrada as entradaPura, ehCardDaColuna, passouWip } from '../../../shared/logica/quadro.ts'
 import { extrairMencoes, linhasParaItens, normalizarAlias } from '../../../shared/logica/texto.ts'
+import { limparMencoes } from '../../../shared/logica/modal-texto.ts'
 import { detectarSenha } from '../../../shared/logica/senha.ts'
 import type { Ator } from '../auth.ts'
 import { agora, agoraData, depoisDe, marcadores, novoId, rodar, todos, um, type Db } from '../db.ts'
@@ -291,6 +292,14 @@ export function mencoesValidas(db: Db, md: string): Id[] {
   return ids.filter((id) => ativos.has(id))
 }
 
+/**
+ * Menção a pessoa inexistente ou desativada vira texto ("@Theo"), como nos comentários (API §4.15): senão a marcação
+ * ficava na descrição e, com a pessoa reativada, a próxima edição qualquer a notificava em nome de quem editou.
+ */
+function descricaoComMencoesValidas(db: Db, md: string): string {
+  return extrairMencoes(md).length === 0 ? md : limparMencoes(md, new Set(mencoesValidas(db, md)))
+}
+
 /** Regrava `demanda_mencao` com as menções atuais da descrição; devolve as NOVAS (que notificam). */
 function gravarMencoesDescricao(db: Db, demandaId: Id, md: string): Id[] {
   const atuais = mencoesValidas(db, md)
@@ -386,7 +395,7 @@ export function criarDemanda(db: Db, e: Omit<CriarDemandaEntrada, 'origem'> & { 
   const atendimentoId = e.atendimentoId !== undefined ? e.atendimentoId
     : (cliente?.atendimento_id ?? (ator.papel === 'atendimento' ? ator.usuario!.id : null))
   const rodadasInclusas = e.rodadasInclusas ?? modelo?.rodadasInclusas ?? cliente?.rodadas_inclusas ?? 2
-  const descricaoMd = e.descricaoMd ?? modelo?.briefingMd ?? ''
+  const descricaoMd = descricaoComMencoesValidas(db, e.descricaoMd ?? modelo?.briefingMd ?? '')
   const criadoPor = ator.usuario?.id ?? opcoes.criadoPor
   if (!criadoPor) throw new Error('criarDemanda sem usuário: passe opcoes.criadoPor')
 
@@ -534,6 +543,7 @@ export function atualizarDemanda(db: Db, id: Id, mudancas: EditarDemandaEntrada 
     m.titulo = m.titulo.trim()
     if (!m.titulo) throw validacao('Escreva um título.', { titulo: 'vazio' })
   }
+  if (m.descricaoMd !== undefined) m.descricaoMd = descricaoComMencoesValidas(db, m.descricaoMd)
   if (m.clienteId !== undefined && m.clienteId !== antes.clienteId) {
     if (antes.versaoEnviadaId) throw conflito('Esta demanda já foi enviada ao cliente. Para outro cliente, copie a demanda.')
     const novo = m.clienteId ? um<{ atendimento_id: string | null }>(db, 'SELECT atendimento_id FROM cliente WHERE id = ?', m.clienteId) : null

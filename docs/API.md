@@ -501,7 +501,8 @@ Qualquer usuário. `200 ItemTrilhaCliente[]` (mais novas primeiro), inclusive an
   sem par, **criadas** no quadro com a cor do modelo (o admin decidiu o modelo; isto não vale para mover, §5.6).
 - **Padrões:** `atendimentoId` = AM do cliente, senão eu se meu papel for atendimento; `rodadasInclusas` = corpo ??
   modelo ?? cliente ?? 2; prioridade `media`. `membroIds` (ativos) e `etiquetaIds` (do quadro) validados (`400`).
-- **Também cria:** rodada 1 (`inicial`, prazo = prazo da demanda), anexos dos `links`, menções da descrição. Coluna de
+- **Também cria:** rodada 1 (`inicial`, prazo = prazo da demanda), anexos dos `links`, menções da descrição (a de
+  pessoa inexistente ou desativada vira texto, `@Nome`, como no comentário; vale também no PATCH). Coluna de
   papel `concluida` → nasce concluída. Coluna de pessoa → a pessoa entra como membro.
 - **Avisos:** `senha_detectada`, `limite_wip` (não bloqueiam).
 - **Atividade:** `demanda.criada`. **SSE:** `demanda` (objeto inteiro), `rodada`, `checklist`, `checklist_item`,

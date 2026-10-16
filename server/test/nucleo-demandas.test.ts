@@ -198,6 +198,30 @@ describe('PATCH com If-Match', () => {
     assert.match(JSON.parse(atv.antes).descricaoMd, /^oi/)
   })
 
+  test('descrição: menção a pessoa inativa ou inexistente vira texto (ao criar e editar) e não notifica depois de reativar', async () => {
+    const a = await ambiente()
+    const theo = a.pessoas.web
+    rodar(a.db, 'UPDATE usuario SET ativo = 0 WHERE id = ?', theo.id)
+    const fantasma = '00000000-0000-4000-8000-000000000000'
+    const am = a.como(a.pessoas.am)
+    const criada = await am.post('/api/demandas', {
+      quadroId: a.quadros.criacao.quadro.id, titulo: 'Menções inativas',
+      descricaoMd: `desc @[Theo](mencao:${theo.id}) @[Fantasma](mencao:${fantasma}) @[Gabi](mencao:${a.pessoas.am2.id})`,
+    })
+    assert.equal(criada.status, 201)
+    const d = criada.corpo.demanda
+    const desc = () => um<{ m: string }>(a.db, 'SELECT descricao_md AS m FROM demanda WHERE id = ?', d.id)!.m
+    assert.equal(desc(), `desc @Theo @Fantasma @[Gabi](mencao:${a.pessoas.am2.id})`)
+    const r = await am.patch(`/api/demandas/${d.id}`, { descricaoMd: `${desc()} e @[Theo](mencao:${theo.id}) de novo` }, { ifMatch: d.rev })
+    assert.equal(r.status, 200)
+    assert.equal(desc(), `desc @Theo @Fantasma @[Gabi](mencao:${a.pessoas.am2.id}) e @Theo de novo`)
+    // reativado, uma edição qualquer do fim não o menciona em nome de quem editou
+    rodar(a.db, 'UPDATE usuario SET ativo = 1 WHERE id = ?', theo.id)
+    const r2 = await am.patch(`/api/demandas/${d.id}`, { descricaoMd: `${desc()}.` }, { ifMatch: r.corpo.demanda.rev })
+    assert.equal(r2.status, 200)
+    assert.deepEqual(notificacoesDe(a.db, theo.id).map((n) => n.tipo), [])
+  })
+
   test('trocar o cliente troca o AM só quando era o do cliente antigo, e leva as horas; com versão enviada → 409', async () => {
     const a = await ambiente()
     const d = await a.criarDemanda()

@@ -122,5 +122,8 @@
     .cat-topo-titulo small { display: none; }
     .cat-painel-corpo { padding: var(--space-6) var(--space-4) var(--space-4); }
     .cat-tipo { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    /* o quadro de amostra fica dentro do painel: a coluna do celular (100vw − 40px no quadro de verdade) desconta
+       as margens do catálogo para a vizinha continuar aparecendo na borda */
+    .cat-quadro .ui-quadro { --coluna-w: calc(100vw - 110px); padding: var(--space-3); scroll-padding-inline: var(--space-3); }
   }
 }

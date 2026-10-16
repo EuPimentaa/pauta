@@ -11,6 +11,9 @@
  *   reaplica os eventos recentes com seq maior que o dele (nada se perde entre a leitura e a chegada).
  * - Ignora o próprio eco (ecoIgnorado), segura os eventos durante um arraste e entrega aos tratadores (vários por
  *   entidade, em ordem de id), cada um isolado: um tratador quebrado não para os outros.
+ * - Cache de voltar/avançar: ao sair da página (pagehide) fecha o fluxo; se ela voltar do cache (pageshow persistido),
+ *   reabre do último seq. Uma página congelada com o SSE aberto segura uma das 6 conexões por origem do HTTP/1.1 (o
+ *   Vite em desenvolvimento) e, depois de umas 5 navegações, a página nova não consegue baixar os chunks.
  * - Estado para a faixa "Sem conexão · tentando de novo" em lib/conexao.ts.
  */
 import type { QueryClient } from '@tanstack/react-query'
@@ -232,8 +235,20 @@ export function conectarTempoReal(deps: DepsConexao, seqInicial: number): () => 
 
   const aoVoltarRede = () => reconectarJa()
   const aoMudarAba = () => { if (!abaOculta()) reconectarJa() }
+  /** Saindo da página (talvez para o cache de voltar/avançar): solta a conexão e os relógios. */
+  const aoSairDaPagina = () => {
+    if (timerSse) { clearTimeout(timerSse); timerSse = null }
+    if (vigia) { clearTimeout(vigia); vigia = null }
+    pararSync()
+    fluxo?.close()
+    fluxo = null
+  }
+  /** A página voltou do cache de voltar/avançar: reabre do último seq (o que chegou nesse meio vem na retomada). */
+  const aoVoltarParaPagina = (e: Event) => { if ((e as PageTransitionEvent).persisted) reconectarJa() }
   if (typeof window !== 'undefined') {
     window.addEventListener('online', aoVoltarRede)
+    window.addEventListener('pagehide', aoSairDaPagina)
+    window.addEventListener('pageshow', aoVoltarParaPagina)
     document.addEventListener('visibilitychange', aoMudarAba)
   }
 
@@ -250,6 +265,8 @@ export function conectarTempoReal(deps: DepsConexao, seqInicial: number): () => 
     pararCache()
     if (typeof window !== 'undefined') {
       window.removeEventListener('online', aoVoltarRede)
+      window.removeEventListener('pagehide', aoSairDaPagina)
+      window.removeEventListener('pageshow', aoVoltarParaPagina)
       document.removeEventListener('visibilitychange', aoMudarAba)
     }
   }

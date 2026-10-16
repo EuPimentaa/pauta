@@ -381,6 +381,35 @@ describe('cliente SSE', () => {
     assert.equal(estados.at(-1), 'online')
   })
 
+  test('cache de voltar/avançar: pagehide fecha o fluxo; pageshow persistido reabre do último seq', () => {
+    const g = globalThis as unknown as { window?: EventTarget; document?: EventTarget & { visibilityState: string } }
+    const antes = { window: g.window, document: g.document }
+    g.window = new EventTarget()
+    g.document = Object.assign(new EventTarget(), { visibilityState: 'visible' })
+    try {
+      ligar()
+      const primeiro = ultimo()
+      primeiro.emitir('open')
+      primeiro.emitir('d', ev(107))
+      g.window.dispatchEvent(new Event('pagehide'))
+      assert.equal(primeiro.fechado, true)
+      mock.timers.tick(SILENCIO_MAX * 2)
+      assert.equal(FluxoFalso.abertos.length, 1, 'congelada: nada de reabrir nem de vigia')
+      g.window.dispatchEvent(new Event('pageshow'))                 // carga normal: nada a fazer
+      assert.equal(FluxoFalso.abertos.length, 1)
+      g.window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }))
+      assert.equal(FluxoFalso.abertos.length, 2)
+      assert.equal(ultimo().url, '/api/eventos?desde=107')
+      ultimo().emitir('open')
+      assert.equal(estados.at(-1), 'online')
+    } finally {
+      parar()
+      parar = () => {}
+      g.window = antes.window
+      g.document = antes.document
+    }
+  })
+
   test('três falhas seguidas: consulta /api/sync até o SSE voltar', async () => {
     ligar()
     ultimo().falhar(2)

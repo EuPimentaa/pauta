@@ -6,8 +6,9 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { config } from '../src/config.ts'
 import { rodar, tx, um } from '../src/db.ts'
 import {
-  assinaturaValida, caminhoDoArquivo, detectarMime, nomeSeguro, salvarUpload, urlAssinada,
+  assinaturaValida, caminhoDoArquivo, detectarMime, nomeSeguro, salvarUpload, tamanhoLegivel, urlAssinada,
 } from '../src/servicos/arquivos.ts'
+import { LIMITE_UPLOAD_BYTES } from '../../shared/tipos/index.ts'
 import { gravarConfig } from '../src/servicos/config-app.ts'
 import { limparArquivos } from '../src/tarefas/nucleo-lixo.ts'
 import { ambiente, ORIGEM, type Ambiente, type Cliente_ } from './ajuda.ts'
@@ -118,7 +119,26 @@ describe('POST /api/arquivos', () => {
     const r = await enviar(a.como(a.pessoas.am), new Uint8Array([...AMOSTRAS.png, ...new Uint8Array(1000)]), 'grande.png')
     assert.equal(r.status, 413)
     assert.equal(r.corpo.erro.codigo, 'arquivo_grande')
+    assert.equal(r.corpo.erro.mensagem, 'O arquivo passa de 1 KB.')                // o limite configurado, não o do contrato
+    assert.deepEqual(r.corpo.erro.detalhes, { limiteBytes: 1000 })
     assert.equal(um<{ n: number }>(a.db, 'SELECT count(*) AS n FROM arquivo')!.n, 0)
+  })
+
+  test('a configuração só baixa o limite: gravada acima de 10 MB, vale 10 MB (o CHECK de arquivo.bytes)', async () => {
+    const a = await ambiente()
+    gravarConfig(a.db, 'uploadLimiteBytes', 20 * 1024 * 1024, null)
+    const conteudo = new Uint8Array(LIMITE_UPLOAD_BYTES + 1)                        // cabe no bodyLimit (10 MiB + 64 KiB)
+    conteudo.set(AMOSTRAS.pdf)
+    const r = await enviar(a.como(a.pessoas.am), conteudo, 'grande.pdf')
+    assert.equal(r.status, 413)
+    assert.equal(r.corpo.erro.mensagem, 'O arquivo passa de 10 MB.')
+    assert.deepEqual(r.corpo.erro.detalhes, { limiteBytes: LIMITE_UPLOAD_BYTES })
+    const noLimite = await enviar(a.como(a.pessoas.am), conteudo.subarray(0, LIMITE_UPLOAD_BYTES), 'no-limite.pdf')
+    assert.equal(noLimite.status, 201)
+    assert.equal(noLimite.corpo.bytes, LIMITE_UPLOAD_BYTES)
+    assert.equal(tamanhoLegivel(1_572_864), '1,5 MB')
+    assert.equal(tamanhoLegivel(200 * 1024), '200 KB')
+    assert.equal(tamanhoLegivel(10), '1 KB')
   })
 
   test('transação desfeita depois do upload apaga o arquivo do disco', async () => {

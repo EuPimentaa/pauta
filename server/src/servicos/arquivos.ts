@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto'
 import { createReadStream, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
-import type { ArquivoInfo, Id, MimePermitido } from '../../../shared/tipos/index.ts'
+import { LIMITE_UPLOAD_BYTES, type ArquivoInfo, type Id, type MimePermitido } from '../../../shared/tipos/index.ts'
 import type { Ator } from '../auth.ts'
 import { config } from '../config.ts'
 import { agora, agoraData, novoId, rodar, seDesfeita, um, type Db } from '../db.ts'
@@ -49,13 +49,24 @@ export function nomeSeguro(nome: string): string {
   return limpo.slice(0, 200 - ext.length) + ext
 }
 
+/** "10 MB", "1,5 MB", "200 KB" (para a mensagem do limite). */
+export function tamanhoLegivel(bytes: number): string {
+  if (bytes < 1_048_576) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  const mb = Math.round((bytes / 1_048_576) * 10) / 10
+  return `${String(mb).replace('.', ',')} MB`
+}
+
 /**
  * Grava o upload (já lido em memória pelo multipart, até o bodyLimit). Tamanho acima de uploadLimiteBytes → 413
  * arquivo_grande; vazio → 400; magic number fora da lista → 415 tipo_arquivo.
  */
 export function salvarUpload(db: Db, conteudo: Uint8Array, nomeOriginal: string, ator: Ator): ArquivoInfo {
   if (conteudo.byteLength === 0) throw validacao('O arquivo está vazio.', { arquivo: 'vazio' })
-  if (conteudo.byteLength > lerConfig(db).uploadLimiteBytes) throw new ErroHttp(413, 'arquivo_grande', 'O arquivo passa de 10 MB.')
+  // a configuração pode baixar o limite, nunca passar dos 10 MB do contrato (e do CHECK de arquivo.bytes)
+  const limite = Math.min(lerConfig(db).uploadLimiteBytes, LIMITE_UPLOAD_BYTES)
+  if (conteudo.byteLength > limite) {
+    throw new ErroHttp(413, 'arquivo_grande', `O arquivo passa de ${tamanhoLegivel(limite)}.`, { limiteBytes: limite })
+  }
   const mime = detectarMime(conteudo)
   if (!mime) throw new ErroHttp(415, 'tipo_arquivo', 'Envie imagem (jpg, png, webp, gif), PDF ou zip.')
   const id = novoId()

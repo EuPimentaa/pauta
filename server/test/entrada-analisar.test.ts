@@ -1,7 +1,9 @@
 /** "Colar do WhatsApp" (API.md §4.13): POST /api/entrada/analisar e a lógica pura (shared/logica/colar-whatsapp.ts). */
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { analisarConversa, escaparMarkdown, lerConversa, sugerirModelos, tituloDaConversa, trechoDaConversa } from '../../shared/logica/colar-whatsapp.ts'
+import {
+  analisarConversa, escaparMarkdown, lerConversa, prazoDaConversa, sugerirModelos, tituloDaConversa, trechoDaConversa,
+} from '../../shared/logica/colar-whatsapp.ts'
 import { normalizarAlias } from '../../shared/logica/texto.ts'
 import { rodar } from '../src/db.ts'
 import { ambiente } from './ajuda.ts'
@@ -124,6 +126,18 @@ describe('colar-whatsapp (puro)', () => {
     ].join('\n'))
     assert.equal(escaparMarkdown('1. item'), '1\\. item')
     assert.equal(escaparMarkdown('@[Rafa](mencao:u1)'), '@\\[Rafa\\](mencao:u1)')
+  })
+
+  test('prazo pedido na conversa: o dia da semana seguinte, amanhã, a data (sem voltar no tempo) e a última menção', () => {
+    const p = (s: string, hoje = '2026-10-14') => prazoDaConversa(lerConversa(s, hoje), hoje)
+    assert.deepEqual(p('Precisamos de um reels para sexta'), { data: '2026-10-16', casou: 'para sexta' })
+    assert.equal(p('Consegue até quarta-feira?')!.data, '2026-10-21', 'hoje é quarta: a próxima')
+    assert.equal(p('pode entregar amanhã')!.data, '2026-10-15')
+    assert.equal(p('Prazo: dia 24/10')!.data, '2026-10-24')
+    assert.equal(p('para 10/01')!.data, '2027-01-10', 'janeiro já passou: o do ano que vem')
+    assert.equal(p('[14/10 10:00] A: para sexta\n[14/10 10:05] B: combinado, entrego até segunda')!.data, '2026-10-19')
+    assert.equal(p('um carrossel para o Dia do Médico'), null)
+    assert.equal(p('o evento é sexta'), null, 'sem "até/para/prazo/entrega" não é prazo')
   })
 
   test('sem cliente conhecido e sem sigla: nada sugerido', () => {

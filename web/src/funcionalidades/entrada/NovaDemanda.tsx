@@ -16,7 +16,7 @@ import {
   type Repeticao,
 } from '@shared/tipos/index.ts'
 import { dataLocalDe, hojeSP, horaLocalDe } from '@shared/logica/datas.ts'
-import { lerConversa, trechoDaConversa } from '@shared/logica/colar-whatsapp.ts'
+import { lerConversa, prazoDaConversa, trechoDaConversa } from '@shared/logica/colar-whatsapp.ts'
 import { normalizarAlias } from '@shared/logica/texto.ts'
 import { useBootstrap } from '../../api/bootstrap.ts'
 import { mensagemDeErro } from '../../api/cliente.ts'
@@ -25,6 +25,7 @@ import { useListaFeriados } from '../../api/seletores.ts'
 import { MolduraDialogo, useContextoAcao } from '../../dialogos/index.ts'
 import type { PropsDialogo } from '../../extensoes/tipos.ts'
 import { gravarLocal, lerLocal } from '../../lib/armazenamento.ts'
+import { focoNaCarga } from '../../lib/foco.ts'
 import { formatarData } from '../../lib/datas.ts'
 import { EH_MAC } from '../../lib/teclas.ts'
 import { avisar } from '../../ui/avisos.tsx'
@@ -61,6 +62,8 @@ interface Estado extends EstadoNovaDemanda {
   colagem: Colagem | null
   siglaNova: string | null
   senhaNoTexto: boolean
+  /** "para sexta" na conversa: vence o prazo do modelo (enquanto a pessoa não mexe). */
+  prazoConversa: { data: string; casou: string } | null
   modeloSugerido: Id | null
   membroSugeridoId: Id | null
   estimativaTexto: string
@@ -101,7 +104,7 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
     const auto = descricaoAutomatica(modelo, e.trecho)
     const x: Estado = { ...e, descricaoAuto: auto }
     if (e.descricaoMd === e.descricaoAuto && e.descricaoMd !== auto) { x.descricaoMd = auto; x.versaoDescricao = e.versaoDescricao + 1 }
-    if (!e.mexidos.has('prazo')) { x.prazo = prazoSugerido(modelo, hoje, feriados); x.prazoHora = null }
+    if (!e.mexidos.has('prazo')) { x.prazo = e.prazoConversa?.data ?? prazoSugerido(modelo, hoje, feriados); x.prazoHora = null }
     if (!e.mexidos.has('prioridade')) x.prioridade = modelo?.prioridade ?? 'media'
     if (!e.mexidos.has('estimativa')) { x.estimativaMin = modelo?.estimativaMin ?? null; x.estimativaTexto = textoDeMinutos(x.estimativaMin) }
     const sugerido = membroSugerido(cliente, quadro, ativos)
@@ -122,7 +125,7 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
       membroIds: [], etiquetaIds: null, descricaoMd: '', prioridade: 'media', inicio: null, prazo: null, prazoHora: null,
       publicacaoData: null, publicacaoHora: null, estimativaMin: null, repetir: 'nenhuma', origemTexto: null,
       mexidos: new Set(), descricaoAuto: '', trecho: '', colagem: null, siglaNova: null, senhaNoTexto: false,
-      modeloSugerido: null, membroSugeridoId: null, estimativaTexto: '', versaoDescricao: 0,
+      modeloSugerido: null, membroSugeridoId: null, estimativaTexto: '', versaoDescricao: 0, prazoConversa: null,
     }
     return recalcular(base)
   })
@@ -192,13 +195,18 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
         modeloSugerido: sugModelo,
         siglaNova: sugCliente || (e.mexidos.has('cliente') && e.clienteId) ? null : analise.siglaNova,
         senhaNoTexto: analise.senhaDetectada,
+        prazoConversa: prazoDaConversa(msgs, hoje),
       }
     })
-    requestAnimationFrame(() => tituloRef.current?.focus())
+    // o foco segue no diálogo (Ctrl+Enter cria); no toque, sem abrir o teclado
+    requestAnimationFrame(() => {
+      if (focoNaCarga() && tituloRef.current) { tituloRef.current.focus(); tituloRef.current.setSelectionRange(0, 0) }
+      else resumoRef.current?.focus()
+    })
   }
 
   function tirarColagem() {
-    mudar((e) => ({ ...e, origemTexto: null, trecho: '', colagem: null, siglaNova: null, senhaNoTexto: false, modeloSugerido: null }))
+    mudar((e) => ({ ...e, origemTexto: null, trecho: '', colagem: null, siglaNova: null, senhaNoTexto: false, modeloSugerido: null, prazoConversa: null }))
   }
 
   async function colarDaAreaDeTransferencia() {
@@ -277,6 +285,7 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
 
   const tituloRef = useRef<HTMLInputElement>(null)
   const colarRef = useRef<HTMLTextAreaElement>(null)
+  const resumoRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (params.textoColado?.trim()) void colar(params.textoColado)
   }, [])
@@ -312,7 +321,7 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
         <section className="entrada-colar" aria-labelledby={`${id}-colar`} data-estado={estado.colagem ? 'lido' : lendo ? 'lendo' : 'vazio'}>
           <h3 id={`${id}-colar`} className="entrada-colar-titulo"><MessageSquareText aria-hidden="true" /> Colar do WhatsApp</h3>
           {estado.colagem ? (
-            <div className="entrada-colar-resumo" role="status">
+            <div ref={resumoRef} className="entrada-colar-resumo" role="status" tabIndex={-1}>
               <p>
                 Conversa{estado.colagem.autor ? <> de <strong>{estado.colagem.autor}</strong></> : null}
                 {estado.colagem.recebidoEm ? ` · ${formatarRecebido(estado.colagem.recebidoEm)}` : ''}
@@ -493,9 +502,11 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
                 <span className="ui-rotulo">Prazo</span>
                 <SeletorData rotulo="Prazo" valor={estado.prazo} hora={estado.prazoHora} comHora feriados={feriadosLista}
                   aoMudar={(d, h) => setEstado((e) => ({ ...e, prazo: d, prazoHora: d ? h : null, repetir: d ? e.repetir : 'nenhuma', mexidos: mexer(e, 'prazo') }))} />
-                {modelo?.prazoDiasUteis != null && !estado.mexidos.has('prazo') && estado.prazo && (
+                {!estado.mexidos.has('prazo') && estado.prazo && (estado.prazoConversa ? (
+                  <p className="ui-campo-ajuda">Pela conversa: "{estado.prazoConversa.casou}".</p>
+                ) : modelo?.prazoDiasUteis != null && (
                   <p className="ui-campo-ajuda">{modelo.prazoDiasUteis} {modelo.prazoDiasUteis === 1 ? 'dia útil' : 'dias úteis'}, pelo modelo.</p>
-                )}
+                ))}
               </div>
               <div className="ui-campo-grupo">
                 <span className="ui-rotulo">Início</span>

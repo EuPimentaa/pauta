@@ -285,6 +285,43 @@ export function analisarConversa(texto: string, ctx: ContextoAnalise): AnaliseTe
   }
 }
 
+// ─────────────────────────────── prazo pedido na conversa ───────────────────────────────
+
+const DIAS = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado']
+const PRAZO = /\b(?:ate|para|pra|prazo|entreg\w*)\b[^.\n?!]{0,24}?\b(hoje|depois de amanha|amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/g
+
+/**
+ * Prazo que a conversa pede ("até sexta", "para amanhã", "entrega dia 24/10"): a última menção com "até", "para",
+ * "pra", "prazo" ou "entrega" antes do dia. Dia da semana = o próximo depois de hoje; data sem ano = a próxima (não
+ * volta no tempo). Nada disso na conversa: null (vale o prazo do modelo).
+ */
+export function prazoDaConversa(msgs: readonly MensagemConversa[], hoje: DataLocal): { data: DataLocal; casou: string } | null {
+  let achado: { data: DataLocal; casou: string } | null = null
+  for (const m of msgs) {
+    const n = normalizarAlias(m.texto.replace(/-feira/gi, ''))
+    for (const x of n.matchAll(PRAZO)) {
+      const alvo = x[1]!
+      let data: DataLocal | null = null
+      if (alvo === 'hoje') data = hoje
+      else if (alvo === 'amanha') data = somarDias(hoje, 1)
+      else if (alvo === 'depois de amanha') data = somarDias(hoje, 2)
+      else if (DIAS.includes(alvo)) {
+        const alvoDia = DIAS.indexOf(alvo)
+        const hojeDia = new Date(`${hoje}T12:00:00Z`).getUTCDay()
+        data = somarDias(hoje, ((alvoDia - hojeDia + 7) % 7) || 7)
+      } else {
+        const [d, mes, a] = alvo.split('/')
+        const ano = Number(hoje.slice(0, 4))
+        let c: DataLocal | null = a ? dataDe(d!, mes!, a, hoje) : `${ano}-${dois(mes!)}-${dois(d!)}`
+        if (c && !a && c < hoje) c = `${ano + 1}-${dois(mes!)}-${dois(d!)}`
+        if (c && ehDataLocal(c) && c >= hoje) data = c
+      }
+      if (data) achado = { data, casou: x[0].trim() }
+    }
+  }
+  return achado
+}
+
 // ─────────────────────────────── trecho da descrição ───────────────────────────────
 
 /** Escapa o que o markdown-it leria como sintaxe: o texto do cliente aparece como foi escrito (regra 9). */

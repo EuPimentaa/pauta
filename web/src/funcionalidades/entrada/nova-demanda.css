@@ -133,3 +133,8 @@
     outline: none; box-shadow: var(--focus-ring);
   }
 }
+
+@layer foco {
+  /* o resumo da conversa recebe o foco depois de colar (no toque, sem abrir o teclado): não é parada do Tab */
+  .entrada-colar-resumo:focus, .entrada-colar-resumo:focus-visible { outline: none; box-shadow: none; }
+}

@@ -1,0 +1,21 @@
+/* Lista de atalhos do "?" (F4). */
+@layer components {
+  .entrada-atalhos { display: flex; flex-direction: column; gap: var(--space-4); }
+  .entrada-atalhos-nota { color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .entrada-atalhos-vazio { color: var(--text-2); }
+  .entrada-atalhos-grupo { display: flex; flex-direction: column; gap: var(--space-2); }
+  .entrada-atalhos-titulo {
+    font: 700 var(--fs-micro) / var(--lh-micro) var(--font); letter-spacing: var(--tracking-micro); text-transform: uppercase; color: var(--text-2);
+  }
+  .entrada-atalhos-lista { display: flex; flex-direction: column; }
+  .entrada-atalhos-item {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 36px; padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .entrada-atalhos-item:last-child { border-bottom: 0; }
+  .entrada-atalhos-item dt { min-width: 0; color: var(--text); font: 400 var(--fs-body) / var(--lh-body) var(--font); }
+  .entrada-atalhos-onde { color: var(--text-2); font-size: var(--fs-meta); }
+  .entrada-atalhos-item dd { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex: none; max-width: 55%; }
+  .entrada-atalhos-teclas { display: inline-flex; align-items: center; gap: 6px; }
+  .entrada-atalhos-ou { color: var(--text-2); font: 400 var(--fs-meta) / 1 var(--font); }
+}

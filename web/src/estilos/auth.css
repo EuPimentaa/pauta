@@ -59,7 +59,19 @@
   .auth-ponto span { font-size: 13px; line-height: 1.45; color: var(--text-2); }
 
   /* ─────────────── lado do formulário ─────────────── */
-  .auth-lado { display: grid; place-items: center; padding: var(--space-10) var(--space-8); }
+  .auth-lado { position: relative; isolation: isolate; display: grid; place-items: center; padding: var(--space-10) var(--space-8); }
+  /* papel quadriculado de pontos, que some nas bordas (o "quadro" por trás do cartão), e uma luz suave no centro */
+  .auth-lado::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background-image: radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--text) 13%, transparent) 1px, transparent 1.5px);
+    background-size: 22px 22px; background-position: center;
+    -webkit-mask-image: radial-gradient(62% 56% at 50% 48%, black 0%, transparent 100%);
+            mask-image: radial-gradient(62% 56% at 50% 48%, black 0%, transparent 100%);
+  }
+  .auth-lado::after {
+    content: ''; position: absolute; inset: 0; z-index: -2; pointer-events: none;
+    background: radial-gradient(48% 42% at 50% 48%, color-mix(in oklab, var(--surface) 70%, transparent), transparent 100%);
+  }
   .auth-cartao {
     position: relative; width: min(420px, 100%); overflow: hidden; border-radius: var(--radius-xl);
     background: var(--surface); box-shadow: 0 0 0 1px var(--border), var(--shadow-hover), 0 30px 60px -30px var(--shadow-c2);
@@ -93,6 +105,9 @@
     .auth-sub, .auth-pontos { display: none; }
     .auth-marca-dagua { height: 150%; right: -22%; }
     .auth-lado { place-items: start center; padding: 0 16px 32px; margin-top: -40px; }
+    /* os pontos ficam só abaixo do palco (o cartão sobe 40 px por cima dele) */
+    .auth-lado::before, .auth-lado::after { top: 40px; }
+    .auth-lado::before { -webkit-mask-image: radial-gradient(80% 60% at 50% 40%, black 0%, transparent 100%); mask-image: radial-gradient(80% 60% at 50% 40%, black 0%, transparent 100%); }
     .auth-cartao-corpo { padding: var(--space-6) var(--space-5) var(--space-5); }
     .auth-rodape { padding: var(--space-4) var(--space-5); }
   }

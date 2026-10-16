@@ -2,7 +2,7 @@
  * /convite e /redefinir: o token chega no fragmento (#…), é apagado da URL na hora e vai só no corpo (API §4.2).
  * Confere o link, mostra de quem é, pede a senha (10 caracteres ou mais) e já entra.
  */
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { ArrowRight, Check, Circle, LinkIcon } from 'lucide-react'
 import { useConsultarToken, useDefinirSenha, type FinalidadeToken } from '../../api/auth.ts'
@@ -37,12 +37,25 @@ export function TelaDefinirSenha({ finalidade }: { finalidade: FinalidadeToken }
   const app = useNomeApp()
   const t = TEXTOS[finalidade]
   const navegar = useNavigate()
-  const [token] = useState(tokenDoFragmento)
+  const [token, setToken] = useState(tokenDoFragmento)
   const consulta = useConsultarToken(finalidade, token)
   const definir = useDefinirSenha(finalidade)
   const [senha, setSenha] = useState('')
   const [confirmacao, setConfirmacao] = useState('')
   const [tentou, setTentou] = useState(false)
+
+  // link novo colado nesta mesma aba (só o # muda, a página não recarrega): lê o token de novo e recomeça
+  const { reset } = definir
+  useEffect(() => {
+    const aoMudar = () => {
+      if (!window.location.hash) return
+      setToken(tokenDoFragmento())
+      reset()
+      setTentou(false)
+    }
+    window.addEventListener('hashchange', aoMudar)
+    return () => window.removeEventListener('hashchange', aoMudar)
+  }, [reset])
 
   const tamanhoOk = senha.length >= MINIMO
   const iguais = senha.length > 0 && senha === confirmacao
@@ -64,7 +77,8 @@ export function TelaDefinirSenha({ finalidade }: { finalidade: FinalidadeToken }
   const invalido = !token || consulta.error?.codigo === 'token_invalido' || definir.error?.codigo === 'token_invalido'
   if (invalido) {
     return (
-      <LayoutAuth titulo={t.invalido} subtitulo={token ? t.invalidoTexto : 'O link chegou incompleto. Abra o endereço exatamente como você recebeu, ou peça um novo ao admin.'}
+      <LayoutAuth titulo={token ? t.invalido : 'O link chegou incompleto.'}
+        subtitulo={token ? t.invalidoTexto : 'Abra o endereço exatamente como você recebeu (com tudo depois do #), ou peça um link novo ao admin.'}
         rodape="O admin gera um link novo em Configurações › Pessoas.">
         <div className="mt-6 flex items-center gap-3 rounded-md bg-sunken p-3 text-meta text-fg-2">
           <LinkIcon className="size-4 flex-none" aria-hidden="true" />

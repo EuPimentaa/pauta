@@ -78,7 +78,8 @@ function useSecaoAtual(): string {
       }
       const primeira = SECOES.find((s) => visiveis.has(s.id))
       if (primeira) setAtual(primeira.id)
-    }, { rootMargin: '-120px 0px -55% 0px' })
+    // desconta a barra (60 px) e, no celular, também a faixa do índice presa embaixo dela
+    }, { rootMargin: `-${matchMedia('(max-width: 899.98px)').matches ? 116 : 64}px 0px -55% 0px` })
     for (const s of SECOES) { const el = document.getElementById(s.id); if (el) obs.observe(el) }
     return () => obs.disconnect()
   }, [])

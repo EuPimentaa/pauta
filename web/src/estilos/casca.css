@@ -126,7 +126,7 @@
   /* contador do item ("Início 3") no canto do ícone, como nas abas do celular */
   .casca-trilho-num {
     position: absolute; top: 3px; left: calc(50% + 3px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
-    background: var(--surface-inverse); color: var(--text-inverse); font: 700 10px / 16px var(--font); text-align: center;
+    background: var(--surface-inverse); color: var(--text-inverse); font: 700 var(--fs-micro) / 16px var(--font); text-align: center;
     box-shadow: 0 0 0 2px var(--surface);
   }
   .casca-trilho-sep { width: 24px; height: 1px; margin: 8px 0; background: var(--border-strong); }
@@ -175,7 +175,7 @@
   .casca-conta-email { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--glass-text-3); overflow: hidden; text-overflow: ellipsis; }
   .casca-conta-papel {
     display: inline-flex; align-items: center; height: 18px; margin-top: 5px; padding: 0 7px; border-radius: var(--radius-full);
-    background: var(--veu-1); color: var(--text-2); font: 700 10px / 1 var(--font); letter-spacing: .08em; text-transform: uppercase;
+    background: var(--veu-1); color: var(--text-2); font: 700 var(--fs-micro) / 1 var(--font); letter-spacing: .08em; text-transform: uppercase;
   }
   .casca-conta-itens { padding: 4px 5px 5px; border-top: 1px solid var(--border); }
   .casca-conta-linha { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 6px 4px 10px; }
@@ -197,10 +197,12 @@
   }
   .casca-aba {
     position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-    min-width: 0; border: 0; background: transparent; color: var(--text-2); text-decoration: none; font: 500 11px / 1 var(--font);
+    min-width: 0; border: 0; background: transparent; color: var(--text-2); text-decoration: none; font: 500 var(--fs-meta) / 1 var(--font);
   }
   .casca-aba svg { width: 22px; height: 22px; }
   .casca-aba[aria-current="page"] { color: var(--text); }
+  /* rótulo da aba: corta com reticências em vez de empurrar as vizinhas */
+  .casca-aba > span:nth-child(2) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .casca-aba[aria-current="page"] svg { color: var(--accent-ink); }
   .casca-aba-destaque { flex: none; width: 64px; }
   .casca-aba-destaque > span:first-child {
@@ -210,7 +212,7 @@
   .casca-aba-destaque svg { color: var(--on-accent); }
   .casca-aba-num {
     position: absolute; top: 8px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
-    background: var(--danger); color: var(--on-accent); font: 700 10px / 16px var(--font); text-align: center;
+    background: var(--danger); color: var(--on-accent); font: 700 var(--fs-micro) / 16px var(--font); text-align: center;
     box-shadow: 0 0 0 2px var(--surface);
   }
 

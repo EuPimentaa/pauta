@@ -170,7 +170,7 @@
     --tam: 28px;
     position: relative; display: inline-grid; place-items: center; flex: none; width: var(--tam); height: var(--tam);
     border-radius: 50%; background: var(--cor-bg); color: var(--cor-ink);
-    font: 600 calc(var(--tam) * .38) / 1 var(--font); letter-spacing: .01em; user-select: none;
+    font: 600 max(var(--fs-iniciais), calc(var(--tam) * .38)) / 1 var(--font); letter-spacing: .01em; user-select: none;
     box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--cor) 30%, transparent);
   }
   .ui-avatar[data-inativo="true"] { filter: grayscale(1); opacity: .65; }
@@ -179,7 +179,7 @@
   .ui-pilha > .ui-avatar, .ui-pilha > .ui-pilha-mais { box-shadow: 0 0 0 2px var(--pilha-borda, var(--surface)); }
   .ui-pilha-mais {
     display: inline-grid; place-items: center; min-width: var(--tam); height: var(--tam); padding: 0 4px; border-radius: var(--radius-full);
-    background: var(--surface-sunken); color: var(--text-2); font: 600 calc(var(--tam) * .36) / 1 var(--font);
+    background: var(--surface-sunken); color: var(--text-2); font: 600 max(var(--fs-iniciais), calc(var(--tam) * .36)) / 1 var(--font);
   }
 
   /* ─────────────── contador, progresso, kbd ─────────────── */
@@ -204,7 +204,7 @@
   .ui-kbd { display: inline-flex; gap: 3px; align-items: center; }
   .ui-kbd kbd {
     display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 4px;
-    font: 600 10.5px / 1 var(--font); letter-spacing: .02em; color: var(--text-2); background: var(--surface);
+    font: 600 var(--fs-micro) / 1 var(--font); letter-spacing: .02em; color: var(--text-2); background: var(--surface);
     box-shadow: inset 0 -1px 0 var(--border-strong), 0 0 0 1px var(--border-strong);
   }
   .ui-tooltip .ui-kbd kbd { color: var(--text-inverse); background: transparent; box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--text-inverse) 35%, transparent); }
@@ -229,7 +229,7 @@
   }
   .ui-abas[data-variante="linha"] .ui-aba[aria-selected="true"] { color: var(--text); }
   .ui-abas[data-variante="linha"] .ui-aba[aria-selected="true"]::after { transform: scaleX(1); }
-  .ui-aba .ui-contador { height: 18px; min-width: 18px; padding: 0 5px; font-size: 11px; }
+  .ui-aba .ui-contador { height: 18px; min-width: 18px; padding: 0 5px; font-size: var(--fs-micro); }
 
   /* ─────────────── esqueleto e estado vazio ─────────────── */
   .ui-esqueleto {

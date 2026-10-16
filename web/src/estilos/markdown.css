@@ -20,7 +20,7 @@
   .ui-md blockquote { padding: 2px 0 2px 14px; border-left: 3px solid var(--border-strong); color: var(--text-2); }
   .ui-md code {
     padding: 1px 5px; border-radius: 5px; background: var(--veu-1);
-    font: 500 .88em / 1.5 ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, monospace;
+    font: 500 max(12px, .88em) / 1.5 ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, monospace;
   }
   .ui-md pre { padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface-sunken); overflow-x: auto; }
   .ui-md pre code { padding: 0; background: none; font-size: 12.5px; }

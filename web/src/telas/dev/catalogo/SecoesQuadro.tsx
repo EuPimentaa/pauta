@@ -74,7 +74,7 @@ function CartaoAmostra(p: PropsCartao) {
             {p.comentarios ? <span className="ui-cartao-meta"><MessageSquare aria-hidden="true" />{p.comentarios}</span> : null}
             {p.anexos ? <span className="ui-cartao-meta"><Paperclip aria-hidden="true" />{p.anexos}</span> : null}
           </div>
-          {p.membros && <PilhaAvatares pessoas={p.membros.map(pessoa)} tamanho={22} />}
+          {p.membros && <PilhaAvatares pessoas={p.membros.map(pessoa)} tamanho={24} />}
         </div>
       )}
     </article>

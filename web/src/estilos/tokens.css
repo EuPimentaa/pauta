@@ -111,8 +111,11 @@
                      radial-gradient(60% 80% at 100% 10%, var(--fundo-aurora-b), transparent 70%),
                      linear-gradient(160deg, var(--fundo-aurora-b), var(--fundo-aurora-c));
 
-  /* ---------- tipografia (marca §4; a Syne é larga: nada abaixo de 12px em texto lido) ---------- */
-  --fs-micro: 11px; --lh-micro: 14px;   /* 700 caixa alta, eyebrow e rótulo de seção */
+  /* ---------- tipografia (marca §4; a Syne é larga: nada abaixo de 12px em texto lido) ----------
+     Piso (a auditoria de navegador confere): 12 px em texto lido; 11 px (--fs-micro) só no micro em 700 caixa alta,
+     em kbd e em números (contadores); 10 px (--fs-iniciais) só nas iniciais e no "+N" do avatar. */
+  --fs-iniciais: 10px;                  /* iniciais do avatar e "+N" da pilha (glifos num círculo) */
+  --fs-micro: 11px; --lh-micro: 14px;   /* 700 caixa alta, eyebrow e rótulo de seção; kbd e contadores */
   --fs-meta: 12px;  --lh-meta: 16px;    /* 500 metadados do card */
   --fs-body: 14px;  --lh-body: 21px;    /* 400 texto padrão */
   --fs-card: 14px;  --lh-card: 19px;    /* 500 título do card */

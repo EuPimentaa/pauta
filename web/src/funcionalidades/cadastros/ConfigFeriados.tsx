@@ -107,7 +107,7 @@ export default function ConfigFeriados() {
     <div className="cad-secao">
       <header className="cad-cabecalho">
         <div className="cad-cabecalho-texto">
-          <h1 className="cad-titulo">Feriados</h1>
+          <h2 className="cad-titulo">Feriados</h2>
           <p className="cad-subtitulo">Dias que não contam como úteis no prazo dos modelos, nas repetições, nas rodadas e no "parado há". Um feriado novo não muda os prazos já marcados.</p>
         </div>
         <div className="cad-acoes" role="group" aria-label="Ano">

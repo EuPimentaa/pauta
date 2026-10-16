@@ -957,7 +957,7 @@ Contrato em `web/src/extensoes/tipos.ts`. O DESIGN-SYSTEM-WEB escreve os carrega
 | `extensoes/global` | DS (App.tsx) | NW (tempo real, diálogos, paleta, teclado) |
 | `extensoes/menu` | DS (menu lateral; a seção Quadros é da casca) | F3 (trabalho), F5 (agência) |
 | `extensoes/topo` | DS | NW (busca), F1 (cronômetro), F3 (sino), F4 (Nova demanda) |
-| `extensoes/avatar` | DS | DS (tema, sair) |
+| `extensoes/avatar` | DS | DS (tema, sair), F5 (Sua conta) |
 | `extensoes/celular` | DS | NW (busca), F3, F4 |
 | `extensoes/quadro-cabecalho` | NW (página do quadro) | F6 (filtros, colunas no celular) |
 | `extensoes/quadro-menu` | NW | NW (seguir, copiar link), F1 (etiquetas), F2 (automações), F4 (modelos), F5 (editar, copiar, arquivar) |
@@ -998,9 +998,9 @@ DS = DESIGN-SYSTEM-WEB, NS = NÚCLEO-SERVIDOR, NW = NÚCLEO-WEB.
 | celular | `paineis-inicio` 100 · `paineis-agenda` 200 · `entrada-mais` 300 · `nucleo-busca` 400 · `paineis-sino` 500 |
 | menu lateral | grupo `trabalho`: `paineis` (Início 100, Agenda 200, Horas 300); seção Quadros (casca); grupo `agencia`: `cadastros` (Clientes 100, Arquivo 200, Configurações 300) |
 | barra superior | esquerda: `nucleo-busca` 100; direita: `modal-cronometro` 50, `entrada-nova` 100, `paineis-sino` 200 |
-| avatar | `nucleo-tema` 200 · `nucleo-sair` 900 |
+| avatar | `cadastros-conta` 100 ("Sua conta", integração 3A) · `nucleo-tema` 200 · `nucleo-sair` 900 |
 | Início | `cadastros-primeiros-passos` 50 (veio com o F5; o F3 não repete) · `paineis-minhas` 100 · `paineis-cliente-parado` 200 · `paineis-mencoes` 300 |
-| Configurações | `cadastros-pessoas` 100 · `cadastros-equipes` 200 · `cadastros-quadros` 300 · `entrada-modelos` 400 · `cadastros-feriados` 500 · `cadastros-parametros` 550 (Prazos e limites) · `cadastros-aparencia` 600 |
+| Configurações | `cadastros-conta` 50 (Sua conta: nome, apelido, cor e senha; integração 3A) · `cadastros-pessoas` 100 · `cadastros-equipes` 200 · `cadastros-quadros` 300 · `entrada-modelos` 400 · `cadastros-feriados` 500 · `cadastros-parametros` 550 (Prazos e limites) · `cadastros-aparencia` 600 |
 | globais | `nucleo-tempo-real` 100 · `nucleo-dialogos` 200 · `nucleo-teclado` 300 · `nucleo-paleta` 400 |
 
 ### 4.1 Estados vazios, carregamento e erro: texto e dono

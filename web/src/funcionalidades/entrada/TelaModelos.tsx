@@ -174,7 +174,7 @@ export default function TelaModelos() {
     <section className="modelos" aria-labelledby="modelos-titulo">
       <header className="modelos-cabeca">
         <div>
-          <h1 id="modelos-titulo" className="modelos-titulo">Modelos de demanda</h1>
+          <h2 id="modelos-titulo" className="modelos-titulo">Modelos de demanda</h2>
           <p className="modelos-sub">
             O modelo preenche a Nova demanda: o briefing vira a descrição, com o checklist, as etiquetas e o prazo em dias úteis.
           </p>

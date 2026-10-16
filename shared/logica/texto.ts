@@ -30,3 +30,14 @@ export function linhasParaItens(texto: string): string[] {
       .trim())
     .filter((linha) => linha.length > 0)
 }
+
+/**
+ * Nome provisório tirado do e-mail (o admin do primeiro boot): "admin.revfun@x" → "Admin Revfun", "pedro@x" → "Pedro".
+ * Os Primeiros passos pedem para o admin conferir enquanto o nome for este e não houver apelido.
+ */
+export function nomeDoEmail(email: string): string {
+  const local = email.split('@')[0] ?? ''
+  const nome = local.split(/[._+-]+/).filter(Boolean)
+    .map((p) => p.charAt(0).toLocaleUpperCase('pt-BR') + p.slice(1)).join(' ')
+  return (nome || local).slice(0, 120)
+}

@@ -126,7 +126,7 @@ export default function ConfigPessoas() {
     <div className="cad-secao">
       <header className="cad-cabecalho">
         <div className="cad-cabecalho-texto">
-          <h1 className="cad-titulo">Pessoas</h1>
+          <h2 className="cad-titulo">Pessoas</h2>
           <p className="cad-subtitulo">Convide pelo link: a pessoa abre, define a senha e entra. Quem entra numa equipe segue os quadros dela e ganha a própria coluna.</p>
         </div>
         <Botao variante="primario" icone={UserPlus} onClick={() => setEditando('nova')}>Convidar pessoa</Botao>

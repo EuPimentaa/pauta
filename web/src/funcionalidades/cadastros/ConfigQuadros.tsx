@@ -33,26 +33,36 @@ import { SeletorCor } from '../../ui/SeletorCor.tsx'
 import { arquivarQuadro, excluirQuadro, restaurarQuadro, useQuadroCompleto, useQuadrosArquivados } from './api.ts'
 import { BotaoCor, Faixa, nomeCurto, Painel, Pilula, SeletorFundo, usePode } from './comum.tsx'
 import './dialogos.ts'
+import { RodapePendente, useRascunhoConfig } from './pendentes.tsx'
 
 const colacao = new Intl.Collator('pt-BR', { sensitivity: 'base' })
 const OPCOES_PAPEL = PAPEIS_COLUNA.map((p) => ({ valor: p, rotulo: ROTULO_PAPEL_COLUNA[p] }))
 
 // ─────────────────────────────── dados do quadro (admin) ───────────────────────────────
 
+interface DadosQuadro { nome: string; slug: string; descricao: string; equipeId: string | null; cor: Cor; fundo: FundoQuadro; porPessoa: boolean }
+
+/** Os dados do quadro (admin). As mudanças não salvas ficam guardadas por quadro: trocar o seletor e voltar não as perde. */
 function PainelDados({ quadro }: { quadro: Quadro }) {
   const editar = useEditarQuadro()
   const equipes = useEquipes()
-  const [nome, setNome] = useState(quadro.nome)
-  const [slug, setSlug] = useState(quadro.slug)
-  const [descricao, setDescricao] = useState(quadro.descricao)
-  const [equipeId, setEquipeId] = useState(quadro.equipeId)
-  const [cor, setCor] = useState<Cor>(quadro.cor)
-  const [fundo, setFundo] = useState<FundoQuadro>(quadro.fundo)
-  const [porPessoa, setPorPessoa] = useState(quadro.colunaPorMembro)
+  const [d, definir, esquecer] = useRascunhoConfig<DadosQuadro>(`config:quadro:${quadro.id}`, {
+    nome: quadro.nome, slug: quadro.slug, descricao: quadro.descricao, equipeId: quadro.equipeId, cor: quadro.cor, fundo: quadro.fundo,
+    porPessoa: quadro.colunaPorMembro,
+  })
+  const { nome, slug, descricao, equipeId, cor, fundo, porPessoa } = d
+  const setNome = (v: string) => definir({ ...d, nome: v })
+  const setSlug = (v: string) => definir({ ...d, slug: v })
+  const setDescricao = (v: string) => definir({ ...d, descricao: v })
+  const setEquipeId = (v: string | null) => definir({ ...d, equipeId: v })
+  const setCor = (v: Cor) => definir({ ...d, cor: v })
+  const setFundo = (v: FundoQuadro) => definir({ ...d, fundo: v })
+  const setPorPessoa = (v: boolean) => definir({ ...d, porPessoa: v })
   const [salvando, setSalvando] = useState(false)
   const slugValido = /^[a-z0-9][a-z0-9-]{0,59}$/.test(slug)
-  const mudou = nome.trim() !== quadro.nome || slug !== quadro.slug || descricao.trim() !== quadro.descricao || equipeId !== quadro.equipeId
-    || cor !== quadro.cor || fundo !== quadro.fundo || porPessoa !== quadro.colunaPorMembro
+  const mudancas = [nome.trim() !== quadro.nome, slug !== quadro.slug, descricao.trim() !== quadro.descricao, equipeId !== quadro.equipeId,
+    cor !== quadro.cor, fundo !== quadro.fundo, porPessoa !== quadro.colunaPorMembro].filter(Boolean).length
+  const mudou = mudancas > 0
 
   async function salvar() {
     if (!nome.trim() || !slugValido) return
@@ -64,7 +74,10 @@ function PainelDados({ quadro }: { quadro: Quadro }) {
       ...(porPessoa !== quadro.colunaPorMembro ? { colunaPorMembro: porPessoa } : {}),
     })
     setSalvando(false)
-    if (r) avisar(`Quadro ${r.nome} salvo.`, { tipo: 'sucesso' })
+    if (r) {
+      esquecer({ nome: r.nome, slug: r.slug, descricao: r.descricao, equipeId: r.equipeId, cor: r.cor, fundo: r.fundo, porPessoa: r.colunaPorMembro })
+      avisar(`Quadro ${r.nome} salvo.`, { tipo: 'sucesso' })
+    }
   }
 
   return (
@@ -85,9 +98,10 @@ function PainelDados({ quadro }: { quadro: Quadro }) {
         <div className="cad-campo-cor"><span className="ui-rotulo">Fundo</span><SeletorFundo valor={fundo} aoMudar={setFundo} /></div>
       </div>
       <Interruptor ligado={porPessoa} aoMudar={setPorPessoa}>Uma coluna por pessoa: quem entrar na equipe ganha a própria coluna (desligar não apaga as que existem)</Interruptor>
-      <div className="cad-rodape-form">
+      <RodapePendente mudancas={mudancas} aoDescartar={() => esquecer()}
+        rotulo={mudancas === 1 ? '1 mudança não salva neste quadro' : `${mudancas} mudanças não salvas neste quadro`}>
         <Botao type="submit" variante="primario" carregando={salvando} disabled={!mudou || !nome.trim() || !slugValido}>Salvar quadro</Botao>
-      </div>
+      </RodapePendente>
     </form>
   )
 }
@@ -388,7 +402,7 @@ export default function ConfigQuadros() {
   if (quadros.length === 0 && !arquivado && (arquivados.data?.length ?? 0) === 0) {
     return (
       <div className="cad-secao">
-        <header className="cad-cabecalho"><div className="cad-cabecalho-texto"><h1 className="cad-titulo">Quadros</h1></div></header>
+        <header className="cad-cabecalho"><div className="cad-cabecalho-texto"><h2 className="cad-titulo">Quadros</h2></div></header>
         <EstadoVazio icone={LayoutGrid} titulo="Nenhum quadro ainda."
           texto={admin ? 'Crie um quadro por equipe, com as colunas sugeridas e uma coluna por pessoa.' : 'Peça ao admin para criar os quadros.'}
           acoes={admin ? <Botao variante="primario" icone={LayoutGrid} onClick={() => abrir('/quadros/novo?equipes=1')}>Criar os quadros das equipes</Botao> : undefined} />
@@ -400,7 +414,7 @@ export default function ConfigQuadros() {
     <div className="cad-secao">
       <header className="cad-cabecalho">
         <div className="cad-cabecalho-texto">
-          <h1 className="cad-titulo">Quadros</h1>
+          <h2 className="cad-titulo">Quadros</h2>
           <p className="cad-subtitulo">Colunas e etiquetas são de todos; nome, endereço, equipe e arquivar ficam com o admin.</p>
         </div>
         {admin && <Botao variante="secundario" icone={Plus} onClick={() => abrir('/quadros/novo')}>Novo quadro</Botao>}

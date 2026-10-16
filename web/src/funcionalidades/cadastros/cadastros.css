@@ -93,7 +93,13 @@
   .cad-opcao[aria-checked="true"] .cad-opcao-nome svg { color: var(--accent-ink); }
   .cad-opcao-texto { font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); }
   .cad-check-lista { display: flex; flex-direction: column; gap: var(--space-2); }
-  .cad-rodape-form { display: flex; justify-content: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+  .cad-rodape-form { display: flex; justify-content: flex-end; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  /* com mudanças não salvas: gruda no fim da tela (pendentes.tsx) */
+  .cad-rodape-form[data-pendente] {
+    position: sticky; bottom: var(--space-3); z-index: 3; padding: 8px 8px 8px 16px; border-radius: var(--radius-lg);
+    background: var(--surface-raised); border: 1px solid var(--border-strong); box-shadow: var(--shadow-pop);
+  }
+  .cad-pendente-texto { margin-right: auto; color: var(--text); font: 500 var(--fs-body) / var(--lh-body) var(--font); }
 
   /* fundos do quadro: amostras */
   .cad-fundos { display: flex; gap: var(--space-2); flex-wrap: wrap; }
@@ -165,6 +171,12 @@
 
   /* ─────────────── primeiros passos ─────────────── */
   .cad-passos { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border-radius: var(--radius-lg); background: var(--surface-card); border: 1px solid var(--border-card); box-shadow: var(--shadow-card); }
+  .cad-passos-nome {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: 8px 8px 8px 12px; border-radius: var(--radius-md);
+    background: var(--info-bg); color: var(--info-ink); font: 400 var(--fs-meta) / var(--lh-meta) var(--font);
+  }
+  .cad-passos-nome > svg { width: 16px; height: 16px; flex: none; }
+  .cad-passos-nome > span { flex: 1 1 260px; }
   .cad-passos-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
   .cad-passos-lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: var(--space-3); counter-reset: passo; }
   .cad-passo {

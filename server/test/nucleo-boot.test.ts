@@ -36,8 +36,9 @@ describe('primeiro boot', () => {
 
     configurar({ adminSenha: `${randomBytes(12).toString('base64url')}-Boot1` })
     assert.equal(await criarAdminInicial(db), true)
-    const admin = um<{ email: string; papel: string; ativo: number; senha_hash: string | null }>(db, 'SELECT email, papel, ativo, senha_hash FROM usuario')!
+    const admin = um<{ nome: string; email: string; papel: string; ativo: number; senha_hash: string | null }>(db, 'SELECT nome, email, papel, ativo, senha_hash FROM usuario')!
     assert.equal(admin.email, 'dono@melt.test')
+    assert.equal(admin.nome, 'Dono', 'o nome provisório sai do e-mail, com maiúscula (os Primeiros passos pedem para conferir)')
     assert.equal(admin.papel, 'admin')
     assert.equal(admin.ativo, 1)
     assert.match(admin.senha_hash!, /^scrypt\$/)

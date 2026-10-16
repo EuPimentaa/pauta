@@ -181,7 +181,7 @@ export default function ConfigEquipes() {
     <div className="cad-secao">
       <header className="cad-cabecalho">
         <div className="cad-cabecalho-texto">
-          <h1 className="cad-titulo">Equipes</h1>
+          <h2 className="cad-titulo">Equipes</h2>
           <p className="cad-subtitulo">Cada equipe tem o seu quadro e o modelo que o "Criar os quadros das equipes" sugere.</p>
         </div>
         <Botao variante="primario" icone={Plus} onClick={() => setEditando('nova')}>Nova equipe</Botao>

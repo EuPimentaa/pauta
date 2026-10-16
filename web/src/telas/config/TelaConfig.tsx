@@ -80,6 +80,8 @@ export default function TelaConfig() {
         </nav>
       )}
       <div className="config-conteudo">
+        {/* o título da seção é h2; no celular o menu (com o h1) fica numa folha */}
+        {celular && atual && <h1 className="sr-only">Configurações</h1>}
         {celular && secoes.length > 0 && (
           <div className="config-topo-celular">
             <Botao variante="secundario" icone={IconeMenu} onClick={() => setFolha(true)}>{atual?.rotulo ?? 'Seções'}</Botao>

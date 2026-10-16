@@ -5,8 +5,10 @@
  */
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { Building2, Check, ClipboardCheck, LayoutGrid, Rocket, UserPlus } from 'lucide-react'
+import { Building2, Check, ClipboardCheck, LayoutGrid, Rocket, UserPlus, UserRound } from 'lucide-react'
 import type { Bootstrap, PassoInicial } from '@shared/tipos/index.ts'
+import { nomeDoEmail } from '@shared/logica/texto.ts'
+import { useEu } from '../../api/auth.ts'
 import { useDoBootstrap } from '../../api/seletores.ts'
 import { useAbrirDialogo } from '../../dialogos/index.ts'
 import { useAbrirSobreposta } from '../../sessao/sobreposta.tsx'
@@ -27,6 +29,7 @@ export default function PrimeirosPassos() {
   const abrir = useAbrirSobreposta()
   const abrirDialogo = useAbrirDialogo()
   const [convidando, setConvidando] = useState(false)
+  const eu = useEu()
   if (!dados) return null
   const { itens, concluido } = calcularPassos(dados as DadosPassos)
   if (concluido) return null
@@ -74,6 +77,14 @@ export default function PrimeirosPassos() {
           <BarraProgresso valor={feitos} max={itens.length} rotulo="Primeiros passos" />
         </div>
       </div>
+      {/* o admin do primeiro boot nasce com o nome tirado do e-mail: é como ele aparece em colunas, membros e @menções */}
+      {!eu.usuario.apelido && eu.usuario.nome === nomeDoEmail(eu.usuario.email) && (
+        <p className="cad-passos-nome">
+          <UserRound aria-hidden="true" />
+          <span>Você aparece para a equipe como <strong>{eu.usuario.nome}</strong>. Confira o seu nome e escolha um apelido antes de convidar.</span>
+          <Link {...propsBotao({ tamanho: 'p', variante: 'secundario' })} to="/config/conta">Sua conta</Link>
+        </p>
+      )}
       <ol className="cad-passos-lista">
         {itens.map((p, i) => (
           <li key={p.id} className="cad-passo" data-feito={p.feito ? '' : undefined} data-atual={p.id === atual ? '' : undefined}

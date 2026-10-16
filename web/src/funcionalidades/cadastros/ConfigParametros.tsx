@@ -1,8 +1,9 @@
 /**
  * Configurações › Prazos e limites (admin; API §4.11): os parâmetros de ConfigApp em grupos, cada número dentro de
- * FAIXAS_CONFIG (o servidor confere de novo) e o próximo número de demanda só para cima. Salva só o que mudou.
+ * FAIXAS_CONFIG (o servidor confere de novo) e o próximo número de demanda só para cima. Salva só o que mudou. As
+ * mudanças não salvas ficam guardadas ao trocar de seção e a barra do rodapé gruda na tela (pendentes.tsx).
  */
-import { useEffect, useId, useState } from 'react'
+import { useId, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Clock3, FileArchive, Hash, KeyRound, LayoutGrid } from 'lucide-react'
 import { FAIXAS_CONFIG, type ConfigApp, type EditarConfigAppEntrada, type ParametroNumerico } from '@shared/tipos/index.ts'
@@ -13,6 +14,7 @@ import { Campo } from '../../ui/Campo.tsx'
 import { EsqueletoLinhas, EstadoVazio } from '../../ui/Indicadores.tsx'
 import { editarConfigApp, useConfigApp } from './api.ts'
 import { erroDoCampo, Faixa, mensagemGeral, Painel } from './comum.tsx'
+import { RodapePendente, useRascunhoConfig } from './pendentes.tsx'
 
 type Campo_ = ParametroNumerico | 'prazoHoraPadrao'
 interface Def { campo: Campo_; rotulo: string; unidade?: string; ajuda: string }
@@ -77,13 +79,10 @@ export default function ConfigParametros() {
   const qc = useQueryClient()
   const idForm = useId()
   const consulta = useConfigApp()
-  const [rascunho, setRascunho] = useState<Rascunho | null>(null)
+  const [guardado, setRascunho, esquecer] = useRascunhoConfig<Rascunho | null>('config:parametros', null)
+  const rascunho = guardado ?? (consulta.data ? paraRascunho(consulta.data.config) : null)
   const [erro, setErro] = useState<unknown>(null)
   const [salvando, setSalvando] = useState(false)
-
-  useEffect(() => {
-    if (consulta.data && !rascunho) setRascunho(paraRascunho(consulta.data.config))
-  }, [consulta.data, rascunho])
 
   if (consulta.isPending || !rascunho) {
     if (consulta.isError) {
@@ -102,8 +101,8 @@ export default function ConfigParametros() {
     if (!Object.keys(corpo).length) return
     setSalvando(true)
     try {
-      const saida = await editarConfigApp(qc, corpo as EditarConfigAppEntrada)
-      setRascunho(paraRascunho(saida.config))
+      await editarConfigApp(qc, corpo as EditarConfigAppEntrada)
+      esquecer()
       avisar(mudancas.length === 1 ? '1 parâmetro salvo.' : `${mudancas.length} parâmetros salvos.`, { tipo: 'sucesso' })
     } catch (e) {
       setErro(e)
@@ -118,7 +117,7 @@ export default function ConfigParametros() {
     <div className="cad-secao">
       <header className="cad-cabecalho">
         <div className="cad-cabecalho-texto">
-          <h1 className="cad-titulo">Prazos e limites</h1>
+          <h2 className="cad-titulo">Prazos e limites</h2>
           <p className="cad-subtitulo">Os números que o sistema usa para sugerir prazos, destacar o que está parado e cuidar dos links. {info.nome} · versão {info.versao}.</p>
         </div>
       </header>
@@ -144,12 +143,11 @@ export default function ConfigParametros() {
           </Painel>
         ))}
         {erro && !algumCampo ? <Faixa tom="perigo">{mensagemGeral(erro)}</Faixa> : null}
-        <div className="cad-rodape-form">
-          {mudancas.length > 0 && <Botao variante="ghost" onClick={() => { setRascunho(atual); setErro(null) }}>Descartar</Botao>}
+        <RodapePendente mudancas={mudancas.length} aoDescartar={() => { esquecer(); setErro(null) }}>
           <Botao type="submit" variante="primario" carregando={salvando} disabled={mudancas.length === 0}>
-            {mudancas.length === 0 ? 'Nada para salvar' : mudancas.length === 1 ? 'Salvar 1 mudança' : `Salvar ${mudancas.length} mudanças`}
+            {mudancas.length === 0 ? 'Nada para salvar' : 'Salvar'}
           </Botao>
-        </div>
+        </RodapePendente>
       </form>
     </div>
   )

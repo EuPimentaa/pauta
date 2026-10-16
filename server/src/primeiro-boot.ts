@@ -1,5 +1,6 @@
 /** Primeiro boot: sem nenhum usuário e com ADMIN_EMAIL e ADMIN_SENHA no ambiente, cria o admin. */
 import { ehSenhaFraca } from '../../shared/logica/senha.ts'
+import { nomeDoEmail } from '../../shared/logica/texto.ts'
 import { hashSenha } from './auth.ts'
 import { config } from './config.ts'
 import { agora, novoId, rodar, tx, um, type Db } from './db.ts'
@@ -19,7 +20,7 @@ export async function criarAdminInicial(db: Db): Promise<boolean> {
     const instante = agora()
     rodar(db, `INSERT INTO usuario (id, nome, email, senha_hash, senha_definida_em, papel, cor, criado_em, atualizado_em)
                VALUES (?, ?, ?, ?, ?, 'admin', 'grafite', ?, ?)`,
-      novoId(), email.split('@')[0]!.slice(0, 120), email, hash, instante, instante, instante)
+      novoId(), nomeDoEmail(email), email, hash, instante, instante, instante)
     console.log(`Admin criado: ${email}. Tire ADMIN_SENHA do ambiente.`)
     return true
   })

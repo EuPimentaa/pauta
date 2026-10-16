@@ -83,10 +83,18 @@ export const coordenadasTeclado: KeyboardCoordinateGetter = (event, { context, c
 /**
  * Coluna arrastada: a coluna de centro mais perto. Card: o card sob o ponteiro; sobre o cabeçalho ou a lista de uma
  * coluna, o card mais perto dela (ou a própria lista, vazia). Sem nada debaixo, o último alvo (sem piscar).
+ * Logo depois de o card mudar de coluna (`recemMovido`), o alvo é o próprio card até o próximo quadro de animação: a
+ * coluna nova muda de tamanho e, sem isso, a colisão voltaria para a antiga e as duas trocariam sem parar.
  */
-export function deteccaoDoQuadro(cardsDaColuna: (colunaId: Id) => readonly UniqueIdentifier[], ultimo: { current: UniqueIdentifier | null }): CollisionDetection {
+export function deteccaoDoQuadro(
+  cardsDaColuna: (colunaId: Id) => readonly UniqueIdentifier[], ultimo: { current: UniqueIdentifier | null }, recemMovido: { current: boolean },
+): CollisionDetection {
   return (args) => {
     const tipo = dadoDe(args.active)?.tipo
+    if (tipo === 'card' && recemMovido.current) {
+      ultimo.current = args.active.id
+      return [{ id: args.active.id }]
+    }
     if (tipo === 'coluna') {
       return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => dadoDe(c)?.tipo === 'coluna') })
     }

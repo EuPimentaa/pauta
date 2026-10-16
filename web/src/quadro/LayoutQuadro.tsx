@@ -126,6 +126,7 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
   const inicio = useRef<{ coluna: Id; indice: number } | null>(null)
   const soltarPausa = useRef<(() => void) | null>(null)
   const ultimoAlvo = useRef<UniqueIdentifier | null>(null)
+  const recemMovido = useRef(false)
   // depois de soltar, a ordem local fica até o cache refletir o movimento (sem o card piscar no lugar antigo)
   const esperando = useRef(false)
   useLayoutEffect(() => {
@@ -139,7 +140,13 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
   )
 
   const cardsRenderizados = useCallback((colunaId: Id) => (recolhidas.has(colunaId) ? [] : (ordemRef.current ?? base)[colunaId] ?? []), [recolhidas, base])
-  const deteccao = useMemo(() => deteccaoDoQuadro(cardsRenderizados, ultimoAlvo), [cardsRenderizados])
+  const deteccao = useMemo(() => deteccaoDoQuadro(cardsRenderizados, ultimoAlvo, recemMovido), [cardsRenderizados])
+  // a troca de coluna durante o arraste segura a colisão por um quadro (ver deteccaoDoQuadro)
+  useEffect(() => {
+    if (!recemMovido.current) return
+    const q = requestAnimationFrame(() => { recemMovido.current = false })
+    return () => cancelAnimationFrame(q)
+  }, [ordem])
 
   const terminar = useCallback(() => {
     setAtivo(null)
@@ -185,6 +192,7 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
     }
     destino.splice(i, 0, idA)
     const nova = { ...atual, [de]: atual[de].filter((x) => x !== idA), [para]: destino }
+    recemMovido.current = true
     ordemRef.current = nova
     setOrdem(nova)
   }

@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, type Plugin, type ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
@@ -26,6 +26,20 @@ function exigirLightDarkNativo(): Plugin {
   }
 }
 
+/**
+ * /api vai para a API. Se a API cai no meio de um SSE, o proxy não fecha a resposta do navegador e o EventSource fica
+ * aberto e calado, sem a faixa "Sem conexão" (pedido 2 do NÚCLEO-WEB): a resposta do navegador fecha junto.
+ */
+const proxyDaApi: ProxyOptions = {
+  target: API,
+  changeOrigin: true,
+  configure: (proxy) => {
+    proxy.on('proxyRes', (resposta, _pedido, saida) => {
+      resposta.on('close', () => { if (!saida.writableEnded) saida.destroy() })
+    })
+  },
+}
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), exigirLightDarkNativo()],
   resolve: { alias: { '@shared': fileURLToPath(new URL('../shared', import.meta.url)) } },
@@ -33,10 +47,9 @@ export default defineConfig({
     // navegadores com light-dark() nativo (Baseline maio/2024, marca §7); ver exigirLightDarkNativo()
     cssTarget: ['chrome123', 'edge123', 'firefox120', 'safari17.5'],
   },
+  // o `preview` herda este proxy
   server: {
     port: 5173,
-    proxy: {
-      '/api': API,
-    },
+    proxy: { '/api': proxyDaApi },
   },
 })

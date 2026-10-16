@@ -81,6 +81,8 @@ export function ehMeuTrace(t: string | null | undefined): boolean {
   return !!t && conjunto.has(t)
 }
 
+const SEM_CONEXAO = 'Sem conexão com o servidor. Tente de novo em instantes.'
+
 // ─────────────── rota pública ───────────────
 
 let rotaPublica = false
@@ -132,7 +134,7 @@ export async function api<T>(metodo: Metodo, caminho: string, opcoes: OpcoesApi 
     resp = await fetch(url, { method: metodo, headers, body, credentials: 'same-origin', signal: opcoes.sinal })
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e
-    throw new ErroDaApi(0, 'rede', 'Sem conexão com o servidor. Tente de novo em instantes.')
+    throw new ErroDaApi(0, 'rede', SEM_CONEXAO)
   }
 
   if (resp.status === 204 || resp.status === 205) return undefined as T
@@ -142,6 +144,9 @@ export async function api<T>(metodo: Metodo, caminho: string, opcoes: OpcoesApi 
   if (resp.ok) return dados as T
 
   const erro = (dados as Partial<ErroApi> | null)?.erro
+  // 502/503/504 sem o erro da API: o proxy da frente (Vite em dev; Traefik e Cloudflare em produção) não alcançou o
+  // servidor. Para a pessoa é o mesmo que estar sem conexão (e o aviso oferece "Tentar de novo").
+  if (!erro && (resp.status === 502 || resp.status === 503 || resp.status === 504)) throw new ErroDaApi(0, 'rede', SEM_CONEXAO)
   const codigo: CodigoErro = erro?.codigo ?? (resp.status === 401 ? 'nao_autenticado' : 'interno')
   const mensagem = erro?.mensagem ?? (resp.status >= 500 ? 'O servidor não respondeu como deveria. Tente de novo.' : 'Não foi possível concluir.')
   const falha = new ErroDaApi(resp.status, codigo, mensagem, erro?.detalhes)

@@ -18,6 +18,7 @@ import { useEu } from '../../api/auth.ts'
 import { ehErroDaApi, mensagemDeErro } from '../../api/cliente.ts'
 import { useConfig, useQuadros } from '../../api/seletores.ts'
 import { useTituloAba } from '../../lib/app.ts'
+import { ehCelular } from '../../lib/midia.ts'
 import { avisar } from '../../ui/avisos.tsx'
 import { Botao, BotaoIcone } from '../../ui/Botao.tsx'
 import { AreaTexto, Campo, Selecao } from '../../ui/Campo.tsx'
@@ -114,6 +115,12 @@ export default function TelaModelos() {
     setErro(null)
   }, [selecionado, atual?.atualizadoEm])
 
+  /** No celular o editor fica embaixo da lista: escolher leva até ele. */
+  function escolher(id: Id | 'novo') {
+    setSelecionado(id)
+    if (ehCelular()) requestAnimationFrame(() => document.querySelector('.modelos-editor')?.scrollIntoView({ block: 'start' }))
+  }
+
   function mudarEscopo(id: string) {
     setParams(id ? { quadro: id } : {}, { replace: true })
     setSelecionado(null)
@@ -184,7 +191,7 @@ export default function TelaModelos() {
         <Selecao rotulo="Modelos de" tamanho="p" value={quadroId ?? ''} classeGrupo="modelos-escopo"
           opcoes={[{ valor: '', rotulo: 'Todos os quadros (globais)' }, ...quadrosAtivos.map((q) => ({ valor: q.id, rotulo: `Quadro ${q.nome}` }))]}
           onChange={(e) => mudarEscopo(e.target.value)} />
-        {podeEditar && <Botao variante="secundario" tamanho="p" icone={Plus} onClick={() => setSelecionado('novo')}>Novo modelo</Botao>}
+        {podeEditar && <Botao variante="secundario" tamanho="p" icone={Plus} onClick={() => escolher('novo')}>Novo modelo</Botao>}
       </div>
       {!podeEditar && (
         <p className="modelos-nota"><Lock aria-hidden="true" /> Só o admin edita os modelos globais. Os de cada quadro, qualquer pessoa.</p>
@@ -209,7 +216,7 @@ export default function TelaModelos() {
               return (
                 <li key={m.id}>
                   <button type="button" className="modelos-item" aria-current={selecionado === m.id ? 'true' : undefined}
-                    data-inativo={!m.ativo || undefined} onClick={() => setSelecionado(m.id)}>
+                    data-inativo={!m.ativo || undefined} onClick={() => escolher(m.id)}>
                     <I aria-hidden="true" />
                     <span className="modelos-item-textos">
                       <span className="modelos-item-nome">{m.nome}{!m.ativo && <span className="modelos-item-inativo"> · desativado</span>}</span>

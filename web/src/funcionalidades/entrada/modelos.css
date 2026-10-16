@@ -1,0 +1,75 @@
+/* Configurações › Modelos de demanda (F4): a lista do escopo à esquerda e o editor; no celular, um embaixo do outro. */
+@layer components {
+  .modelos { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+  .modelos-cabeca { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+  .modelos-titulo { font: 600 var(--fs-h2) / var(--lh-h2) var(--font); letter-spacing: var(--tracking-titulo); }
+  .modelos-sub { margin-top: 4px; max-width: 60ch; color: var(--text-2); }
+  .modelos-revisado {
+    display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: 8px 8px 8px 12px; border-radius: var(--radius-md);
+    background: var(--surface-sunken); color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font);
+  }
+  .modelos-barra { display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap; }
+  .modelos-escopo { width: min(320px, 100%); }
+  .modelos-nota { display: flex; align-items: center; gap: 6px; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .modelos-nota svg { width: 14px; height: 14px; }
+  .modelos-corpo { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+  .modelos-lista {
+    display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: var(--radius-lg); position: sticky; top: calc(var(--topo-h) + var(--space-4));
+    background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .modelos-vazio { padding: 10px; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .modelos-item {
+    display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: var(--radius-sm);
+    background: transparent; color: var(--text); text-align: left;
+  }
+  .modelos-item > svg { flex: none; width: 18px; height: 18px; margin-top: 2px; color: var(--text-2); }
+  .modelos-item:hover { background: var(--veu-1); }
+  .modelos-item[aria-current="true"] { background: var(--accent-soft); }
+  .modelos-item[aria-current="true"] > svg { color: var(--accent-ink); }
+  .modelos-item-textos { display: flex; flex-direction: column; min-width: 0; }
+  .modelos-item-nome { font: 600 var(--fs-body) / var(--lh-body) var(--font); }
+  .modelos-item-inativo { color: var(--text-2); font-weight: 400; }
+  .modelos-item[data-inativo] .modelos-item-nome { color: var(--text-2); }
+  .modelos-item-meta { color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+
+  .modelos-editor {
+    display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-5); border-radius: var(--radius-lg);
+    background: var(--surface); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .modelos-par { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: var(--space-3); }
+  .modelos-quatro { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-3); align-items: start; }
+  .modelos-icones { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .modelos-icones-grade { display: flex; flex-wrap: wrap; gap: 4px; }
+  .modelos-icone {
+    display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-2);
+  }
+  .modelos-icone svg { width: 18px; height: 18px; }
+  .modelos-icone:hover { background: var(--veu-1); color: var(--text); }
+  .modelos-icone[aria-checked="true"] { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--accent) 60%, transparent); }
+  .modelos-icones:disabled .modelos-icone { opacity: 1; }
+  .modelos-rotulo-linha { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+  .modelos-previa {
+    min-height: 160px; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken);
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .modelos-grupo { display: flex; flex-direction: column; gap: 6px; }
+  .modelos-tirar { align-self: flex-start; }
+  .modelos-etiqueta { display: grid; grid-template-columns: minmax(120px, 200px) minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; }
+  .modelos-acoes { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; padding-top: var(--space-2); border-top: 1px solid var(--border); }
+  .modelos-acoes-espaco { flex: 1; }
+
+  @media (max-width: 899.98px) {
+    .modelos-corpo { grid-template-columns: minmax(0, 1fr); }
+    .modelos-lista { position: static; }
+    .modelos-par { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 767.98px) {
+    .modelos-editor { padding: var(--space-4); }
+    .modelos-etiqueta { grid-template-columns: minmax(0, 1fr) auto; }
+    .modelos-etiqueta .ui-cores { grid-column: 1 / -1; grid-row: 2; }
+  }
+}
+
+@layer foco {
+  .modelos-item:focus-visible, .modelos-icone:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+}

@@ -98,6 +98,19 @@ export function mudarBootstrap(qc: QueryClient, fn: (b: Bootstrap) => Bootstrap)
   qc.setQueryData<Bootstrap>(chaves.bootstrap, (b) => (b ? fn(b) : b))
 }
 
+/** O QueryClient do app, para quem só recebe texto (fontes da paleta): os globais do núcleo registram ao montar. */
+let padrao: QueryClient | null = null
+export function definirClientePadrao(qc: QueryClient | null): void {
+  padrao = qc
+}
+export function clientePadrao(): QueryClient | null {
+  return padrao
+}
+/** O bootstrap em cache do cliente padrão (undefined antes de carregar ou fora da área autenticada). */
+export function bootstrapAtual(): Bootstrap | undefined {
+  return padrao ? bootstrapDe(padrao) : undefined
+}
+
 export function bootstrapDe(qc: QueryClient): Bootstrap | undefined {
   return qc.getQueryData<Bootstrap>(chaves.bootstrap)
 }

@@ -6,6 +6,7 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { SyncSaida } from '@shared/tipos/index.ts'
 import { bootstrapEmCache } from '../api/bootstrap.ts'
+import { definirClientePadrao } from '../api/cache.ts'
 import { api, ehMeuTrace } from '../api/cliente.ts'
 import { definirConexao } from '../lib/conexao.ts'
 import { useRegistro } from '../sessao/registro.ts'
@@ -15,6 +16,7 @@ export default function TempoReal() {
   const qc = useQueryClient()
   const reg = useRegistro()
   useEffect(() => {
+    definirClientePadrao(qc)
     const seq = bootstrapEmCache(qc)?.seq ?? 0
     const parar = conectarTempoReal({
       qc,
@@ -26,6 +28,7 @@ export default function TempoReal() {
     return () => {
       parar()
       definirConexao('online')
+      definirClientePadrao(null)
     }
   }, [qc, reg])
   return null

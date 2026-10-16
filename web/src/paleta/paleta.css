@@ -1,0 +1,47 @@
+/* Paleta Cmd+K (cmdk dentro do Modal do DS). Só tokens da marca. */
+@layer components {
+  .ui-modal-posicao:has(> .paleta) { place-items: start center; padding-top: min(12vh, 120px); }
+  .ui-modal.paleta { --largura: 640px; overflow: hidden; }
+  .ui-modal-corpo.paleta-corpo { padding: 0; display: flex; flex-direction: column; min-height: 0; }
+  .paleta [cmdk-root] { display: flex; flex-direction: column; min-height: 0; max-height: min(70vh, 560px); }
+  .paleta-entrada {
+    display: flex; align-items: center; gap: 10px; padding: 0 var(--space-4); height: 56px; flex: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .paleta-entrada > svg { width: 18px; height: 18px; flex: none; color: var(--text-2); }
+  .paleta-entrada input {
+    flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: var(--text); outline: none;
+    font: 400 16px / 1 var(--font);
+  }
+  .paleta-entrada input::placeholder { color: var(--text-3); }
+  .paleta-lista { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 6px; scrollbar-gutter: stable; }
+  .paleta [cmdk-group-heading] {
+    padding: 10px 10px 4px; font: 700 var(--fs-micro) / var(--lh-micro) var(--font); letter-spacing: var(--tracking-micro);
+    text-transform: uppercase; color: var(--glass-text-3, var(--text-2));
+  }
+  .paleta [cmdk-item] {
+    display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px; border-radius: var(--radius-sm);
+    color: var(--text); font: 400 var(--fs-body) / 1.3 var(--font); cursor: pointer; user-select: none;
+  }
+  .paleta [cmdk-item] > svg { width: 16px; height: 16px; flex: none; color: var(--text-2); }
+  .paleta [cmdk-item][data-selected="true"] { background: var(--veu-2, var(--veu-1)); }
+  .paleta [cmdk-item][data-selected="true"] > svg { color: var(--text); }
+  .paleta-rotulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .paleta-detalhe { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: var(--fs-meta); }
+  .paleta-vazio { padding: var(--space-6) var(--space-4); text-align: center; color: var(--text-2); font: 400 var(--fs-body) / var(--lh-body) var(--font); }
+  .paleta-rodape {
+    display: flex; flex-wrap: wrap; gap: var(--space-4); padding: 8px var(--space-4); flex: none; border-top: 1px solid var(--border);
+    color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font);
+  }
+  .paleta-rodape > span { display: inline-flex; align-items: center; gap: 6px; }
+  @media (max-width: 767.98px) {
+    .ui-modal-posicao:has(> .paleta) { padding-top: 0; }
+    .paleta [cmdk-root] { max-height: none; flex: 1; }
+    .paleta-rodape { display: none; }
+  }
+}
+
+/* a paleta inteira é o contexto do foco: o campo não leva o anel (o cursor e o item marcado mostram onde se está) */
+@layer foco {
+  .paleta-entrada input:focus-visible { box-shadow: none; outline: none; }
+}

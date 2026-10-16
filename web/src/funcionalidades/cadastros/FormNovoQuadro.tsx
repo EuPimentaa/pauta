@@ -4,13 +4,14 @@
  * seguem cada coluna, cor, fundo, "uma coluna por pessoa" e seguidores. Criar abre o quadro.
  * `?equipe=<id>` já escolhe a equipe (Configurações › Equipes).
  */
-import { useId, useMemo, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Columns3, LayoutGrid, LayoutTemplate, Square, UserRound, Users } from 'lucide-react'
 import type { Cor, FundoQuadro, Id, ModeloQuadro } from '@shared/tipos/index.ts'
 import { useDoBootstrap, useEquipes, useUsuarios } from '../../api/seletores.ts'
 import { ehErroDaApi } from '../../api/cliente.ts'
+import { useAbrirDialogo } from '../../dialogos/index.ts'
 import type { Icone } from '../../extensoes/tipos.ts'
 import { avisar } from '../../ui/avisos.tsx'
 import { Botao } from '../../ui/Botao.tsx'
@@ -81,6 +82,19 @@ export default function FormNovoQuadro({ fechar, equipeInicial }: { fechar(): vo
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<unknown>(null)
   const [tentou, setTentou] = useState(false)
+  const abrirDialogo = useAbrirDialogo()
+
+  // formulário mexido: Esc, X e o clique fora perguntam antes de jogar fora (o Cancelar fecha direto)
+  const planoInicial = useRef(JSON.stringify(plano))
+  const sujo = nomeTocado || modeloTocado || corTocada || fundo !== 'liso' || equipeId !== (equipeIni?.id ?? null)
+    || JSON.stringify(plano) !== planoInicial.current
+  async function fecharPerguntando() {
+    if (!sujo) { fechar(); return }
+    const ok = await abrirDialogo('confirmar', {
+      titulo: 'Descartar este quadro?', mensagem: 'O nome, o modelo e as colunas que você ajustou se perdem.', confirmar: 'Descartar', perigo: true,
+    })
+    if (ok) fechar()
+  }
 
   const equipe = equipes.find((e) => e.id === equipeId) ?? null
   const modelo = modelos.find((m) => m.id === modeloId) ?? null
@@ -137,7 +151,8 @@ export default function FormNovoQuadro({ fechar, equipeInicial }: { fechar(): vo
   const semMembros = !!equipe && temColunaPorPessoa(modelo) && membros.length === 0
 
   return (
-    <Modal aberto aoFechar={fechar} titulo="Novo quadro" descricao="Escolha um modelo e ajuste as colunas antes de criar." tamanho="g"
+    <Modal aberto aoFechar={() => void fecharPerguntando()} fecharAoClicarFora={!sujo} titulo="Novo quadro"
+      descricao="Escolha um modelo e ajuste as colunas antes de criar." tamanho="g"
       rodape={(
         <>
           <Botao variante="secundario" onClick={fechar}>Cancelar</Botao>

@@ -12,6 +12,7 @@ import {
   prazoSugerido, quadroInicial, textoDeMinutos, type EstadoNovaDemanda,
 } from '../../web/src/funcionalidades/entrada/formulario.ts'
 import { quadroAtualDaUrl } from '../../web/src/funcionalidades/entrada/lugar.ts'
+import { formularioSujo, paraGuardar, rascunhoValido } from '../../web/src/funcionalidades/entrada/rascunho.ts'
 import {
   clientesEmAndamento, comporLinha, linhasColadas, marcadorDaPessoa, mencaoEmAndamento, reconhecerAoDigitarEspaco,
 } from '../../web/src/funcionalidades/entrada/rapida-chips.ts'
@@ -189,5 +190,44 @@ describe('lista do "?" (puro)', () => {
     assert.equal(g[2]!.itens.length, 2, 'lugares diferentes ficam separados')
     assert.deepEqual(agruparAtalhos(atalhos, 'proximo').map((x) => x.grupo), ['quadro'])
     assert.deepEqual(agruparAtalhos(atalhos, 'nada'), [])
+  })
+})
+
+describe('rascunho da Nova demanda (integração 3A)', () => {
+  const base = {
+    titulo: '', descricaoMd: '## Objetivo', descricaoAuto: '## Objetivo', colagem: null, etiquetaIds: null,
+    mexidos: new Set<string>(), quadroId: 'q1', colunaId: 'c1',
+  }
+  const ctx = {
+    quadroAtivo: (id: string) => id === 'q1',
+    colunaAtiva: (id: string) => id === 'c1',
+    colunaDeEntrada: () => 'c-entrada',
+  }
+
+  test('sujo: título, conversa colada ou no campo, descrição mexida, etiquetas ou qualquer campo tocado; o briefing do modelo não conta', () => {
+    assert.equal(formularioSujo(base, ''), false)
+    assert.equal(formularioSujo(base, '   '), false)
+    assert.equal(formularioSujo({ ...base, titulo: 'Banner' }, ''), true)
+    assert.equal(formularioSujo(base, '[14/10 15:32] Ana: oi'), true)
+    assert.equal(formularioSujo({ ...base, colagem: { texto: 'x' } }, ''), true)
+    assert.equal(formularioSujo({ ...base, descricaoMd: '## Objetivo\nMais' }, ''), true)
+    assert.equal(formularioSujo({ ...base, etiquetaIds: [] }, ''), true)
+    assert.equal(formularioSujo({ ...base, mexidos: new Set(['prazo']) }, ''), true)
+  })
+
+  test('guardar e voltar: mexidos como lista; vence em 3 dias; quadro arquivado descarta; coluna arquivada vai para a de entrada', () => {
+    const agora = new Date('2026-10-16T12:00:00.000Z')
+    const g = paraGuardar({ ...base, titulo: 'Banner', mexidos: new Set(['titulo']) }, 'conversa', agora)
+    const ida = JSON.parse(JSON.stringify(g))
+    assert.deepEqual(ida.estado.mexidos, ['titulo'])
+    const volta = rascunhoValido(ida, new Date('2026-10-17T12:00:00.000Z'), ctx)!
+    assert.equal(volta.estado.titulo, 'Banner')
+    assert.ok(volta.estado.mexidos instanceof Set && volta.estado.mexidos.has('titulo'))
+    assert.equal(volta.textoColar, 'conversa')
+    assert.equal(rascunhoValido(ida, new Date('2026-10-19T12:00:01.000Z'), ctx), null, 'passou de 3 dias')
+    assert.equal(rascunhoValido({ ...ida, estado: { ...ida.estado, quadroId: 'q-arquivado' } }, agora, ctx), null)
+    assert.equal(rascunhoValido({ ...ida, estado: { ...ida.estado, colunaId: 'c-arquivada' } }, agora, ctx)!.estado.colunaId, 'c-entrada')
+    assert.equal(rascunhoValido(null, agora, ctx), null)
+    assert.equal(rascunhoValido({ lixo: 1 } as never, agora, ctx), null)
   })
 })

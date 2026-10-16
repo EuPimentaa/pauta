@@ -7,6 +7,8 @@
  * do quadro aberto e da coluna de entrada. O modelo preenche o que a pessoa ainda não mexeu (descrição, prazo em dias
  * úteis, prioridade, estimativa) e o cliente sugere o responsável dele na equipe do quadro como membro.
  * Ctrl+Enter cria; Ctrl+Shift+Enter cria e abre. "Criar cliente XYZ" abre o diálogo `criar-cliente` (F5).
+ * Fechar sem criar guarda um rascunho (rascunho.ts) que a próxima abertura devolve; com o formulário mexido, o clique
+ * fora não fecha (Esc, X e Cancelar fecham e guardam).
  */
 import './nova-demanda.css'
 import { useEffect, useId, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
@@ -36,6 +38,7 @@ import { EditorMarkdown } from '../../ui/EditorMarkdown.tsx'
 import { Kbd } from '../../ui/Kbd.tsx'
 import { SeletorData } from '../../ui/SeletorData.tsx'
 import { analisarTexto } from './api.ts'
+import { formularioSujo, gravarRascunho, lerRascunho, paraGuardar, rascunhoValido } from './rascunho.ts'
 import { GradeModelos, Segmentos, SeletorEtiquetas, SeletorPessoas } from './componentes.tsx'
 import {
   colunaInicial, descricaoAutomatica, entradaDaNovaDemanda, membroSugerido, minutosDeTexto, modelosDoQuadro, motivoParaNaoCriar,
@@ -109,7 +112,19 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
   }
 
   const clienteExtra = useRef<ClienteResumo | null>(null)
-  const [estado, setEstado] = useState<Estado>(() => {
+
+  // rascunho de um fechar anterior: volta quando o diálogo abre sem pedido próprio (conversa, modelo ou cliente)
+  const [rascunho] = useState(() => {
+    if (params.textoColado?.trim() || params.modeloId || params.clienteId) return null
+    return rascunhoValido<Estado>(lerRascunho<Estado>(eu.usuario.id), new Date(), {
+      quadroAtivo: (id) => b.quadros.some((q) => q.id === id && q.arquivadoEm === null),
+      colunaAtiva: (id, quadroId) => b.colunas.some((c) => c.id === id && c.quadroId === quadroId && c.arquivadaEm === null),
+      colunaDeEntrada: (quadroId) => colunaInicial(b.colunas, quadroId, null)?.id ?? null,
+    })
+  })
+  const [rascunhoDe, setRascunhoDe] = useState<string | null>(rascunho?.salvoEm ?? null)
+
+  function estadoNovo(): Estado {
     const quadro = quadroInicial(b.quadros, {
       pedido: params.quadroId, aberto: ctx.quadroAtual?.id, ultimo: lerLocal<string | null>(CHAVE_ULTIMO_QUADRO, null), favoritos: eu.favoritos,
     })
@@ -123,7 +138,8 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
       modeloSugerido: null, membroSugeridoId: null, estimativaTexto: '', prazoConversa: null,
     }
     return recalcular(base)
-  })
+  }
+  const [estado, setEstado] = useState<Estado>(() => rascunho?.estado ?? estadoNovo())
   const mudar = (fn: (e: Estado) => Estado) => setEstado((e) => recalcular(fn(e)))
   const mexer = (e: Estado, ...campos: Mexido[]): ReadonlySet<Mexido> => new Set([...e.mexidos, ...campos])
 
@@ -151,7 +167,35 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
   // ─────────────── Colar do WhatsApp ───────────────
 
   const [lendo, setLendo] = useState(false)
-  const [textoColar, setTextoColar] = useState(params.textoColado ?? '')
+  const [textoColar, setTextoColar] = useState(params.textoColado ?? rascunho?.textoColar ?? '')
+
+  // ─────────────── rascunho ───────────────
+
+  const sujo = formularioSujo(estado, textoColar)
+  const atual = useRef({ estado, textoColar, sujo })
+  atual.current = { estado, textoColar, sujo }
+  const criada = useRef(false)
+  const guardar = () => {
+    if (criada.current) return
+    const a = atual.current
+    if (a.sujo) gravarRascunho(eu.usuario.id, paraGuardar(a.estado, a.textoColar, new Date()))
+    else if (rascunho) gravarRascunho(eu.usuario.id, null)
+  }
+  // guarda um pouco depois de cada mudança (outra aba ou o Shift+N logo depois do Esc já acham) e ao fechar
+  useEffect(() => {
+    const t = setTimeout(guardar, 400)
+    return () => clearTimeout(t)
+  }, [estado, textoColar])
+  useEffect(() => guardar, [])
+
+  function descartarRascunho() {
+    gravarRascunho(eu.usuario.id, null)
+    setRascunhoDe(null)
+    clienteExtra.current = null
+    setTextoColar('')
+    setEstado(estadoNovo())
+    requestAnimationFrame(() => tituloRef.current?.focus())
+  }
   const pedidoColar = useRef<AbortController | null>(null)
 
   async function colar(texto: string) {
@@ -258,6 +302,8 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
     const r = await criar(entradaDaNovaDemanda(estado, { podeAm, responsavelDaColuna: coluna.responsavelId }))
     setCriando(false)
     if (!r) return
+    criada.current = true
+    gravarRascunho(eu.usuario.id, null)
     gravarLocal(CHAVE_ULTIMO_QUADRO, quadro.id)
     fechar({ demanda: r.demanda })
     const n = r.demanda.numero
@@ -296,6 +342,7 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
     <MolduraDialogo
       titulo="Nova demanda"
       tamanho="g"
+      fecharAoClicarFora={!sujo}
       rodape={(
         <div className="entrada-rodape" onKeyDown={aoTeclar}>
           <span className="entrada-rodape-dica" aria-hidden="true"><Kbd teclas="mod+enter" /> cria · <Kbd teclas="mod+shift+enter" /> cria e abre</span>
@@ -312,6 +359,12 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
       )}
     >
       <div className="entrada-nova" onKeyDown={aoTeclar} onPaste={aoColarNoDialogo}>
+        {rascunhoDe && (
+          <p className="entrada-rascunho" role="status">
+            <span>Rascunho de {tempoDesde(rascunhoDe)}: o que você deixou ao fechar.</span>
+            <Botao variante="ghost" tamanho="p" icone={X} onClick={descartarRascunho}>Descartar</Botao>
+          </p>
+        )}
         {/* ─── Colar do WhatsApp ─── */}
         <section className="entrada-colar" aria-labelledby={`${id}-colar`} data-estado={estado.colagem ? 'lido' : lendo ? 'lendo' : 'vazio'}>
           <h3 id={`${id}-colar`} className="entrada-colar-titulo"><MessageSquareText aria-hidden="true" /> Colar do WhatsApp</h3>
@@ -582,6 +635,17 @@ function ordemQuadros(favoritos: readonly Id[]) {
     const fa = favoritos.indexOf(a.id), fc = favoritos.indexOf(c.id)
     return (fa < 0 ? 1e9 : fa) - (fc < 0 ? 1e9 : fc) || a.pos - c.pos
   }
+}
+
+/** "agora há pouco", "há 12 min", "há 3 h", "ontem", "há 2 dias". */
+function tempoDesde(instante: string): string {
+  const min = Math.round((Date.now() - Date.parse(instante)) / 60_000)
+  if (min < 2) return 'agora há pouco'
+  if (min < 60) return `há ${min} min`
+  const h = Math.round(min / 60)
+  if (h < 24) return `há ${h} h`
+  const dias = Math.round(h / 24)
+  return dias === 1 ? 'ontem' : `há ${dias} dias`
 }
 
 function formatarRecebido(instante: string): string {

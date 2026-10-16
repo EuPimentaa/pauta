@@ -42,6 +42,11 @@
   .entrada-lugar, .entrada-datas { display: flex; flex-direction: column; gap: var(--space-3); }
   .entrada-par { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2); }
   .entrada-ponto { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--cor); margin-left: 2px; }
+  .entrada-rascunho {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); justify-content: space-between;
+    padding: 6px 6px 6px 12px; border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--text-2);
+    font: 400 var(--fs-meta) / var(--lh-meta) var(--font);
+  }
   .entrada-sigla-nova {
     display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); justify-content: space-between; margin-top: calc(-1 * var(--space-2));
     padding: 8px 10px; border-radius: var(--radius-md); background: var(--info-bg); color: var(--info-ink);

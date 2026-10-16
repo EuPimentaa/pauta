@@ -34,10 +34,12 @@ export interface PropsMoldura {
   tamanho?: 'p' | 'm' | 'g'
   /** Popover: largura em px (padrão 320). */
   largura?: number
+  /** Modal: false = o clique fora não fecha (formulário preenchido; Esc, X e os botões continuam). Padrão true. */
+  fecharAoClicarFora?: boolean
   children: ReactNode
 }
 
-export function MolduraDialogo({ titulo, descricao, rodape, tamanho = 'p', largura = 320, children }: PropsMoldura) {
+export function MolduraDialogo({ titulo, descricao, rodape, tamanho = 'p', largura = 320, fecharAoClicarFora = true, children }: PropsMoldura) {
   const ctx = useContext(ContextoMoldura)
   if (!ctx) throw new Error('MolduraDialogo só funciona dentro do host de diálogos (abrirDialogo).')
   if (ctx.forma === 'popover' && ctx.ancora) {
@@ -52,7 +54,8 @@ export function MolduraDialogo({ titulo, descricao, rodape, tamanho = 'p', largu
     )
   }
   return (
-    <Modal aberto={ctx.aberto} aoFechar={ctx.cancelar} titulo={titulo} descricao={descricao} tamanho={tamanho} rodape={rodape}>
+    <Modal aberto={ctx.aberto} aoFechar={ctx.cancelar} titulo={titulo} descricao={descricao} tamanho={tamanho} rodape={rodape}
+      fecharAoClicarFora={fecharAoClicarFora}>
       {children}
     </Modal>
   )

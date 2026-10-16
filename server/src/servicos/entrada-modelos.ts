@@ -12,7 +12,7 @@ import { normalizarAlias } from '../../../shared/logica/texto.ts'
 import type { Ator } from '../auth.ts'
 import { agora, novoId, rodar, todos, um, type Db } from '../db.ts'
 import { conflito, estadoInvalido, naoEncontrado, validacao } from '../erros.ts'
-import { gravarConfig } from './config-app.ts'
+import { gravarConfig, lerConfig } from './config-app.ts'
 import { emitirObjeto } from './eventos.ts'
 import { exigir } from './permissoes.ts'
 import { posicaoEntre } from './posicao.ts'
@@ -144,5 +144,7 @@ export function marcarRevisados(db: Db, ator: Ator): ModelosRevisadosSaida {
   exigir(ator, 'modelos.revisados')
   const instante = agora()
   gravarConfig(db, 'modelosRevisadosEm', instante, ator.usuario?.id ?? null)
+  // as outras janelas veem o passo "Revisar os modelos" feito (entidade config, integração da Onda 3)
+  emitirObjeto(db, 'config', 'app', lerConfig(db), ator)
   return { modelosRevisadosEm: instante }
 }

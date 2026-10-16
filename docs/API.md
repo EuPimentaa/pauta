@@ -402,7 +402,8 @@ ativos também vêm no bootstrap.
 #### `POST /api/modelos-demanda/revisados`
 - **Quem:** admin ("Revisei os modelos" dos Primeiros passos, na tela de modelos). Sem corpo. Grava
   `configuracao['passos.modelos_revisados_em'] = agora` (de novo, se apertar outra vez). **Resposta:** `200
-  ModelosRevisadosSaida`. Sem SSE (o front atualiza `['bootstrap'].config` pela resposta e invalida `['inicio']`).
+  ModelosRevisadosSaida`. **SSE:** `config` (objeto inteiro; quem apertou atualiza `['bootstrap'].config` pela
+  resposta e invalida `['inicio']`).
 
 ### 4.10 Clientes · núcleo (+ trilha em cadastros)
 

@@ -89,14 +89,16 @@ export interface PropsEstadoVazio {
   texto?: ReactNode
   acoes?: ReactNode
   tamanho?: 'p' | 'm'
+  /** Elemento do título: 'h1' quando o estado vazio é o conteúdo principal da tela (ex.: "Página não encontrada"). */
+  como?: 'p' | 'h1' | 'h2' | 'h3'
   className?: string
 }
 
-export function EstadoVazio({ icone: I, titulo, texto, acoes, tamanho = 'm', className }: PropsEstadoVazio) {
+export function EstadoVazio({ icone: I, titulo, texto, acoes, tamanho = 'm', como: Titulo = 'p', className }: PropsEstadoVazio) {
   return (
     <div className={cx('ui-vazio', className)} data-tamanho={tamanho}>
       {I && <div className="ui-vazio-icone" aria-hidden="true"><I /></div>}
-      <p className="ui-vazio-titulo">{titulo}</p>
+      <Titulo className="ui-vazio-titulo">{titulo}</Titulo>
       {texto && <p className="ui-vazio-texto">{texto}</p>}
       {acoes && <div className="ui-vazio-acoes">{acoes}</div>}
     </div>

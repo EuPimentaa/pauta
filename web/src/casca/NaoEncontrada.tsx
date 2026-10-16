@@ -11,6 +11,7 @@ export function NaoEncontrada() {
     <div className="grid flex-1 place-items-center p-6">
       <EstadoVazio
         icone={Compass}
+        como="h1"
         titulo="Página não encontrada."
         texto="O endereço pode ter mudado ou a página saiu do ar. Volte para o Início ou procure pelo menu."
         acoes={<Link to="/" {...propsBotao({ variante: 'secundario' })}>Ir para o Início</Link>}

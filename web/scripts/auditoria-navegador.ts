@@ -12,8 +12,9 @@
  *   - rolagem lateral: nenhuma.
  *
  *   node web/scripts/auditoria-navegador.ts --url http://localhost:5173 [--chrome <chrome.exe | http://127.0.0.1:9222>]
- *     [--capturas <pasta>] [--so claro|escuro] [--larguras 1440,390]
- *   Login opcional (casca e menu do avatar): AUDITORIA_EMAIL e AUDITORIA_SENHA no ambiente.
+ *     [--capturas <pasta>] [--so claro|escuro] [--larguras 1440,390] [--paginas /q/criacao,/d/12]
+ *   Login opcional (casca e menu do avatar): AUDITORIA_EMAIL e AUDITORIA_SENHA no ambiente. Com login, --paginas
+ *   audita também essas telas (o quadro e o modal de quem mexe neles).
  * Sai com código 1 se achar algum problema. Sem dependências: fala CDP direto (scripts/cdp.ts).
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -29,8 +30,10 @@ const { values: arg } = parseArgs({
     so: { type: 'string' },
     larguras: { type: 'string', default: '1440,390' },
     'max-tabs': { type: 'string', default: '600' },
+    paginas: { type: 'string', default: '' },
   },
 })
+const paginas = arg.paginas!.split(',').map((s) => s.trim()).filter(Boolean)
 const BASE = arg.url!.replace(/\/$/, '')
 const temas = (['claro', 'escuro'] as const).filter((t) => !arg.so || arg.so === t)
 const larguras = arg.larguras!.split(',').map(Number)
@@ -256,6 +259,11 @@ try {
             for (const p of await aba.avaliar<{ tipo: string; id: string; detalhe: string }[]>('window.__aud.textos()')) problemas.push({ onde: `menu do avatar ${sufixo}`, ...p })
             const paradas = await percorrerTab(aba, `menu do avatar ${sufixo}`, 30)
             resumo.push(`menu do avatar ${sufixo}: ${paradas} paradas no Tab`)
+          }
+          for (const caminho of paginas) {
+            await navegar(aba, `${BASE}${caminho}`, 2000)
+            if (arg.capturas) writeFileSync(join(arg.capturas, `${caminho.replace(/\W+/g, '-').replace(/^-+/, '')}-${sufixo}.png`), await capturar(aba))
+            await auditarPagina(aba, `${caminho} ${sufixo}`)
           }
         }
       } finally {

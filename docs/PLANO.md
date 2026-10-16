@@ -53,7 +53,8 @@ Sumário: [0 Regras](#0-regras-para-todos) · [1 Onda 1](#1-onda-1-núcleo-servi
    executado (claro e escuro, 1440 px e 390 px). Quem mexe no front roda também `npm run contraste --workspace web` e
    `npm run auditoria --workspace web -- --url <origem do seu Vite>` (Chrome headless próprio: percorre o `/dev/ui`,
    e com `AUDITORIA_EMAIL`/`AUDITORIA_SENHA` a casca e o menu do avatar, no Tab acusando parada sem anel de foco, e
-   mede contraste composto com a opacidade, pares não textuais, piso de tipo da marca e rolagem lateral).
+   mede contraste composto com a opacidade, pares não textuais, piso de tipo da marca e rolagem lateral). Quem mexe no
+   quadro, no card ou no modal acrescenta as telas: `-- --paginas /q/criacao,/d/<número>` (e as telas novas dela).
 9. **Segurança não é opcional:** nada de `dangerouslySetInnerHTML`; Markdown só pelo componente seguro do design system;
    texto de fora (WhatsApp, cliente) só como texto puro; URL só `https:`; caminho `M:\` nunca vira `href`.
 10. **`shared/**` só importa por caminho relativo com `.ts`** (`../tipos/index.ts`), nunca `@shared`: o alias existe só

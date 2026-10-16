@@ -217,6 +217,7 @@ function DemoCampos() {
 function DemoEscolhas() {
   const [itens, setItens] = useState([true, false, false])
   const [atalhos, setAtalhos] = useState(true)
+  const [avisos, setAvisos] = useState(false)
   const [concluida, setConcluida] = useState(true)
   const todos = itens.every(Boolean)
   const algum = itens.some(Boolean)
@@ -236,6 +237,7 @@ function DemoEscolhas() {
         </Checkbox>
         <Checkbox disabled>Desabilitado</Checkbox>
         <Interruptor ligado={atalhos} aoMudar={setAtalhos}>Atalhos de uma tecla</Interruptor>
+        <Interruptor ligado={avisos} aoMudar={setAvisos}>Avisos por e-mail</Interruptor>
         <Interruptor ligado={false} aoMudar={() => {}} desabilitado>Desabilitado</Interruptor>
         <Rotulo opcional>Rótulo solto</Rotulo>
       </div>

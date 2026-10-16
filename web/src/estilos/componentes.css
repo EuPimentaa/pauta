@@ -116,8 +116,10 @@
   .ui-check-caixa input { position: absolute; inset: -6px; width: 30px; height: 30px; margin: 0; opacity: 0; cursor: inherit; }
   .ui-check-caixa svg { width: 13px; height: 13px; stroke-width: 3; opacity: 0; transform: scale(.6); transition: opacity var(--dur-1) var(--ease), transform var(--dur-2) var(--ease); }
   .ui-check:hover .ui-check-caixa { border-color: var(--text-2); }
-  .ui-check-caixa:has(input:checked), .ui-check-caixa:has(input:indeterminate) { background: var(--accent); border-color: var(--accent); }
-  .ui-check-caixa[data-tom="sucesso"]:has(input:checked) { background: var(--success); border-color: var(--success); }
+  /* marcada: fundo na cor cheia e contorno na -ink, que fecha 3:1 contra a superfície em volta (o verde cheio dava 1,9:1
+     no claro; no escuro a -ink é a própria cor cheia) */
+  .ui-check-caixa:has(input:checked), .ui-check-caixa:has(input:indeterminate) { background: var(--accent); border-color: var(--accent-ink); }
+  .ui-check-caixa[data-tom="sucesso"]:has(input:checked) { background: var(--success); border-color: var(--success-ink); }
   .ui-check-caixa:has(input:checked) svg, .ui-check-caixa:has(input:indeterminate) svg { opacity: 1; transform: none; }
   .ui-check-caixa:has(input:disabled) { opacity: .5; }
   .ui-check-descricao { display: block; color: var(--text-3); font-size: var(--fs-meta); line-height: var(--lh-meta); margin-top: 2px; }
@@ -125,15 +127,16 @@
   .ui-interruptor { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text); font: 400 var(--fs-body) / var(--lh-body) var(--font); }
   .ui-interruptor-trilho {
     position: relative; flex: none; width: 36px; height: 20px; border-radius: var(--radius-full); padding: 0;
-    background: var(--border-strong); border: 1px solid var(--border-control);
+    background: var(--surface); border: 1px solid var(--border-control);
     transition: background-color var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
   }
+  /* desligado: bolinha --text-3 no trilho de superfície (5:1 ou mais nos dois temas; a branca no cinza dava 1,5:1) */
   .ui-interruptor-trilho::after {
     content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
-    background: var(--surface); box-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: transform var(--dur-2) var(--ease);
+    background: var(--text-3); transition: transform var(--dur-2) var(--ease), background-color var(--dur-2) var(--ease);
   }
   .ui-interruptor-trilho[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
-  .ui-interruptor-trilho[aria-checked="true"]::after { transform: translateX(16px); background: var(--melt-white); }
+  .ui-interruptor-trilho[aria-checked="true"]::after { transform: translateX(16px); background: var(--melt-white); box-shadow: 0 1px 2px rgb(0 0 0 / .25); }
   .ui-interruptor-trilho:disabled { opacity: .5; }
 
   /* ─────────────── chips: etiqueta e cliente ─────────────── */

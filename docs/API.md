@@ -630,7 +630,8 @@ Demanda excluída → `404`.
 
 #### `GET /api/demandas/:id/historico`
 Qualquer usuário. **Consulta:** `ListarHistoricoConsulta`. `200 Pagina<Atividade>` (mais novas primeiro). Omite
-`tempo.lancado` de outra pessoa (só o próprio ator e o admin veem). Demanda excluída → `404`.
+`tempo.lancado` de outra pessoa (só o próprio ator e o admin veem); "outra pessoa" é a **dona do apontamento**, não
+quem agiu (quem arquiva a demanda e para o cronômetro de outra pessoa não vê as horas dela). Demanda excluída → `404`.
 
 #### `POST /api/demandas/:id/comentarios`
 - **Corpo:** `CriarComentarioEntrada`. **Resposta:** `201 ComentarioSaida`.
@@ -650,8 +651,9 @@ Qualquer usuário. **Consulta:** `ListarHistoricoConsulta`. `200 Pagina<Atividad
 - **Atividade:** `checklist.criado`. **SSE:** `checklist`, `checklist_item`, `demanda` (contadores).
 
 #### `PATCH /api/checklists/:id` · `DELETE /api/checklists/:id`
-- **Corpo:** `EditarChecklistEntrada`. `DELETE` apaga com os itens (`204`). **Atividade:** `checklist.removido`.
-  **SSE:** `checklist` (upsert/delete), `demanda` (contadores).
+- **Corpo:** `EditarChecklistEntrada`. **Resposta:** `200 ChecklistComItens`. `DELETE` apaga com os itens (`204`).
+  **Atividade:** `checklist.removido`. **SSE:** `checklist` (upsert/delete), `checklist_item` (delete de cada item, no
+  `DELETE`), `demanda` (contadores).
 
 #### `POST /api/checklists/:id/itens`
 - **Corpo:** `CriarItensEntrada` (cada texto vira um item). **Resposta:** `201 ChecklistItem[]`.
@@ -664,6 +666,8 @@ Qualquer usuário. **Consulta:** `ListarHistoricoConsulta`. `200 Pagina<Atividad
 #### `POST /api/demandas/:id/anexos`
 - **Corpo:** `CriarAnexoEntrada` (link https, caminho de rede ou arquivo já enviado). Provedor detectado pelo host.
   **Resposta:** `201 Anexo`. **Atividade:** `anexo.adicionado`. **SSE:** `anexo`, `demanda` (`nAnexos`).
+- Comentário, checklist (e itens) e anexo numa demanda arquivada ou de quadro arquivado → `422 estado_invalido` (o
+  modal abre só para leitura). Lançar tempo numa arquivada continua permitido.
 
 #### `PATCH /api/anexos/:id` · `DELETE /api/anexos/:id`
 - **Quem:** editar: qualquer usuário; excluir: quem enviou, atendimento, admin. `DELETE` marca `excluido_em` (e o do
@@ -678,7 +682,8 @@ Qualquer usuário. **Consulta:** `ListarHistoricoConsulta`. `200 Pagina<Atividad
 - Copia título (ou o novo), descrição, cliente, AM, prioridade, estimativa, modelo e repetir; com `manter`:
   checklists (itens desmarcados; o de rodada não vai), etiquetas (as atuais, mapeadas por nome no destino, §5.6), membros,
   anexos de referência (link e caminho; arquivo reaproveita o mesmo `arquivo_id`) e datas. Nasce com rodada 1, sem
-  versões, comentários nem histórico; `origem='copia'`, `origemDemandaId`.
+  versões, comentários nem histórico; `origem='copia'`, `origemDemandaId`. O modelo só vai se valer no quadro de
+  destino; `repetir` só vai junto com as datas; com o AM original desativado, a cópia fica com o AM do cliente.
 - **Atividade:** `demanda.copiada` nas duas. **SSE/Notifica:** como `POST /api/demandas`.
 
 #### `POST /api/demandas/:id/cronometro` · `POST /api/cronometro/parar`

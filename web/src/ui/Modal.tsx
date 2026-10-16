@@ -82,7 +82,7 @@ export function Modal({
                 {descricao && <p id={idDescr} className="ui-modal-descricao">{descricao}</p>}
               </div>
               {acoesCabeca}
-              <BotaoIcone icone={X} rotulo="Fechar" atalho="esc" onClick={aoFechar} />
+              <BotaoIcone icone={X} rotulo="Fechar" atalho="esc" onClick={aoFechar} data-foco-por-ultimo="" />
             </div>
           )}
           <div className={cx('ui-modal-corpo', classeCorpo)}>{children}</div>
@@ -132,7 +132,7 @@ export function Folha({ aberto, aoFechar, titulo, rotulo, lado = 'baixo', semCab
         {!semCabecalho && (
           <div className="ui-folha-cabeca">
             <h2 id={idTitulo} className="ui-folha-titulo">{titulo}</h2>
-            <BotaoIcone icone={X} rotulo="Fechar" onClick={aoFechar} semDica />
+            <BotaoIcone icone={X} rotulo="Fechar" onClick={aoFechar} semDica data-foco-por-ultimo="" />
           </div>
         )}
         <div className={cx('ui-folha-corpo', classeCorpo)}>{children}</div>

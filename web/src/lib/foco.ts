@@ -13,8 +13,20 @@ export function focaveis(raiz: HTMLElement): HTMLElement[] {
 }
 
 /**
- * Enquanto `ativa`: põe o foco dentro de `ref` ([data-autofocus], senão o primeiro focável, senão o próprio contêiner),
- * prende o Tab ali (se `prender`) e, ao desativar, devolve o foco ao elemento que estava focado antes.
+ * Onde o foco entra numa camada: [data-autofocus]; senão o primeiro focável que não seja o "Fechar" do cabeçalho
+ * (marcado com data-foco-por-ultimo), ou seja, o primeiro campo de um formulário ou, num diálogo de confirmação, o
+ * Cancelar (a ação menos destrutiva vem antes no rodapé); senão o próprio "Fechar"; senão o contêiner.
+ */
+export function alvoDoFocoInicial(raiz: HTMLElement): HTMLElement {
+  const marcado = raiz.querySelector<HTMLElement>('[data-autofocus]')
+  if (marcado) return marcado
+  const lista = focaveis(raiz)
+  return lista.find((el) => !el.hasAttribute('data-foco-por-ultimo')) ?? lista[0] ?? raiz
+}
+
+/**
+ * Enquanto `ativa`: põe o foco dentro de `ref` (alvoDoFocoInicial), prende o Tab ali (se `prender`) e, ao desativar,
+ * devolve o foco ao elemento que estava focado antes.
  */
 export function useArmadilhaFoco(ref: RefObject<HTMLElement | null>, ativa: boolean, prender = true): void {
   useEffect(() => {
@@ -24,8 +36,7 @@ export function useArmadilhaFoco(ref: RefObject<HTMLElement | null>, ativa: bool
     if (!raiz) return
     const quadro = requestAnimationFrame(() => {
       if (raiz.contains(document.activeElement)) return
-      const alvo = raiz.querySelector<HTMLElement>('[data-autofocus]') ?? focaveis(raiz)[0] ?? raiz
-      alvo.focus({ preventScroll: true })
+      alvoDoFocoInicial(raiz).focus({ preventScroll: true })
     })
     function aoTeclar(e: KeyboardEvent) {
       if (!prender || e.key !== 'Tab' || !raiz) return

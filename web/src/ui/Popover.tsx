@@ -90,7 +90,7 @@ function PopoverFlutuante({ aberto, aoFechar, ancora, lado, alinhar, titulo, mos
       {mostrarTitulo && titulo && (
         <div className="ui-popover-titulo">
           <span>{titulo}</span>
-          <BotaoIcone icone={X} rotulo="Fechar" tamanho="p" onClick={aoFechar} semDica />
+          <BotaoIcone icone={X} rotulo="Fechar" tamanho="p" onClick={aoFechar} semDica data-foco-por-ultimo="" />
         </div>
       )}
       {children}

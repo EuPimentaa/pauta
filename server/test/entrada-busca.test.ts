@@ -1,7 +1,7 @@
 /** Busca (API.md §4.13, GET /api/busca): número, cliente, FTS sem acento, arquivadas, anonimizada e o tempo com 5 mil. */
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { markdownParaTexto, trechoCom } from '../src/servicos/entrada-busca.ts'
+import { markdownParaTexto, trechoCom, trechoDaDescricao } from '../src/servicos/entrada-busca.ts'
 import { ambiente } from './ajuda.ts'
 import { demandasEmMassa } from './entrada-ajuda.ts'
 
@@ -110,5 +110,50 @@ describe('trecho (puro)', () => {
     assert.match(t, /Vacinação aparece/)
     assert.match(t, /…$/)
     assert.equal(trechoCom('nada aqui', ['vacina']), null)
+  })
+
+  test('descrição de 100 mil "[" vira trecho em menos de 50 ms (sem regex quadrática)', () => {
+    const md = `zebralunar ${'['.repeat(99_980)}`
+    for (const f of [() => trechoDaDescricao(md, ['zebra']), () => trechoDaDescricao(md, ['nada']), () => markdownParaTexto('['.repeat(50_000))]) {
+      const t0 = performance.now()
+      f()
+      const ms = performance.now() - t0
+      assert.ok(ms < 50, `${ms.toFixed(1)} ms`)
+    }
+    assert.equal(trechoDaDescricao(md, ['zebra']), 'zebralunar…')
+    // o termo no fim de uma descrição longa ainda dá trecho (a janela vai até ele), com acento e sem caixa
+    const longa = `${'texto comum de briefing. '.repeat(400)}Fim com a **Vacinação** de outono.`
+    assert.match(trechoDaDescricao(longa, ['vacinacao'])!, /a Vacinação de outono\.$/)
+  })
+})
+
+describe('busca: sigla do cliente', () => {
+  test('"carrossel he" e "HE: carrossel" filtram o HE; a última palavra que não acha nada continua termo', async () => {
+    const a = await ambiente()
+    await a.criarDemanda({ titulo: 'Carrossel de vacinação' })
+    await a.criarDemanda({ titulo: 'Carrossel de outubro' })
+    await a.criarDemanda({ titulo: 'Carrossel do ICC', clienteId: a.clientes.icc.id })
+    await a.criarDemanda({ titulo: 'Carrossel sem cliente icc solto', clienteId: null })
+    const eu = a.como(a.pessoas.am)
+    const ids = async (q: string) => (await eu.get(`/api/busca?q=${encodeURIComponent(q)}`)).corpo.demandas
+      .map((d: { clienteId: string | null }) => d.clienteId)
+    assert.deepEqual(await ids('carrossel he'), [a.clientes.he.id, a.clientes.he.id])
+    assert.deepEqual(await ids('HE: carrossel'), [a.clientes.he.id, a.clientes.he.id])
+    assert.deepEqual(await ids('carrossel hospital evangélico'), [a.clientes.he.id, a.clientes.he.id])
+    assert.deepEqual(await ids('carrossel icc'), [a.clientes.icc.id], 'com o cliente no fim, só as dele')
+    // "solto icc": nenhuma do ICC tem "solto", então "icc" volta a ser termo e acha a sem cliente
+    assert.deepEqual(await ids('solto icc'), [null])
+  })
+
+  test('três descrições plantadas com "[" não travam a busca de outra pessoa', async () => {
+    const a = await ambiente()
+    const md = `zebralunar ${'['.repeat(99_980)}`
+    for (let i = 0; i < 3; i++) await a.criarDemanda({ titulo: `Plantada ${i}`, descricaoMd: md })
+    const t0 = performance.now()
+    const r = await a.como(a.pessoas.am).get('/api/busca?q=zebra')
+    const ms = performance.now() - t0
+    assert.equal(r.status, 200)
+    assert.equal(r.corpo.demandas.length, 3)
+    assert.ok(ms < 300, `${ms.toFixed(1)} ms`)
   })
 })

@@ -1,17 +1,23 @@
 /**
  * Busca de demandas (API.md §4.13, GET /api/busca; a fonte Demandas da paleta Cmd+K):
  * - `#4521` ou `4521` → o número exato primeiro;
- * - as primeiras palavras iguais a um apelido de cliente ("he", "hospital evangelico") filtram o cliente;
+ * - as primeiras palavras iguais a um apelido de cliente ("he", "hospital evangelico", também "HE:" como na criação
+ *   rápida) filtram o cliente; sem cliente no começo, as últimas ("carrossel he") também, se acharem alguma coisa;
  * - o resto vai ao FTS5 (título e descrição) por prefixo, sem acento ("acao" acha "Ação");
  * - nunca a anonimizada (nem pelo número); arquivadas e de quadro arquivado só com `incluirArquivadas`.
  * Ordem: abertas, depois concluídas, depois arquivadas; dentro de cada grupo, a relevância (título pesa mais).
- * O trecho é texto puro (Markdown e menções tirados) em volta do termo, quando ele está só na descrição.
+ * O trecho é texto puro (Markdown e menções tirados) em volta do termo, quando ele está só na descrição. A descrição
+ * aceita até 100 mil caracteres: o trecho sai de uma janela de JANELA_TRECHO em volta do termo (e as regexes de
+ * markdownParaTexto têm quantificadores limitados), para uma descrição cheia de '[' não travar o processo.
  */
 import type { BuscaConsulta, BuscaSaida, Id, ResultadoBuscaDemanda } from '../../../shared/tipos/index.ts'
 import { normalizarAlias } from '../../../shared/logica/texto.ts'
 import { todos, um, type Db } from '../db.ts'
 
 export const LIMITE_BUSCA = 20
+
+/** Tamanho da janela da descrição que vira trecho (em volta do primeiro termo, ou o começo). */
+export const JANELA_TRECHO = 2000
 
 interface LinhaBusca {
   id: string
@@ -40,12 +46,12 @@ export function markdownParaTexto(md: string): string {
   return md
     .replace(/\\([\\`*_[\]~<>|#+\-.!()])/g, (_, c: string) => String.fromCharCode(0xe000 + c.charCodeAt(0)))
     .replace(/@\[([^\]\n]{1,120})\]\(mencao:[A-Za-z0-9-]{1,64}\)/g, '@$1')
-    .replace(/\[([^\]\n]*)\]\((?:[^)\s]*)\)/g, '$1')
+    .replace(/\[([^\]\n]{0,200})\]\((?:[^)\s]{0,2000})\)/g, '$1')
     .replace(/^\s{0,3}(#{1,6}|>+|[-*+]|\d+[.)])\s+/gm, '')
     .replace(/(\*\*|__|~~|`+)/g, '')
     .replace(/(^|[\s(])[*_](\S)/g, '$1$2')
     .replace(/(\S)[*_](?=[\s).,;:!?]|$)/g, '$1')
-    .replace(/[-]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xe000))
+    .replace(/[\uE000-\uE0FF]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xe000))
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -83,13 +89,57 @@ export function trechoCom(texto: string, termos: string[]): string | null {
   return `${de > 0 ? '…' : ''}${texto.slice(de, ate).trim()}${ate < texto.length ? '…' : ''}`
 }
 
+const VARIANTES: Record<string, string> = {
+  a: 'aàáâãäå', e: 'eèéêë', i: 'iìíîï', o: 'oòóôõö', u: 'uùúûü', c: 'cç', n: 'nñ', y: 'yýÿ',
+}
+
+/** Posição, no texto original, do primeiro termo como começo de palavra (sem acento e sem caixa); -1 se não aparece. */
+function posicaoDoTermo(texto: string, termos: string[]): number {
+  let pos = -1
+  for (const t of termos) {
+    const padrao = [...normalizarAlias(t)]
+      .map((c) => (VARIANTES[c] ? `[${VARIANTES[c]}]` : c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+      .join('')
+    if (!padrao) continue
+    const m = new RegExp(`(^|[^\\p{L}\\p{N}])${padrao}`, 'iu').exec(texto)
+    if (m && (pos < 0 || m.index + m[1]!.length < pos)) pos = m.index + m[1]!.length
+  }
+  return pos
+}
+
+/** Trecho da descrição: só a janela em volta do termo (ou o começo) passa por markdownParaTexto e trechoCom. */
+export function trechoDaDescricao(md: string, termos: string[]): string | null {
+  if (!md || termos.length === 0) return null
+  let janela = md
+  if (md.length > JANELA_TRECHO) {
+    const pos = posicaoDoTermo(md, termos)
+    const ini = pos < 0 ? 0 : Math.max(0, pos - JANELA_TRECHO / 2)
+    janela = md.slice(ini, ini + JANELA_TRECHO)
+  }
+  return trechoCom(markdownParaTexto(janela), termos)
+}
+
+/** Cliente cujo apelido é exatamente estas palavras ("HE:" vale o mesmo que "HE", como na criação rápida). */
+function clientePorAlias(db: Db, palavras: string[]): Id | null {
+  const alias = normalizarAlias(palavras.join(' ').replace(/:$/, ''))
+  if (!alias) return null
+  return um<{ cliente_id: string }>(db, 'SELECT cliente_id FROM cliente_alias WHERE alias_norm = ?', alias)?.cliente_id ?? null
+}
+
 /** As primeiras palavras (até 4) que formam um apelido de cliente: o cliente e quantas palavras usou. */
 function clienteDoComeco(db: Db, palavras: string[]): { clienteId: Id; usadas: number } | null {
   for (let k = Math.min(4, palavras.length); k >= 1; k--) {
-    const alias = normalizarAlias(palavras.slice(0, k).join(' '))
-    if (!alias) continue
-    const l = um<{ cliente_id: string }>(db, 'SELECT cliente_id FROM cliente_alias WHERE alias_norm = ?', alias)
-    if (l) return { clienteId: l.cliente_id, usadas: k }
+    const clienteId = clientePorAlias(db, palavras.slice(0, k))
+    if (clienteId) return { clienteId, usadas: k }
+  }
+  return null
+}
+
+/** As últimas palavras (até 4, sobrando ao menos uma antes) que formam um apelido: "carrossel he". */
+function clienteDoFim(db: Db, palavras: string[]): { clienteId: Id; usadas: number } | null {
+  for (let k = Math.min(4, palavras.length - 1); k >= 1; k--) {
+    const clienteId = clientePorAlias(db, palavras.slice(palavras.length - k))
+    if (clienteId) return { clienteId, usadas: k }
   }
   return null
 }
@@ -99,7 +149,7 @@ function resultado(l: LinhaBusca, termos: string[]): ResultadoBuscaDemanda {
   return {
     id: l.id, numero: l.numero, titulo: l.titulo, clienteId: l.cliente_id, quadroId: l.quadro_id, colunaId: l.coluna_id,
     concluida: l.concluida_em !== null, arquivado: l.arquivado_em !== null || l.quadro_arquivado_em !== null,
-    trecho: tituloTem ? null : trechoCom(markdownParaTexto(l.descricao_md), termos),
+    trecho: tituloTem ? null : trechoDaDescricao(l.descricao_md, termos),
   }
 }
 
@@ -127,21 +177,38 @@ export function buscarDemandas(db: Db, c: BuscaConsulta): BuscaSaida {
     if (texto.startsWith('#')) return { demandas: achadas.map((l) => resultado(l, [])) }
   }
 
-  const palavras = texto.split(/\s+/)
-  const cliente = num ? null : clienteDoComeco(db, palavras)
-  const termos = termosDaBusca((cliente ? palavras.slice(cliente.usadas) : palavras).join(' '))
-  const filtrosCliente = cliente ? [...filtros, 'd.cliente_id = ?'] : filtros
-  const paramsCliente = cliente ? [...params, cliente.clienteId] : params
-
-  if (termos.length > 0) {
-    const consulta = termos.map((t) => `"${t}"*`).join(' AND ')
-    juntar(todos<LinhaBusca>(db, `
-      SELECT ${COLUNAS} FROM demanda_fts JOIN demanda d ON d.numero = demanda_fts.rowid JOIN quadro q ON q.id = d.quadro_id
-       WHERE demanda_fts MATCH ? AND ${filtrosCliente.join(' AND ')}
-       ORDER BY ${ordem}, bm25(demanda_fts, 8.0, 1.0), d.numero DESC LIMIT ?`, consulta, ...paramsCliente, limite + ja.size))
-  } else if (cliente) {
-    juntar(todos<LinhaBusca>(db, `SELECT ${COLUNAS} FROM demanda d JOIN quadro q ON q.id = d.quadro_id
-      WHERE ${filtrosCliente.join(' AND ')} ORDER BY ${ordem}, d.atualizado_em DESC LIMIT ?`, ...paramsCliente, limite))
+  const consultar = (clienteId: Id | null, termos: string[]): LinhaBusca[] => {
+    const f = clienteId ? [...filtros, 'd.cliente_id = ?'] : filtros
+    const p = clienteId ? [...params, clienteId] : params
+    if (termos.length > 0) {
+      const consulta = termos.map((t) => `"${t}"*`).join(' AND ')
+      return todos<LinhaBusca>(db, `
+        SELECT ${COLUNAS} FROM demanda_fts JOIN demanda d ON d.numero = demanda_fts.rowid JOIN quadro q ON q.id = d.quadro_id
+         WHERE demanda_fts MATCH ? AND ${f.join(' AND ')}
+         ORDER BY ${ordem}, bm25(demanda_fts, 8.0, 1.0), d.numero DESC LIMIT ?`, consulta, ...p, limite + ja.size)
+    }
+    if (!clienteId) return []
+    return todos<LinhaBusca>(db, `SELECT ${COLUNAS} FROM demanda d JOIN quadro q ON q.id = d.quadro_id
+      WHERE ${f.join(' AND ')} ORDER BY ${ordem}, d.atualizado_em DESC LIMIT ?`, ...p, limite)
   }
-  return { demandas: achadas.map((l) => resultado(l, termos)) }
+  const responder = (linhas: LinhaBusca[], termos: string[]): BuscaSaida => {
+    juntar(linhas)
+    return { demandas: achadas.map((l) => resultado(l, termos)) }
+  }
+
+  const palavras = texto.split(/\s+/)
+  const comeco = num ? null : clienteDoComeco(db, palavras)
+  if (comeco) {
+    const termos = termosDaBusca(palavras.slice(comeco.usadas).join(' '))
+    return responder(consultar(comeco.clienteId, termos), termos)
+  }
+  // a sigla no fim ("carrossel he") só filtra se achar alguma coisa; senão a palavra era do título
+  const fim = num ? null : clienteDoFim(db, palavras)
+  if (fim) {
+    const termos = termosDaBusca(palavras.slice(0, palavras.length - fim.usadas).join(' '))
+    const comCliente = consultar(fim.clienteId, termos)
+    if (comCliente.length > 0) return responder(comCliente, termos)
+  }
+  const termos = termosDaBusca(texto)
+  return responder(consultar(null, termos), termos)
 }

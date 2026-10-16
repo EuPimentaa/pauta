@@ -599,9 +599,12 @@ dia da semana e "amanhã" contam do dia da mensagem, prazo que já passou não �
 
 #### `GET /api/busca`
 Qualquer usuário. **Consulta:** `BuscaConsulta`. `200 BuscaSaida` (até 20). `#4521`/`4521` → número exato primeiro;
-o maior começo do texto (até 4 palavras) igual a um apelido de cliente filtra o cliente; o resto vai ao FTS5 (título e descrição) por prefixo,
-sem acento. Sempre `excluido_em IS NULL` (a anonimizada nunca aparece, nem pelo número). Arquivadas e de quadros
-arquivados só com `incluirArquivadas`. Meta: menos de 150 ms com 5 mil demandas.
+o maior começo do texto (até 4 palavras, com ou sem os dois-pontos da criação rápida: `HE: carrossel`) igual a um
+apelido de cliente filtra o cliente; sem cliente no começo, o maior fim (até 4 palavras, sobrando ao menos uma) igual a
+um apelido também filtra (`carrossel he`), mas só quando acha alguma demanda (senão a palavra volta a ser termo); o
+resto vai ao FTS5 (título e descrição) por prefixo, sem acento. O `trecho` sai de uma janela de 2.000 caracteres da
+descrição em volta do termo (a descrição aceita 100 mil). Sempre `excluido_em IS NULL` (a anonimizada nunca aparece, nem
+pelo número). Arquivadas e de quadros arquivados só com `incluirArquivadas`. Meta: menos de 150 ms com 5 mil demandas.
 
 ### 4.14 Arquivos · núcleo
 

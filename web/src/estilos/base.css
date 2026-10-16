@@ -10,13 +10,17 @@
     font: 400 var(--fs-body) / var(--lh-body) var(--font);
     -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
     font-synthesis-weight: none;
+    /* A Syne vem com algarismos de estilo antigo (o 3 desce da linha, o 1 é baixo): contadores, #número, 0/5 e 13/10
+       ficavam tortos nas pílulas. Ela tem `lnum` e `tnum`; o lnum vai por font-feature-settings porque o atalho
+       `font:` (usado em quase todo componente) zera o font-variant-numeric e não zera esta propriedade (herdada). */
+    font-feature-settings: "lnum" 1;
   }
   #root { min-height: 100%; isolation: isolate; }
   h1, h2, h3, h4 { letter-spacing: var(--tracking-titulo); }
   ::selection { background: var(--accent-soft); color: var(--text); }
   :focus { outline: none; }
-  /* contadores, datas e valores (marca §4) */
-  .tabular { font-variant-numeric: tabular-nums; }
+  /* contadores, datas e valores (marca §4): tabulares e alinhados à linha */
+  .tabular { font-variant-numeric: lining-nums tabular-nums; }
   input, textarea, select, button { font: inherit; color: inherit; }
   button { cursor: pointer; }
   button:disabled { cursor: not-allowed; }

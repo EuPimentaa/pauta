@@ -127,7 +127,7 @@ export function SecaoTipografia() {
           </div>
         ))}
       </div>
-      <Nota>Syne 400–700 hospedada no app. Nunca 800, nunca peso trocado no hover (a Syne alarga). Contadores com <code>tabular-nums</code>.</Nota>
+      <Nota>Syne 400–700 hospedada no app. Nunca 800, nunca peso trocado no hover (a Syne alarga). Algarismos alinhados à linha em tudo (<code>lnum</code>; os de estilo antigo da Syne entortavam as pílulas) e tabulares nos contadores (<code>tnum</code>).</Nota>
     </Amostra>
   )
 }

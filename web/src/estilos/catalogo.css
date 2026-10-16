@@ -22,7 +22,7 @@
     display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 6px 10px; border-radius: 8px;
     color: var(--text-2); text-decoration: none; font: 500 var(--fs-body) / 1.3 var(--font);
   }
-  .cat-nav a span { width: 18px; color: var(--text-3); font-size: var(--fs-meta); font-variant-numeric: tabular-nums; }
+  .cat-nav a span { width: 18px; color: var(--text-3); font-size: var(--fs-meta); font-variant-numeric: lining-nums tabular-nums; }
   .cat-nav a:hover { background: var(--veu-1); color: var(--text); }
   .cat-nav a[aria-current="true"] { background: var(--accent-soft); color: var(--text); }
 
@@ -34,7 +34,7 @@
   .cat-secao { scroll-margin-top: 76px; padding-top: var(--space-8); }
   .cat-secao + .cat-secao { margin-top: var(--space-6); border-top: 1px solid var(--border); }
   .cat-secao-cabeca { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
-  .cat-secao-cabeca span { color: var(--text-3); font: 500 var(--fs-meta) / 1 var(--font); font-variant-numeric: tabular-nums; }
+  .cat-secao-cabeca span { color: var(--text-3); font: 500 var(--fs-meta) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; }
   .cat-secao h2 { font: 600 var(--fs-h2) / var(--lh-h2) var(--font); letter-spacing: var(--tracking-titulo); }
   .cat-secao-descricao { max-width: 76ch; margin-bottom: var(--space-5); color: var(--text-2); }
   .cat-secao-descricao code, .cat-nota code, .cat-abertura code {
@@ -95,7 +95,7 @@
   }
   .cat-agenda-item > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* a hora vai na tinta cheia (com opacidade ficava abaixo de AA); o que a separa do título são os números tabulares */
-  .cat-agenda-item b { font-weight: 500; font-variant-numeric: tabular-nums; }
+  .cat-agenda-item b { font-weight: 500; font-variant-numeric: lining-nums tabular-nums; }
   .cat-menu-contexto {
     display: grid; place-items: center; height: 96px; border-radius: var(--radius-md); border: 1.5px dashed var(--border-strong);
     color: var(--text-2); font-size: var(--fs-meta); text-align: center; padding: 0 var(--space-4); user-select: none;

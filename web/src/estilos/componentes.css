@@ -185,7 +185,7 @@
   /* ─────────────── contador, progresso, kbd ─────────────── */
   .ui-contador {
     display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 7px; border-radius: var(--radius-full);
-    background: var(--surface); color: var(--text-2); font: 600 var(--fs-meta) / 1 var(--font); font-variant-numeric: tabular-nums;
+    background: var(--surface); color: var(--text-2); font: 600 var(--fs-meta) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums;
     box-shadow: 0 0 0 1px var(--border);
   }
   .ui-contador[data-tom="destaque"] { background: var(--accent-soft); color: var(--accent-ink); box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent); }
@@ -199,7 +199,7 @@
     transition: width var(--dur-3) var(--ease), background-color var(--dur-2) var(--ease);
   }
   .ui-progresso[data-completo="true"] .ui-progresso-barra { background: var(--success); }
-  .ui-progresso-rotulo { font: 500 var(--fs-meta) / 1 var(--font); color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .ui-progresso-rotulo { font: 500 var(--fs-meta) / 1 var(--font); color: var(--text-2); font-variant-numeric: lining-nums tabular-nums; }
 
   .ui-kbd { display: inline-flex; gap: 3px; align-items: center; }
   .ui-kbd kbd {

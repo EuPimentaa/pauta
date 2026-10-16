@@ -21,7 +21,7 @@
   .cal-chip:hover { background: var(--surface-hover); }
   .cal-chip svg { width: 12px; height: 12px; flex: none; color: var(--text-2); }
   .cal-chip-ponto { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--cor-ponto); }
-  .cal-chip-hora { flex: none; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .cal-chip-hora { flex: none; color: var(--text-2); font-variant-numeric: lining-nums tabular-nums; }
   .cal-chip-titulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cal-chip[data-concluida="true"] .cal-chip-titulo { text-decoration: line-through; color: var(--text-2); }
   .cal-chip[data-campo="inicio"], .cal-chip[data-campo="publicacao"] { background: var(--surface-sunken); }

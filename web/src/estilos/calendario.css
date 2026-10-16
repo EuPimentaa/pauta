@@ -22,7 +22,7 @@
   .ui-cal-cabeca { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 2px; }
   .ui-cal-num {
     display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 4px; border-radius: var(--radius-full);
-    font: 600 var(--fs-meta) / 1 var(--font); font-variant-numeric: tabular-nums; color: var(--text);
+    font: 600 var(--fs-meta) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; color: var(--text);
   }
   .ui-cal-dia[data-hoje="true"] .ui-cal-num { background: var(--accent); color: var(--on-accent); }
   .ui-cal-feriado {

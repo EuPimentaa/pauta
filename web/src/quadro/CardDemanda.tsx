@@ -144,7 +144,7 @@ export const CorpoCard = memo(function CorpoCard({ d, dados, agora, compacto, mo
       {/* etiquetas, cliente e número numa linha só (o card cabe em 88 px com prazo e título de uma linha) */}
       <div className="ui-cartao-topo">
         {marcaFeita && <span className="ui-cartao-feita" role="img" aria-label="Concluída"><Check aria-hidden="true" /></span>}
-        {!compacto && dados.etiquetas.map((e) => <ChipEtiqueta key={e.id} etiqueta={e} recolhida={recolhidas} aoClicar={alternarEtiquetas} />)}
+        {!compacto && dados.etiquetas.map((e) => <ChipEtiqueta key={e.id} etiqueta={e} recolhida={recolhidas} aoClicar={alternarEtiquetas} tabIndex={-1} />)}
         {dados.cliente && <ChipCliente cliente={dados.cliente} />}
         <span className="ui-cartao-numero">#{d.numero}</span>
         {mostrarQuadro && dados.quadro && (

@@ -15,10 +15,15 @@ export interface PropsChipEtiqueta {
   recolhida?: boolean
   /** Clicar recolhe/expande todas (o estado fica com quem desenha o card). */
   aoClicar?(): void
+  /**
+   * Fora da ordem do Tab (-1): no card do quadro o chip é um atalho do mouse; o teclado anda de card em card (foco
+   * itinerante) e cada etiqueta seria uma parada a mais.
+   */
+  tabIndex?: number
   className?: string
 }
 
-export function ChipEtiqueta({ etiqueta, recolhida, aoClicar, className }: PropsChipEtiqueta) {
+export function ChipEtiqueta({ etiqueta, recolhida, aoClicar, tabIndex, className }: PropsChipEtiqueta) {
   const nome = etiqueta.nome.trim()
   const descricao = nome ? `Etiqueta ${nome}` : `Etiqueta ${ROTULO_COR[etiqueta.cor].toLowerCase()}`
   const soCor = !nome && !recolhida
@@ -31,7 +36,7 @@ export function ChipEtiqueta({ etiqueta, recolhida, aoClicar, className }: Props
   }
   const el = aoClicar ? (
     <button type="button" {...props} aria-label={recolhida || !nome ? `${descricao}. Clique para ${recolhida ? 'mostrar' : 'recolher'} os nomes` : undefined}
-      aria-pressed={!recolhida} onClick={(e) => { e.stopPropagation(); aoClicar() }}>
+      aria-pressed={!recolhida} tabIndex={tabIndex} onClick={(e) => { e.stopPropagation(); aoClicar() }}>
       {conteudo}
     </button>
   ) : (

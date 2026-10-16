@@ -155,4 +155,17 @@ describe('colar-whatsapp (puro)', () => {
     assert.equal(x.modelos[0]!.id, 'v')
     assert.equal(x.tituloSugerido, 'Vídeo')
   })
+
+  test('50 mil espaços (ou vírgulas) numa linha são analisados em menos de 50 ms (sem regex quadrática no título)', () => {
+    for (const recheio of [' ', ',', '-']) {
+      const texto = `Banner bonito${recheio.repeat(49_900)}x`
+      const t0 = performance.now()
+      const x = analisarConversa(texto, { clientes: [], modelos: [], hoje: '2026-10-16' })
+      const ms = performance.now() - t0
+      assert.ok(ms < 50, `${JSON.stringify(recheio)}: ${ms.toFixed(1)} ms`)
+      assert.ok(x.tituloSugerido.startsWith('Banner bonito'))
+      assert.ok(x.tituloSugerido.length <= 80)
+    }
+    assert.equal(tituloDaConversa(lerConversa('Banner para a feira, até sexta', '2026-10-16')), 'Banner para a feira', 'o prazo no fim continua saindo')
+  })
 })

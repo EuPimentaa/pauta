@@ -115,6 +115,9 @@ export function tituloDaConversa(msgs: readonly MensagemConversa[]): string {
   let t = escolhida.replace(/^\[?[A-Z][A-Z0-9]{1,11}\]?\s*(?::|\s[-–—])\s+/, '').replace(PEDIDO, '').replace(/^[\s:,;–—-]+/, '')
   const fimFrase = /[.!?;](\s|$)/.exec(t)
   if (fimFrase && fimFrase.index >= 12) t = t.slice(0, fimFrase.index)
+  // a conversa aceita 50 mil caracteres numa linha só: as duas regexes do fim abaixo voltam muito numa sequência longa
+  // de espaços ou pontuação (2 s de CPU), então o título já vai curto para elas (ele fica com 80 no fim)
+  t = t.replace(/\s+/g, ' ').slice(0, 200)
   t = t
     // o prazo no fim ("…, até sexta") vai para o campo Prazo, não para o título
     .replace(/[\s,;–—-]+(?:at[eé]|para|pra)\s+(?:(?:o\s+)?dia\s+)?(?:hoje|amanh[ãa]|depois de amanh[ãa]|segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)(?:-feira)?\s*[.!?]*$/i, '')

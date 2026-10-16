@@ -86,7 +86,6 @@
     transition: box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--ease), background-color var(--dur-2) var(--ease);
   }
   .ui-cartao:hover { box-shadow: var(--shadow-hover); border-color: var(--border-strong); }
-  .ui-cartao:focus-visible { box-shadow: var(--focus-ring), var(--shadow-hover); }
   .ui-cartao[data-selecionado="true"] { background: var(--accent-soft); border-color: var(--accent); }
   /* sobre o --accent-soft o --text-3 não fecha 4,5:1 no escuro: os metadados sobem para --text-2 */
   .ui-cartao[data-selecionado="true"] :is(.ui-cartao-numero, .ui-cartao-meta, .ui-prazo[data-estado="em_dia"]) { color: var(--text-2); }
@@ -145,4 +144,8 @@
   .ui-sinal[data-tom="perigo"] { background: var(--danger-bg); color: var(--danger-ink); }
   .ui-sinal[data-tom="cliente"] { background: var(--info-bg); color: var(--info-ink); }
   .ui-sinal[data-tom="extra"] { background: var(--label-roxo-bg); color: var(--label-roxo-ink); }
+}
+
+@layer foco {
+  .ui-cartao:focus-visible { box-shadow: var(--focus-ring), var(--shadow-hover); }
 }

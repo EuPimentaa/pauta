@@ -12,7 +12,6 @@
   h1, h2, h3, h4 { letter-spacing: var(--tracking-titulo); }
   ::selection { background: var(--accent-soft); color: var(--text); }
   :focus { outline: none; }
-  :focus-visible { outline: none; box-shadow: var(--focus-ring); }
   /* contadores, datas e valores (marca §4) */
   .tabular { font-variant-numeric: tabular-nums; }
   input, textarea, select, button { font: inherit; color: inherit; }
@@ -20,7 +19,6 @@
   button:disabled { cursor: not-allowed; }
   [hidden] { display: none !important; }
   * { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
-  @media (forced-colors: active) { :focus-visible { outline: 2px solid Highlight; outline-offset: 2px; } }
 }
 
 @layer components {
@@ -31,7 +29,6 @@
     background: var(--surface-raised); color: var(--text); box-shadow: var(--shadow-pop);
     transform: translateY(-200%); transition: transform var(--dur-2) var(--ease);
   }
-  .pular-conteudo:focus-visible { transform: none; box-shadow: var(--focus-ring), var(--shadow-pop); }
 
   /* ---------- vidro fosco: só barra superior, menu lateral, popovers, menus e modal ---------- */
   .vidro {
@@ -75,4 +72,16 @@
   @media (forced-colors: active) { .marca-logo, .marca-e { background: CanvasText; } }
   /* barra assinatura: só no login, convite e redefinição (marca §3.1) */
   .barra-assinatura { display: block; height: 3px; background: url('/marca/bar_rainbow.png') center / 100% 100% no-repeat; }
+}
+
+/*
+ * Foco visível (--focus-ring) numa camada acima de components e utilities (ordem em index.css). As regras de estado
+ * (selecionado, marcado, variante, coluna recolhida) mexem em box-shadow; na mesma camada que o anel, venciam pela
+ * especificidade e o apagavam. Aqui só entram regras de :focus-visible: o componente que precisa de outro anel (inset
+ * numa lista que corta o de fora, sobre o fundo inverso do aviso) escreve o dele também em @layer foco, no próprio CSS.
+ */
+@layer foco {
+  :focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .pular-conteudo:focus-visible { transform: none; box-shadow: var(--focus-ring), var(--shadow-pop); }
+  @media (forced-colors: active) { :focus-visible { outline: 2px solid Highlight; outline-offset: 2px; } }
 }

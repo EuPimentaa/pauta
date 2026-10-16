@@ -16,6 +16,8 @@
  * editor.css (componentes pesados) e catalogo.css (/dev/ui).
  */
 @import "tailwindcss";
+/* ordem das camadas: o foco (estilos/base.css) fica por cima de tudo, para nenhuma regra de estado apagar o anel */
+@layer theme, base, components, utilities, foco;
 @import "./estilos/fontes.css";
 @import "./estilos/tokens.css";
 @import "./estilos/base.css";

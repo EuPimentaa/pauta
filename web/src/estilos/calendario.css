@@ -19,7 +19,6 @@
   .ui-cal-dia[data-fora="true"] { background: color-mix(in oklab, var(--surface-sunken) 80%, var(--surface)); }
   .ui-cal-dia[data-fora="true"] .ui-cal-num { color: var(--text-3); }
   .ui-cal-dia[data-sobre="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
-  .ui-cal-dia:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); z-index: 1; }
   .ui-cal-cabeca { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 2px; }
   .ui-cal-num {
     display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 4px; border-radius: var(--radius-full);
@@ -33,7 +32,8 @@
   .ui-cal-itens { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .ui-cal-mais { align-self: flex-start; padding: 2px 6px; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--text-2); font: 500 var(--fs-meta) / 1.2 var(--font); }
   .ui-cal-mais:hover { background: var(--veu-1); color: var(--text); }
-  .ui-cal-item { min-width: 0; touch-action: manipulation; }
+  /* o raio é o do item desenhado (chip --radius-xs): o anel de foco acompanha o contorno */
+  .ui-cal-item { min-width: 0; border-radius: var(--radius-xs); touch-action: manipulation; }
   .ui-cal-item[data-arrastavel="true"] { cursor: grab; }
   .ui-cal-item[data-arrastando="true"] { opacity: .35; }
   .ui-cal-fantasma { cursor: grabbing; transform: rotate(2deg); box-shadow: var(--shadow-drag); border-radius: var(--radius-md); }
@@ -44,4 +44,8 @@
     .ui-cal-dia { padding: 4px 2px; align-items: center; }
     .ui-cal-feriado { display: none; }
   }
+}
+
+@layer foco {
+  .ui-cal-dia:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); z-index: 1; }
 }

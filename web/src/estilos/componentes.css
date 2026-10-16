@@ -24,13 +24,11 @@
     box-shadow: inset 0 1px 0 rgb(255 255 255 / .22), 0 1px 2px rgb(190 57 0 / .28), 0 0 0 1px rgb(190 57 0 / .18);
   }
   .ui-botao[data-variante="primario"]:hover:not(:disabled) { background: var(--accent-hover); }
-  .ui-botao[data-variante="primario"]:focus-visible { box-shadow: var(--focus-ring); }
 
   .ui-botao[data-variante="secundario"] {
     background: var(--surface); border-color: var(--border-strong); box-shadow: var(--shadow-card);
   }
   .ui-botao[data-variante="secundario"]:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-control); }
-  .ui-botao[data-variante="secundario"]:focus-visible { box-shadow: var(--focus-ring); }
 
   .ui-botao[data-variante="ghost"] { color: var(--text-2); }
   .ui-botao[data-variante="ghost"]:hover:not(:disabled) { background: var(--veu-1); color: var(--text); }
@@ -86,7 +84,8 @@
   .ui-entrada:hover { border-color: var(--text-3); }
   .ui-entrada:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent); }
   .ui-entrada[data-invalido="true"] { border-color: var(--danger-ink); }
-  .ui-entrada[data-invalido="true"]:focus-within { box-shadow: 0 0 0 3px color-mix(in oklab, var(--danger) 22%, transparent); }
+  /* inválido com foco: a borda dobra (1 px a mais na cor do erro) e ganha o halo; só o halo de 22% quase não se via */
+  .ui-entrada[data-invalido="true"]:focus-within { box-shadow: 0 0 0 1px var(--danger-ink), 0 0 0 4px color-mix(in oklab, var(--danger) 28%, transparent); }
   .ui-entrada[data-desabilitado="true"] { background: var(--surface-sunken); border-color: var(--border-strong); color: var(--text-disabled); }
   .ui-entrada > svg { width: 16px; height: 16px; flex: none; color: var(--text-3); }
   .ui-entrada input, .ui-entrada textarea, .ui-entrada select {
@@ -94,7 +93,6 @@
     font: 400 var(--fs-body) / var(--lh-body) var(--font);
   }
   .ui-entrada input::placeholder, .ui-entrada textarea::placeholder { color: var(--text-3); opacity: 1; }
-  .ui-entrada input:focus-visible, .ui-entrada textarea:focus-visible, .ui-entrada select:focus-visible { box-shadow: none; }
   .ui-entrada-texto { align-items: stretch; padding: 0; }
   .ui-entrada-texto textarea {
     height: auto; padding: 9px var(--space-3); resize: vertical; min-height: calc(var(--linhas, 3) * var(--lh-body) + 18px);
@@ -121,7 +119,6 @@
   .ui-check-caixa:has(input:checked), .ui-check-caixa:has(input:indeterminate) { background: var(--accent); border-color: var(--accent); }
   .ui-check-caixa[data-tom="sucesso"]:has(input:checked) { background: var(--success); border-color: var(--success); }
   .ui-check-caixa:has(input:checked) svg, .ui-check-caixa:has(input:indeterminate) svg { opacity: 1; transform: none; }
-  .ui-check-caixa:has(input:focus-visible) { box-shadow: var(--focus-ring); }
   .ui-check-caixa:has(input:disabled) { opacity: .5; }
   .ui-check-descricao { display: block; color: var(--text-3); font-size: var(--fs-meta); line-height: var(--lh-meta); margin-top: 2px; }
 
@@ -268,7 +265,6 @@
   .ui-cor:hover { transform: scale(1.06); }
   .ui-cor svg { width: 16px; height: 16px; stroke-width: 3; filter: drop-shadow(0 1px 1px rgb(0 0 0 / .35)); }
   .ui-cor[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 4px var(--cor); }
-  .ui-cor[aria-checked="true"]:focus-visible, .ui-cor:focus-visible { box-shadow: var(--focus-ring); }
   .ui-cor[data-cor="nenhuma"] {
     background: var(--surface); color: var(--text-2);
     background-image: linear-gradient(135deg, transparent calc(50% - 1px), var(--danger-ink) calc(50% - 1px), var(--danger-ink) calc(50% + 1px), transparent calc(50% + 1px));
@@ -310,8 +306,17 @@
     background: color-mix(in oklab, var(--text-inverse) 12%, transparent); color: var(--text-inverse); font: 600 13px / 1 var(--font);
   }
   .ui-aviso-acao:hover { background: color-mix(in oklab, var(--text-inverse) 20%, transparent); }
-  .ui-aviso-acao:focus-visible, .ui-aviso-fechar:focus-visible { box-shadow: 0 0 0 2px var(--surface-inverse), 0 0 0 4px var(--accent); }
   .ui-aviso-fechar { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; border: 0; background: transparent; color: var(--text-inverse); opacity: .7; }
   .ui-aviso-fechar:hover { opacity: 1; background: color-mix(in oklab, var(--text-inverse) 10%, transparent); }
   .ui-aviso-fechar svg { width: 15px; height: 15px; }
+}
+
+/* foco (camada acima das regras de estado; base.css): os casos que não usam o anel padrão */
+@layer foco {
+  /* o campo mostra o foco na moldura (.ui-entrada:focus-within); a caixa do checkbox, no lugar do input invisível */
+  .ui-entrada input:focus-visible, .ui-entrada textarea:focus-visible, .ui-entrada select:focus-visible { box-shadow: none; }
+  .ui-check-caixa:has(input:focus-visible) { box-shadow: var(--focus-ring); }
+  /* abas: a lista rola na horizontal e cortaria o anel de fora */
+  .ui-aba:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+  .ui-aviso-acao:focus-visible, .ui-aviso-fechar:focus-visible { box-shadow: 0 0 0 2px var(--surface-inverse), 0 0 0 4px var(--accent); }
 }

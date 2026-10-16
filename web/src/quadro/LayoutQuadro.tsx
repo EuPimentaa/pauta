@@ -433,7 +433,7 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
           <NovaColuna quadroId={quadro.id} aberta={novaColunaAberta} setAberta={setNovaColunaAberta} />
         </div>
         {createPortal(
-          // acima da barra e das abas do celular, abaixo dos popovers e do modal (--z-popover 60, --z-modal 70)
+          // acima da barra e das abas do celular, abaixo dos popovers e do modal (--z-popover e --z-modal: 70)
           <DragOverlay zIndex={55} dropAnimation={ANIMACAO_SOLTAR}>
             {ativoCard ? (
               <div className="cartao-sobreposto" inert style={{ ['--largura-arraste' as string]: `${ativo!.largura}px` }}>

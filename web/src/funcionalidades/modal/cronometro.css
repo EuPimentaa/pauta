@@ -27,15 +27,6 @@
 
 }
 
-/*
- * Contorno (pedido ao DESIGN-SYSTEM-WEB em docs/pedidos/modal.md): popover, menu e lista aberta POR CIMA de um modal
- * (o ··· do modal da demanda, os seletores do painel, o combobox) ficavam atrás dele (--z-popover 60 < --z-modal 70).
- * As camadas abertas depois de um modal sobem um degrau acima dele. Fica aqui porque este CSS viaja com o registro.
- */
-@layer components {
-  .ui-modal-posicao ~ .ui-popover { z-index: calc(var(--z-modal) + 1); }
-}
-
 @layer foco {
   .mdl-topo-abrir:focus-visible, .mdl-topo-parar:focus-visible { box-shadow: 0 0 0 2px var(--surface-inverse), 0 0 0 4px var(--accent); }
 }

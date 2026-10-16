@@ -86,8 +86,7 @@
   .mdl-item:hover .mdl-item-alca, .mdl-item-alca:focus-visible { opacity: 1; }
   .mdl-item-alca svg { width: 14px; height: 14px; }
   .mdl-item .ui-check-caixa { margin-top: 2px; }
-  /* o ícone fica por cima do input invisível e comia o clique no meio da caixa (pedido ao DS em docs/pedidos/modal.md) */
-  .mdl-item .ui-check-caixa svg, .mdl-escolha svg { pointer-events: none; }
+  .mdl-escolha svg { pointer-events: none; }
   .mdl-item-texto {
     min-width: 0; padding: 1px 6px; margin: 0 -2px; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--text);
     font: 400 var(--fs-body) / var(--lh-body) var(--font); text-align: left; cursor: text; overflow-wrap: anywhere; white-space: pre-wrap;

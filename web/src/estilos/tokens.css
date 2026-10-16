@@ -191,7 +191,9 @@
 
   /* ---------- casca e camadas ---------- */
   --topo-h: 56px; --menu-w: 264px; --menu-w-recolhido: 64px; --abas-h: 64px;
-  --z-menu: 30; --z-topo: 40; --z-faixa: 45; --z-abas: 50; --z-popover: 60; --z-modal: 70; --z-aviso: 80; --z-tooltip: 90;
+  /* popover e modal na mesma camada: dentro do #pauta-camadas a ordem de abertura decide quem fica por cima (o menu
+     aberto de dentro de um modal fica sobre ele; o modal aberto de dentro de um popover, sobre o popover) */
+  --z-menu: 30; --z-topo: 40; --z-faixa: 45; --z-abas: 50; --z-popover: 70; --z-modal: 70; --z-aviso: 80; --z-tooltip: 90;
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"]  { color-scheme: dark; --glass-bg-topo: var(--glass-bg-topo-escuro); }

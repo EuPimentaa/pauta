@@ -1,0 +1,43 @@
+# Pedidos do F1 · MODAL (Onda 3)
+
+Mudanças em arquivos de outros donos que o modal completo precisa. Nada aqui bloqueia o merge: cada item diz o
+contorno em uso.
+
+## 1. Popover e menu abertos sobre um modal ficam atrás dele (DESIGN-SYSTEM-WEB · `web/src/estilos/tokens.css` ou `sobreposicoes.css`)
+
+**Pedido:** a camada aberta depois de um modal tem de ficar acima dele. Hoje `.ui-popover` usa `--z-popover` (60) e
+`.ui-modal-posicao`/`.ui-scrim` usam `--z-modal` (70); como as duas vão para `#pauta-camadas`, todo popover, menu ou
+lista aberto de dentro de um modal fica **por trás** dele. Duas saídas, qualquer uma serve:
+- regra em `sobreposicoes.css`: `.ui-modal-posicao ~ .ui-popover { z-index: calc(var(--z-modal) + 1); }`; ou
+- `--z-popover` acima de `--z-modal` (popover nunca abre por baixo de um modal; a folha do celular já usa `--z-modal`).
+
+**Por quê:** afeta o núcleo também. Medido no modal da demanda (`/d/22`, 1440 px): o menu ··· do NÚCLEO-WEB abria
+com `z-index: 60` atrás da janela (`z-index: 70`) e não aparecia; o mesmo com os seletores do painel lateral
+(membros, etiquetas, datas, capa), o `Combobox` e o `SeletorData` dentro de qualquer modal.
+
+**Contorno em uso:** a primeira regra acima, em `web/src/funcionalidades/modal/cronometro.css` (viaja com o registro,
+então vale desde a primeira abertura do modal). Com o pedido feito, apagar o bloco marcado "Contorno" de lá.
+
+## 2. `Checkbox` sem texto: o ícone come o clique no meio da caixa (DESIGN-SYSTEM-WEB · `web/src/estilos/componentes.css`)
+
+**Pedido:** `.ui-check-caixa svg { pointer-events: none; }`.
+
+**Por quê:** sem `children` o `Checkbox` é só a `span.ui-check-caixa` (não é `label`); o `svg` do check fica por
+cima do `input` invisível e recebe o clique no centro da caixa, que então não marca nada (`elementFromPoint` no
+centro devolve o `svg`). Com texto o `label` resolve, por isso a pílula "Concluída" não sofre.
+
+**Contorno em uso:** `.mdl-item .ui-check-caixa svg { pointer-events: none; }` em `web/src/funcionalidades/modal/modal.css`
+(os itens do checklist).
+
+## Avisos (não são pedidos)
+
+- **Painel lateral:** as linhas do F1 são filhas diretas de `.modal-demanda-lateral` (que tem `gap: 20px` para seções
+  grandes). O `modal.css` do F1 fecha o espaço só quando há linhas do F1 (`.modal-demanda-lateral:has(> .mdl-prop)`).
+- **Respostas sem forma no contrato:** `PATCH /api/checklists/:id` devolve `200 ChecklistComItens` e `DELETE /api/checklists/:id`
+  emite também o `delete` de cada item (os tratadores do F1 tiram o checklist e os itens do detalhe aberto).
+- **F3 (`GET /api/notificacoes`):** o roteiro do F1 conferiu a notificação de menção pela tabela `notificacao` (a rota
+  é do F3 e não está nesta worktree). Os resumos saem como "Rafa mencionou você em #12 Carrossel: “trecho…”".
+- **Tela `/horas` (F3):** o diálogo `lancar-tempo` só precisa de `{ demandaId }`; ele lança para quem está logado e
+  atualiza `minutosRegistrados` do card e o "meu tempo" do detalhe aberto.
+- **Atalhos do F1:** M, L, D, T e Shift+M nos escopos `card` e `modal`. Nenhuma outra funcionalidade deve usar essas
+  teclas nesses escopos (C continua livre: no Trello ela arquiva).

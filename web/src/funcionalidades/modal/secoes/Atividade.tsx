@@ -12,7 +12,9 @@ import {
 import type { Anexo, Bootstrap, Comentario, Id } from '@shared/tipos/index.ts'
 import { pode } from '@shared/logica/permissoes.ts'
 import { fraseAtividade, type FraseAtividade } from '@shared/logica/modal-atividade.ts'
+import { useQueryClient } from '@tanstack/react-query'
 import type { ContextoDemanda } from '../../../extensoes/tipos.ts'
+import { chaves } from '../../../api/chaves.ts'
 import { useDoBootstrap } from '../../../api/seletores.ts'
 import { enviarArquivo } from '../../../api/arquivos.ts'
 import { abrirDialogo } from '../../../dialogos/estado.ts'
@@ -55,7 +57,8 @@ function Compositor({ ctx, aberto, abrir, fechar, prefixo }: {
 
   // "Responder": começa com a menção a quem escreveu
   useEffect(() => {
-    if (prefixo && !rascunho.includes(prefixo)) setRascunho(`${prefixo} ${rascunho}`.trimEnd() + ' ')
+    // o espaço depois da menção é não separável: o Markdown carregado no editor perderia um espaço comum no fim
+    if (prefixo && !rascunho.includes(prefixo)) setRascunho(`${prefixo}\u00a0${rascunho.trim()}`)
   }, [prefixo])
 
   async function colar(e: ClipboardEvent<HTMLDivElement>) {
@@ -227,6 +230,14 @@ const selQuadros = (b: Bootstrap) => b.quadros
 
 function ListaAtividade({ ctx }: { ctx: ContextoDemanda }) {
   const q = useHistorico(ctx.demanda.id)
+  const qc = useQueryClient()
+  // a demanda mudou (aqui ou em outra janela): o histórico busca de novo, juntando as mudanças de 600 ms
+  const primeira = useRef(true)
+  useEffect(() => {
+    if (primeira.current) { primeira.current = false; return }
+    const t = window.setTimeout(() => { void qc.invalidateQueries({ queryKey: chaves.historico(ctx.demanda.id) }) }, 600)
+    return () => window.clearTimeout(t)
+  }, [ctx.demanda, qc])
   const usuarios = useUsuarios()
   const colunas = useDoBootstrap(selColunas) ?? []
   const quadros = useDoBootstrap(selQuadros) ?? []

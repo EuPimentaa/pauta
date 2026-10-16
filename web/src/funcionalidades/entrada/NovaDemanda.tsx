@@ -67,11 +67,6 @@ interface Estado extends EstadoNovaDemanda {
   modeloSugerido: Id | null
   membroSugeridoId: Id | null
   estimativaTexto: string
-  /**
-   * Sobe quando a descrição é trocada sozinha (modelo, colagem): o editor monta de novo com o texto novo. Trocar o
-   * valor por fora deixava o "placeholder" do editor por cima do texto (docs/pedidos/entrada.md).
-   */
-  versaoDescricao: number
 }
 
 /** Texto que parece conversa do WhatsApp (cabeçalho) ou que tem várias linhas: vai para o Colar. */
@@ -103,7 +98,7 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
     const cliente = e.clienteId ? clientePorId.get(e.clienteId) ?? clienteExtra.current ?? null : null
     const auto = descricaoAutomatica(modelo, e.trecho)
     const x: Estado = { ...e, descricaoAuto: auto }
-    if (e.descricaoMd === e.descricaoAuto && e.descricaoMd !== auto) { x.descricaoMd = auto; x.versaoDescricao = e.versaoDescricao + 1 }
+    if (e.descricaoMd === e.descricaoAuto && e.descricaoMd !== auto) x.descricaoMd = auto
     if (!e.mexidos.has('prazo')) { x.prazo = e.prazoConversa?.data ?? prazoSugerido(modelo, hoje, feriados); x.prazoHora = null }
     if (!e.mexidos.has('prioridade')) x.prioridade = modelo?.prioridade ?? 'media'
     if (!e.mexidos.has('estimativa')) { x.estimativaMin = modelo?.estimativaMin ?? null; x.estimativaTexto = textoDeMinutos(x.estimativaMin) }
@@ -125,7 +120,7 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
       membroIds: [], etiquetaIds: null, descricaoMd: '', prioridade: 'media', inicio: null, prazo: null, prazoHora: null,
       publicacaoData: null, publicacaoHora: null, estimativaMin: null, repetir: 'nenhuma', origemTexto: null,
       mexidos: new Set(), descricaoAuto: '', trecho: '', colagem: null, siglaNova: null, senhaNoTexto: false,
-      modeloSugerido: null, membroSugeridoId: null, estimativaTexto: '', versaoDescricao: 0, prazoConversa: null,
+      modeloSugerido: null, membroSugeridoId: null, estimativaTexto: '', prazoConversa: null,
     }
     return recalcular(base)
   })
@@ -432,7 +427,6 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
             <div className="ui-campo-grupo">
               <span className="ui-rotulo">Descrição</span>
               <EditorMarkdown
-                key={estado.versaoDescricao}
                 rotulo="Descrição"
                 valor={estado.descricaoMd}
                 aoMudar={(md) => setEstado((e) => ({ ...e, descricaoMd: md }))}

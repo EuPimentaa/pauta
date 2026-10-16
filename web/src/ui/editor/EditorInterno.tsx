@@ -6,7 +6,7 @@
 import '../../estilos/editor.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { EditorContent, useEditor, type Editor } from '@tiptap/react'
+import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Mention from '@tiptap/extension-mention'
 import type { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion'
@@ -133,7 +133,10 @@ export default function EditorInterno({
     setSugestao(null)
   }
 
-  const vazio = editor?.isEmpty ?? !valor
+  // lido a cada transação (inclusive o setContent do valor trocado de fora, que não emite update nem renderiza): sem
+  // isso o texto de ajuda ficava por cima do texto novo até a próxima tecla
+  const vazioNoEditor = useEditorState({ editor, selector: ({ editor: ed }) => ed?.isEmpty ?? null })
+  const vazio = vazioNoEditor ?? !valor
   return (
     <div className={cx('ui-editor', className)} data-desabilitado={desabilitado || undefined}>
       {!semBarra && editor && <Barra editor={editor} />}

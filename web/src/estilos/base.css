@@ -1,6 +1,9 @@
 /* Base global: documento, foco, seleção, rolagem, vidro (marca §8) e as marcas (logo, "e", barra assinatura). */
 @layer base {
-  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scrollbar-gutter: stable; }
+  /* sem scrollbar-gutter no documento: a calha reservada ficava fora da barra superior fixa (que termina antes dela) e,
+     em toda tela sem rolagem (o quadro rola por dentro; o login cabe na tela), sobrava uma faixa de 10 px na cor do
+     canvas ao lado da barra escura. Quem rola por dentro (menu, colunas) reserva a calha no próprio contêiner. */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   html, body { height: 100%; }
   body {
     background: var(--bg); color: var(--text);

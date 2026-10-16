@@ -37,6 +37,7 @@
 
   /* ─────────────── menu lateral ─────────────── */
   .casca-menu {
+    --glass-bg: var(--glass-bg-menu);
     position: fixed; top: var(--topo-h); bottom: 0; left: 0; z-index: var(--z-menu); width: var(--menu-atual);
     display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden;
     transition: width var(--dur-3) var(--ease);
@@ -191,6 +192,7 @@
 
   /* ─────────────── abas do celular ─────────────── */
   .casca-abas {
+    --glass-bg: var(--glass-bg-menu);
     position: fixed; inset: auto 0 0 0; z-index: var(--z-abas); display: flex; align-items: stretch; justify-content: space-around;
     height: calc(var(--abas-h) + env(safe-area-inset-bottom)); padding: 0 4px env(safe-area-inset-bottom);
     border-top: 1px solid var(--border);
@@ -199,10 +201,10 @@
     position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
     min-width: 0; border: 0; background: transparent; color: var(--text-2); text-decoration: none; font: 500 var(--fs-meta) / 1 var(--font);
   }
-  .casca-aba svg { width: 22px; height: 22px; }
-  .casca-aba[aria-current="page"] { color: var(--text); }
   /* rótulo da aba: corta com reticências em vez de empurrar as vizinhas */
   .casca-aba > span:nth-child(2) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .casca-aba svg { width: 22px; height: 22px; }
+  .casca-aba[aria-current="page"] { color: var(--text); }
   .casca-aba[aria-current="page"] svg { color: var(--accent-ink); }
   .casca-aba-destaque { flex: none; width: 64px; }
   .casca-aba-destaque > span:first-child {

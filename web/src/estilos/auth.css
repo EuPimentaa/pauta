@@ -4,7 +4,9 @@
  * No tema escuro o cartão vira superfície escura em camadas. No celular, o palco vira uma faixa no topo.
  */
 @layer components {
-  .auth { position: relative; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(440px, 1fr); min-height: 100dvh; background: var(--bg); }
+  /* o fundo do lado do formulário vem daqui (no celular o cartão sobe 40 px sobre o palco e o lado não pode cobri-lo):
+     no escuro, --auth-lado fica um degrau acima do palco #0A0A0A e o pontilhado aparece */
+  .auth { position: relative; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(440px, 1fr); min-height: 100dvh; background: var(--auth-lado); }
 
   /* ─────────────── palco ─────────────── */
   .auth-palco {
@@ -63,7 +65,7 @@
   /* papel quadriculado de pontos, que some nas bordas (o "quadro" por trás do cartão), e uma luz suave no centro */
   .auth-lado::before {
     content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-    background-image: radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--text) 13%, transparent) 1px, transparent 1.5px);
+    background-image: radial-gradient(circle at 1px 1px, var(--auth-pontos) 1px, transparent 1.5px);
     background-size: 22px 22px; background-position: center;
     -webkit-mask-image: radial-gradient(62% 56% at 50% 48%, black 0%, transparent 100%);
             mask-image: radial-gradient(62% 56% at 50% 48%, black 0%, transparent 100%);

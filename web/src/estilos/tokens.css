@@ -164,6 +164,9 @@
 
   /* ---------- movimento ---------- */
   --ease: cubic-bezier(.2, .8, .2, 1);
+  --glass-bg-topo-escuro: rgb(36 36 36 / .94);
+  /* menu lateral e abas do celular: no escuro, sobre a --surface (#181818), um degrau acima do conteúdo (--bg) */
+  --glass-bg-menu:   light-dark(rgb(255 255 255 / .80), rgb(24 24 24 / .92));
   --dur-1: 120ms; --dur-2: 200ms; --dur-3: 320ms;
 
   /* ---------- véus de interação (hover e pressionado sobre qualquer superfície, inclusive vidro e coluna) ---------- */
@@ -175,8 +178,13 @@
   --topo-h: 56px; --menu-w: 264px; --menu-w-recolhido: 64px; --abas-h: 64px;
   --z-menu: 30; --z-topo: 40; --z-faixa: 45; --z-abas: 50; --z-popover: 60; --z-modal: 70; --z-aviso: 80; --z-tooltip: 90;
 }
+  /* ---------- telas de acesso: lado do formulário (no escuro, um degrau acima do palco, com o pontilhado visível) ---------- */
+  --auth-lado:   light-dark(#F3F3F3, #111111);
+  --auth-pontos: light-dark(rgb(17 17 17 / .13), rgb(237 236 234 / .17));
+
 :root[data-theme="light"] { color-scheme: light; }
-:root[data-theme="dark"]  { color-scheme: dark; }
+:root[data-theme="dark"]  { color-scheme: dark; --glass-bg-topo: var(--glass-bg-topo-escuro); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --glass-bg-topo: var(--glass-bg-topo-escuro); } }
 .chrome-dark { color-scheme: dark; }      /* topbar escura no tema claro (alternância da marca) */
 .chrome-light { color-scheme: light; }    /* cartão claro sobre o palco escuro do login */
 @media (prefers-reduced-motion: reduce) { :root { --dur-1: 0ms; --dur-2: 0ms; --dur-3: 0ms; } }

@@ -302,7 +302,7 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
       titulo="Nova demanda"
       tamanho="g"
       rodape={(
-        <div className="entrada-rodape">
+        <div className="entrada-rodape" onKeyDown={aoTeclar}>
           <span className="entrada-rodape-dica" aria-hidden="true"><Kbd teclas="mod+enter" /> cria · <Kbd teclas="mod+shift+enter" /> cria e abre</span>
           <span className="entrada-rodape-acoes">
             <Botao variante="ghost" onClick={() => fechar(null)}>Cancelar</Botao>

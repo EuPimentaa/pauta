@@ -18,6 +18,24 @@ declare module '../../extensoes/tipos.ts' {
   }
 }
 
+// ─────────────────────────────── ligado ou não ───────────────────────────────
+
+/**
+ * Contorno do pedido 1 (docs/pedidos/nucleo-web.md): o padrão negativo do registro (!./*\/nucleo-exemplo*) não tira os
+ * exemplos das listas normais nesta versão do Vite. Enquanto o registro não muda, cada exemplo só aparece com a tela
+ * /dev/extensoes aberta (ou com "manter ligados") e, no build de produção, exporta undefined (não entra).
+ */
+let ligados = import.meta.env.DEV && (() => { try { return sessionStorage.getItem('pauta:exemplos-ligados') === '1' } catch { return false } })()
+const ouvintesLigados = new Set<() => void>()
+export function definirExemplosAtivos(v: boolean): void {
+  ligados = v
+  ouvintesLigados.forEach((f) => f())
+}
+export const exemplosAtivos = (): boolean => import.meta.env.DEV && ligados
+export function useExemplosAtivos(): boolean {
+  return useSyncExternalStore((f) => { ouvintesLigados.add(f); return () => { ouvintesLigados.delete(f) } }, exemplosAtivos, exemplosAtivos)
+}
+
 export interface LinhaRegistro { quando: number; texto: string }
 
 let linhas: readonly LinhaRegistro[] = []

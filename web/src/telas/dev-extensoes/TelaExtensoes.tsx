@@ -19,7 +19,7 @@ import { Selecao } from '../../ui/Campo.tsx'
 import { Checkbox } from '../../ui/Checkbox.tsx'
 import { avisar } from '../../ui/avisos.tsx'
 import { PaginaQuadro } from '../quadro/TelaQuadro.tsx'
-import { anotar, limparRegistro, mudarContador, useContadorExemplo, useRegistroExemplos } from './exemplos.ts'
+import { anotar, definirExemplosAtivos, limparRegistro, mudarContador, useContadorExemplo, useRegistroExemplos } from './exemplos.ts'
 
 const MANTER = 'pauta:exemplos-ligados'
 
@@ -151,8 +151,13 @@ export default function TelaExtensoes() {
   const [pronto, setPronto] = useState(false)
   useLayoutEffect(() => {
     reg.ligarExemplos(true)
+    definirExemplosAtivos(true)
     setPronto(true)
-    return () => { if (sessionStorage.getItem(MANTER) !== '1') reg.ligarExemplos(false) }
+    return () => {
+      if (sessionStorage.getItem(MANTER) === '1') return
+      reg.ligarExemplos(false)
+      definirExemplosAtivos(false)
+    }
   }, [reg])
   return pronto ? <Conteudo /> : null
 }

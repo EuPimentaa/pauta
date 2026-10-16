@@ -1,9 +1,17 @@
-/** Só DEV (/dev/extensoes): seção de Configurações de exemplo em /config/exemplo (testa o host). */
+/**
+ * Só DEV (/dev/extensoes): seção de Configurações de exemplo em /config/exemplo (testa o host). Só aparece com os
+ * exemplos ligados (`acesso` vazio fora deles).
+ */
 import { FlaskConical } from 'lucide-react'
 import type { ExtensaoSecaoConfig } from '../tipos.ts'
+import type { Papel } from '@shared/tipos/index.ts'
+import { exemplosAtivos } from '../../telas/dev-extensoes/exemplos.ts'
 
-export const secao: ExtensaoSecaoConfig = {
-  id: 'nucleo-exemplo', rotulo: 'Exemplo', ordem: 999, caminho: 'exemplo', acesso: ['admin', 'atendimento', 'equipe'], icone: FlaskConical,
+const TODOS: Papel[] = ['admin', 'atendimento', 'equipe']
+
+export const secao: ExtensaoSecaoConfig | undefined = import.meta.env.DEV ? {
+  id: 'nucleo-exemplo', rotulo: 'Exemplo', ordem: 999, caminho: 'exemplo', icone: FlaskConical,
+  get acesso() { return exemplosAtivos() ? TODOS : [] },
   carregar: () => Promise.resolve({
     default: () => (
       <section className="flex flex-col gap-2">
@@ -12,4 +20,4 @@ export const secao: ExtensaoSecaoConfig = {
       </section>
     ),
   }),
-}
+} : undefined

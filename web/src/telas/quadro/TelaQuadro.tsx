@@ -27,6 +27,7 @@ import { propsBotao } from '../../ui/Botao.tsx'
 import { Carregando, Esqueleto, EstadoVazio } from '../../ui/Indicadores.tsx'
 import { LimiteErro } from '../../ui/LimiteErro.tsx'
 import { CabecalhoQuadro } from '../../quadro/Cabecalho.tsx'
+import { exemplosAtivos } from '../dev-extensoes/exemplos.ts'
 import { useAgora, useVisaoGuardada } from '../../quadro/estado.ts'
 import '../../quadro/quadro.css'
 
@@ -128,7 +129,8 @@ export function PaginaQuadro({ quadro }: { quadro: Quadro }) {
   }), [quadro.id, filtros, definirFiltros])
 
   // ─────────── visão (?v=) ───────────
-  const layouts = reg.layouts()
+  // os layouts de exemplo (/dev/extensoes) só aparecem com os exemplos ligados
+  const layouts = reg.layouts().filter((l) => !('exemplo' in l) || exemplosAtivos())
   const [guardada, guardar] = useVisaoGuardada(quadro.id)
   const pedida = params.get('v')
   const quer: VisaoQuadro = ehVisao(pedida) ? pedida : guardada ?? 'quadro'

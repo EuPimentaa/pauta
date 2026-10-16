@@ -7,7 +7,6 @@ import { useId, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import type { QuadroCompleto } from '@shared/tipos/index.ts'
-import { normalizarAlias } from '@shared/logica/texto.ts'
 import { useCopiarQuadro } from '../../api/quadros.ts'
 import { useEquipes, useQuadro, useQuadros } from '../../api/seletores.ts'
 import { MolduraDialogo } from '../../dialogos/index.ts'
@@ -17,17 +16,8 @@ import { Botao } from '../../ui/Botao.tsx'
 import { Campo, Selecao } from '../../ui/Campo.tsx'
 import { Interruptor } from '../../ui/Checkbox.tsx'
 import { depoisDeCopiar, useQuadroCompleto } from './api.ts'
+import { nomeDaCopia } from './logica.ts'
 import './dialogos.ts'
-
-/** "Criação" → "Criação 2" (ou 3, 4… se já existir). */
-export function nomeDaCopia(nome: string, existentes: readonly string[]): string {
-  const usados = new Set(existentes.map(normalizarAlias))
-  for (let i = 2; i < 100; i++) {
-    const candidato = `${nome} ${i}`
-    if (!usados.has(normalizarAlias(candidato))) return candidato
-  }
-  return `${nome} (cópia)`
-}
 
 export default function DialogoCopiarQuadro({ params, fechar }: PropsDialogo<'copiar-quadro'>) {
   const qc = useQueryClient()
@@ -62,7 +52,7 @@ export default function DialogoCopiarQuadro({ params, fechar }: PropsDialogo<'co
     const n = (x: number, um: string, varios: string) => `${x} ${x === 1 ? um : varios}`
     avisar(`Quadro ${r.quadro.nome} criado.`, {
       tipo: 'sucesso',
-      descricao: `${n(r.colunas.length, 'coluna', 'colunas')}, ${n(r.etiquetas.length, 'etiqueta', 'etiquetas')} e ${n(r.automacoes.length, 'automação', 'automações')}; sem cards.`,
+      descricao: `${[n(r.colunas.length, 'coluna', 'colunas'), r.etiquetas.length ? n(r.etiquetas.length, 'etiqueta', 'etiquetas') : null, r.automacoes.length ? n(r.automacoes.length, 'automação', 'automações') : null].filter(Boolean).join(', ')}; sem cards.`,
     })
     fechar({ quadro: r })
     navegar(`/q/${encodeURIComponent(r.quadro.slug)}`)

@@ -133,7 +133,7 @@ export default function ConfigParametros() {
                   const mb = d.campo === 'uploadLimiteBytes'
                   return (
                     <Campo key={d.campo} rotulo={d.rotulo} type={hora ? 'time' : 'number'} inputMode={hora ? undefined : 'numeric'}
-                      min={hora ? undefined : mb ? 0.1 : min} max={hora ? undefined : mb ? max / MB : max} step={mb ? 0.1 : 1}
+                      min={hora ? undefined : mb ? 0.1 : min} max={hora ? undefined : mb ? max / MB : max} step={hora ? 60 : mb ? 0.1 : 1}
                       value={rascunho[d.campo]} sufixo={d.unidade ? <span className="cad-nota">{d.unidade}</span> : undefined}
                       ajuda={[d.ajuda, faixa(d)].filter(Boolean).join(' ')} erro={erroDoCampo(erro, d.campo)}
                       onChange={(e) => setRascunho({ ...rascunho, [d.campo]: e.target.value })} />

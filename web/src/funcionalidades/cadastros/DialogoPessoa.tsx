@@ -119,7 +119,7 @@ export function DialogoPessoa({ pessoa, aoFechar }: { pessoa: Usuario | null; ao
 
         <fieldset className="cad-secao">
           <legend className="ui-rotulo mb-2">Papel</legend>
-          <div role="radiogroup" aria-label="Papel" className="cad-opcoes">
+          <div role="radiogroup" aria-label="Papel" className="cad-opcoes" data-colunas="3">
             {PAPEIS_UI.map(({ id, icone: I, texto }) => (
               <button key={id} type="button" role="radio" aria-checked={papel === id} tabIndex={papel === id ? 0 : -1} className="cad-opcao"
                 onClick={() => setPapel(id)}

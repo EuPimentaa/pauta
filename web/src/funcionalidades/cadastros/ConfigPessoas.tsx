@@ -133,7 +133,7 @@ export default function ConfigPessoas() {
       </div>
 
       {pendentes > 0 && aba === 'ativas' && (
-        <p className="cad-nota" role="status">{pendentes === 1 ? '1 pessoa ainda não entrou.' : `${pendentes} pessoas ainda não entraram.`} Gere um link novo pelo menu ··· se o anterior se perdeu.</p>
+        <p className="cad-nota" role="status">{pendentes === 1 ? '1 pessoa ainda não entrou.' : `${pendentes} pessoas ainda não entraram.`} Se o link se perdeu, gere outro em "Link de convite".</p>
       )}
 
       <Painel>

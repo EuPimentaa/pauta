@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  Archive, ArchiveRestore, ArrowDown, ArrowUp, Copy, ExternalLink, LayoutGrid, Plus, Settings2, Tag, Trash2, TriangleAlert, Zap,
+  Archive, ArchiveRestore, ArrowDown, ArrowUp, ChevronDown, Copy, ExternalLink, LayoutGrid, Plus, Settings2, Tag, Trash2, TriangleAlert, Zap,
 } from 'lucide-react'
 import {
   GATILHOS_AUTOMACAO, PAPEIS_COLUNA, ROTULO_GATILHO, ROTULO_PAPEL_COLUNA, type Bootstrap, type Coluna, type Cor, type Etiqueta, type FundoQuadro,
@@ -28,7 +28,7 @@ import { Botao, BotaoIcone, propsBotao } from '../../ui/Botao.tsx'
 import { AreaTexto, Campo, Selecao } from '../../ui/Campo.tsx'
 import { Interruptor } from '../../ui/Checkbox.tsx'
 import { ChipEtiqueta } from '../../ui/Chips.tsx'
-import { EsqueletoLinhas, EstadoVazio } from '../../ui/Indicadores.tsx'
+import { EstadoVazio } from '../../ui/Indicadores.tsx'
 import { SeletorCor } from '../../ui/SeletorCor.tsx'
 import { arquivarQuadro, excluirQuadro, restaurarQuadro, useQuadroCompleto, useQuadrosArquivados } from './api.ts'
 import { BotaoCor, Faixa, nomeCurto, Painel, Pilula, SeletorFundo, usePode } from './comum.tsx'
@@ -69,17 +69,17 @@ function PainelDados({ quadro }: { quadro: Quadro }) {
 
   return (
     <form className="cad-form" noValidate onSubmit={(e) => { e.preventDefault(); void salvar() }}>
-      <div className="cad-grade-2">
+      <div className="cad-grade">
         <Campo rotulo="Nome" value={nome} maxLength={80} onChange={(e) => setNome(e.target.value)} erro={!nome.trim() ? 'Dê um nome ao quadro.' : undefined} />
         <Campo rotulo="Endereço" value={slug} maxLength={60} onChange={(e) => setSlug(e.target.value.toLowerCase())}
           sufixo={slug !== slugDe(nome) && nome.trim() ? <button type="button" className="cad-nota underline" onClick={() => setSlug(slugDe(nome))}>usar do nome</button> : undefined}
           ajuda={`/q/${slug || '…'}`} erro={!slugValido ? 'Letras minúsculas, números e hífens.' : undefined} />
+        <Selecao rotulo="Equipe" value={equipeId ?? ''} vazia="Sem equipe" onChange={(e) => setEquipeId(e.target.value || null)}
+          opcoes={equipes.filter((e) => e.ativa || e.id === quadro.equipeId).map((e) => ({ valor: e.id, rotulo: e.nome }))} />
       </div>
       {slug !== quadro.slug && slugValido && <Faixa icone={TriangleAlert}>Os links antigos para /q/{quadro.slug} param de abrir.</Faixa>}
-      <AreaTexto rotulo="Descrição" opcional linhas={2} value={descricao} maxLength={500} onChange={(e) => setDescricao(e.target.value)}
+      <AreaTexto rotulo="Descrição" opcional linhas={1} value={descricao} maxLength={500} onChange={(e) => setDescricao(e.target.value)}
         ajuda="Aparece embaixo do nome, no quadro." />
-      <Selecao rotulo="Equipe" value={equipeId ?? ''} vazia="Sem equipe" onChange={(e) => setEquipeId(e.target.value || null)}
-        opcoes={equipes.filter((e) => e.ativa || e.id === quadro.equipeId).map((e) => ({ valor: e.id, rotulo: e.nome }))} />
       <div className="cad-grade-2">
         <div className="cad-campo-cor"><span className="ui-rotulo">Cor</span><SeletorCor valor={cor} rotulo="Cor do quadro" aoMudar={(c) => c && setCor(c)} /></div>
         <div className="cad-campo-cor"><span className="ui-rotulo">Fundo</span><SeletorFundo valor={fundo} aoMudar={setFundo} /></div>
@@ -405,30 +405,31 @@ export default function ConfigQuadros() {
         </div>
         {admin && <Botao variante="secundario" icone={Plus} onClick={() => abrir('/quadros/novo')}>Novo quadro</Botao>}
       </header>
+      <div className="cad-quadros-escolha">
+        <label className="ui-rotulo" htmlFor="cad-escolha-quadro">Quadro</label>
+        <div className="ui-entrada" data-tamanho="m">
+          <select id="cad-escolha-quadro" value={arquivado?.slug ?? ativo?.slug ?? ''} onChange={(e) => escolher(e.target.value || null)}>
+            {grupos.map((g) => (
+              <optgroup key={g.id || 'sem'} label={g.rotulo}>
+                {g.lista.map((q) => <option key={q.id} value={q.slug}>{q.nome}</option>)}
+              </optgroup>
+            ))}
+            {(arquivados.data ?? []).length > 0 && (
+              <optgroup label="Arquivados">
+                {arquivados.data!.map((q) => <option key={q.id} value={q.slug}>{q.nome} (arquivado)</option>)}
+              </optgroup>
+            )}
+            {!ativo && !arquivado && <option value="">Escolha um quadro</option>}
+          </select>
+          <ChevronDown className="ui-selecao-seta" aria-hidden="true" />
+        </div>
+        <span className="cad-nota">
+          {quadros.length === 1 ? '1 quadro ativo' : `${quadros.length} quadros ativos`}
+          {' · '}
+          {arquivados.isPending ? '…' : (arquivados.data ?? []).length === 0 ? 'Nenhum quadro arquivado.' : (arquivados.data ?? []).length === 1 ? '1 arquivado' : `${arquivados.data!.length} arquivados`}
+        </span>
+      </div>
       <div className="cad-quadros">
-        <nav className="cad-quadros-lista" aria-label="Quadros">
-          {grupos.map((g) => (
-            <div key={g.id || 'sem'}>
-              <div className="cad-eyebrow cad-quadros-grupo">{g.rotulo}</div>
-              {g.lista.map((q) => (
-                <button key={q.id} type="button" className="cad-quadro-item" aria-current={q.id === ativo?.id ? 'true' : undefined} onClick={() => escolher(q.slug)}>
-                  <span className="cad-ponto" data-cor={q.cor} aria-hidden="true" /><span>{q.nome}</span>
-                </button>
-              ))}
-            </div>
-          ))}
-          <div>
-            <div className="cad-eyebrow cad-quadros-grupo">Arquivados</div>
-            {arquivados.isPending ? <EsqueletoLinhas linhas={2} /> : (arquivados.data ?? []).length === 0
-              ? <p className="cad-nota cad-quadros-grupo">Nenhum quadro arquivado.</p>
-              : (arquivados.data ?? []).map((q) => (
-                <button key={q.id} type="button" className="cad-quadro-item" aria-current={q.id === arquivado?.id ? 'true' : undefined} onClick={() => escolher(q.slug)}>
-                  <Archive className="text-fg-3" width={14} height={14} aria-hidden="true" /><span>{q.nome}</span>
-                </button>
-              ))}
-          </div>
-        </nav>
-
         <div className="cad-secao">
           {arquivado ? (
             <QuadroArquivado key={arquivado.id} quadro={arquivado} aoSair={escolher} />

@@ -7,6 +7,22 @@ import type {
   ClienteResumo, Cor, CriarQuadroEntrada, Equipe, FundoQuadro, GatilhoAutomacao, Id, ModeloQuadro, NovaColuna, PapelColuna,
   PassoInicial, Quadro, UsuarioResumo,
 } from '../../../../shared/tipos/index.ts'
+import { normalizarAlias } from '../../../../shared/logica/texto.ts'
+
+/** Sigla como o servidor aceita: maiúsculas, A–Z e 0–9, até 12 ("hé-1" → "HE1"). */
+export function limparSigla(s: string): string {
+  return s.toUpperCase().normalize('NFD').replace(/[^A-Z0-9]/g, '').slice(0, 12)
+}
+
+/** "Criação" → "Criação 2" (ou 3, 4… se já existir um quadro com o nome, sem caixa e sem acento). */
+export function nomeDaCopia(nome: string, existentes: readonly string[]): string {
+  const usados = new Set(existentes.map(normalizarAlias))
+  for (let i = 2; i < 100; i++) {
+    const candidato = `${nome} ${i}`
+    if (!usados.has(normalizarAlias(candidato))) return candidato
+  }
+  return `${nome} (cópia)`
+}
 
 /** Uma coluna planejada (editável antes de criar). */
 export interface ColunaPlano {

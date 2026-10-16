@@ -11,7 +11,7 @@ import type { Demanda, ListarArquivoConsulta, Quadro } from '@shared/tipos/index
 import { useAcoes } from '../../api/demandas.ts'
 import { useClientes, useColunas, useConfig, useQuadros } from '../../api/seletores.ts'
 import { useArquivo, useQuadrosArquivados } from '../../funcionalidades/cadastros/api.ts'
-import { Painel, Pilula } from '../../funcionalidades/cadastros/comum.tsx'
+import { Painel } from '../../funcionalidades/cadastros/comum.tsx'
 import { useTituloAba } from '../../lib/app.ts'
 import { MESES } from '../../lib/datas.ts'
 import { useAbrirSobreposta } from '../../sessao/sobreposta.tsx'
@@ -150,7 +150,6 @@ export default function TelaArquivo() {
           </>
         )}
       </Painel>
-      {itens.length > 0 && <p className="cad-nota"><Pilula>{itens.length}{arquivo.hasNextPage ? '+' : ''}</Pilula> {itens.length === 1 ? 'demanda' : 'demandas'} na lista.</p>}
     </div>
   )
 }

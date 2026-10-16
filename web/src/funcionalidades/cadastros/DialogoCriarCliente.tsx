@@ -17,8 +17,7 @@ import { Botao } from '../../ui/Botao.tsx'
 import { Campo } from '../../ui/Campo.tsx'
 import { criarCliente, resumoCliente } from './api.ts'
 import { erroDoCampo, Faixa, mensagemGeral } from './comum.tsx'
-
-export const limparSigla = (s: string) => s.toUpperCase().normalize('NFD').replace(/[^A-Z0-9]/g, '').slice(0, 12)
+import { limparSigla } from './logica.ts'
 
 export default function DialogoCriarCliente({ params, fechar }: PropsDialogo<'criar-cliente'>) {
   const qc = useQueryClient()

@@ -135,7 +135,7 @@ function DialogoContato({ cliente, contato, aoFechar }: { cliente: Cliente; cont
     try {
       if (contato) await editarContato(qc, cliente, contato, dados)
       else await criarContato(qc, cliente, dados)
-      avisar(contato ? 'Contato salvo.' : `${dados.nome} cadastrada como contato.`, { tipo: 'sucesso' })
+      avisar(contato ? 'Contato salvo.' : `Contato ${dados.nome} cadastrado.`, { tipo: 'sucesso' })
       aoFechar()
     } catch (e) {
       setErro(e)

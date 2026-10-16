@@ -80,6 +80,7 @@
   .cad-campo-cor { display: flex; flex-direction: column; gap: 6px; }
   .cad-campo-cor > .ui-rotulo { margin-bottom: 2px; }
   .cad-opcoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-2); }
+  .cad-opcoes[data-colunas="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .cad-opcao {
     position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: var(--space-3);
     border-radius: var(--radius-md); border: 1px solid var(--border-strong); background: var(--surface); text-align: left; color: var(--text);
@@ -131,7 +132,13 @@
   }
   .cad-coluna-auto svg { width: 13px; height: 13px; flex: none; color: var(--accent-ink); }
   .cad-coluna[data-desmarcada] .cad-coluna-auto { text-decoration: line-through; }
-  .cad-coluna-config { grid-template-columns: auto 32px minmax(120px, 1fr) minmax(260px, 1.3fr) auto; }
+  .cad-coluna-config {
+    grid-template-columns: auto 32px minmax(0, 1fr) auto;
+    grid-template-areas: "num cor nome fim" ". . papel papel";
+  }
+  .cad-coluna-config > .cad-coluna-num { grid-area: num; }
+  .cad-coluna-config > .cad-coluna-papel { grid-area: papel; }
+  .cad-coluna-config > .cad-coluna-fim { grid-area: fim; }
   .cad-coluna-num { font: 500 var(--fs-meta) / 1 var(--font); color: var(--text-3); min-width: 1.5em; text-align: right; }
 
   /* ─────────────── criar os quadros das equipes ─────────────── */
@@ -182,7 +189,7 @@
   .cad-filtros > .cad-filtro-busca { flex: 1; min-width: 220px; max-width: 360px; }
   .cad-tabela { display: flex; flex-direction: column; }
   .cad-tabela-cabeca, .cad-cliente-linha {
-    display: grid; grid-template-columns: minmax(220px, 2.2fr) minmax(130px, 1fr) minmax(120px, 1fr) 72px 72px 72px; align-items: center;
+    display: grid; grid-template-columns: minmax(220px, 2.2fr) minmax(130px, 1fr) minmax(120px, 1fr) 76px 104px 84px; align-items: center;
     gap: var(--space-3); padding: 0 var(--space-5);
   }
   .cad-tabela-cabeca { min-height: 40px; font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-3); border-bottom: 1px solid var(--border); }
@@ -194,7 +201,7 @@
   .cad-cliente-nomes { display: flex; flex-direction: column; min-width: 0; }
   .cad-cliente-nome { font: 500 var(--fs-body) / var(--lh-body) var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cad-cliente-detalhe { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); }
-  .cad-numero { text-align: right; font: 500 var(--fs-body) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; color: var(--text); }
+  .cad-numero { display: block; text-align: right; font: 500 var(--fs-body) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; color: var(--text); }
   .cad-numero[data-zero] { color: var(--text-3); }
   .cad-numero[data-tom="perigo"] { color: var(--danger-ink); font-weight: 600; }
   .cad-numero-rotulo { display: none; }
@@ -244,16 +251,9 @@
   .cad-num { font: 500 var(--fs-meta) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; color: var(--text-3); flex: none; }
 
   /* ─────────────── Configurações › Quadros ─────────────── */
-  .cad-quadros { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: var(--space-5); align-items: start; }
-  .cad-quadros-lista { display: flex; flex-direction: column; gap: 2px; position: sticky; top: calc(var(--topo-h) + var(--space-6)); }
-  .cad-quadros-grupo { padding: var(--space-3) 10px var(--space-1); }
-  .cad-quadro-item {
-    display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 10px; border-radius: var(--radius-sm); color: var(--text);
-    text-align: left; font: 500 var(--fs-body) / 1.2 var(--font); width: 100%;
-  }
-  .cad-quadro-item > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cad-quadro-item:hover { background: var(--veu-1); }
-  .cad-quadro-item[aria-current="true"] { background: var(--accent-soft); }
+  .cad-quadros { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+  .cad-quadros-escolha { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+  .cad-quadros-escolha > .ui-entrada { min-width: 240px; flex: 0 1 320px; }
   .cad-etiquetas { display: flex; flex-direction: column; gap: 6px; }
   .cad-etiqueta { display: grid; grid-template-columns: 32px minmax(120px, 1fr) auto auto; align-items: center; gap: var(--space-2); }
   .cad-automacao { display: flex; align-items: center; gap: var(--space-2); min-height: 32px; font: 400 var(--fs-body) / var(--lh-body) var(--font); flex-wrap: wrap; }
@@ -286,14 +286,13 @@
     .cad-numero-rotulo { display: block; font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-3); }
     .cad-cliente-grade { grid-template-columns: minmax(0, 1fr); }
     .cad-grade-2 { grid-template-columns: minmax(0, 1fr); }
+    .cad-opcoes[data-colunas="3"] { grid-template-columns: minmax(0, 1fr); }
     .cad-coluna { grid-template-columns: auto 32px minmax(0, 1fr) auto; }
     .cad-coluna > .cad-coluna-papel { grid-column: 3 / 4; }
     .cad-coluna-auto { grid-column: 3 / -1; }
-    .cad-coluna-config { grid-template-columns: auto 32px minmax(0, 1fr); }
-    .cad-coluna-config > .cad-coluna-papel, .cad-coluna-config > .cad-coluna-fim { grid-column: 1 / -1; }
+    .cad-coluna-config { grid-template-columns: auto 32px minmax(0, 1fr); grid-template-areas: "num cor nome" "papel papel papel" "fim fim fim"; }
     .cad-coluna-config > .cad-coluna-fim { justify-content: flex-start; }
-    .cad-quadros { grid-template-columns: minmax(0, 1fr); }
-    .cad-quadros-lista { position: static; }
+    .cad-quadros-escolha > .ui-entrada { flex: 1 1 100%; min-width: 0; }
     .cad-membro { grid-template-columns: auto minmax(0, 1fr) auto; }
     .cad-membro > .cad-membro-funcao { grid-column: 2 / -1; }
     .cad-filtros > .ui-campo-grupo, .cad-filtros > .cad-filtro-busca { min-width: 0; flex: 1 1 140px; max-width: none; }
@@ -305,7 +304,7 @@
 }
 
 @layer foco {
-  .cad-opcao:focus-visible, .cad-fundo:focus-visible, .cad-cor-botao:focus-visible, .cad-quadro-item:focus-visible,
+  .cad-opcao:focus-visible, .cad-fundo:focus-visible, .cad-cor-botao:focus-visible,
   .cad-arquivo-abrir:focus-visible, button.cad-pilula:focus-visible {
     box-shadow: var(--focus-ring);
   }

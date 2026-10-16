@@ -1,23 +1,52 @@
 /*
- * Modal da demanda (/d/:numero): topo com título, lugar e ações; duas colunas (principal e lateral) a partir de
- * 900 px; tela cheia no celular (o Modal do DS cuida). Só tokens da marca.
+ * Modal da demanda (/d/:numero). Grade com quatro faixas: barra de ações (Concluída, ações, ···, fechar), capa, topo
+ * (número, etiquetas, título e o lugar) e o corpo em duas colunas (principal e um painel lateral) a partir de 900 px.
+ * No celular é tela cheia (o Modal do DS cuida) e a barra fica presa no topo enquanto o conteúdo rola.
+ * A janela é sólida (texto longo para ler; o vidro das camadas deixava manchas dos cards atrás do texto) e o scrim é
+ * um pouco mais escuro que o padrão, para o quadro colorido não competir com a leitura. Só tokens da marca.
  */
 @layer components {
   .ui-modal.modal-demanda-janela { --largura: 1040px; }
+  .ui-modal.modal-demanda-janela.vidro { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .ui-scrim:has(+ .ui-modal-posicao .modal-demanda-janela) { background: var(--overlay-leitura); }
   .ui-modal-corpo.modal-demanda-rolagem { padding: 0; }
-  .modal-demanda { display: flex; flex-direction: column; min-height: 100%; outline: none; }
+
+  .modal-demanda {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: start; min-height: 100%; outline: none;
+    grid-template-areas: "capa capa" "topo barra" "faixa faixa" "corpo corpo";
+  }
   .modal-demanda-capa {
-    height: 56px; margin-bottom: var(--space-2); border-radius: var(--radius-xl) var(--radius-xl) 0 0; background: var(--cor, var(--border-strong));
+    grid-area: capa; height: 56px; margin-bottom: var(--space-2); border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    background: var(--cor, var(--border-strong));
   }
   .modal-demanda-capa[data-imagem] { height: auto; max-height: 200px; overflow: hidden; background: var(--surface-sunken); }
   .modal-demanda-capa img { display: block; width: 100%; max-height: 200px; object-fit: cover; }
-  .modal-demanda-topo {
-    display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-5) var(--space-5) var(--space-4) var(--space-6);
+
+  /* ─────────────── barra de ações ─────────────── */
+  .modal-demanda-barra {
+    grid-area: barra; align-self: start; display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end;
+    gap: var(--space-2); padding: var(--space-5) var(--space-5) 0 var(--space-4);
   }
+  /* "Concluída" como pílula (é o checkbox nativo por baixo: teclado e leitor de tela continuam iguais) */
+  .ui-check.modal-demanda-concluir {
+    align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 10px; border-radius: var(--radius-full);
+    box-shadow: inset 0 0 0 1px var(--border-strong); font: 500 var(--fs-body) / 1 var(--font); color: var(--text); white-space: nowrap;
+    transition: background-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+  }
+  .ui-check.modal-demanda-concluir:hover { background: var(--veu-1); }
+  .ui-check.modal-demanda-concluir .ui-check-caixa { border-radius: 50%; }
+  .ui-check.modal-demanda-concluir:has(input:checked) {
+    background: var(--success-bg); color: var(--success-ink); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--success) 45%, transparent);
+  }
+  .ui-check.modal-demanda-concluir[data-desabilitado="true"] { color: var(--text-disabled); box-shadow: inset 0 0 0 1px var(--border); }
+
+  /* ─────────────── topo ─────────────── */
+  .modal-demanda-topo { grid-area: topo; display: flex; min-width: 0; padding: var(--space-5) 0 var(--space-4) var(--space-6); }
   .modal-demanda-titulos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-  .modal-demanda-pre { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
-  .modal-demanda-numero { color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); font-variant-numeric: tabular-nums; }
-  .modal-demanda-titulo { font: 600 var(--fs-h3) / var(--lh-h3) var(--font); letter-spacing: var(--tracking-titulo); color: var(--text); overflow-wrap: anywhere; }
+  .modal-demanda-pre { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-height: 20px; }
+  .modal-demanda-numero { color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); font-variant-numeric: lining-nums tabular-nums; }
+  /* o título é o maior texto do modal (os títulos da descrição ficam bem abaixo dele) */
+  .modal-demanda-titulo { font: 600 var(--fs-h2) / var(--lh-h2) var(--font); letter-spacing: var(--tracking-titulo); color: var(--text); overflow-wrap: anywhere; }
   .modal-demanda-titulo-botao {
     display: block; width: 100%; margin: -2px -6px; padding: 2px 6px; border: 0; border-radius: var(--radius-sm);
     background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; cursor: text;
@@ -25,7 +54,7 @@
   .modal-demanda-titulo-botao:hover { background: var(--veu-1); }
   .modal-demanda-titulo-campo {
     width: 100%; resize: none; padding: 4px 8px; margin: -4px -8px; border: 1px solid var(--border-control); border-radius: var(--radius-sm);
-    background: var(--surface); color: var(--text); font: 600 var(--fs-h3) / var(--lh-h3) var(--font); letter-spacing: var(--tracking-titulo);
+    background: var(--surface); color: var(--text); font: 600 var(--fs-h2) / var(--lh-h2) var(--font); letter-spacing: var(--tracking-titulo);
     field-sizing: content; min-height: 2lh;
   }
   .modal-demanda-onde { color: var(--text-2); font: 400 var(--fs-body) / var(--lh-body) var(--font); }
@@ -36,44 +65,73 @@
   }
   .modal-demanda-lugar:hover:not(:disabled) { background: var(--veu-1); text-decoration-color: currentColor; }
   .modal-demanda-lugar:disabled { cursor: default; text-decoration: none; }
-  .modal-demanda-acoes { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); flex: none; max-width: 55%; }
   .modal-demanda-faixa {
-    display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin: 0 var(--space-6) var(--space-3);
+    grid-area: faixa; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin: 0 var(--space-6) var(--space-3);
     padding: 10px 14px; border-radius: var(--radius-md); background: var(--warning-bg); color: var(--warning-ink);
     font: 500 var(--fs-body) / var(--lh-body) var(--font);
   }
   .modal-demanda-faixa svg { width: 16px; height: 16px; flex: none; }
   .modal-demanda-faixa > span { flex: 1; min-width: 12em; }
+
+  /* ─────────────── corpo: principal e painel lateral ─────────────── */
   .modal-demanda-corpo {
-    display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--space-6); padding: var(--space-2) var(--space-6) var(--space-6);
+    grid-area: corpo; display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; gap: var(--space-6);
+    padding: var(--space-2) var(--space-6) var(--space-6);
   }
   .modal-demanda-principal, .modal-demanda-lateral { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+  .modal-demanda-lateral {
+    position: sticky; top: var(--space-4); padding: var(--space-4); border-radius: var(--radius-lg);
+    background: color-mix(in oklab, var(--surface-sunken) 55%, transparent); box-shadow: inset 0 0 0 1px var(--border);
+  }
   .modal-demanda-secao { display: flex; flex-direction: column; gap: var(--space-2); }
   .modal-demanda-secao-titulo {
     font: 700 var(--fs-micro) / var(--lh-micro) var(--font); letter-spacing: var(--tracking-micro); text-transform: uppercase; color: var(--text-2);
   }
-  .modal-demanda-resumo { display: flex; flex-direction: column; gap: var(--space-3); }
-  .modal-demanda-campo { display: flex; flex-direction: column; gap: 4px; }
+  /* títulos do Markdown da descrição: abaixo do título do modal (22 px) e do rótulo de seção */
+  .modal-demanda .ui-md h1 { font-size: 16px; }
+  .modal-demanda .ui-md h2 { font-size: var(--fs-col); }
+  .modal-demanda .ui-md h3 { font-size: var(--fs-body); }
+
+  /* resumo do núcleo: rótulo com ícone à esquerda, valor à direita (sem caixa alta empilhada) */
+  .modal-demanda-resumo { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 10px 12px; }
+  .modal-demanda-campo { display: contents; }
   .modal-demanda-campo dt {
-    font: 700 var(--fs-micro) / var(--lh-micro) var(--font); letter-spacing: var(--tracking-micro); text-transform: uppercase; color: var(--text-2);
+    display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font);
   }
-  .modal-demanda-campo dd { font: 400 var(--fs-body) / var(--lh-body) var(--font); color: var(--text); }
+  .modal-demanda-campo dt svg { flex: none; width: 14px; height: 14px; }
+  .modal-demanda-campo dd { min-width: 0; color: var(--text); font: 400 var(--fs-body) / var(--lh-body) var(--font); overflow-wrap: anywhere; }
+
   @media (max-width: 899.98px) {
-    .modal-demanda-corpo { grid-template-columns: minmax(0, 1fr); }
-    .modal-demanda-topo { flex-direction: column-reverse; align-items: stretch; }
-    .modal-demanda-acoes { max-width: none; justify-content: flex-start; width: 100%; }
-    /* ··· e fechar no canto direito; a caixa Concluída e as ações ficam à esquerda */
+    .modal-demanda { grid-template-columns: minmax(0, 1fr); grid-template-areas: "capa" "barra" "topo" "faixa" "corpo"; }
+    .modal-demanda-barra { justify-content: flex-start; padding: var(--space-4) var(--space-5) 0 var(--space-6); }
+    /* ··· e fechar no canto direito; Concluída e as ações à esquerda */
     .modal-demanda-mais { margin-left: auto; }
+    .modal-demanda-topo { padding-right: var(--space-6); padding-top: var(--space-3); }
+    .modal-demanda-corpo { grid-template-columns: minmax(0, 1fr); }
+    .modal-demanda-lateral { position: static; }
   }
   @media (max-width: 767.98px) {
-    .modal-demanda-topo { padding: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-4) var(--space-3); }
+    /* altura da tela: quem rola é o corpo do modal, e a barra (sticky) fica em cima enquanto o conteúdo passa */
+    .ui-modal.modal-demanda-janela { height: 100dvh; }
+    .modal-demanda { grid-template-areas: "barra" "capa" "topo" "faixa" "corpo"; }
+    .modal-demanda-barra {
+      position: sticky; top: 0; z-index: 2; padding: calc(var(--space-2) + env(safe-area-inset-top)) var(--space-3) var(--space-2) var(--space-4);
+      background: var(--surface-raised); box-shadow: 0 1px 0 var(--border);
+    }
+    .modal-demanda-capa { border-radius: 0; margin-bottom: 0; }
+    .modal-demanda-topo { padding: var(--space-3) var(--space-4); }
+    .modal-demanda-titulo, .modal-demanda-titulo-campo { font-size: var(--fs-h3); line-height: var(--lh-h3); }
+    /* no celular o resumo (prazo, membros, prioridade) vem antes da descrição */
     .modal-demanda-corpo { padding: var(--space-2) var(--space-4) var(--space-6); gap: var(--space-5); }
+    .modal-demanda-lateral { order: -1; }
     .modal-demanda-faixa { margin: 0 var(--space-4) var(--space-3); }
-    .modal-demanda-capa { border-radius: 0; }
   }
 }
 
 @layer foco {
   .modal-demanda-titulo-botao:focus-visible, .modal-demanda-lugar:focus-visible { box-shadow: var(--focus-ring); }
   .modal-demanda-titulo-campo:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
+  /* o anel vai na pílula inteira, não só na caixinha */
+  .ui-check.modal-demanda-concluir:has(input:focus-visible) { box-shadow: var(--focus-ring); }
+  .ui-check.modal-demanda-concluir .ui-check-caixa:has(input:focus-visible) { box-shadow: none; }
 }

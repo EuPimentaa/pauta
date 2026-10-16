@@ -195,7 +195,21 @@ export function ConteudoModal({ demanda, detalhe, fechar }: PropsModalDemanda) {
   }
 
   return (
-    <div className="modal-demanda" data-modal-demanda="" tabIndex={-1}>
+    // o foco entra no próprio modal (não no primeiro botão): Espaço, J/K e ←/→ valem de cara; Tab leva aos controles
+    <div className="modal-demanda" data-modal-demanda="" tabIndex={-1} data-autofocus="">
+      {/* a barra vem primeiro: no celular ela fica presa no topo enquanto o conteúdo rola; no desktop o grid a põe
+          à direita do título */}
+      <div className="modal-demanda-barra">
+        <Checkbox tom="sucesso" className="modal-demanda-concluir" checked={!!demanda.concluidaEm} disabled={ctx.somenteLeitura}
+          onChange={(e) => void acoes.concluir(demanda, e.target.checked)}>
+          Concluída
+        </Checkbox>
+        {!ctx.somenteLeitura && secundarias.map((a) => <BotaoAcao key={a.id} a={a} ctx={ctx} util={util} />)}
+        {!ctx.somenteLeitura && primaria && <BotaoAcao a={primaria} ctx={ctx} util={util} primaria />}
+        <BotaoIcone icone={MoreHorizontal} rotulo="Mais ações da demanda" aria-haspopup="menu" aria-expanded={!!menu}
+          className="modal-demanda-mais" onClick={(e) => abrirMenu(e.currentTarget)} />
+        <BotaoIcone icone={X} rotulo="Fechar" atalho="esc" onClick={fechar} data-foco-por-ultimo="" />
+      </div>
       {demanda.capaUrl ? (
         <div className="modal-demanda-capa" data-imagem=""><img src={demanda.capaUrl} alt="" /></div>
       ) : demanda.capaCor ? <div className="modal-demanda-capa" data-cor={demanda.capaCor} aria-hidden="true" /> : null}
@@ -218,17 +232,6 @@ export function ConteudoModal({ demanda, detalhe, fechar }: PropsModalDemanda) {
               {ctx.quadro.nome}
             </button>
           </p>
-        </div>
-        <div className="modal-demanda-acoes">
-          <Checkbox tom="sucesso" checked={!!demanda.concluidaEm} disabled={ctx.somenteLeitura}
-            onChange={(e) => void acoes.concluir(demanda, e.target.checked)}>
-            Concluída
-          </Checkbox>
-          {!ctx.somenteLeitura && secundarias.map((a) => <BotaoAcao key={a.id} a={a} ctx={ctx} util={util} />)}
-          {!ctx.somenteLeitura && primaria && <BotaoAcao a={primaria} ctx={ctx} util={util} primaria />}
-          <BotaoIcone icone={MoreHorizontal} rotulo="Mais ações da demanda" aria-haspopup="menu" aria-expanded={!!menu}
-            className="modal-demanda-mais" onClick={(e) => abrirMenu(e.currentTarget)} />
-          <BotaoIcone icone={X} rotulo="Fechar" atalho="esc" onClick={fechar} data-foco-por-ultimo="" />
         </div>
       </header>
       {ctx.somenteLeitura && (
@@ -256,12 +259,12 @@ export function ConteudoModal({ demanda, detalhe, fechar }: PropsModalDemanda) {
 export function EsqueletoModal({ fechar, mensagem }: { fechar(): void; mensagem?: React.ReactNode }) {
   return (
     <div className="modal-demanda" data-modal-demanda="" tabIndex={-1} aria-busy={!mensagem}>
+      <div className="modal-demanda-barra">
+        <BotaoIcone icone={X} rotulo="Fechar" atalho="esc" onClick={fechar} data-foco-por-ultimo="" className="modal-demanda-mais" />
+      </div>
       <header className="modal-demanda-topo">
         <div className="modal-demanda-titulos">
           {mensagem ?? <EsqueletoLinhas linhas={2} />}
-        </div>
-        <div className="modal-demanda-acoes">
-          <BotaoIcone icone={X} rotulo="Fechar" atalho="esc" onClick={fechar} data-foco-por-ultimo="" />
         </div>
       </header>
       {!mensagem && (

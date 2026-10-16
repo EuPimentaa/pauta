@@ -1,0 +1,41 @@
+/*
+ * Cronômetro fora do modal (F1): o botão da barra superior ("0:42 · #123" com ■) e o selo no card. Separado do
+ * modal.css porque viaja com o registro (a barra e o card estão sempre na tela).
+ */
+@layer components {
+  .mdl-pulso { width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex: none; animation: mdl-pulso 1.6s var(--ease) infinite; }
+  @keyframes mdl-pulso { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--success) 50%, transparent); } 50% { box-shadow: 0 0 0 5px transparent; } }
+  @media (prefers-reduced-motion: reduce) { .mdl-pulso { animation: none; } }
+  .mdl-topo-cronometro {
+    display: inline-flex; align-items: center; gap: 2px; height: 34px; padding: 0 2px 0 4px; border-radius: var(--radius-full);
+    background: color-mix(in oklab, var(--success) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--success) 45%, transparent);
+  }
+  .mdl-topo-abrir {
+    display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 8px; border: 0; border-radius: var(--radius-full);
+    background: transparent; color: var(--text); font: 600 var(--fs-meta) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; cursor: pointer;
+    white-space: nowrap;
+  }
+  .mdl-topo-abrir:hover { background: color-mix(in oklab, var(--text) 10%, transparent); }
+  .mdl-topo-abrir svg { width: 15px; height: 15px; }
+  .mdl-topo-parar {
+    display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; color: var(--text); cursor: pointer;
+  }
+  .mdl-topo-parar:hover { background: color-mix(in oklab, var(--text) 12%, transparent); }
+  .mdl-topo-parar svg { width: 13px; height: 13px; fill: currentColor; }
+  @media (max-width: 767.98px) { .mdl-topo-numero { display: none; } }
+  .ui-sinal.mdl-selo-cronometro { background: var(--success-bg); color: var(--success-ink); }
+
+}
+
+/*
+ * Contorno (pedido ao DESIGN-SYSTEM-WEB em docs/pedidos/modal.md): popover, menu e lista aberta POR CIMA de um modal
+ * (o ··· do modal da demanda, os seletores do painel, o combobox) ficavam atrás dele (--z-popover 60 < --z-modal 70).
+ * As camadas abertas depois de um modal sobem um degrau acima dele. Fica aqui porque este CSS viaja com o registro.
+ */
+@layer components {
+  .ui-modal-posicao ~ .ui-popover { z-index: calc(var(--z-modal) + 1); }
+}
+
+@layer foco {
+  .mdl-topo-abrir:focus-visible, .mdl-topo-parar:focus-visible { box-shadow: 0 0 0 2px var(--surface-inverse), 0 0 0 4px var(--accent); }
+}

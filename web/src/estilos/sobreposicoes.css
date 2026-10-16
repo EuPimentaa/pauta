@@ -154,7 +154,9 @@
   .ui-data-dia[aria-selected="true"] { background: var(--accent); color: var(--on-accent); }
   .ui-data-dia[aria-selected="true"]::after { background: var(--on-accent); }
   .ui-data-dia:focus-visible { box-shadow: var(--focus-ring); }
-  .ui-data-rodape { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+  /* hora + Limpar + Pronto cabem nos 272 px úteis do seletor (sem rolagem lateral); se não couberem, quebram a linha */
+  .ui-data-rodape { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+  .ui-data-hora { flex: 0 1 112px; min-width: 96px; }
   .ui-data-gatilho { justify-content: flex-start; font-weight: 400; min-width: 180px; }
   .ui-data-gatilho[data-vazio="true"] { color: var(--text-3); }
 }

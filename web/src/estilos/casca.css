@@ -122,6 +122,8 @@
   .casca-trilho { display: flex; flex-direction: column; align-items: center; gap: 4px; }
   .casca-trilho .casca-item { width: 44px; height: 40px; justify-content: center; padding: 0; }
   .casca-trilho-sep { width: 24px; height: 1px; margin: 8px 0; background: var(--border-strong); }
+  /* grupo sem itens (nenhuma extensão de menu ainda): nada de divisória sobrando no começo, no fim ou dobrada */
+  .casca-trilho-sep:first-child, .casca-trilho-sep:last-child, .casca-trilho-sep + .casca-trilho-sep { display: none; }
   .casca-quadro-mini {
     display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; text-decoration: none;
     background: var(--cor-bg); color: var(--cor-ink); font: 600 13px / 1 var(--font);

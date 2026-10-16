@@ -7,7 +7,7 @@
  *   <SeletorHora valor={h} aoMudar={setH} />
  */
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { DataLocal, HoraLocal } from '@shared/tipos/index.ts'
 import { cx } from '../lib/classes.ts'
 import {
@@ -188,13 +188,13 @@ export function SeletorData({
           {(comHora || permitirLimpar) && (
             <div className="ui-data-rodape">
               {comHora && (
-                <div className="w-32">
+                <div className="ui-data-hora">
                   <SeletorHora valor={hora} aoMudar={(h) => aoMudar(valor ?? hoje, h)} aria-label="Hora" permitirLimpar />
                 </div>
               )}
               <span className="flex-1" />
               {permitirLimpar && valor && (
-                <Botao variante="ghost" tamanho="p" icone={X} onClick={() => { aoMudar(null, null); setAberto(false) }}>Limpar</Botao>
+                <Botao variante="ghost" tamanho="p" onClick={() => { aoMudar(null, null); setAberto(false) }}>Limpar</Botao>
               )}
               {comHora && <Botao variante="secundario" tamanho="p" onClick={() => setAberto(false)}>Pronto</Botao>}
             </div>

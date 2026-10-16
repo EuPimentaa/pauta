@@ -98,12 +98,20 @@ export function motivoNegado(acao: AcaoPermissao): string {
 }
 
 /**
- * Campos da entrada que o papel não pode mandar: na demanda, CAMPOS_SO_ATENDIMENTO para a equipe; no cliente, tudo
- * fora de CAMPOS_CLIENTE_EQUIPE para a equipe. Conta a chave presente, qualquer que seja o valor.
+ * Campos do modelo de demanda que só atendimento e admin mandam: a demanda herda `rodadasInclusas` do modelo, então a
+ * equipe definir no modelo seria definir na demanda (o campo é de CAMPOS_SO_ATENDIMENTO).
  */
-export function camposProibidos(entrada: object, papel: Papel, lista: 'demanda' | 'cliente' = 'demanda'): string[] {
+export const CAMPOS_MODELO_SO_ATENDIMENTO = ['rodadasInclusas'] as const
+
+/**
+ * Campos da entrada que o papel não pode mandar: na demanda, CAMPOS_SO_ATENDIMENTO para a equipe; no modelo de
+ * demanda, CAMPOS_MODELO_SO_ATENDIMENTO; no cliente, tudo fora de CAMPOS_CLIENTE_EQUIPE para a equipe. Conta a chave
+ * presente, qualquer que seja o valor.
+ */
+export function camposProibidos(entrada: object, papel: Papel, lista: 'demanda' | 'cliente' | 'modelo' = 'demanda'): string[] {
   if (papel !== 'equipe') return []
   const chaves = Object.keys(entrada).filter((k) => (entrada as Record<string, unknown>)[k] !== undefined)
   if (lista === 'cliente') return chaves.filter((k) => !(CAMPOS_CLIENTE_EQUIPE as readonly string[]).includes(k))
+  if (lista === 'modelo') return chaves.filter((k) => (CAMPOS_MODELO_SO_ATENDIMENTO as readonly string[]).includes(k))
   return chaves.filter((k) => (CAMPOS_SO_ATENDIMENTO as readonly string[]).includes(k))
 }

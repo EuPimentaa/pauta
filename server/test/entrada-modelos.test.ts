@@ -117,4 +117,30 @@ describe('modelos de demanda', () => {
     assert.equal((await a.como(a.pessoas.admin).post('/api/modelos-demanda/revisados')).corpo.modelosRevisadosEm, '2026-10-15T13:00:00.000Z')
     assert.equal((await a.como(a.pessoas.admin).get('/api/bootstrap')).corpo.config.modelosRevisadosEm, '2026-10-15T13:00:00.000Z')
   })
+
+  test('rodadasInclusas no modelo só por atendimento e admin (a demanda herda o valor)', async () => {
+    const a = await ambiente()
+    const equipe = a.como(a.pessoas.design)
+    const quadroId = a.quadros.criacao.quadro.id
+    const criar = await equipe.post('/api/modelos-demanda', { ...NOVO, quadroId, rodadasInclusas: 20 })
+    assert.equal(criar.status, 403)
+    assert.equal(criar.corpo.erro.codigo, 'campo_nao_permitido')
+    assert.equal(criar.corpo.erro.detalhes.campo, 'rodadasInclusas')
+    const m = (await equipe.post('/api/modelos-demanda', { ...NOVO, quadroId })).corpo
+    assert.equal(m.rodadasInclusas, null)
+    for (const valor of [20, null]) {
+      const r = await equipe.patch(`/api/modelos-demanda/${m.id}`, { rodadasInclusas: valor })
+      assert.equal(r.status, 403, `PATCH com ${valor}`)
+      assert.equal(r.corpo.erro.codigo, 'campo_nao_permitido')
+    }
+    assert.equal((await equipe.patch(`/api/modelos-demanda/${m.id}`, { descricao: 'Outra' })).status, 200, 'sem a chave, a equipe edita')
+    const d = await equipe.post('/api/demandas', { quadroId, titulo: 'Convite', modeloId: m.id })
+    assert.equal(d.status, 201)
+    const semModelo = await equipe.post('/api/demandas', { quadroId, titulo: 'Sem modelo' })
+    assert.equal(d.corpo.demanda.rodadasInclusas, semModelo.corpo.demanda.rodadasInclusas, 'o padrão do cliente, não um valor posto pela equipe')
+    // o atendimento define, e a demanda criada com o modelo herda
+    assert.equal((await a.como(a.pessoas.am).patch(`/api/modelos-demanda/${m.id}`, { rodadasInclusas: 3 })).corpo.rodadasInclusas, 3)
+    const d2 = await equipe.post('/api/demandas', { quadroId, titulo: 'Convite 2', modeloId: m.id })
+    assert.equal(d2.corpo.demanda.rodadasInclusas, 3)
+  })
 })

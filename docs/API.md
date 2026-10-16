@@ -397,6 +397,9 @@ ativos também vêm no bootstrap.
 - **Quem:** global (`quadroId` nulo): admin; de um quadro: qualquer usuário. **Corpo:** `CriarModeloDemandaEntrada` /
   `EditarModeloDemandaEntrada` (`itens` e `etiquetas` substituem as listas). "Excluir" = `ativo: false` (as demandas
   criadas com ele continuam com `modeloId`). **Resposta:** `201`/`200 ModeloDemanda`.
+- **Campo só do atendimento:** `rodadasInclusas` (a demanda criada com o modelo herda o valor, e na demanda o campo é de
+  `CAMPOS_SO_ATENDIMENTO`): a equipe que manda a chave, com qualquer valor, recebe `403 campo_nao_permitido`
+  (`CAMPOS_MODELO_SO_ATENDIMENTO`, `shared/logica/permissoes.ts`; decisão da integração 3A, segurança 3).
 - **Erros:** `409 conflito` nome repetido no mesmo escopo; `422 estado_invalido` quadro arquivado. **SSE:** `modelo_demanda`.
 
 #### `POST /api/modelos-demanda/revisados`

@@ -19,15 +19,17 @@ export function podeAtor(ator: Ator, acao: AcaoPermissao, alvo?: AlvoPermissao):
 }
 
 /**
- * Demanda: CAMPOS_SO_ATENDIMENTO só para atendimento e admin; cliente: o papel equipe só manda CAMPOS_CLIENTE_EQUIPE.
- * Outro campo → 403 campo_nao_permitido com `detalhes.campo`.
+ * Demanda: CAMPOS_SO_ATENDIMENTO só para atendimento e admin; modelo de demanda: CAMPOS_MODELO_SO_ATENDIMENTO idem;
+ * cliente: o papel equipe só manda CAMPOS_CLIENTE_EQUIPE. Outro campo → 403 campo_nao_permitido com `detalhes.campo`.
  */
-export function exigirCamposPermitidos(ator: Ator, entrada: object, lista: 'demanda' | 'cliente' = 'demanda'): void {
+export function exigirCamposPermitidos(ator: Ator, entrada: object, lista: 'demanda' | 'cliente' | 'modelo' = 'demanda'): void {
   if (!ator.papel) return
   const proibidos = camposProibidos(entrada, ator.papel, lista)
   if (proibidos.length > 0) {
     throw new ErroHttp(403, 'campo_nao_permitido', lista === 'cliente'
       ? 'Você cria o cliente só com sigla e nome. O atendimento completa o cadastro.'
-      : 'Só o atendimento e o admin mudam este campo.', { campo: proibidos[0], campos: proibidos })
+      : lista === 'modelo'
+        ? 'Só o atendimento e o admin definem as rodadas inclusas do modelo.'
+        : 'Só o atendimento e o admin mudam este campo.', { campo: proibidos[0], campos: proibidos })
   }
 }

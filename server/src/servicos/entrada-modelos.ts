@@ -14,7 +14,7 @@ import { agora, novoId, rodar, todos, um, type Db } from '../db.ts'
 import { conflito, estadoInvalido, naoEncontrado, validacao } from '../erros.ts'
 import { gravarConfig, lerConfig } from './config-app.ts'
 import { emitirObjeto } from './eventos.ts'
-import { exigir } from './permissoes.ts'
+import { exigir, exigirCamposPermitidos } from './permissoes.ts'
 import { posicaoEntre } from './posicao.ts'
 import { carregarModeloDemanda } from './quadros.ts'
 
@@ -89,6 +89,7 @@ function emitirModelo(db: Db, id: Id, ator: Ator): ModeloDemanda {
 export function criarModelo(db: Db, e: CriarModeloDemandaEntrada, ator: Ator): ModeloDemanda {
   const quadroId = e.quadroId ?? null
   exigirEscopo(ator, quadroId)
+  exigirCamposPermitidos(ator, e, 'modelo')
   if (quadroId) exigirQuadroAtivo(db, quadroId)
   const nome = e.nome.trim()
   exigirNomeLivre(db, quadroId, nome, null)
@@ -116,6 +117,7 @@ export function editarModelo(db: Db, id: Id, e: EditarModeloDemandaEntrada, ator
     'SELECT id, quadro_id, nome, ativo FROM modelo_demanda WHERE id = ?', id)
   if (!l) throw naoEncontrado('Modelo de demanda não encontrado.')
   exigirEscopo(ator, l.quadro_id)
+  exigirCamposPermitidos(ator, e, 'modelo')
   if (l.quadro_id) exigirQuadroAtivo(db, l.quadro_id)
 
   const campos: Record<string, unknown> = {}

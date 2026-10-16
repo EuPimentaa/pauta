@@ -50,7 +50,10 @@ Sumário: [0 Regras](#0-regras-para-todos) · [1 Onda 1](#1-onda-1-núcleo-servi
    6 equipes, pessoas, clientes e demandas em todas as colunas; só desenvolvimento).
 8. **Pronto = verde em tudo**, na raiz: `npx tsc --noEmit -p server`, `npx tsc --noEmit -p web`, `npm test`,
    `node server/scripts/verificar-migracoes.ts`, `npm run build`, e o roteiro de navegador da sua funcionalidade
-   executado (claro e escuro, 1440 px e 390 px).
+   executado (claro e escuro, 1440 px e 390 px). Quem mexe no front roda também `npm run contraste --workspace web` e
+   `npm run auditoria --workspace web -- --url <origem do seu Vite>` (Chrome headless próprio: percorre o `/dev/ui`,
+   e com `AUDITORIA_EMAIL`/`AUDITORIA_SENHA` a casca e o menu do avatar, no Tab acusando parada sem anel de foco, e
+   mede contraste composto com a opacidade, pares não textuais, piso de tipo da marca e rolagem lateral).
 9. **Segurança não é opcional:** nada de `dangerouslySetInnerHTML`; Markdown só pelo componente seguro do design system;
    texto de fora (WhatsApp, cliente) só como texto puro; URL só `https:`; caminho `M:\` nunca vira `href`.
 10. **`shared/**` só importa por caminho relativo com `.ts`** (`../tipos/index.ts`), nunca `@shared`: o alias existe só
@@ -444,7 +447,8 @@ fora do chunk inicial); o que `/a/:token` baixa (entrada + tela pública) soma m
 inclui `registro.ts`; `npm run contraste --workspace web` (`web/scripts/contraste.ts`, sem dependência: lê
 `estilos/tokens.css` e calcula a razão WCAG de cada par texto/fundo, inclusive o texto da coluna tingida e o card sobre
 ela, nos dois temas) passa com mínimo 4,5:1; `/dev/ui` no claro e no escuro navega só pelo teclado; login →
-`/inicio`; convite em janela anônima define a senha e entra (URL sem o
+`/inicio`; `npm run auditoria --workspace web` sem problemas (foco, contraste composto, piso de tipo, rolagem lateral);
+convite em janela anônima define a senha e entra (URL sem o
 `#token`); com o servidor da Onda 1, o menu lista os quadros do bootstrap, a estrela leva o quadro para Favoritos e
 arrastar reordena (persistindo); 390 px sem rolagem horizontal na casca; `[` recolhe o menu; nenhuma cor hex fora de
 `estilos/`; `Markdown` com `[x](javascript:alert(1))` não gera link e com `@[Rafa](mencao:u1)` gera o `span`; build

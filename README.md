@@ -20,7 +20,9 @@ npm run seed:demo --workspace server    # dados de exemplo (só desenvolvimento)
 
 Pronto = verde em tudo, na raiz (`docs/PLANO.md` §0, regra 8): `npx tsc --noEmit -p server`, `npx tsc --noEmit -p web`,
 `npm test`, `node server/scripts/verificar-migracoes.ts`, `npm run build` e o roteiro de navegador (claro e escuro,
-1440 e 390 px). No front, também `npm run contraste --workspace web`.
+1440 e 390 px). No front, também `npm run contraste --workspace web` (pares de tokens) e
+`npm run auditoria --workspace web -- --url http://localhost:5173` (navegador: anel de foco no Tab, contraste composto,
+piso de tipo e rolagem lateral no `/dev/ui`; com `AUDITORIA_EMAIL` e `AUDITORIA_SENHA`, também a casca).
 
 ## Deploy (EasyPanel atrás da Cloudflare)
 

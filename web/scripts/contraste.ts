@@ -275,6 +275,21 @@ export function pares(): Par[] {
   p('--glass-text-3', '--glass-bg-camada', T, 'metadado na camada', extremos)
   p('--text', '--glass-bg-topo', T, 'texto na barra superior', extremos, 'escuro')
   p('--text-2', '--glass-bg-topo', T, 'texto secundário na barra superior', extremos, 'escuro')
+  p('--text', '--glass-bg-topo-escuro', T, 'texto na barra superior (página no tema escuro)', extremos, 'escuro')
+  p('--text-2', '--glass-bg-topo-escuro', T, 'texto secundário na barra superior (tema escuro)', extremos, 'escuro')
+  p('--text', '--glass-bg-menu', T, 'texto no menu lateral', extremos)
+  p('--text-2', '--glass-bg-menu', T, 'ícone e texto secundário no menu lateral', extremos)
+  p('--glass-text-3', '--glass-bg-menu', T, 'título de grupo no menu lateral', extremos)
+  // não textuais (3:1): o que o navegador mostrou que faltava medir (auditoria-navegador.ts confere as composições)
+  for (const f of ['--surface', '--surface-raised']) {
+    p('--text-3', f, UI, 'interruptor desligado: bolinha no trilho de superfície')
+    p('--border-control', f, UI, 'interruptor desligado: contorno do trilho')
+  }
+  p('--melt-white', '--accent', UI, 'interruptor ligado: bolinha no trilho laranja')
+  for (const f of ['--surface', '--surface-raised', '--surface-sunken', '--bg']) {
+    p('--accent-ink', f, UI, 'checkbox marcado: contorno da caixa contra o fundo em volta')
+    p('--success-ink', f, UI, 'checkbox de concluída marcado: contorno da caixa')
+  }
   // card selecionado e o sinal do card (véu sobre a superfície)
   p('--text-2', '--accent-soft', T, 'card selecionado: metadado (sobe para --text-2)')
   p('--text-2', '--veu-1', T, 'sinal do card (parado há)', ['var(--surface)'])

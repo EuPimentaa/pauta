@@ -278,6 +278,9 @@
     .cad-painel-corpo { padding: var(--space-3) var(--space-4) var(--space-4); }
     .cad-linha, .cad-arquivo-item, .cad-feriado, .cad-trilha-item { padding-left: var(--space-4); padding-right: var(--space-4); }
     .cad-linha { flex-wrap: wrap; }
+    .cad-linha-fim { flex-wrap: wrap; justify-content: flex-end; margin-left: auto; max-width: 100%; }
+    .cad-arquivo-item { flex-wrap: wrap; }
+    .cad-arquivo-item > .cad-linha-fim { width: 100%; }
     .cad-tabela-cabeca { display: none; }
     .cad-cliente-linha { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: var(--space-3) var(--space-4); gap: var(--space-2) var(--space-3); }
     .cad-cliente-linha > .cad-cliente-id { grid-column: 1 / -1; }

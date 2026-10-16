@@ -98,11 +98,11 @@ export default function TelaCliente() {
       {c.observacoes && <p className="cad-texto-2 whitespace-pre-line">{c.observacoes}</p>}
 
       <div className="cad-cliente-grade">
-        <Contatos cliente={c} podeEditar={podeEditar} novo={novoContato} setNovo={setNovoContato} />
         <div className="cad-secao">
-          <Responsaveis cliente={c} podeEditar={podeEditar} />
+          <Contatos cliente={c} podeEditar={podeEditar} novo={novoContato} setNovo={setNovoContato} />
           <Links cliente={c} podeEditar={podeEditar} />
         </div>
+        <Responsaveis cliente={c} podeEditar={podeEditar} />
       </div>
 
       <Abas rotulo="Seções do cliente" variante="linha" idBase="cad-cliente" ativa={aba} aoMudar={mudarAba}

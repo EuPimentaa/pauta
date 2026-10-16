@@ -29,6 +29,19 @@ centro devolve o `svg`). Com texto o `label` resolve, por isso a pílula "Conclu
 **Contorno em uso:** `.mdl-item .ui-check-caixa svg { pointer-events: none; }` em `web/src/funcionalidades/modal/modal.css`
 (os itens do checklist).
 
+## 3. Esc no título do modal fecha o modal inteiro (NÚCLEO-WEB · `web/src/demanda/ModalDemanda.tsx`)
+
+**Pedido:** enquanto o título está em edição, registrar o campo como camada (`useCamada(editando, { aoEsc: cancelar })`,
+de `web/src/lib/camadas.ts`), em vez do `onKeyDown` com `stopPropagation`.
+
+**Por quê:** as camadas do DS escutam o Esc na captura da janela, antes de qualquer campo; o `stopPropagation` do
+`textarea` chega tarde. Medido: clicar no título, apertar Esc → o modal fecha e a URL volta para `/q/criacao` (o
+esperado é só sair da edição do título).
+
+**Contorno no F1:** os campos que editam no lugar (itens e títulos de checklist, descrição, compositor e edição de
+comentário, nome de anexo, "Link ou caminho") usam `useEscLocal()` (`web/src/funcionalidades/modal/comum.tsx`), que
+faz exatamente isso. O título é do núcleo e segue com o problema.
+
 ## Avisos (não são pedidos)
 
 - **Painel lateral:** as linhas do F1 são filhas diretas de `.modal-demanda-lateral` (que tem `gap: 20px` para seções

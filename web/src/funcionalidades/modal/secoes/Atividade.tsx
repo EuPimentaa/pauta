@@ -27,7 +27,7 @@ import { EditorMarkdown } from '../../../ui/EditorMarkdown.tsx'
 import { EsqueletoLinhas } from '../../../ui/Indicadores.tsx'
 import { Kbd } from '../../../ui/Kbd.tsx'
 import { useAcoesModal, useComentarios, useHistorico } from '../api.ts'
-import { Secao, nomeCurto, quandoPorExtenso, tempoRelativo, useBuscarPessoas, useUsuarios } from '../comum.tsx'
+import { Secao, nomeCurto, quandoPorExtenso, tempoRelativo, useBuscarPessoas, useEscLocal, useUsuarios } from '../comum.tsx'
 
 const Markdown = lazy(() => import('../../../ui/Markdown.tsx').then((m) => ({ default: m.Markdown })))
 
@@ -50,6 +50,8 @@ function Compositor({ ctx, aberto, abrir, fechar, prefixo }: {
   const [subindo, setSubindo] = useState(0)
   const eu = ctx.eu.usuario
   const podeCliente = pode('comentario.visivel_cliente', { id: eu.id, papel: eu.papel })
+  // Esc fecha o compositor; o rascunho fica guardado
+  useEscLocal(aberto, fechar)
 
   // "Responder": começa com a menção a quem escreveu
   useEffect(() => {
@@ -140,6 +142,7 @@ function UmComentario({ c, ctx, responder }: { c: Comentario; ctx: ContextoDeman
   const usuarios = useUsuarios()
   const buscarPessoas = useBuscarPessoas()
   const [editando, setEditando] = useState<string | null>(null)
+  useEscLocal(editando !== null, () => setEditando(null))
   const autor = c.autorId ? usuarios.find((u) => u.id === c.autorId) : undefined
   const eu = ctx.eu.usuario
   const nome = autor ? autor.nome : (c.autorExterno ? `${c.autorExterno} (cliente)` : 'Alguém')

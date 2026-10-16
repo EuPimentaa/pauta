@@ -23,7 +23,7 @@ import { EsqueletoLinhas } from '../../../ui/Indicadores.tsx'
 import { Menu, type ItemMenuUi } from '../../../ui/Menu.tsx'
 import { CopiarTexto, copiarParaAreaDeTransferencia } from '../../../ui/Texto.tsx'
 import { useAcoesModal } from '../api.ts'
-import { Secao, nomeCurto, quandoPorExtenso, tamanho, tempoRelativo, useUsuarios } from '../comum.tsx'
+import { Secao, nomeCurto, quandoPorExtenso, tamanho, tempoRelativo, useEscLocal, useUsuarios } from '../comum.tsx'
 
 const PROVEDOR: Record<Provedor, { rotulo: string; icone: typeof Link2 }> = {
   drive: { rotulo: 'Google Drive', icone: Cloud }, docs: { rotulo: 'Google Docs', icone: FileText }, figma: { rotulo: 'Figma', icone: PenTool },
@@ -57,6 +57,7 @@ function CartaoAnexo({ a, ctx }: { a: Anexo; ctx: ContextoDemanda }) {
   const usuarios = useUsuarios()
   const [renomeando, setRenomeando] = useState(false)
   const [nome, setNome] = useState(a.nome)
+  useEscLocal(renomeando, () => { setNome(a.nome); setRenomeando(false) })
   const d = ctx.demanda
   const so = ctx.somenteLeitura
   const evidencia = a.finalidade === 'evidencia'
@@ -113,8 +114,7 @@ function CartaoAnexo({ a, ctx }: { a: Anexo; ctx: ContextoDemanda }) {
           <form onSubmit={(e) => { e.preventDefault(); setRenomeando(false); if (nome.trim() && nome.trim() !== a.nome) void acoes.renomearAnexo(a, nome.trim()) }}>
             <input className="mdl-titulo-campo" aria-label="Nome do anexo" value={nome} autoFocus maxLength={200}
               onFocus={(e) => e.currentTarget.select()} onChange={(e) => setNome(e.target.value)}
-              onBlur={() => { setRenomeando(false); if (nome.trim() && nome.trim() !== a.nome) void acoes.renomearAnexo(a, nome.trim()) }}
-              onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setRenomeando(false) } }} />
+              onBlur={() => { if (!renomeando) return; setRenomeando(false); if (nome.trim() && nome.trim() !== a.nome) void acoes.renomearAnexo(a, nome.trim()) }} />
           </form>
         ) : href ? (
           <a className="mdl-anexo-nome" href={href} target="_blank" rel="noopener noreferrer" title={a.nome}>{a.nome}</a>
@@ -149,6 +149,7 @@ function Adicionar({ d, fechar }: { d: Demanda; fechar(): void }) {
   const [texto, setTexto] = useState('')
   const [nome, setNome] = useState('')
   const [salvando, setSalvando] = useState(false)
+  useEscLocal(true, fechar)
   const endereco = lerEndereco(texto)
   const erro = texto.trim() && !endereco
     ? (/^http:\/\//i.test(texto.trim()) ? 'Use o link com https://.' : 'Cole um link https:// ou um caminho como M:\\Clientes\\…')

@@ -13,7 +13,7 @@ import { EditorMarkdown } from '../../../ui/EditorMarkdown.tsx'
 import { EsqueletoLinhas } from '../../../ui/Indicadores.tsx'
 import { Kbd } from '../../../ui/Kbd.tsx'
 import { TextoPuro } from '../../../ui/Texto.tsx'
-import { Secao, useBuscarPessoas } from '../comum.tsx'
+import { Secao, useBuscarPessoas, useEscLocal } from '../comum.tsx'
 
 const Markdown = lazy(() => import('../../../ui/Markdown.tsx').then((m) => ({ default: m.Markdown })))
 
@@ -34,6 +34,9 @@ export default function Descricao({ ctx }: { ctx: ContextoDemanda }) {
 
   // outra demanda (←/→ no modal): descarta a edição desta
   useEffect(() => { setEditando(null) }, [ctx.demanda.id])
+  // Esc salva e fecha o editor (como sair dele); "Cancelar" descarta
+  const salvarRef = useRef(async () => {})
+  useEscLocal(!!editando, () => { void salvarRef.current() })
 
   if (!ctx.detalhe) {
     return <Secao id="descricao" icone={TextQuote} titulo="Descrição"><EsqueletoLinhas linhas={3} /></Secao>
@@ -45,6 +48,7 @@ export default function Descricao({ ctx }: { ctx: ContextoDemanda }) {
     setEditando({ base: ctx.demanda, texto })
   }
 
+  salvarRef.current = salvar
   async function salvar() {
     if (!editando || salvando.current) return
     salvando.current = true
@@ -60,14 +64,14 @@ export default function Descricao({ ctx }: { ctx: ContextoDemanda }) {
         <div ref={bloco} className="flex flex-col gap-2"
           onBlur={(e) => { if (saiuDe(bloco.current, e.relatedTarget)) void salvar() }}>
           <EditorMarkdown valor={editando.texto} aoMudar={(md) => setEditando((x) => (x ? { ...x, texto: md } : x))}
-            aoSalvar={() => void salvar()} aoCancelar={() => { salvando.current = true; setEditando(null) }}
+            aoSalvar={() => void salvar()}
             buscarPessoas={buscarPessoas} rotulo="Descrição" autoFoco minLinhas={6}
             placeholder="Briefing, referências e o que precisa ficar pronto. Use @ para chamar alguém." />
           <div className="mdl-editor-rodape">
             <Botao variante="secundario" tamanho="p" onMouseDown={(e) => e.preventDefault()} onClick={() => void salvar()}>Salvar</Botao>
             <Botao variante="ghost" tamanho="p" onMouseDown={(e) => e.preventDefault()}
               onClick={() => { salvando.current = true; setEditando(null) }}>Cancelar</Botao>
-            <span className="mdl-editor-dica"><Kbd teclas="mod+enter" /> salva · <Kbd teclas="esc" /> descarta</span>
+            <span className="mdl-editor-dica"><Kbd teclas="mod+enter" /> ou <Kbd teclas="esc" /> salvam</span>
           </div>
         </div>
       ) : texto.trim() ? (

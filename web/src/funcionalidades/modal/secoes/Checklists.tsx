@@ -23,7 +23,7 @@ import { Checkbox } from '../../../ui/Checkbox.tsx'
 import { BarraProgresso, EsqueletoLinhas } from '../../../ui/Indicadores.tsx'
 import { Menu, type ItemMenuUi } from '../../../ui/Menu.tsx'
 import { useAcoesModal, chaveLocal } from '../api.ts'
-import { Secao, nomeCurto, tempoRelativo, useUsuarios } from '../comum.tsx'
+import { Secao, nomeCurto, tempoRelativo, useEscLocal, useUsuarios } from '../comum.tsx'
 
 // ─────────────────────────────── campo de texto que salva com Enter ───────────────────────────────
 
@@ -32,6 +32,7 @@ function CampoTexto({ valor, rotulo, aoSalvar, aoCancelar, classe, multiplo, pla
 }) {
   const [texto, setTexto] = useState(valor)
   const feito = useRef(false)
+  useEscLocal(true, () => { feito.current = true; aoCancelar() })
   const salvar = () => {
     if (feito.current) return
     feito.current = true
@@ -52,10 +53,27 @@ function CampoTexto({ valor, rotulo, aoSalvar, aoCancelar, classe, multiplo, pla
 
 // ─────────────────────────────── item ───────────────────────────────
 
+/** Ao fechar um campo de edição, o foco volta para o botão que o abriu (senão cairia no corpo da página). */
+function useFocoDeVolta(editando: boolean) {
+  const botao = useRef<HTMLButtonElement>(null)
+  const estava = useRef(editando)
+  useEffect(() => {
+    if (estava.current && !editando) {
+      requestAnimationFrame(() => {
+        const ativo = document.activeElement
+        if (!ativo || ativo === document.body) botao.current?.focus()
+      })
+    }
+    estava.current = editando
+  }, [editando])
+  return botao
+}
+
 function Item({ item, ctx, mover, podeArrastar }: { item: ChecklistItem; ctx: ContextoDemanda; mover(i: ChecklistItem, passo: -1 | 1): void; podeArrastar: boolean }) {
   const acoes = useAcoesModal()
   const usuarios = useUsuarios()
   const [editando, setEditando] = useState(false)
+  const voltar = useFocoDeVolta(editando)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled: !podeArrastar })
   const { role: _papel, tabIndex: _tab, ...atributos } = attributes
   const euId = ctx.eu.usuario.id
@@ -85,7 +103,7 @@ function Item({ item, ctx, mover, podeArrastar }: { item: ChecklistItem; ctx: Co
           aoSalvar={(t) => { setEditando(false); void acoes.editarItem(item, { texto: t.replace(/\s+/g, ' ').trim() }, euId) }}
           aoCancelar={() => setEditando(false)} />
       ) : (
-        <button type="button" className="mdl-item-texto" disabled={so} onClick={() => setEditando(true)} title={so ? undefined : 'Editar o item'}
+        <button ref={voltar} type="button" className="mdl-item-texto" disabled={so} onClick={() => setEditando(true)} title={so ? undefined : 'Editar o item'}
           aria-label={`Editar o item ${item.texto}`}>
           <span className="mdl-item-rotulo">{item.texto}</span>
           {item.feitoEm && (
@@ -108,6 +126,7 @@ function NovoItem({ c, aberto, abrir, fechar }: { c: ChecklistComItens; aberto: 
   const acoes = useAcoesModal()
   const [texto, setTexto] = useState('')
   const campo = useRef<HTMLTextAreaElement>(null)
+  useEscLocal(aberto, () => { setTexto(''); fechar() })
   if (!aberto) {
     return <button type="button" className="mdl-novo-item-botao" onClick={abrir}><Plus aria-hidden="true" />Adicionar item</button>
   }
@@ -141,6 +160,7 @@ function Checklist({ c, ctx, rodada, novoAberto, abrirNovo }: {
   const acoes = useAcoesModal()
   const [esconder, setEsconder] = useLocal<boolean>(`checklist-esconder:${c.id}`, false)
   const [renomeando, setRenomeando] = useState(false)
+  const voltarTitulo = useFocoDeVolta(renomeando)
   const feitos = c.itens.filter((i) => i.feitoEm).length
   const total = c.itens.length
   const pct = total ? Math.round((feitos / total) * 100) : 0
@@ -195,7 +215,7 @@ function Checklist({ c, ctx, rodada, novoAberto, abrirNovo }: {
             aoSalvar={(t) => { setRenomeando(false); void acoes.editarChecklist(c, { titulo: t.replace(/\s+/g, ' ').trim() }) }}
             aoCancelar={() => setRenomeando(false)} />
         ) : (
-          <button type="button" className="mdl-checklist-titulo" disabled={so} onClick={() => setRenomeando(true)}
+          <button ref={voltarTitulo} type="button" className="mdl-checklist-titulo" disabled={so} onClick={() => setRenomeando(true)}
             aria-label={so ? c.titulo : `Renomear o checklist ${c.titulo}`}>{c.titulo}</button>
         )}
         {rodada && (
@@ -240,6 +260,7 @@ function Checklist({ c, ctx, rodada, novoAberto, abrirNovo }: {
 
 function NovoChecklist({ aoCriar, aoCancelar }: { aoCriar(titulo: string): void; aoCancelar(): void }) {
   const [titulo, setTitulo] = useState('Checklist')
+  useEscLocal(true, aoCancelar)
   return (
     <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); if (titulo.trim()) aoCriar(titulo.trim()) }}>
       <input className="mdl-titulo-campo" aria-label="Nome do novo checklist" value={titulo} autoFocus maxLength={200}

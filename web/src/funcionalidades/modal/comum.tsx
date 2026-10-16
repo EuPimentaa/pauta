@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { Bootstrap, Demanda, Id, Instante, UsuarioResumo } from '@shared/tipos/index.ts'
 import { FUSO } from '@shared/tipos/index.ts'
 import { demandaConhecida } from '../../api/cache.ts'
+import { useCamada } from '../../lib/camadas.ts'
 import { useDemanda, useDoBootstrap } from '../../api/seletores.ts'
 import { cx } from '../../lib/classes.ts'
 import { normalizarBusca } from '../../ui/Combobox.tsx'
@@ -63,6 +64,21 @@ export function Propriedade({ id, icone: Icone, rotulo, children, abrir, desabil
 }
 
 export const Vazio = ({ children }: { children: ReactNode }) => <span className="mdl-prop-vazio">{children}</span>
+
+/**
+ * Esc de um campo que edita no lugar (item, título do checklist, descrição, comentário): enquanto ele está aberto, o
+ * Esc é dele e não fecha o modal. As camadas do DS escutam o Esc na captura da janela, antes do campo; por isso o
+ * campo entra na pilha como uma camada. Com a lista de menções do editor aberta, o Esc não faz nada (a lista some ao
+ * escolher ou ao clicar fora).
+ */
+export function useEscLocal(ativo: boolean, aoEsc: () => void): void {
+  useCamada(ativo, {
+    aoEsc: () => {
+      if (document.querySelector('[role="listbox"][aria-label="Pessoas para mencionar"]')) return
+      aoEsc()
+    },
+  })
+}
 
 /** A demanda de um diálogo: a do bootstrap (reativa) ou, fora dele, a do detalhe aberto. */
 export function useDemandaAtual(id: Id): Demanda | undefined {

@@ -5,6 +5,7 @@
  *   const eu = useEu()                        // dentro da área autenticada (sempre definido)
  *   const { eu, carregando } = useSessao()    // em qualquer lugar (eu nulo = sem sessão)
  */
+import { useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query'
 import type {
   Bootstrap, DefinirSenhaEntrada, EditarEuEntrada, Eu, LoginEntrada, TokenAcessoInfo, TrocarSenhaEntrada,
@@ -107,7 +108,8 @@ export function useTrocarSenha() {
  */
 export function useEditarEu(): (e: EditarEuEntrada, opcoes?: { silencioso?: boolean }) => Promise<Eu | null> {
   const qc = useQueryClient()
-  return async (e, opcoes) => {
+  // estável entre renders: quem guarda em useCallback/useEffect (menu recolhido, tecla [) não re-registra à toa
+  return useCallback(async (e: EditarEuEntrada, opcoes?: { silencioso?: boolean }) => {
     const antes = euEmCache(qc)
     atualizarEu(qc, (eu) => ({
       ...eu,
@@ -128,5 +130,5 @@ export function useEditarEu(): (e: EditarEuEntrada, opcoes?: { silencioso?: bool
       if (!opcoes?.silencioso) avisar(mensagemDeErro(erro), { tipo: 'erro' })
       return null
     }
-  }
+  }, [qc])
 }

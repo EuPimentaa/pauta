@@ -6,6 +6,7 @@ import { useCallback, useEffect } from 'react'
 import type { Id } from '@shared/tipos/index.ts'
 import { useEditarEu, useSessao } from '../api/auth.ts'
 import { gravarLocal, lerLocal, useLocal } from '../lib/armazenamento.ts'
+import { haCamadaAberta } from '../lib/camadas.ts'
 import { emCampoDeTexto } from '../lib/teclas.ts'
 
 /** Atalhos tratados pela casca (para a lista do "?" do F4 mostrar). */
@@ -18,13 +19,14 @@ export function useMenuRecolhido(): [boolean, (v: boolean) => void] {
   const [local, setLocal] = useLocal<boolean>('menu-recolhido', false)
   const editar = useEditarEu()
   const doServidor = eu?.prefs.menuRecolhido
+  const comSessao = !!eu
   useEffect(() => {
     if (doServidor !== undefined && doServidor !== lerLocal('menu-recolhido', false)) setLocal(doServidor)
   }, [doServidor, setLocal])
   const definir = useCallback((v: boolean) => {
     setLocal(v)
-    if (eu) void editar({ prefs: { menuRecolhido: v } }, { silencioso: true })
-  }, [eu, editar, setLocal])
+    if (comSessao) void editar({ prefs: { menuRecolhido: v } }, { silencioso: true })
+  }, [comSessao, editar, setLocal])
   return [local, definir]
 }
 
@@ -36,7 +38,7 @@ export function useTeclaMenu(alternar: () => void): void {
     if (!ligados) return
     const aoTeclar = (e: KeyboardEvent) => {
       if (e.key !== '[' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || e.repeat) return
-      if (emCampoDeTexto(e.target) || document.querySelector('#camadas [aria-modal="true"]')) return
+      if (emCampoDeTexto(e.target) || haCamadaAberta()) return
       e.preventDefault()
       alternar()
     }

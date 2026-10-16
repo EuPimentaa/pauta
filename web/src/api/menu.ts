@@ -1,11 +1,13 @@
 /**
  * Estrela e Seguir (API §4.5, PUT /api/quadros/:id/favorito|seguir), otimistas sobre ['bootstrap'].eu.
- * O tratador SSE de `quadro_usuario` (NÚCLEO-WEB) aplica o mesmo resultado nas outras janelas.
+ * O tratador SSE de `quadro_usuario` (NÚCLEO-WEB) aplica o mesmo resultado nas outras janelas. As funções são estáveis
+ * entre renders (podem ir em dependências de useEffect/useCallback).
  *
  *   const favoritar = useFavoritar()
  *   favoritar(quadro.id, true)                                  // estrela (vai para o fim dos favoritos)
  *   favoritar(quadro.id, true, { depoisDeQuadroId: null })      // reordenar: primeiro da lista
  */
+import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { FavoritoEntrada, Id, QuadroUsuario, SeguirEntrada } from '@shared/tipos/index.ts'
 import { avisar } from '../ui/avisos.tsx'
@@ -24,7 +26,7 @@ export function reordenarFavoritos(atuais: readonly Id[], id: Id, favorito: bool
 
 export function useFavoritar(): (quadroId: Id, favorito: boolean, posicao?: FavoritoEntrada['posicao']) => Promise<QuadroUsuario | null> {
   const qc = useQueryClient()
-  return async (quadroId, favorito, posicao) => {
+  return useCallback(async (quadroId: Id, favorito: boolean, posicao?: FavoritoEntrada['posicao']) => {
     const antes = euEmCache(qc)?.favoritos
     atualizarEu(qc, (eu) => ({ ...eu, favoritos: reordenarFavoritos(eu.favoritos, quadroId, favorito, posicao) }))
     try {
@@ -35,12 +37,12 @@ export function useFavoritar(): (quadroId: Id, favorito: boolean, posicao?: Favo
       avisar(mensagemDeErro(e), { tipo: 'erro', descricao: favorito ? 'A estrela não foi salva.' : 'A estrela não foi tirada.' })
       return null
     }
-  }
+  }, [qc])
 }
 
 export function useSeguir(): (quadroId: Id, seguindo: boolean) => Promise<QuadroUsuario | null> {
   const qc = useQueryClient()
-  return async (quadroId, seguindo) => {
+  return useCallback(async (quadroId: Id, seguindo: boolean) => {
     const antes = euEmCache(qc)?.seguindo
     atualizarEu(qc, (eu) => ({
       ...eu,
@@ -54,5 +56,5 @@ export function useSeguir(): (quadroId: Id, seguindo: boolean) => Promise<Quadro
       avisar(mensagemDeErro(e), { tipo: 'erro' })
       return null
     }
-  }
+  }, [qc])
 }

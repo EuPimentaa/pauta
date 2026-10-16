@@ -3,7 +3,7 @@
  *   useSincronizarTema()   montado na área autenticada: aplica o prefs.tema que chegou no bootstrap
  *   const mudar = useMudarTema(); mudar('escuro')
  */
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useEditarEu, useSessao } from '../api/auth.ts'
 import { aplicarTema, lerPreferenciaTema, type PreferenciaTema } from '../lib/tema.ts'
 
@@ -17,9 +17,9 @@ export function useSincronizarTema(): void {
 
 export function useMudarTema(): (p: PreferenciaTema) => void {
   const editar = useEditarEu()
-  const { eu } = useSessao({ buscar: false })
-  return (p) => {
+  const comSessao = !!useSessao({ buscar: false }).eu
+  return useCallback((p: PreferenciaTema) => {
     aplicarTema(p)
-    if (eu) void editar({ prefs: { tema: p } }, { silencioso: true })
-  }
+    if (comSessao) void editar({ prefs: { tema: p } }, { silencioso: true })
+  }, [comSessao, editar])
 }

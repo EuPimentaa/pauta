@@ -142,7 +142,7 @@
   .mdl-anexo-detalhe > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mdl-anexo-marca {
     display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 6px; border-radius: var(--radius-full);
-    background: var(--accent-soft); color: var(--accent-ink); font: 600 var(--fs-micro) / 1 var(--font); letter-spacing: .02em;
+    background: var(--accent-soft); color: var(--accent-ink); font: 600 var(--fs-meta) / 1 var(--font);
   }
   .mdl-anexo-marca[data-tom="evidencia"] { background: var(--info-bg); color: var(--info-ink); }
   .mdl-anexo .ui-copiar { padding: 2px 2px 2px 8px; }

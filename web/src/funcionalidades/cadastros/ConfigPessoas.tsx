@@ -10,6 +10,8 @@ import { KeyRound, Link2, MoreHorizontal, Pencil, Search, UserCheck, UserMinus, 
 import type { LinkAcesso, Usuario } from '@shared/tipos/index.ts'
 import { useEu } from '../../api/auth.ts'
 import { avisarErro } from '../../api/acoes.ts'
+import { chaves } from '../../api/chaves.ts'
+import { ErroDaApi } from '../../api/cliente.ts'
 import { useEquipes } from '../../api/seletores.ts'
 import { useAbrirDialogo } from '../../dialogos/index.ts'
 import { useNomeApp } from '../../lib/app.ts'
@@ -78,6 +80,15 @@ export default function ConfigPessoas() {
     try {
       setLink({ u, finalidade, link: await gerarLink(qc, u, finalidade) })
     } catch (e) {
+      // a pessoa já entrou (a lista estava velha): atualiza a lista e oferece o link de nova senha
+      if (finalidade === 'convite' && e instanceof ErroDaApi && e.status === 409) {
+        void qc.invalidateQueries({ queryKey: chaves.pessoas })
+        avisar(`${u.nome} já entrou.`, {
+          tipo: 'info', descricao: 'O convite não vale mais. Para trocar a senha dela, gere um link de nova senha.',
+          acao: { rotulo: 'Gerar link de nova senha', executar: () => novoLink(u, 'redefinicao') },
+        })
+        return
+      }
       avisarErro(e, { titulo: 'Não foi possível gerar o link.' })
     }
   }

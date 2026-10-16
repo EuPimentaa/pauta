@@ -83,9 +83,11 @@ export function DialogoPessoa({ pessoa, aoFechar }: { pessoa: Usuario | null; ao
   const erroApelido = erroDoCampo(erro, 'apelido') ?? (conflito && /apelido/i.test(conflito) ? conflito : undefined)
   const geral = erro && !erroEmail && !erroApelido && !erroDoCampo(erro, 'nome') ? mensagemGeral(erro) : null
 
+  // as chaves fazem o formulário montar de novo em "Convidar outra pessoa": o foco entra no Nome ([data-autofocus]),
+  // não fica no botão que sumiu
   if (convite) {
     return (
-      <Modal aberto aoFechar={aoFechar} titulo="Convite pronto" tamanho="m"
+      <Modal key="convite" aberto aoFechar={aoFechar} titulo="Convite pronto" tamanho="m"
         descricao="Mande o link para a pessoa. Ela abre, define a senha e já entra."
         rodape={(
           <>
@@ -99,7 +101,7 @@ export function DialogoPessoa({ pessoa, aoFechar }: { pessoa: Usuario | null; ao
   }
 
   return (
-    <Modal aberto aoFechar={aoFechar} titulo={pessoa ? `Editar ${pessoa.nome}` : 'Convidar pessoa'} tamanho="m"
+    <Modal key="formulario" aberto aoFechar={aoFechar} titulo={pessoa ? `Editar ${pessoa.nome}` : 'Convidar pessoa'} tamanho="m"
       descricao={pessoa ? undefined : 'Você recebe um link para mandar no WhatsApp. Sem e-mail automático.'}
       rodape={(
         <>

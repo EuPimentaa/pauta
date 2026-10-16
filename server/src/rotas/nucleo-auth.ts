@@ -89,6 +89,8 @@ async function definirSenha(c: Context<Ambiente>, finalidade: Finalidade): Promi
     revogarTokens(db, t.usuario_id)
     if (finalidade === 'redefinicao') revogarSessoes(db, t.usuario_id)
     criarSessao(db, c, t.usuario_id, c.get('ator').ip)
+    // a lista de Pessoas do admin (aberta em outra janela) tira o "Convite pendente" na hora
+    emitirUsuario(db, carregarUsuario(db, t.usuario_id), c)
     return montarEu(db, t.usuario_id)
   })
   return c.json(eu satisfies Eu)

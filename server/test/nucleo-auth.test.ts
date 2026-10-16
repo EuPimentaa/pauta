@@ -6,7 +6,7 @@ import { configurar, type Config } from '../src/config.ts'
 import { atorDe } from '../src/auth.ts'
 import { todos, tx, um } from '../src/db.ts'
 import { gerarLinkAcesso } from '../src/servicos/pessoas.ts'
-import { ORIGEM, SENHA_TESTE, ambiente, clienteHttp, sessaoPara } from './ajuda.ts'
+import { ORIGEM, SENHA_TESTE, ambiente, clienteHttp, eventos, sessaoPara, ultimoSeq } from './ajuda.ts'
 
 /** Senha nova dos testes: gerada a cada execução, como a SENHA_TESTE (nenhuma senha fica no código). */
 const NOVA = `${randomBytes(12).toString('base64url')}-Nova7`
@@ -235,9 +235,15 @@ describe('convite e redefinição', () => {
     assert.equal(info.status, 200)
     assert.deepEqual(info.corpo, { nome: 'Nina Nova', email: 'nina@melt.test', cor: 'azul', expiraEm: '2026-10-21T13:00:00.000Z' })
     assert.equal((await anonimo.post('/api/auth/convite', { token, senha: 'curta' })).status, 422)
+    const seq = ultimoSeq(a.db)
     const def = await anonimo.post('/api/auth/convite', { token, senha: NOVA })
     assert.equal(def.status, 200)
     assert.equal(def.corpo.usuario.temSenha, true)
+    // a lista de Pessoas do admin (outra janela) fica sabendo que ela entrou: evento usuario, sem e-mail
+    const ev = eventos(a.db, seq).filter((e) => e.entidade === 'usuario' && e.entidade_id === def.corpo.usuario.id)
+    assert.equal(ev.length, 1)
+    assert.equal(ev[0]!.publico, 'interno')
+    assert.ok(!('email' in (ev[0]!.patch ?? {})))
     assert.match(def.headers.get('set-cookie') ?? '', /^sid=/)
     const deNovo = await anonimo.post('/api/auth/convite', { token, senha: NOVA })
     assert.equal(deNovo.status, 410)

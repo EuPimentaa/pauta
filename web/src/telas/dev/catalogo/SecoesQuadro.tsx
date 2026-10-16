@@ -168,7 +168,7 @@ export function SecaoQuadro() {
           </div>
         </div>
       </Amostra>
-      <Nota>Coluna: fundo <code>--coluna-&lt;cor&gt;-bg</code> (mistura OKLab com a mesma claridade para todas as cores; texto e card AA nos dois temas), ponto no título, contador “6/5” acima do limite, ícone do papel. Card: um primário de estado por vez (prazo), um sinal, faixa de 3 px para alta e urgente, avatares até 3 + o resto.</Nota>
+      <Nota>Coluna: fundo <code>--coluna-&lt;cor&gt;-bg</code> (pastel em OKLCH com a matiz exata da cor da marca, o mesmo peso para todas; texto e card AA nos dois temas; no escuro o card fica acima da coluna), ponto no título, contador “6/5” acima do limite, ícone do papel. Card: um primário de estado por vez (prazo), um sinal, faixa de 3 px para alta e urgente, avatares até 3 + o resto.</Nota>
     </>
   )
 }

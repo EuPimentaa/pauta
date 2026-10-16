@@ -71,22 +71,25 @@
   /* o laranja NÃO é etiqueta: fica reservado para acento, foco e seleção */
 
   /* ---------- colunas tingidas (ADAPTACOES, "Visual") ----------
-     Fundo = mistura OKLab da cor com --surface-sunken. A fração de cada cor foi calculada para cair na mesma
-     claridade (L OKLab 0,90 no claro e 0,255 no escuro, teto de 32%/24%): as cores claras tingem mais, as escuras
-     menos, e todas ficam pastel com o mesmo peso visual. Na coluna use --text e --text-2 (AA nos dois temas,
-     contraste.ts); o --text-3 fica dentro do card. Destaque sobre a coluna (limite WIP) vai em pílula
-     --accent-soft/--accent-ink, nunca laranja solto no fundo tingido.
+     Pastel calculado em OKLCH com a MATIZ exata do hex da marca (--label-<cor>) e claridade/croma fixas por tema:
+     claro L 0,915–0,935 (amarelo mais claro, rosa e azul um pouco mais baixos para caber croma na gama sRGB), croma
+     0,028–0,068; escuro L 0,19, entre o canvas (#0A0A0A) e o card (#181818, que fica acima da coluna), croma
+     0,03–0,05. A mistura OKLab com --surface-sunken (versão anterior) deixava as cores escuras quase cinza (berinjela
+     com croma 0,005, igual ao grafite): assim cada cor se reconhece com o mesmo peso. Grafite é o cinza (croma 0).
+     O contraste.ts confere: dentro da gama, matiz igual à do hex da marca e AA de --text e --text-2 na coluna.
+     Na coluna use --text e --text-2; o --text-3 fica dentro do card. Destaque sobre a coluna (limite WIP) vai em
+     pílula --accent-soft/--accent-ink, nunca laranja solto no fundo tingido.
      -ponto = bolinha no título (a cor cheia; com contorno sutil no componente). */
-  --coluna-ambar-bg:     light-dark(color-mix(in oklab, var(--label-ambar) 28%, var(--surface-sunken)),     color-mix(in oklab, var(--label-ambar) 12%, var(--surface-sunken)));
-  --coluna-amarelo-bg:   light-dark(color-mix(in oklab, var(--label-amarelo) 32%, var(--surface-sunken)),   color-mix(in oklab, var(--label-amarelo) 11%, var(--surface-sunken)));
-  --coluna-rosa-bg:      light-dark(color-mix(in oklab, var(--label-rosa) 14%, var(--surface-sunken)),      color-mix(in oklab, var(--label-rosa) 16%, var(--surface-sunken)));
-  --coluna-magenta-bg:   light-dark(color-mix(in oklab, var(--label-magenta) 11%, var(--surface-sunken)),   color-mix(in oklab, var(--label-magenta) 20%, var(--surface-sunken)));
-  --coluna-roxo-bg:      light-dark(color-mix(in oklab, var(--label-roxo) 7%, var(--surface-sunken)),      color-mix(in oklab, var(--label-roxo) 22%, var(--surface-sunken)));
-  --coluna-berinjela-bg: light-dark(color-mix(in oklab, var(--label-berinjela) 6%, var(--surface-sunken)), color-mix(in oklab, var(--label-berinjela) 23%, var(--surface-sunken)));
-  --coluna-verde-bg:     light-dark(color-mix(in oklab, var(--label-verde) 21%, var(--surface-sunken)),     color-mix(in oklab, var(--label-verde) 13%, var(--surface-sunken)));
-  --coluna-turquesa-bg:  light-dark(color-mix(in oklab, var(--label-turquesa) 16%, var(--surface-sunken)),  color-mix(in oklab, var(--label-turquesa) 15%, var(--surface-sunken)));
-  --coluna-azul-bg:      light-dark(color-mix(in oklab, var(--label-azul) 15%, var(--surface-sunken)),      color-mix(in oklab, var(--label-azul) 16%, var(--surface-sunken)));
-  --coluna-grafite-bg:   light-dark(color-mix(in oklab, var(--label-grafite) 10%, var(--surface-sunken)),   color-mix(in oklab, var(--label-grafite) 20%, var(--surface-sunken)));
+  --coluna-ambar-bg:     light-dark(oklch(0.925 0.054 70.7),  oklch(0.19 0.035 70.7));
+  --coluna-amarelo-bg:   light-dark(oklch(0.935 0.068 88.7),  oklch(0.19 0.034 88.7));
+  --coluna-rosa-bg:      light-dark(oklch(0.915 0.042 13.3),  oklch(0.19 0.045 13.3));
+  --coluna-magenta-bg:   light-dark(oklch(0.915 0.045 356.5), oklch(0.19 0.045 356.5));
+  --coluna-roxo-bg:      light-dark(oklch(0.92 0.046 307.9),  oklch(0.19 0.05 307.9));
+  --coluna-berinjela-bg: light-dark(oklch(0.925 0.028 305.9), oklch(0.19 0.03 305.9));
+  --coluna-verde-bg:     light-dark(oklch(0.93 0.05 149.6),   oklch(0.19 0.04 149.6));
+  --coluna-turquesa-bg:  light-dark(oklch(0.93 0.042 194.2),  oklch(0.19 0.03 194.2));
+  --coluna-azul-bg:      light-dark(oklch(0.915 0.04 252.3),  oklch(0.19 0.045 252.3));
+  --coluna-grafite-bg:   light-dark(oklch(0.91 0 0),          oklch(0.19 0 0));
   --coluna-ambar-ponto: var(--label-ambar);         --coluna-amarelo-ponto: var(--label-amarelo);
   --coluna-rosa-ponto: var(--label-rosa);           --coluna-magenta-ponto: var(--label-magenta);
   --coluna-roxo-ponto: var(--label-roxo);           --coluna-berinjela-ponto: var(--label-berinjela);

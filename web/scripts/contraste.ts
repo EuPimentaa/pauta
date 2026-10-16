@@ -1,7 +1,7 @@
 /**
  * Confere o contraste WCAG 2.x dos pares texto/fundo dos tokens (web/src/estilos/tokens.css), nos dois temas.
- * Sem dependências: lê o CSS, resolve var(), light-dark(), color-mix(in oklab|srgb, ...) e rgb() com alfa como o
- * navegador faz, e calcula a razão de contraste. Sai com código 1 se algum par ficar abaixo do mínimo.
+ * Sem dependências: lê o CSS, resolve var(), light-dark(), color-mix(in oklab|srgb, ...), oklch() e rgb() com alfa
+ * como o navegador faz, e calcula a razão de contraste. Sai com código 1 se algum par ficar abaixo do mínimo.
  *
  *   npm run contraste --workspace web          (ou: node web/scripts/contraste.ts)
  *   node web/scripts/contraste.ts --tudo       (lista também os pares que passaram)
@@ -73,6 +73,25 @@ export function deOklab([L, A, Bb]: [number, number, number], a = 1): Rgba {
     b: limitar(gama(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s)),
     a,
   }
+}
+
+/**
+ * oklch(L C H) → sRGB. Os tokens só usam cores DENTRO da gama sRGB (fora dela o navegador faria mapeamento de gama e
+ * a cor pintada não seria a medida aqui): fora da gama, erro.
+ */
+export function deOklch(L: number, C: number, H: number, a = 1): Rgba {
+  const rad = (H * Math.PI) / 180
+  const A = C * Math.cos(rad), B = C * Math.sin(rad)
+  const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3
+  const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3
+  const s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3
+  const linear = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ]
+  if (linear.some((x) => x < -1e-4 || x > 1 + 1e-4)) throw new Error(`oklch(${L} ${C} ${H}) fica fora da gama sRGB: baixe a croma`)
+  return deOklab([L, A, B], a)
 }
 
 export function hex(h: string): Rgba {
@@ -150,6 +169,12 @@ export function avaliar(expr: string, tokens: Map<string, string>, tema: Tema, p
     }
     case 'light-dark':
       return avaliar(tema === 'claro' ? args[0] : args[1], tokens, tema, pilha)
+    case 'oklch': {
+      const [cor, alfa] = f.corpo.split('/').map((s) => s.trim())
+      const [L, C, H] = cor.split(/\s+/).map((v) => (v.endsWith('%') ? parseFloat(v) / 100 : Number(v)))
+      if ([L, C, H].some((v) => Number.isNaN(v))) throw new Error(`oklch inválido: "${e}"`)
+      return deOklch(L, C, H, alfa === undefined ? 1 : alfa.endsWith('%') ? parseFloat(alfa) / 100 : Number(alfa))
+    }
     case 'rgb': case 'rgba': {
       const [cor, alfa] = f.corpo.split('/').map((s) => s.trim())
       const [r, g, b] = cor.split(/[\s,]+/).map(Number)
@@ -279,19 +304,55 @@ export function conferir(css: string): Resultado[] {
   return saida
 }
 
+/** Matiz OKLCH (graus, 0–360) de uma cor. */
+export function matiz(c: Rgba): number {
+  const [, a, b] = paraOklab(c)
+  const h = (Math.atan2(b, a) * 180) / Math.PI
+  return h < 0 ? h + 360 : h
+}
+
+/**
+ * A tinta de cada coluna (--coluna-<cor>-bg, oklch nos dois temas) tem que ter a matiz do hex da marca da cor
+ * (--label-<cor> no claro), com folga de 0,15°: o pastel é derivado da marca, não uma cor nova. Devolve os problemas.
+ */
+export function conferirMatizes(css: string): string[] {
+  const tokens = lerTokens(css)
+  const problemas: string[] = []
+  for (const c of CORES) {
+    const valor = tokens.get(`--coluna-${c}-bg`) ?? ''
+    const lados = [...valor.matchAll(/oklch\(\s*([\d.]+%?)\s+([\d.]+)\s+([\d.]+)\s*\)/g)]
+    if (lados.length !== 2) { problemas.push(`--coluna-${c}-bg: esperado light-dark(oklch(…), oklch(…))`); continue }
+    if (c === 'grafite') {
+      if (lados.some((m) => Number(m[2]) !== 0)) problemas.push('--coluna-grafite-bg: o grafite é neutro (croma 0)')
+      continue
+    }
+    const alvo = matiz(avaliar(`var(--label-${c})`, tokens, 'claro'))
+    for (const m of lados) {
+      const h = Number(m[3])
+      const dif = Math.abs(((h - alvo + 540) % 360) - 180)
+      if (dif > 0.15) problemas.push(`--coluna-${c}-bg: matiz ${h} difere da marca (${alvo.toFixed(1)})`)
+    }
+  }
+  return problemas
+}
+
 function principal() {
   const caminho = fileURLToPath(new URL('../src/estilos/tokens.css', import.meta.url))
-  const resultados = conferir(readFileSync(caminho, 'utf8'))
+  const css = readFileSync(caminho, 'utf8')
+  const resultados = conferir(css)
   const tudo = process.argv.includes('--tudo')
   const falhas = resultados.filter((r) => !r.ok)
   const fmt = (n: number) => n.toFixed(2).replace('.', ',')
   for (const r of tudo ? resultados : falhas) {
     console.log(`${r.ok ? 'ok   ' : 'FALHA'} ${r.tema.padEnd(6)} ${fmt(r.valor).padStart(6)}:1 (mín. ${fmt(r.minimo)})  ${r.texto} em ${r.fundo}  [${r.cores}]  ${r.nota}`)
   }
+  const matizes = conferirMatizes(css)
+  for (const m of matizes) console.log(`FALHA tinta ${m}`)
   const menor = (t: Tema) => Math.min(...resultados.filter((r) => r.tema === t && r.minimo === T).map((r) => r.valor))
-  console.log(`\n${resultados.length} pares conferidos, ${falhas.length} abaixo do mínimo. ` +
+  console.log(`\n${resultados.length} pares conferidos, ${falhas.length} abaixo do mínimo; ` +
+    `${CORES.length} tintas de coluna com a matiz da marca${matizes.length ? `: ${matizes.length} com problema` : ''}. ` +
     `Menor razão de texto: claro ${fmt(menor('claro'))}:1, escuro ${fmt(menor('escuro'))}:1.`)
-  if (falhas.length) process.exit(1)
+  if (falhas.length || matizes.length) process.exit(1)
 }
 
 if (import.meta.main) principal()

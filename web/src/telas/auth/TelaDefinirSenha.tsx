@@ -94,7 +94,7 @@ export function TelaDefinirSenha({ finalidade }: { finalidade: FinalidadeToken }
         <div className="auth-pessoa" aria-hidden="true"><Esqueleto largura={40} altura={40} raio={999} /><div className="flex flex-1 flex-col gap-2"><Esqueleto largura="55%" /><Esqueleto largura="75%" altura={11} /></div></div>
       ) : consulta.data ? (
         <div className="auth-pessoa">
-          <Avatar pessoa={{ nome: consulta.data.nome }} tamanho={40} dica={false} />
+          <Avatar pessoa={{ nome: consulta.data.nome, cor: consulta.data.cor }} tamanho={40} dica={false} />
           <div className="min-w-0"><strong className="truncate">{consulta.data.nome}</strong><span className="block truncate">{consulta.data.email}</span></div>
         </div>
       ) : null}

@@ -7,9 +7,12 @@ import { ShieldAlert } from 'lucide-react'
 import { useSessao } from '../api/auth.ts'
 import type { ExtensaoRota } from '../extensoes/tipos.ts'
 import { nomeApp } from '../lib/app.ts'
+import { Botao } from '../ui/Botao.tsx'
 import { EstadoVazio } from '../ui/Indicadores.tsx'
 import { LimiteErro } from '../ui/LimiteErro.tsx'
+import { Modal } from '../ui/Modal.tsx'
 import { EsqueletoTela } from './EsqueletoTela.tsx'
+import { useFecharSobreposta } from './sobreposta.tsx'
 
 const telas = new Map<string, LazyExoticComponent<ComponentType>>()
 
@@ -28,14 +31,26 @@ function useTituloRota(titulo: string | undefined) {
   }, [titulo])
 }
 
+const TITULO_SEM_ACESSO = 'Você não tem acesso a esta página.'
+const TEXTO_SEM_ACESSO = 'Ela é só para quem administra o sistema. Peça ao admin, se precisar.'
+
+/** Rota sobreposta só de admin aberta por quem não é: o aviso num modal sobre a tela de baixo, não solto por cima dela. */
+function SemAcessoSobreposta() {
+  const fechar = useFecharSobreposta()
+  return (
+    <Modal aberto aoFechar={fechar} rotulo="Sem acesso" tamanho="p">
+      <EstadoVazio icone={ShieldAlert} como="h2" titulo={TITULO_SEM_ACESSO} texto={TEXTO_SEM_ACESSO}
+        acoes={<Botao variante="secundario" onClick={fechar}>Fechar</Botao>} />
+    </Modal>
+  )
+}
+
 export function Tela({ rota, esqueleto }: { rota: ExtensaoRota; esqueleto?: ReactNode }) {
   useTituloRota(rota.titulo)
   const { eu } = useSessao({ buscar: false })
   if (rota.acesso === 'admin' && eu?.usuario.papel !== 'admin') {
-    return (
-      <EstadoVazio icone={ShieldAlert} titulo="Você não tem acesso a esta página."
-        texto="Ela é só para quem administra o sistema. Peça ao admin, se precisar." />
-    )
+    if (rota.layout === 'sobreposta') return <SemAcessoSobreposta />
+    return <EstadoVazio icone={ShieldAlert} titulo={TITULO_SEM_ACESSO} texto={TEXTO_SEM_ACESSO} />
   }
   const C = componenteDaRota(rota)
   return (

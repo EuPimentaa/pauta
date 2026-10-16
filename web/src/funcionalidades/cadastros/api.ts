@@ -280,14 +280,6 @@ export async function criarQuadro(qc: QueryClient, e: CriarQuadroEntrada): Promi
   return q
 }
 
-/**
- * "Copiar quadro" pelo hook do núcleo (useCopiarQuadro) e, depois, o que ele não traz: os modelos de demanda copiados
- * e os seguidores (o bootstrap novo traz tudo; os eventos são o nosso eco).
- */
-export function depoisDeCopiar(qc: QueryClient): void {
-  void recarregarBootstrap(qc)
-}
-
 export async function arquivarQuadro(qc: QueryClient, q: Quadro): Promise<Quadro> {
   const novo = await api<Quadro>('POST', `/api/quadros/${encodeURIComponent(q.id)}/arquivar`)
   mudarBootstrap(qc, (b) => semQuadro(b, q.id))

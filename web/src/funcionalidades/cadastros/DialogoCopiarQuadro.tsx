@@ -5,7 +5,6 @@
  */
 import { useId, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { useQueryClient } from '@tanstack/react-query'
 import type { QuadroCompleto } from '@shared/tipos/index.ts'
 import { useCopiarQuadro } from '../../api/quadros.ts'
 import { useEquipes, useQuadro, useQuadros } from '../../api/seletores.ts'
@@ -15,12 +14,11 @@ import { avisar } from '../../ui/avisos.tsx'
 import { Botao } from '../../ui/Botao.tsx'
 import { Campo, Selecao } from '../../ui/Campo.tsx'
 import { Interruptor } from '../../ui/Checkbox.tsx'
-import { depoisDeCopiar, useQuadroCompleto } from './api.ts'
+import { useQuadroCompleto } from './api.ts'
 import { nomeDaCopia } from './logica.ts'
 import './dialogos.ts'
 
 export default function DialogoCopiarQuadro({ params, fechar }: PropsDialogo<'copiar-quadro'>) {
-  const qc = useQueryClient()
   const navegar = useNavigate()
   const copiar = useCopiarQuadro()
   const idForm = useId()
@@ -48,7 +46,6 @@ export default function DialogoCopiarQuadro({ params, fechar }: PropsDialogo<'co
     })
     setEnviando(false)
     if (!r) return
-    depoisDeCopiar(qc)
     const n = (x: number, um: string, varios: string) => `${x} ${x === 1 ? um : varios}`
     avisar(`Quadro ${r.quadro.nome} criado.`, {
       tipo: 'sucesso',

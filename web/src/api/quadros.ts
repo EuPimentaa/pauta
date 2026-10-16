@@ -16,6 +16,7 @@ import { ehCardDaColuna } from '@shared/logica/quadro.ts'
 import { avisar } from '../ui/avisos.tsx'
 import { avisarErro } from './acoes.ts'
 import { atualizarEu, euEmCache } from './auth.ts'
+import { recarregarBootstrap } from './bootstrap.ts'
 import { aplicarNoBootstrap, bootstrapDe, comItem, inserirDemanda, mudarBootstrap } from './cache.ts'
 import { chaves } from './chaves.ts'
 import { api } from './cliente.ts'
@@ -362,6 +363,9 @@ export function useCopiarQuadro(): (q: Quadro, e: CopiarQuadroEntrada) => Promis
         for (const a of novo.automacoes) x = comItem(x, 'automacoes', 'upsert', a)
         return x
       })
+      // os modelos de demanda copiados e o "seguindo" do quadro novo não vêm no QuadroCompleto (e os eventos deles
+      // são o nosso eco): o bootstrap novo traz tudo
+      void recarregarBootstrap(qc)
       return novo
     } catch (erro) {
       avisarErro(erro, { titulo: 'Não foi possível copiar o quadro.' })

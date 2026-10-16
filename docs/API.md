@@ -581,7 +581,8 @@ calculada no front com `shared/logica/rapida.ts`; esta rota confere).
 - **Quem:** qualquer usuário. **Corpo:** `CriarRapidaEntrada` (uma linha = uma demanda, na coluna onde a pessoa
   digitou; Enter cria e mantém o campo aberto, como no Trello). **Resposta:** `201 CriarRapidaSaida`.
 - Marcadores com casamento **exato**: `HE:`, `[HE]`, `HE -` (apelido em `cliente_alias`) = cliente; `@rafa` (apelido
-  de usuário ativo) = membro (vários). O que não casar continua no título. Sigla no formato de marcador que não casa
+  de usuário ativo; para quem não tem apelido, o primeiro nome, se só uma pessoa ativa o tiver) = membro (vários). O
+  que não casar continua no título. Sigla no formato de marcador que não casa
   (1 a 12 de A–Z/0–9) → `siglaNova` (a interface oferece "Criar cliente XYZ" a todos os papéis, pelo diálogo
   `criar-cliente`; o texto continua no título). Coluna de pessoa: a pessoa entra como membro.
 - Cliente = marcador ?? `clienteId` do contexto; AM pelo cliente; sem modelo; posição padrão = fim da coluna. Nunca
@@ -592,11 +593,13 @@ calculada no front com `shared/logica/rapida.ts`; esta rota confere).
 Qualquer usuário. **Corpo:** `AnalisarTextoEntrada` (até 50.000 caracteres). `200 AnaliseTexto`. Sem efeito.
 Reconhece cabeçalhos `[14/10 15:32] Fulana:`; sugere cliente por apelido e modelo por palavras do nome (post,
 carrossel, reels, stories, vídeo, site, relatório, anúncio...); sigla desconhecida em maiúsculas vira `siglaNova`.
-A Nova demanda preenche e cria por `POST /api/demandas` com `origem: 'whatsapp'` e `origemTexto`.
+A Nova demanda preenche e cria por `POST /api/demandas` com `origem: 'whatsapp'` e `origemTexto`. O prazo pedido na
+conversa ("até sexta", "para amanhã", "dia 24/10") é lido no front (`prazoDaConversa`, `shared/logica/colar-whatsapp.ts`):
+dia da semana e "amanhã" contam do dia da mensagem, prazo que já passou não é sugerido; ele vence o prazo do modelo.
 
 #### `GET /api/busca`
 Qualquer usuário. **Consulta:** `BuscaConsulta`. `200 BuscaSaida` (até 20). `#4521`/`4521` → número exato primeiro;
-primeira palavra igual a um apelido de cliente filtra o cliente; o resto vai ao FTS5 (título e descrição) por prefixo,
+o maior começo do texto (até 4 palavras) igual a um apelido de cliente filtra o cliente; o resto vai ao FTS5 (título e descrição) por prefixo,
 sem acento. Sempre `excluido_em IS NULL` (a anonimizada nunca aparece, nem pelo número). Arquivadas e de quadros
 arquivados só com `incluirArquivadas`. Meta: menos de 150 ms com 5 mil demandas.
 

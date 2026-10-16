@@ -92,7 +92,7 @@ function QuadroAusente({ slug }: { slug: string }) {
   )
 }
 
-function PaginaQuadro({ quadro }: { quadro: Quadro }) {
+export function PaginaQuadro({ quadro }: { quadro: Quadro }) {
   const reg = useRegistro()
   const eu = useEu()
   const config = useConfig()

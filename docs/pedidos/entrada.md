@@ -28,6 +28,17 @@ sigla do cliente ou o número.` (hoje: `Nada encontrado para "termo".`).
 quando a busca não acha demanda e nenhuma outra fonte (quadros, clientes, pessoas) casa o termo; assim o estado
 vazio do núcleo não chega a aparecer. Com o pedido feito, essa linha pode sair.
 
+## 3. Teste intermitente da URL assinada (NÚCLEO-SERVIDOR · `server/test/nucleo-arquivos.test.ts`)
+
+**Pedido:** no teste "vale até expirar; assinatura de outro arquivo ou adulterada não vale", adulterar a assinatura
+trocando o último caractere por um diferente dele (ex.: `sig.at(-1) === 'A' ? 'B' : 'A'`).
+
+**Por quê:** `${sig.slice(0, -1)}A` é a própria assinatura quando ela já termina em "A" (1 vez em 64): aí
+`assinaturaValida` devolve `true` e o teste falha com `actual: true, expected: false`. É a falha intermitente citada
+na INTEGRACAO-2 ("Estado final"); apareceu uma vez nesta worktree e passou ao rodar de novo.
+
+**Contorno em uso:** nenhum (só rodar de novo).
+
 ## Avisos (não são pedidos)
 
 - **F5 · diálogo `criar-cliente`:** a Nova demanda (cliente, sigla da conversa) e a criação rápida (sigla nova no

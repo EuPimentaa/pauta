@@ -1,0 +1,77 @@
+/*
+ * Modal da demanda (/d/:numero): topo com título, lugar e ações; duas colunas (principal e lateral) a partir de
+ * 900 px; tela cheia no celular (o Modal do DS cuida). Só tokens da marca.
+ */
+@layer components {
+  .ui-modal.modal-demanda-janela { --largura: 1040px; }
+  .ui-modal-corpo.modal-demanda-rolagem { padding: 0; }
+  .modal-demanda { display: flex; flex-direction: column; min-height: 100%; outline: none; }
+  .modal-demanda-capa {
+    height: 56px; margin-bottom: var(--space-2); border-radius: var(--radius-xl) var(--radius-xl) 0 0; background: var(--cor, var(--border-strong));
+  }
+  .modal-demanda-capa[data-imagem] { height: auto; max-height: 200px; overflow: hidden; background: var(--surface-sunken); }
+  .modal-demanda-capa img { display: block; width: 100%; max-height: 200px; object-fit: cover; }
+  .modal-demanda-topo {
+    display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-5) var(--space-5) var(--space-4) var(--space-6);
+  }
+  .modal-demanda-titulos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .modal-demanda-pre { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+  .modal-demanda-numero { color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); font-variant-numeric: tabular-nums; }
+  .modal-demanda-titulo { font: 600 var(--fs-h3) / var(--lh-h3) var(--font); letter-spacing: var(--tracking-titulo); color: var(--text); overflow-wrap: anywhere; }
+  .modal-demanda-titulo-botao {
+    display: block; width: 100%; margin: -2px -6px; padding: 2px 6px; border: 0; border-radius: var(--radius-sm);
+    background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; cursor: text;
+  }
+  .modal-demanda-titulo-botao:hover { background: var(--veu-1); }
+  .modal-demanda-titulo-campo {
+    width: 100%; resize: none; padding: 4px 8px; margin: -4px -8px; border: 1px solid var(--border-control); border-radius: var(--radius-sm);
+    background: var(--surface); color: var(--text); font: 600 var(--fs-h3) / var(--lh-h3) var(--font); letter-spacing: var(--tracking-titulo);
+    field-sizing: content; min-height: 2lh;
+  }
+  .modal-demanda-onde { color: var(--text-2); font: 400 var(--fs-body) / var(--lh-body) var(--font); }
+  .modal-demanda-lugar {
+    padding: 0 3px; margin: 0 -1px; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--text);
+    font: 600 var(--fs-body) / var(--lh-body) var(--font); text-decoration: underline; text-decoration-color: var(--border-strong);
+    text-underline-offset: 3px; cursor: pointer;
+  }
+  .modal-demanda-lugar:hover:not(:disabled) { background: var(--veu-1); text-decoration-color: currentColor; }
+  .modal-demanda-lugar:disabled { cursor: default; text-decoration: none; }
+  .modal-demanda-acoes { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); flex: none; max-width: 55%; }
+  .modal-demanda-faixa {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin: 0 var(--space-6) var(--space-3);
+    padding: 10px 14px; border-radius: var(--radius-md); background: var(--warning-bg); color: var(--warning-ink);
+    font: 500 var(--fs-body) / var(--lh-body) var(--font);
+  }
+  .modal-demanda-faixa svg { width: 16px; height: 16px; flex: none; }
+  .modal-demanda-faixa > span { flex: 1; min-width: 12em; }
+  .modal-demanda-corpo {
+    display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--space-6); padding: var(--space-2) var(--space-6) var(--space-6);
+  }
+  .modal-demanda-principal, .modal-demanda-lateral { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+  .modal-demanda-secao { display: flex; flex-direction: column; gap: var(--space-2); }
+  .modal-demanda-secao-titulo {
+    font: 700 var(--fs-micro) / var(--lh-micro) var(--font); letter-spacing: var(--tracking-micro); text-transform: uppercase; color: var(--text-2);
+  }
+  .modal-demanda-resumo { display: flex; flex-direction: column; gap: var(--space-3); }
+  .modal-demanda-campo { display: flex; flex-direction: column; gap: 4px; }
+  .modal-demanda-campo dt {
+    font: 700 var(--fs-micro) / var(--lh-micro) var(--font); letter-spacing: var(--tracking-micro); text-transform: uppercase; color: var(--text-2);
+  }
+  .modal-demanda-campo dd { font: 400 var(--fs-body) / var(--lh-body) var(--font); color: var(--text); }
+  @media (max-width: 899.98px) {
+    .modal-demanda-corpo { grid-template-columns: minmax(0, 1fr); }
+    .modal-demanda-topo { flex-direction: column-reverse; }
+    .modal-demanda-acoes { max-width: none; justify-content: flex-start; width: 100%; }
+  }
+  @media (max-width: 767.98px) {
+    .modal-demanda-topo { padding: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-4) var(--space-3); }
+    .modal-demanda-corpo { padding: var(--space-2) var(--space-4) var(--space-6); gap: var(--space-5); }
+    .modal-demanda-faixa { margin: 0 var(--space-4) var(--space-3); }
+    .modal-demanda-capa { border-radius: 0; }
+  }
+}
+
+@layer foco {
+  .modal-demanda-titulo-botao:focus-visible, .modal-demanda-lugar:focus-visible { box-shadow: var(--focus-ring); }
+  .modal-demanda-titulo-campo:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
+}

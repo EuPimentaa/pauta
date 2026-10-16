@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { ArrowRight, Mail } from 'lucide-react'
 import { useEntrar } from '../../api/auth.ts'
 import { useNomeApp } from '../../lib/app.ts'
+import { focoNaCarga } from '../../lib/foco.ts'
 import { aplicarTema } from '../../lib/tema.ts'
 import { Botao } from '../../ui/Botao.tsx'
 import { Campo } from '../../ui/Campo.tsx'
@@ -44,7 +45,7 @@ export default function TelaEntrar() {
       <form className="auth-form" onSubmit={enviar} noValidate>
         {entrar.error && <AlertaErro>{mensagemAcesso(entrar.error)}</AlertaErro>}
         <Campo rotulo="E-mail" type="email" icone={Mail} autoComplete="username" inputMode="email" autoCapitalize="none" spellCheck={false}
-          value={email} onChange={(e) => setEmail(e.target.value)} erro={erroEmail} autoFocus required />
+          value={email} onChange={(e) => setEmail(e.target.value)} erro={erroEmail} autoFocus={focoNaCarga()} required />
         <CampoSenha rotulo="Senha" autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)}
           erro={erroSenha} required />
         <Botao type="submit" variante="primario" tamanho="g" larguraTotal iconeDireita={ArrowRight} carregando={entrar.isPending}>

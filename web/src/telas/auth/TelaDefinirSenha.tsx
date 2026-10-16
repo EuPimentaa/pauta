@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router'
 import { ArrowRight, Check, Circle, LinkIcon } from 'lucide-react'
 import { useConsultarToken, useDefinirSenha, type FinalidadeToken } from '../../api/auth.ts'
 import { useNomeApp } from '../../lib/app.ts'
+import { focoNaCarga } from '../../lib/foco.ts'
 import { aplicarTema } from '../../lib/tema.ts'
 import { Avatar } from '../../ui/Avatar.tsx'
 import { Botao } from '../../ui/Botao.tsx'
@@ -103,7 +104,7 @@ export function TelaDefinirSenha({ finalidade }: { finalidade: FinalidadeToken }
         {definir.error && !erroSenhaFraca && definir.error.codigo !== 'token_invalido' && <AlertaErro>{mensagemAcesso(definir.error)}</AlertaErro>}
         {/* o e-mail ajuda o gerenciador de senhas a guardar a conta certa */}
         {consulta.data && <input type="email" name="username" autoComplete="username" value={consulta.data.email} readOnly hidden />}
-        <CampoSenha rotulo="Senha" autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} autoFocus
+        <CampoSenha rotulo="Senha" autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} autoFocus={focoNaCarga()}
           erro={erroSenhaFraca ?? (tentou && !tamanhoOk ? `Use pelo menos ${MINIMO} caracteres.` : undefined)} aria-describedby="regras-senha" />
         <CampoSenha rotulo="Repita a senha" autoComplete="new-password" value={confirmacao} onChange={(e) => setConfirmacao(e.target.value)}
           erro={tentou && tamanhoOk && !iguais ? 'As duas senhas estão diferentes.' : undefined} />

@@ -6,6 +6,14 @@ const SELETOR = [
   'textarea:not([disabled])', 'iframe', '[contenteditable]:not([contenteditable="false"])', '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
+/**
+ * Foco automático ao carregar uma tela só com mouse ou trackpad: no telefone e no tablet ele abre o teclado na carga,
+ * que cobre o cartão antes de a pessoa ler a tela.
+ */
+export function focoNaCarga(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches
+}
+
 export function focaveis(raiz: HTMLElement): HTMLElement[] {
   return Array.from(raiz.querySelectorAll<HTMLElement>(SELETOR)).filter(
     (el) => !el.closest('[inert]') && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden',

@@ -227,7 +227,7 @@ export function ConteudoModal({ demanda, detalhe, fechar }: PropsModalDemanda) {
           {!ctx.somenteLeitura && secundarias.map((a) => <BotaoAcao key={a.id} a={a} ctx={ctx} util={util} />)}
           {!ctx.somenteLeitura && primaria && <BotaoAcao a={primaria} ctx={ctx} util={util} primaria />}
           <BotaoIcone icone={MoreHorizontal} rotulo="Mais ações da demanda" aria-haspopup="menu" aria-expanded={!!menu}
-            onClick={(e) => abrirMenu(e.currentTarget)} />
+            className="modal-demanda-mais" onClick={(e) => abrirMenu(e.currentTarget)} />
           <BotaoIcone icone={X} rotulo="Fechar" atalho="esc" onClick={fechar} data-foco-por-ultimo="" />
         </div>
       </header>

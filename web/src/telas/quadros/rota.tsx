@@ -7,4 +7,6 @@ export const rota: ExtensaoRota = {
   acesso: 'admin',
   layout: 'sobreposta',
   titulo: 'Novo quadro',
+  // aberta direto (link, recarregar): por baixo e ao fechar, a lista de quadros de Configurações
+  fundo: () => '/config/quadros',
 }

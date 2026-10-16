@@ -41,10 +41,26 @@ function IrParaInicial() {
   return <Navigate to={eu.rotaInicial} replace />
 }
 
-/** Tela de baixo de uma sobreposta aberta direto pela URL (Eu.rotaInicial é sempre '/inicio' no MVP). */
+/** Tela de baixo de uma sobreposta aberta direto pela URL sem `fundo` próprio (Eu.rotaInicial é sempre '/inicio' no MVP). */
 const ROTA_INICIAL: Eu['rotaInicial'] = '/inicio'
 
 const casar = (lista: ExtensaoRota[], location: Location) => !!matchRoutes(lista.map((r) => ({ path: r.caminho })), location)
+
+/** A tela de baixo de uma sobreposta aberta direto: a que a rota pede (ExtensaoRota.fundo), senão a inicial. */
+function fundoDireto(sobrepostas: ExtensaoRota[], location: Location): Location {
+  const achada = matchRoutes(sobrepostas.map((r) => ({ path: r.caminho, rota: r })), location)?.[0]
+  let caminho: string | null = null
+  try {
+    caminho = achada ? (achada.route as { rota: ExtensaoRota }).rota.fundo?.(achada.params, qc) ?? null : null
+  } catch {
+    caminho = null
+  }
+  const destino = caminho ?? ROTA_INICIAL
+  const interrogacao = destino.indexOf('?')
+  const pathname = interrogacao < 0 ? destino : destino.slice(0, interrogacao)
+  const search = interrogacao < 0 ? '' : destino.slice(interrogacao)
+  return { pathname, search, hash: '', state: null, key: 'fundo' }
+}
 
 function Raiz() {
   const location = useLocation()
@@ -61,13 +77,17 @@ function Raiz() {
 
   const emSobreposta = !publica && casar(grupos.sobrepostas, location)
   const fundoDoEstado = (location.state as EstadoFundo | null)?.fundo ?? null
-  const fundo: Location | null = emSobreposta
-    ? fundoDoEstado ?? { pathname: ROTA_INICIAL, search: '', hash: '', state: null, key: 'fundo' }
-    : null
-
   // a sobreposta fica fora da árvore de rotas (um <Routes> dentro da rota de layout gera aviso do react-router) e só
-  // aparece com a área autenticada pronta (sessão, bootstrap e registro), por cima da tela de baixo
+  // aparece com a área autenticada pronta (sessão, bootstrap e registro), por cima da tela de baixo. Aberta direto,
+  // o fundo vem da própria rota (o quadro da demanda) e é recalculado quando a área fica pronta (o bootstrap chegou)
   const areaPronta = useAreaPronta()
+  // calculado uma vez por entrada do histórico (e de novo quando a área fica pronta): arquivar a demanda aberta a tira
+  // do bootstrap, e o fechar ainda precisa levar ao quadro dela
+  const direto = useMemo(
+    () => (emSobreposta && !fundoDoEstado ? fundoDireto(grupos.sobrepostas, location) : null),
+    [emSobreposta, !fundoDoEstado, location.key, location.pathname, areaPronta, grupos.sobrepostas],
+  )
+  const fundo: Location | null = emSobreposta ? fundoDoEstado ?? direto : null
 
   return (
     <ContextoSobreposta.Provider value={{ fundo, fundoDoHistorico: !!fundoDoEstado }}>

@@ -132,6 +132,12 @@ export interface ExtensaoRota {
   layout: 'casca' | 'vazio' | 'sobreposta'
   /** Título da aba: "<titulo> · <APP_NOME>". Telas com título dinâmico (nome do quadro) usam useTituloAba(). */
   titulo?: string
+  /**
+   * Só sobrepostas: a tela de baixo quando a rota abre direto pela URL (link copiado, outra aba, notificação), que é
+   * também para onde "fechar" leva. Lê o cache (o bootstrap já está carregado quando a sobreposta desenha); null ou
+   * ausente = a rota inicial. Ex.: /d/:numero → o quadro da demanda; /quadros/novo → /config/quadros.
+   */
+  fundo?(params: Readonly<Record<string, string | undefined>>, qc: QueryClient): string | null
 }
 
 // ─────────────────────────────── componentes globais ───────────────────────────────

@@ -111,7 +111,8 @@ export function tituloDaConversa(msgs: readonly MensagemConversa[]): string {
     break
   }
   if (!escolhida) escolhida = linhas[0] ?? ''
-  let t = escolhida.replace(PEDIDO, '').replace(/^[\s:,;–—-]+/, '')
+  // "HE: precisamos…", "[XYZ] preciso…": a sigla (o cliente vai no campo Cliente) e o pedido saem do título
+  let t = escolhida.replace(/^\[?[A-Z][A-Z0-9]{1,11}\]?\s*(?::|\s[-–—])\s+/, '').replace(PEDIDO, '').replace(/^[\s:,;–—-]+/, '')
   const fimFrase = /[.!?;](\s|$)/.exec(t)
   if (fimFrase && fimFrase.index >= 12) t = t.slice(0, fimFrase.index)
   t = t

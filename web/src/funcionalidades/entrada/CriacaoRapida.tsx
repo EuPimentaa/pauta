@@ -13,7 +13,7 @@ import { createPortal } from 'react-dom'
 import { CornerDownLeft, Plus, UserRound, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Id } from '@shared/tipos/index.ts'
-import { analisarRapida, nomeCurto } from '@shared/logica/rapida.ts'
+import { analisarRapida, chaveDeMencao, nomeCurto } from '@shared/logica/rapida.ts'
 import { normalizarAlias } from '@shared/logica/texto.ts'
 import { mensagemDeErro } from '../../api/cliente.ts'
 import { useClientes, useUsuarios } from '../../api/seletores.ts'
@@ -194,7 +194,9 @@ export default function CriacaoRapida({ ctx, fechar }: { ctx: ContextoColuna; fe
     if (listaAberta) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setAtiva((a) => (a + 1) % pessoas.length); return }
       if (e.key === 'ArrowUp') { e.preventDefault(); setAtiva((a) => (a - 1 + pessoas.length) % pessoas.length); return }
-      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); escolherPessoa(pessoas[ativa]!.id); return }
+      // "@rafa" já completo: Enter cria (o servidor casa o @); só a menção pela metade ("@ra") escolhe na lista
+      const completa = !!mencao && contexto.pessoas.has(chaveDeMencao(mencao.termo))
+      if (e.key === 'Tab' || (e.key === 'Enter' && !completa)) { e.preventDefault(); escolherPessoa(pessoas[ativa]!.id); return }
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setSemLista(true); return }
     }
     if (e.key === 'Tab' && !e.shiftKey && clientesSug.length > 0) { e.preventDefault(); completarCliente(clientesSug[0]!.id); return }

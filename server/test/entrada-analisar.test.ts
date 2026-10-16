@@ -52,6 +52,7 @@ describe('POST /api/entrada/analisar', () => {
     assert.equal(r.corpo.siglaNova, 'XYZ')
     assert.deepEqual(r.corpo.clientes, [])
     assert.equal(r.corpo.modelos[0].id, 'md-post')
+    assert.equal(r.corpo.tituloSugerido, '3 posts para o lançamento', 'a sigla sai do título')
     const senha = await eu.post('/api/entrada/analisar', { texto: 'O acesso do Instagram: usuario hospital, senha: Hosp@2026!' })
     assert.equal(senha.corpo.senhaDetectada, true)
   })

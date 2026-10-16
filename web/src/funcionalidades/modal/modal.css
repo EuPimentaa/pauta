@@ -276,6 +276,8 @@
   .mdl-tempo-play:hover:not(:disabled) { transform: scale(1.05); }
   .mdl-tempo-play:disabled { opacity: .5; cursor: default; }
   .mdl-tempo-play svg { width: 18px; height: 18px; fill: currentColor; }
+  .mdl-tempo-play[data-desligado] { background: var(--veu-1); color: var(--text-2); }
+  .mdl-tempo-play[data-desligado] svg { fill: none; }
   .mdl-tempo[data-ligado] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--success) 55%, transparent); background: color-mix(in oklab, var(--success-bg) 70%, var(--surface)); }
   .mdl-tempo[data-ligado] .mdl-tempo-play { background: var(--success-ink); color: var(--surface); }
   .mdl-tempo-relogio { color: var(--text); font: 600 22px / 26px var(--font); font-variant-numeric: lining-nums tabular-nums; letter-spacing: -.01em; }
@@ -345,6 +347,9 @@
   /* ─────────────── celular ─────────────── */
   .mdl-campos { display: none; }
   @media (max-width: 767.98px) {
+    /* as abas Comentários | Atividade descem para a linha de baixo do título */
+    .mdl-secao[data-secao="atividade"] .mdl-secao-cabeca { flex-wrap: wrap; }
+    .mdl-secao[data-secao="atividade"] .mdl-secao-acoes { flex-basis: 100%; justify-content: flex-start; margin-left: 0; }
     /* as linhas sem valor saem do caminho (a descrição sobe); "Mostrar todos os campos" traz de volta */
     .modal-demanda-lateral:has(.mdl-campos[data-mdl-campos="preenchidos"]) .mdl-prop[data-vazio] { display: none; }
     .modal-demanda-lateral:has(.mdl-prop[data-vazio]) .mdl-campos, .mdl-campos[data-mdl-campos="todos"] {

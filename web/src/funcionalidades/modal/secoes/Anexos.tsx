@@ -232,8 +232,12 @@ export default function Anexos({ ctx }: { ctx: ContextoDemanda }) {
       <Secao id="anexos" icone={Paperclip} titulo="Anexos" meta={anexos.length ? String(anexos.length) : undefined}
         acoes={!so && (
           <>
-            <Botao variante="ghost" tamanho="p" icone={Upload} onClick={() => arquivo.current?.click()}>Enviar arquivo</Botao>
-            {!adicionando && <Botao variante="ghost" tamanho="p" icone={Plus} onClick={() => setAdicionando(true)}>Link ou caminho</Botao>}
+            <Botao variante="ghost" tamanho="p" icone={Upload} onClick={() => arquivo.current?.click()} dica="Enviar arquivo (até 10 MB)">Arquivo</Botao>
+            {!adicionando && (
+              <Botao variante="ghost" tamanho="p" icone={Plus} onClick={() => setAdicionando(true)} dica="Link https:// ou caminho de rede (M:\…)">
+                Link ou pasta
+              </Botao>
+            )}
           </>
         )}>
         <input ref={arquivo} type="file" multiple hidden accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,application/zip,.zip"

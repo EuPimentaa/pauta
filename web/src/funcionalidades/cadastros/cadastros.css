@@ -1,0 +1,313 @@
+/*
+ * Cadastros (F5): Clientes, página do cliente, Arquivo, Novo quadro, "Criar os quadros das equipes", seções de
+ * Configurações e os Primeiros passos. Só tokens da marca (nenhuma cor solta); classes com o prefixo cad-.
+ * Anéis de foco próprios ficam em @layer foco (aviso da Onda 1).
+ */
+@layer components {
+  /* ─────────────── páginas e seções ─────────────── */
+  .cad-pagina { display: flex; flex-direction: column; gap: var(--space-5); width: 100%; max-width: 1180px; margin: 0 auto; padding: var(--space-6); min-width: 0; }
+  .cad-cabecalho { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+  .cad-cabecalho-texto { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+  .cad-titulo { font: 600 var(--fs-h2) / var(--lh-h2) var(--font); letter-spacing: var(--tracking-titulo); color: var(--text); }
+  .cad-subtitulo { font: 400 var(--fs-body) / var(--lh-body) var(--font); color: var(--text-2); max-width: 70ch; }
+  .cad-acoes { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .cad-secao { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+  .cad-secao + .cad-secao { margin-top: var(--space-4); }
+  .cad-secao-titulo { font: 600 var(--fs-h3) / var(--lh-h3) var(--font); letter-spacing: var(--tracking-titulo); }
+  .cad-eyebrow { font: 700 var(--fs-micro) / var(--lh-micro) var(--font); letter-spacing: var(--tracking-micro); text-transform: uppercase; color: var(--text-3); }
+  .cad-nota { font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-3); }
+  .cad-texto-2 { color: var(--text-2); }
+
+  .cad-painel {
+    display: flex; flex-direction: column; min-width: 0;
+    background: var(--surface-card); border: 1px solid var(--border-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-card);
+  }
+  .cad-painel-cabeca { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-5) 0; flex-wrap: wrap; }
+  .cad-painel-titulo { display: flex; align-items: center; gap: var(--space-2); font: 600 var(--fs-col) / var(--lh-col) var(--font); }
+  .cad-painel-titulo svg { width: 17px; height: 17px; color: var(--text-2); flex: none; }
+  .cad-painel-corpo { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5) var(--space-5); min-width: 0; }
+
+  /* faixas de aviso dentro das telas (equipe sem membros, cadastro incompleto) */
+  .cad-faixa {
+    display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md);
+    background: var(--warning-bg); color: var(--warning-ink); font: 500 var(--fs-body) / var(--lh-body) var(--font);
+  }
+  .cad-faixa > svg { width: 18px; height: 18px; flex: none; margin-top: 2px; }
+  .cad-faixa[data-tom="info"] { background: var(--info-bg); color: var(--info-ink); }
+  .cad-faixa[data-tom="sucesso"] { background: var(--success-bg); color: var(--success-ink); }
+  .cad-faixa[data-tom="perigo"] { background: var(--danger-bg); color: var(--danger-ink); }
+  .cad-faixa-corpo { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; flex: 1; }
+
+  /* ─────────────── listas ─────────────── */
+  .cad-lista { display: flex; flex-direction: column; }
+  .cad-linha {
+    display: flex; align-items: center; gap: var(--space-3); min-height: 56px; padding: var(--space-2) var(--space-5);
+    border-top: 1px solid var(--border); min-width: 0;
+  }
+  .cad-lista > .cad-linha:first-child { border-top: 0; }
+  .cad-linha[data-inativa] { color: var(--text-2); }
+  .cad-linha-principal { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+  .cad-linha-nome { display: flex; align-items: center; gap: var(--space-2); font: 500 var(--fs-body) / var(--lh-body) var(--font); min-width: 0; }
+  .cad-linha-nome > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cad-linha-meta { display: flex; align-items: center; gap: 6px var(--space-3); flex-wrap: wrap; font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); min-width: 0; }
+  .cad-linha-meta svg { width: 13px; height: 13px; flex: none; }
+  .cad-linha-meta > span { display: inline-flex; align-items: center; gap: 4px; }
+  .cad-linha-fim { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+  .cad-link-linha { color: inherit; text-decoration: none; }
+  .cad-link-linha:hover .cad-linha-nome > span { text-decoration: underline; text-underline-offset: 3px; }
+
+  /* pílula de estado (convite pendente, desativada, status do cliente, papel) */
+  .cad-pilula {
+    display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: var(--radius-full); flex: none;
+    background: var(--veu-1); color: var(--text-2); font: 500 var(--fs-meta) / 1 var(--font); white-space: nowrap;
+  }
+  .cad-pilula svg { width: 12px; height: 12px; }
+  .cad-pilula[data-tom="aviso"] { background: var(--warning-bg); color: var(--warning-ink); }
+  .cad-pilula[data-tom="sucesso"] { background: var(--success-bg); color: var(--success-ink); }
+  .cad-pilula[data-tom="perigo"] { background: var(--danger-bg); color: var(--danger-ink); }
+  .cad-pilula[data-tom="info"] { background: var(--info-bg); color: var(--info-ink); }
+  .cad-pilula[data-tom="acento"] { background: var(--accent-soft); color: var(--accent-ink); }
+  .cad-pilula[data-cor] { background: var(--cor-bg); color: var(--cor-ink); }
+  button.cad-pilula { border: 0; cursor: pointer; }
+
+  .cad-ponto { width: 10px; height: 10px; border-radius: var(--radius-full); flex: none; background: var(--cor-ponto, var(--text-3)); }
+  .cad-ponto[data-tamanho="g"] { width: 14px; height: 14px; }
+
+  /* ─────────────── formulários ─────────────── */
+  .cad-form { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+  .cad-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-4); }
+  .cad-grade-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+  .cad-campo-cor { display: flex; flex-direction: column; gap: 6px; }
+  .cad-campo-cor > .ui-rotulo { margin-bottom: 2px; }
+  .cad-opcoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-2); }
+  .cad-opcao {
+    position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: var(--space-3);
+    border-radius: var(--radius-md); border: 1px solid var(--border-strong); background: var(--surface); text-align: left; color: var(--text);
+    transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
+  }
+  .cad-opcao:hover { background: var(--surface-hover); }
+  .cad-opcao[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .cad-opcao-nome { display: flex; align-items: center; gap: var(--space-2); font: 600 var(--fs-body) / var(--lh-body) var(--font); }
+  .cad-opcao-nome svg { width: 16px; height: 16px; color: var(--text-2); }
+  .cad-opcao[aria-checked="true"] .cad-opcao-nome svg { color: var(--accent-ink); }
+  .cad-opcao-texto { font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); }
+  .cad-check-lista { display: flex; flex-direction: column; gap: var(--space-2); }
+  .cad-rodape-form { display: flex; justify-content: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+
+  /* fundos do quadro: amostras */
+  .cad-fundos { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+  .cad-fundo {
+    width: 64px; height: 44px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--fundo);
+    display: grid; place-items: center; color: var(--text);
+  }
+  .cad-fundo[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 4px var(--accent); }
+  .cad-fundo svg { width: 18px; height: 18px; }
+  .cad-fundo-rotulo { font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); text-align: center; margin-top: 4px; }
+  .cad-fundo-item { display: flex; flex-direction: column; align-items: center; }
+
+  /* botão de cor (abre a paleta num popover) */
+  .cad-cor-botao {
+    display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-sm); flex: none;
+    border: 1px solid var(--border-strong); background: var(--surface);
+  }
+  .cad-cor-botao > span { width: 16px; height: 16px; border-radius: var(--radius-full); background: var(--cor, transparent); }
+  .cad-cor-botao[data-sem-cor] > span { background: transparent; border: 1.5px dashed var(--border-control); }
+  .cad-cor-botao:hover { background: var(--surface-hover); }
+
+  /* ─────────────── editor de colunas (Novo quadro, Configurações › Quadros) ─────────────── */
+  .cad-colunas { display: flex; flex-direction: column; gap: 6px; }
+  .cad-coluna {
+    display: grid; grid-template-columns: auto 32px minmax(120px, 1fr) minmax(140px, 190px) auto; align-items: center; gap: var(--space-2);
+    padding: 6px var(--space-2); border-radius: var(--radius-md); background: var(--cor-coluna, var(--coluna-sem-cor-bg));
+  }
+  .cad-coluna:not([data-cor]) { background: var(--coluna-sem-cor-bg); }
+  .cad-coluna[data-desmarcada] { background: transparent; outline: 1px dashed var(--border-strong); outline-offset: -1px; }
+  .cad-coluna[data-desmarcada] .ui-entrada { opacity: .7; }
+  .cad-coluna-fim { display: flex; align-items: center; gap: 2px; justify-content: flex-end; }
+  .cad-coluna-pessoa { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); }
+  .cad-coluna-auto {
+    grid-column: 3 / -1; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 500 var(--fs-meta) / var(--lh-meta) var(--font);
+    color: var(--text-2);
+  }
+  .cad-coluna-auto svg { width: 13px; height: 13px; flex: none; color: var(--accent-ink); }
+  .cad-coluna[data-desmarcada] .cad-coluna-auto { text-decoration: line-through; }
+  .cad-coluna-config { grid-template-columns: auto 32px minmax(120px, 1fr) minmax(260px, 1.3fr) auto; }
+  .cad-coluna-num { font: 500 var(--fs-meta) / 1 var(--font); color: var(--text-3); min-width: 1.5em; text-align: right; }
+
+  /* ─────────────── criar os quadros das equipes ─────────────── */
+  .cad-equipes { display: flex; flex-direction: column; gap: var(--space-3); }
+  .cad-equipe { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-lg); border: 1px solid var(--border-card); background: var(--surface-card); }
+  .cad-equipe[data-desmarcada] { background: transparent; border-style: dashed; }
+  .cad-equipe-topo { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+  .cad-equipe-nome { display: flex; align-items: center; gap: var(--space-2); font: 600 var(--fs-col) / var(--lh-col) var(--font); flex: 1; min-width: 160px; }
+  .cad-equipe-estado { display: inline-flex; align-items: center; gap: 6px; font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); }
+  .cad-equipe-estado svg { width: 15px; height: 15px; }
+  .cad-equipe-estado[data-tom="sucesso"] { color: var(--success-ink); }
+  .cad-equipe-estado[data-tom="perigo"] { color: var(--danger-ink); }
+
+  /* ─────────────── link do convite ─────────────── */
+  .cad-convite { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); background: var(--success-bg); }
+  .cad-convite-titulo { display: flex; align-items: center; gap: var(--space-2); font: 600 var(--fs-body) / var(--lh-body) var(--font); color: var(--success-ink); }
+  .cad-convite-titulo svg { width: 18px; height: 18px; }
+  .cad-convite-link {
+    display: flex; align-items: center; gap: var(--space-2); padding: 6px 6px 6px var(--space-3); border-radius: var(--radius-sm);
+    background: var(--surface); border: 1px solid var(--border-strong); min-width: 0;
+  }
+  .cad-convite-link code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 var(--fs-meta) / var(--lh-meta) ui-monospace, monospace; color: var(--text); }
+  .cad-convite-mensagem { font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); white-space: pre-line; }
+
+  /* ─────────────── primeiros passos ─────────────── */
+  .cad-passos { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border-radius: var(--radius-lg); background: var(--surface-card); border: 1px solid var(--border-card); box-shadow: var(--shadow-card); }
+  .cad-passos-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+  .cad-passos-lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: var(--space-3); counter-reset: passo; }
+  .cad-passo {
+    display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); border-radius: var(--radius-md);
+    background: var(--surface-sunken); min-width: 0;
+  }
+  .cad-passo[data-atual] { background: var(--accent-soft); }
+  .cad-passo-cabeca { display: flex; align-items: center; gap: var(--space-2); font: 600 var(--fs-body) / var(--lh-body) var(--font); }
+  .cad-passo-num {
+    display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-full); flex: none;
+    background: var(--surface); border: 1px solid var(--border-strong); font: 600 var(--fs-meta) / 1 var(--font);
+  }
+  .cad-passo[data-feito] .cad-passo-num { background: var(--success); border-color: transparent; color: var(--on-accent); }
+  .cad-passo[data-feito] .cad-passo-num svg { width: 14px; height: 14px; }
+  .cad-passo-texto { font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); flex: 1; }
+  .cad-passo[data-feito] .cad-passo-texto { color: var(--success-ink); }
+  .cad-passo-acoes { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+  /* ─────────────── clientes ─────────────── */
+  .cad-filtros { display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap; }
+  .cad-filtros > .ui-campo-grupo { min-width: 180px; }
+  .cad-filtros > .cad-filtro-busca { flex: 1; min-width: 220px; max-width: 360px; }
+  .cad-tabela { display: flex; flex-direction: column; }
+  .cad-tabela-cabeca, .cad-cliente-linha {
+    display: grid; grid-template-columns: minmax(220px, 2.2fr) minmax(130px, 1fr) minmax(120px, 1fr) 72px 72px 72px; align-items: center;
+    gap: var(--space-3); padding: 0 var(--space-5);
+  }
+  .cad-tabela-cabeca { min-height: 40px; font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-3); border-bottom: 1px solid var(--border); }
+  .cad-tabela-cabeca > span:nth-child(n+4) { text-align: right; }
+  .cad-cliente-linha { min-height: 60px; border-top: 1px solid var(--border); color: var(--text); text-decoration: none; }
+  .cad-tabela-cabeca + .cad-cliente-linha { border-top: 0; }
+  .cad-cliente-linha:hover { background: var(--veu-1); }
+  .cad-cliente-id { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+  .cad-cliente-nomes { display: flex; flex-direction: column; min-width: 0; }
+  .cad-cliente-nome { font: 500 var(--fs-body) / var(--lh-body) var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cad-cliente-detalhe { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); }
+  .cad-numero { text-align: right; font: 500 var(--fs-body) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; color: var(--text); }
+  .cad-numero[data-zero] { color: var(--text-3); }
+  .cad-numero[data-tom="perigo"] { color: var(--danger-ink); font-weight: 600; }
+  .cad-numero-rotulo { display: none; }
+
+  .cad-sigla {
+    display: inline-grid; place-items: center; min-width: 44px; height: 44px; padding: 0 6px; border-radius: var(--radius-md); flex: none;
+    background: var(--cor-bg); color: var(--cor-ink); font: 700 var(--fs-body) / 1 var(--font); letter-spacing: .02em; overflow: hidden;
+  }
+  .cad-sigla[data-tamanho="g"] { min-width: 72px; height: 72px; border-radius: var(--radius-lg); font-size: var(--fs-h3); }
+  .cad-sigla img { width: 100%; height: 100%; object-fit: contain; background: var(--surface); }
+
+  /* página do cliente */
+  .cad-cliente-topo { display: flex; align-items: flex-start; gap: var(--space-4); flex-wrap: wrap; }
+  .cad-cliente-logo { position: relative; }
+  .cad-cliente-logo .ui-botao-icone { position: absolute; right: -8px; bottom: -8px; }
+  .cad-cliente-titulos { display: flex; flex-direction: column; gap: var(--space-1); flex: 1; min-width: 220px; }
+  .cad-cliente-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+  .cad-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2) var(--space-4); align-items: center; }
+  .cad-dl dt { display: flex; align-items: center; gap: 6px; font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); }
+  .cad-dl dt svg { width: 14px; height: 14px; }
+  .cad-dl dd { min-width: 0; display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .cad-pessoa { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font: 500 var(--fs-body) / var(--lh-body) var(--font); }
+  .cad-pessoa > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cad-grupo-quadro { display: flex; flex-direction: column; gap: var(--space-2); }
+  .cad-grupo-quadro-titulo { display: flex; align-items: center; gap: var(--space-2); font: 600 var(--fs-body) / var(--lh-body) var(--font); }
+  .cad-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--space-3); align-items: start; }
+
+  .cad-trilha-item { display: flex; gap: var(--space-3); padding: var(--space-3) var(--space-5); border-top: 1px solid var(--border); }
+  .cad-trilha-item:first-child { border-top: 0; }
+  .cad-trilha-item[data-anulada] .cad-trilha-cabeca { text-decoration: line-through; color: var(--text-2); }
+  .cad-trilha-icone { width: 32px; height: 32px; border-radius: var(--radius-full); display: grid; place-items: center; flex: none; background: var(--success-bg); color: var(--success-ink); }
+  .cad-trilha-icone[data-decisao="ajuste"] { background: var(--warning-bg); color: var(--warning-ink); }
+  .cad-trilha-icone svg { width: 16px; height: 16px; }
+  .cad-trilha-corpo { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+  .cad-trilha-cabeca { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font: 500 var(--fs-body) / var(--lh-body) var(--font); }
+
+  .cad-horas-total { display: flex; align-items: baseline; gap: var(--space-2); }
+  .cad-horas-total strong { font: 600 var(--fs-h2) / var(--lh-h2) var(--font); font-variant-numeric: lining-nums tabular-nums; }
+
+  /* ─────────────── Arquivo ─────────────── */
+  .cad-arquivo-item { display: flex; align-items: center; gap: var(--space-3); min-height: 64px; padding: var(--space-2) var(--space-5); border-top: 1px solid var(--border); }
+  .cad-arquivo-item:first-child { border-top: 0; }
+  .cad-arquivo-abrir { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; padding: 4px 0; text-align: left; color: var(--text); border-radius: var(--radius-xs); }
+  .cad-arquivo-titulo { display: flex; align-items: center; gap: var(--space-2); font: 500 var(--fs-body) / var(--lh-body) var(--font); min-width: 0; }
+  .cad-arquivo-titulo > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cad-arquivo-abrir:hover .cad-arquivo-titulo > span:last-child { text-decoration: underline; text-underline-offset: 3px; }
+  .cad-num { font: 500 var(--fs-meta) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; color: var(--text-3); flex: none; }
+
+  /* ─────────────── Configurações › Quadros ─────────────── */
+  .cad-quadros { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+  .cad-quadros-lista { display: flex; flex-direction: column; gap: 2px; position: sticky; top: calc(var(--topo-h) + var(--space-6)); }
+  .cad-quadros-grupo { padding: var(--space-3) 10px var(--space-1); }
+  .cad-quadro-item {
+    display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 10px; border-radius: var(--radius-sm); color: var(--text);
+    text-align: left; font: 500 var(--fs-body) / 1.2 var(--font); width: 100%;
+  }
+  .cad-quadro-item > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cad-quadro-item:hover { background: var(--veu-1); }
+  .cad-quadro-item[aria-current="true"] { background: var(--accent-soft); }
+  .cad-etiquetas { display: flex; flex-direction: column; gap: 6px; }
+  .cad-etiqueta { display: grid; grid-template-columns: 32px minmax(120px, 1fr) auto auto; align-items: center; gap: var(--space-2); }
+  .cad-automacao { display: flex; align-items: center; gap: var(--space-2); min-height: 32px; font: 400 var(--fs-body) / var(--lh-body) var(--font); flex-wrap: wrap; }
+  .cad-automacao svg { width: 15px; height: 15px; color: var(--text-2); flex: none; }
+  .cad-automacao[data-inativa] { color: var(--text-2); }
+
+  /* membros da equipe */
+  .cad-membro { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(120px, 180px) auto; align-items: center; gap: var(--space-3); min-height: 44px; }
+
+  /* feriados */
+  .cad-feriado { display: flex; align-items: center; gap: var(--space-3); min-height: 48px; padding: var(--space-1) var(--space-5); border-top: 1px solid var(--border); }
+  .cad-feriado:first-child { border-top: 0; }
+  .cad-feriado-data { width: 104px; flex: none; font: 600 var(--fs-body) / var(--lh-body) var(--font); font-variant-numeric: lining-nums tabular-nums; }
+  .cad-feriado[data-passado] { color: var(--text-2); }
+  .cad-mes-titulo { padding: var(--space-4) var(--space-5) var(--space-1); }
+
+  /* ─────────────── celular ─────────────── */
+  @media (max-width: 767.98px) {
+    .cad-pagina { padding: var(--space-4) 16px var(--space-8); gap: var(--space-4); }
+    .cad-titulo { font-size: var(--fs-h3); line-height: var(--lh-h3); }
+    .cad-painel-cabeca { padding: var(--space-3) var(--space-4) 0; }
+    .cad-painel-corpo { padding: var(--space-3) var(--space-4) var(--space-4); }
+    .cad-linha, .cad-arquivo-item, .cad-feriado, .cad-trilha-item { padding-left: var(--space-4); padding-right: var(--space-4); }
+    .cad-linha { flex-wrap: wrap; }
+    .cad-tabela-cabeca { display: none; }
+    .cad-cliente-linha { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: var(--space-3) var(--space-4); gap: var(--space-2) var(--space-3); }
+    .cad-cliente-linha > .cad-cliente-id { grid-column: 1 / -1; }
+    .cad-cliente-linha > .cad-cliente-am, .cad-cliente-linha > .cad-cliente-resp { display: none; }
+    .cad-numero { text-align: left; display: flex; flex-direction: column; gap: 2px; }
+    .cad-numero-rotulo { display: block; font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-3); }
+    .cad-cliente-grade { grid-template-columns: minmax(0, 1fr); }
+    .cad-grade-2 { grid-template-columns: minmax(0, 1fr); }
+    .cad-coluna { grid-template-columns: auto 32px minmax(0, 1fr) auto; }
+    .cad-coluna > .cad-coluna-papel { grid-column: 3 / 4; }
+    .cad-coluna-auto { grid-column: 3 / -1; }
+    .cad-coluna-config { grid-template-columns: auto 32px minmax(0, 1fr); }
+    .cad-coluna-config > .cad-coluna-papel, .cad-coluna-config > .cad-coluna-fim { grid-column: 1 / -1; }
+    .cad-coluna-config > .cad-coluna-fim { justify-content: flex-start; }
+    .cad-quadros { grid-template-columns: minmax(0, 1fr); }
+    .cad-quadros-lista { position: static; }
+    .cad-membro { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .cad-membro > .cad-membro-funcao { grid-column: 2 / -1; }
+    .cad-filtros > .ui-campo-grupo, .cad-filtros > .cad-filtro-busca { min-width: 0; flex: 1 1 140px; max-width: none; }
+    .cad-feriado-data { width: 88px; }
+    .cad-mes-titulo { padding-left: var(--space-4); padding-right: var(--space-4); }
+    .cad-dl { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .cad-dl dd { margin-bottom: var(--space-2); }
+  }
+}
+
+@layer foco {
+  .cad-opcao:focus-visible, .cad-fundo:focus-visible, .cad-cor-botao:focus-visible, .cad-quadro-item:focus-visible,
+  .cad-arquivo-abrir:focus-visible, button.cad-pilula:focus-visible {
+    box-shadow: var(--focus-ring);
+  }
+  .cad-cliente-linha:focus-visible, .cad-link-linha:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); border-radius: var(--radius-sm); }
+}

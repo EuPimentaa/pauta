@@ -29,7 +29,7 @@ function Editar({ ctx, ancora, fechar }: { ctx: ContextoDemanda; ancora: HTMLEle
       <form className="ui-popover-corpo mdl-formulario" onSubmit={(e) => { e.preventDefault(); if (min) void salvar(min) }}>
         <Campo rotulo="Tempo estimado" value={texto} onChange={(e) => setTexto(e.target.value)} autoFocus placeholder="1h30"
           erro={texto.trim() && !min ? 'Use minutos ou horas: 45, 1h30, 2h.' : undefined}
-          ajuda={min ? `= ${formatarDuracao(min)}` : 'Minutos ou horas: 45, 1h30, 2h.'} />
+          ajuda={min ? (formatarDuracao(min) === texto.trim() ? undefined : `= ${formatarDuracao(min)}`) : 'Minutos ou horas: 45, 1h30, 2h.'} />
         <div className="mdl-sugestoes" role="group" aria-label="Sugestões">
           {SUGESTOES.map((s) => <button key={s} type="button" className="mdl-chip" onClick={() => void salvar(s)}>{formatarDuracao(s)}</button>)}
         </div>

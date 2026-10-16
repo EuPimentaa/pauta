@@ -87,10 +87,19 @@ export function useBuscarPessoas(): (termo: string) => PessoaMencao[] {
   const ativos = useMemo(() => usuarios.filter((u) => u.ativo), [usuarios])
   return useCallback((termo: string) => {
     const t = normalizarBusca(termo)
+    // apelido que começa com o termo primeiro, depois um nome que começa, depois o que contém
+    const nota = (u: UsuarioResumo) => {
+      if (!t) return 1
+      if (normalizarBusca(u.apelido ?? '').startsWith(t)) return 3
+      if (normalizarBusca(u.nome).split(' ').some((p) => p.startsWith(t))) return 2
+      return normalizarBusca(`${u.nome} ${u.apelido ?? ''}`).includes(t) ? 1 : 0
+    }
     return ativos
-      .filter((u) => !t || normalizarBusca(`${u.nome} ${u.apelido ?? ''}`).split(' ').some((p) => p.startsWith(t)) || normalizarBusca(u.nome).includes(t))
+      .map((u) => ({ u, n: nota(u) }))
+      .filter((x) => x.n > 0)
+      .sort((x, y) => y.n - x.n || x.u.nome.localeCompare(y.u.nome, 'pt-BR'))
       .slice(0, 8)
-      .map((u) => ({ id: u.id, nome: u.nome, apelido: u.apelido, cor: u.cor }))
+      .map(({ u }) => ({ id: u.id, nome: u.nome, apelido: u.apelido, cor: u.cor }))
   }, [ativos])
 }
 

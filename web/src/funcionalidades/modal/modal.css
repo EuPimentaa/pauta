@@ -86,13 +86,16 @@
   .mdl-item:hover .mdl-item-alca, .mdl-item-alca:focus-visible { opacity: 1; }
   .mdl-item-alca svg { width: 14px; height: 14px; }
   .mdl-item .ui-check-caixa { margin-top: 2px; }
+  /* o ícone fica por cima do input invisível e comia o clique no meio da caixa (pedido ao DS em docs/pedidos/modal.md) */
+  .mdl-item .ui-check-caixa svg, .mdl-escolha svg { pointer-events: none; }
   .mdl-item-texto {
     min-width: 0; padding: 1px 6px; margin: 0 -2px; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--text);
     font: 400 var(--fs-body) / var(--lh-body) var(--font); text-align: left; cursor: text; overflow-wrap: anywhere; white-space: pre-wrap;
   }
   .mdl-item-texto:disabled { cursor: default; }
-  .mdl-item[data-feito] .mdl-item-texto { color: var(--text-2); text-decoration: line-through; text-decoration-color: var(--text-3); }
-  .mdl-item-quem { display: block; margin-top: 1px; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); text-decoration: none; }
+  .mdl-item[data-feito] .mdl-item-texto { color: var(--text-2); }
+  .mdl-item[data-feito] .mdl-item-rotulo { text-decoration: line-through; text-decoration-color: var(--text-3); }
+  .mdl-item-quem { display: block; margin-top: 1px; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
   .mdl-item-acoes { display: flex; gap: 2px; opacity: 0; }
   .mdl-item:hover .mdl-item-acoes, .mdl-item:focus-within .mdl-item-acoes { opacity: 1; }
   @media (hover: none) { .mdl-item-acoes, .mdl-item-alca { opacity: 1; } }
@@ -334,6 +337,10 @@
     font: 500 var(--fs-meta) / 1 var(--font); cursor: pointer;
   }
   .mdl-chip:hover { background: var(--veu-2); }
+  .mdl-chip[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 40%, transparent); }
+  /* nome longo do cliente: corta com reticências dentro do painel */
+  .mdl-prop .ui-chip-cliente { max-width: 100%; min-width: 0; overflow: hidden; }
+  .mdl-prop .ui-chip-cliente > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* ─────────────── celular ─────────────── */
   .mdl-campos { display: none; }

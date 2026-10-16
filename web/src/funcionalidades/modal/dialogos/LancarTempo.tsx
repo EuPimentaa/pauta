@@ -48,7 +48,8 @@ export default function DialogoLancarTempo({ params, fechar }: PropsDialogo<'lan
         onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void lancar() } }}>
         <Campo rotulo="Quanto tempo" value={texto} onChange={(e) => setTexto(e.target.value)} data-autofocus="" placeholder="1h30"
           erro={texto.trim() && !minutos ? 'Use minutos ou horas: 45, 1h30, 2h (até 24h).' : undefined}
-          ajuda={minutos ? `= ${formatarDuracao(minutos)}` : 'Minutos ou horas: 45, 1h30, 2h.'} inputMode="text" autoComplete="off" />
+          ajuda={minutos ? (formatarDuracao(minutos) === texto.trim() ? undefined : `= ${formatarDuracao(minutos)}`) : 'Minutos ou horas: 45, 1h30, 2h.'}
+          inputMode="text" autoComplete="off" />
         <div className="mdl-sugestoes" role="group" aria-label="Sugestões">
           {SUGESTOES.map((s) => (
             <button key={s} type="button" className="mdl-chip" aria-pressed={minutos === s} onClick={() => setTexto(formatarDuracao(s).replace(' min', ''))}>

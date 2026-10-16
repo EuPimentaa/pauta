@@ -78,7 +78,7 @@ function Item({ item, ctx, mover, podeArrastar }: { item: ChecklistItem; ctx: Co
           <GripVertical aria-hidden="true" />
         </button>
       ) : <span className="mdl-item-vaga" />}
-      <Checkbox checked={!!item.feitoEm} disabled={so} aria-label={item.texto}
+      <Checkbox tom="sucesso" checked={!!item.feitoEm} disabled={so} aria-label={item.texto}
         onChange={(e) => void acoes.editarItem(item, { feito: e.target.checked }, euId)} />
       {editando ? (
         <CampoTexto valor={item.texto} rotulo="Texto do item" classe="mdl-item-campo"
@@ -87,7 +87,7 @@ function Item({ item, ctx, mover, podeArrastar }: { item: ChecklistItem; ctx: Co
       ) : (
         <button type="button" className="mdl-item-texto" disabled={so} onClick={() => setEditando(true)} title={so ? undefined : 'Editar o item'}
           aria-label={`Editar o item ${item.texto}`}>
-          {item.texto}
+          <span className="mdl-item-rotulo">{item.texto}</span>
           {item.feitoEm && (
             <span className="mdl-item-quem">{quem ? `${nomeCurto(quem)} marcou ` : 'Marcado '}{tempoRelativo(item.feitoEm)}</span>
           )}

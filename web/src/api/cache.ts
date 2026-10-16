@@ -32,15 +32,15 @@ export function pertenceAoBootstrap(b: Pick<Bootstrap, 'quadros'>, d: Pick<Deman
   return d.arquivadoEm === null && b.quadros.some((q) => q.id === d.quadroId && q.arquivadoEm === null)
 }
 
+/** Mesmo valor de campo (listas de ids comparadas pelo conteúdo, na ordem). */
+function mesmoValor(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i])
+}
+
 /** Só os campos que mudaram de fato (patch repetido pelo tempo real não troca o objeto). */
 function mudou<T extends object>(atual: T, patch: Partial<T>): boolean {
-  for (const k of Object.keys(patch) as (keyof T)[]) {
-    const a = atual[k], p = patch[k]
-    if (a === p) continue
-    if (Array.isArray(a) && Array.isArray(p) && a.length === p.length && a.every((x, i) => x === p[i])) continue
-    return true
-  }
-  return false
+  return (Object.keys(patch) as (keyof T)[]).some((k) => !mesmoValor(atual[k], patch[k]))
 }
 
 export function comPatchDemanda(b: Bootstrap, id: Id, patch: Partial<Demanda>): Bootstrap {
@@ -166,18 +166,49 @@ export function aplicarNoBootstrap<K extends ListaBootstrap>(
   mudarBootstrap(qc, (b) => comItem(b, lista, op, item))
 }
 
+/** A demanda como a tela a conhece: a do bootstrap; fora dele, a do detalhe aberto (modal de arquivada). */
+export function demandaConhecida(qc: QueryClient, id: Id): Demanda | undefined {
+  const doBootstrap = demandaEmCache(qc, id)
+  if (doBootstrap) return doBootstrap
+  const chave = chaveDoDetalhe(qc, id)
+  return chave ? qc.getQueryData<DemandaDetalhe>(chave)?.demanda : undefined
+}
+
+/** O que uma mutação nossa mexeu: os campos que a resposta pode corrigir e a demanda como ficou na tela logo depois. */
+export interface MutacaoDemanda {
+  campos: readonly (keyof Demanda)[]
+  /** A demanda no cache logo depois da mudança otimista (undefined: não estava no cache). */
+  naTela: Demanda | undefined
+}
+
+/**
+ * Puro: o que a resposta de uma mutação ainda pode mudar num cache que já é mais novo que ela (o servidor gravou esta
+ * mutação ANTES de outra, cujo evento já chegou). Só os `campos` que nenhum evento mais novo tocou, isto é, os que o
+ * cache ainda tem como esta mutação os deixou; o `rev` nunca desce (e sobe se a resposta for de um rev maior).
+ */
+export function camposDaResposta(atual: Demanda, resposta: Demanda, m: MutacaoDemanda): Partial<Demanda> {
+  const patch: Partial<Demanda> = {}
+  if (!m.naTela) return patch
+  for (const k of m.campos) {
+    if (k === 'rev' || k === 'atualizadoEm' || k === 'id') continue
+    if (!mesmoValor(atual[k], m.naTela[k])) continue
+    if (!mesmoValor(atual[k], resposta[k])) (patch as Record<string, unknown>)[k] = resposta[k]
+  }
+  if (resposta.rev > atual.rev) patch.rev = resposta.rev
+  return patch
+}
+
 /**
  * A resposta do servidor para uma demanda que acabamos de mudar. Não volta no tempo: se o cache já tem uma versão mais
- * nova (atualizadoEm maior: outra pessoa mudou enquanto a resposta viajava, e o evento dela já chegou), só os
- * `campos` desta mutação vêm da resposta (o eco dela é ignorado; os outros campos já estão certos no cache).
+ * nova (atualizadoEm maior: outra pessoa mudou depois de nós e o evento dela chegou antes da nossa resposta), a
+ * resposta só corrige o que esta mutação mexeu e ninguém tocou depois (camposDaResposta); sem `mutacao`, nada.
  */
-export function aplicarDemandaDoServidor(qc: QueryClient, d: Demanda, campos?: readonly (keyof Demanda)[]): void {
-  const atual = demandaEmCache(qc, d.id)
+export function aplicarDemandaDoServidor(qc: QueryClient, d: Demanda, mutacao?: MutacaoDemanda): void {
+  const atual = demandaConhecida(qc, d.id)
   if (atual && atual.atualizadoEm > d.atualizadoEm) {
-    if (!campos?.length) return
-    const patch: Partial<Demanda> = {}
-    for (const k of campos) (patch as Record<string, unknown>)[k] = d[k]
-    aplicarPatchDemanda(qc, d.id, patch)
+    if (!mutacao) return
+    const patch = camposDaResposta(atual, d, mutacao)
+    if (Object.keys(patch).length) aplicarPatchDemanda(qc, d.id, patch)
     return
   }
   inserirDemanda(qc, d)

@@ -4,7 +4,9 @@
  */
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { cardsDaColuna, depoisDe, lugarAtual, posicaoNoIndice, posicaoPrevista, preverMovimento } from '../../web/src/api/previsao.ts'
+import {
+  cardsDaColuna, depoisDe, lugarAtual, posicaoNoIndice, posicaoPorChave, posicaoPrevista, posicaoValida, preverMovimento,
+} from '../../web/src/api/previsao.ts'
 import { mesclarEdicao, mesclarTexto } from '../../web/src/demanda/mesclar.ts'
 import { bootstrap, demanda } from './nucleo-web-ajuda.ts'
 
@@ -28,6 +30,20 @@ describe('posição', () => {
     assert.deepEqual(posicaoNoIndice(visiveis, 1), { depoisDeId: 'a' })
     assert.deepEqual(posicaoNoIndice(visiveis, 2), { depoisDeId: 'c' })
     assert.deepEqual(posicaoNoIndice([], 0), {})
+  })
+
+  test('vizinho de referência que saiu da coluna: refaz pela chave de posição (o servidor recusaria com 400)', () => {
+    // a lista de agora: o 'b' foi para outra coluna durante o arraste
+    const agora = [lista[0], lista[2]]
+    assert.deepEqual(posicaoValida(lista, { depoisDeId: 'b' }, 2560), { depoisDeId: 'b' }, 'ainda está: fica como veio')
+    assert.deepEqual(posicaoValida(agora, { depoisDeId: 'b' }, 2560), { depoisDeId: 'a' }, 'logo abaixo de onde o b estava')
+    assert.deepEqual(posicaoValida(agora, { antesDeId: 'b' }, 1536), { depoisDeId: 'a' })
+    assert.deepEqual(posicaoValida(agora, { depoisDeId: 'b' }, 512), { depoisDeId: null }, 'nada antes: topo')
+    assert.deepEqual(posicaoValida(agora, { depoisDeId: 'b' }, null), {}, 'sem chave: fim')
+    assert.deepEqual(posicaoValida(agora, { depoisDeId: null }, 9999), { depoisDeId: null }, 'topo sempre vale')
+    assert.deepEqual(posicaoValida(agora, {}, 9999), {}, 'fim sempre vale')
+    assert.equal(posicaoValida(agora, undefined, 9999), undefined)
+    assert.deepEqual(posicaoPorChave(agora, 4000), { depoisDeId: 'c' })
   })
 
   test('lugar atual (para o Desfazer) e cards da coluna sem o próprio', () => {

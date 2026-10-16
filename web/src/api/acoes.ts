@@ -22,12 +22,13 @@ import { avisar } from '../ui/avisos.tsx'
 import { mesclarEdicao } from '../demanda/mesclar.ts'
 import { prepararVolta } from '../quadro/volta.ts'
 import {
-  aplicarDemandaDoServidor, aplicarPatchDemanda, atualizarDetalhe, bootstrapDe, demandaEmCache, inserirDemanda, mudarBootstrap,
+  aplicarDemandaDoServidor, aplicarPatchDemanda, atualizarDetalhe, bootstrapDe, demandaConhecida, demandaEmCache, inserirDemanda,
+  mudarBootstrap, type MutacaoDemanda,
 } from './cache.ts'
 import { chaves } from './chaves.ts'
 import { api, ehErroDaApi, type ErroDaApi } from './cliente.ts'
 import { marcarPendente } from './pendentes.ts'
-import { CAMPOS_DO_MOVER, lugarAtual, preverMovimento } from './previsao.ts'
+import { CAMPOS_DO_MOVER, cardsDaColuna, lugarAtual, posicaoPorChave, posicaoValida, preverMovimento } from './previsao.ts'
 
 // ─────────────────────────────── avisos de erro (PLANO §4.1) ───────────────────────────────
 
@@ -88,7 +89,13 @@ export interface DepsAcoes {
 interface OpcoesInternas {
   /** Sem o aviso de sucesso (o próprio Desfazer). */
   semAviso?: boolean
+  /** A chave de posição de antes (Desfazer): se o vizinho guardado saiu da coluna, o card volta para perto dela. */
+  posicaoReserva?: number
 }
+
+/** 400 do servidor porque o vizinho de referência não está mais na coluna (API §5.10). */
+const vizinhoPerdido = (e: unknown) => ehErroDaApi(e) && e.status === 400 && e.codigo === 'validacao'
+  && !!(e.detalhes?.campos as Record<string, unknown> | undefined)?.posicao
 
 export interface AcoesCompletas extends AcoesNucleo {
   criar(e: CriarDemandaEntrada): Promise<CriarDemandaSaida | null>
@@ -109,6 +116,8 @@ export function criarAcoes(qc: QueryClient, deps: DepsAcoes): AcoesCompletas {
     const b = bootstrapDe(qc)
     if (!b) return null
     const antes = atualDe(d)
+    const naColuna = (bx: typeof b) => cardsDaColuna(bx.demandas, entrada.colunaId, antes.id)
+    if (entrada.posicao) entrada = { ...entrada, posicao: posicaoValida(naColuna(b), entrada.posicao, op.posicaoReserva ?? null) }
     const prev = preverMovimento(b, antes, entrada, new Date())
     if (!prev) {
       avisar('Esta coluna não está mais no quadro.', { tipo: 'erro' })
@@ -124,6 +133,7 @@ export function criarAcoes(qc: QueryClient, deps: DepsAcoes): AcoesCompletas {
     }
 
     aplicarPatchDemanda(qc, antes.id, campos(prev.demanda, CAMPOS_DO_MOVER))
+    const mutacao: MutacaoDemanda = { campos: CAMPOS_DO_MOVER, naTela: demandaConhecida(qc, antes.id) }
 
     let extras: Pick<MoverEntrada, 'etiquetasSemPar' | 'membros'> = {}
     if (interceptar) {
@@ -156,9 +166,25 @@ export function criarAcoes(qc: QueryClient, deps: DepsAcoes): AcoesCompletas {
       }
     }
 
+    // os eventos que esperavam o fim do arraste já entraram no cache: o vizinho de referência pode ter saído da coluna
+    const posicaoAgora = () => {
+      const bx = bootstrapDe(qc)
+      return bx ? posicaoValida(naColuna(bx), entrada.posicao, prev.demanda.posicao) : entrada.posicao
+    }
+    const enviar = (posicao: MoverEntrada['posicao']) =>
+      api<MoverSaida>('POST', `${caminho(antes.id)}/mover`, { corpo: { ...entrada, ...extras, posicao } satisfies MoverEntrada })
+
     try {
-      const saida = await api<MoverSaida>('POST', `${caminho(antes.id)}/mover`, { corpo: { ...entrada, ...extras } satisfies MoverEntrada })
-      aplicarDemandaDoServidor(qc, saida.demanda, CAMPOS_DO_MOVER)
+      let saida: MoverSaida
+      try {
+        saida = await enviar(entrada.posicao && posicaoAgora())
+      } catch (e) {
+        // o vizinho saiu entre a conferência e o servidor: uma tentativa pela chave de posição prevista
+        const bx = bootstrapDe(qc)
+        if (!entrada.posicao || !vizinhoPerdido(e) || !bx) throw e
+        saida = await enviar(posicaoPorChave(naColuna(bx), prev.demanda.posicao))
+      }
+      aplicarDemandaDoServidor(qc, saida.demanda, mutacao)
       if (saida.proxima) inserirDemanda(qc, saida.proxima)
       if (!op.semAviso && prev.mudaColuna) {
         avisarMovida(antes, saida, { quadroDe: quadroDe.nome, quadroPara: quadroPara.nome, coluna: prev.para.nome, mudaQuadro: prev.mudaQuadro,
@@ -178,7 +204,7 @@ export function criarAcoes(qc: QueryClient, deps: DepsAcoes): AcoesCompletas {
       const volta: MoverEntrada = { colunaId: lugarAntes.colunaId, posicao: lugarAntes.posicao }
       if (nomes.mudaQuadro) { volta.etiquetaIds = antes.etiquetaIds; volta.membroIds = antes.membroIds }
       else if (!mesmoConjunto(antes.membroIds, saida.demanda.membroIds)) volta.membroIds = antes.membroIds
-      const r = await moverBase(atualDe(saida.demanda), volta, 'menu', false, { semAviso: true })
+      const r = await moverBase(atualDe(saida.demanda), volta, 'menu', false, { semAviso: true, posicaoReserva: antes.posicao })
       if (r && saida.proxima) await arquivarBase(atualDe(saida.proxima), { semAviso: true })
     }
     const detalhes: string[] = []
@@ -209,13 +235,15 @@ export function criarAcoes(qc: QueryClient, deps: DepsAcoes): AcoesCompletas {
     const antes = campos(base, Object.keys(otimista) as (keyof Demanda)[])
     aplicarPatchDemanda(qc, d.id, otimista)
     if (descricaoMd !== undefined) atualizarDetalhe(qc, d.id, (det) => ({ ...det, descricaoMd }))
+    const camposEditados: (keyof Demanda)[] = [...(Object.keys(otimista) as (keyof Demanda)[]), 'descricaoAtualizadaEm', 'prazo', 'prazoHora']
+    let naTela = demandaConhecida(qc, d.id)
 
     let corpo: EditarDemandaEntrada = mudancas
     let rev = d.rev
     for (let tentativa = 0; tentativa < 3; tentativa++) {
       try {
         const saida = await api<EditarDemandaSaida>('PATCH', caminho(d.id), { corpo, ifMatch: rev })
-        aplicarDemandaDoServidor(qc, saida.demanda, [...(Object.keys(otimista) as (keyof Demanda)[]), 'rev', 'descricaoAtualizadaEm', 'prazo', 'prazoHora'])
+        aplicarDemandaDoServidor(qc, saida.demanda, { campos: camposEditados, naTela })
         if (corpo.descricaoMd !== undefined) {
           registrarDescricao(d.id, saida.demanda.rev, corpo.descricaoMd)
           atualizarDetalhe(qc, d.id, (det) => ({ ...det, descricaoMd: corpo.descricaoMd! }))
@@ -233,6 +261,7 @@ export function criarAcoes(qc: QueryClient, deps: DepsAcoes): AcoesCompletas {
           const semTexto: Partial<Demanda> = { ...mesclado } as Partial<Demanda>
           delete (semTexto as EditarDemandaEntrada).descricaoMd
           inserirDemanda(qc, { ...atual.demanda, ...semTexto })
+          naTela = demandaConhecida(qc, d.id)
           registrarDescricao(d.id, atual.demanda.rev, atual.descricaoMd)
           atualizarDetalhe(qc, d.id, (det) => ({ ...det, descricaoMd: mesclado.descricaoMd ?? atual.descricaoMd }))
           if (Object.keys(mesclado).length === 0) {
@@ -274,9 +303,10 @@ export function criarAcoes(qc: QueryClient, deps: DepsAcoes): AcoesCompletas {
     const antes = atualDe(d)
     const lugarAntes = b ? lugarAtual(b.demandas, antes) : null
     aplicarPatchDemanda(qc, antes.id, concluida ? { concluidaEm: new Date().toISOString(), concluidaPor: eu() } : { concluidaEm: null, concluidaPor: null })
+    const mutacao: MutacaoDemanda = { campos: ['concluidaEm', 'concluidaPor', ...CAMPOS_DO_MOVER], naTela: demandaConhecida(qc, antes.id) }
     try {
       const saida = await api<ConcluirSaida>('POST', `${caminho(antes.id)}/concluir`, { corpo: { concluida } })
-      aplicarDemandaDoServidor(qc, saida.demanda, ['concluidaEm', 'concluidaPor', ...CAMPOS_DO_MOVER])
+      aplicarDemandaDoServidor(qc, saida.demanda, mutacao)
       if (saida.proxima) inserirDemanda(qc, saida.proxima)
       if (concluida && !op.semAviso && (saida.proxima || saida.automacao)) {
         const desfazer = async () => {
@@ -284,7 +314,7 @@ export function criarAcoes(qc: QueryClient, deps: DepsAcoes): AcoesCompletas {
           if (saida.automacao && lugarAntes && atual.colunaId !== antes.colunaId) {
             const volta: MoverEntrada = { colunaId: lugarAntes.colunaId, posicao: lugarAntes.posicao }
             if (atual.quadroId !== antes.quadroId) { volta.etiquetaIds = antes.etiquetaIds; volta.membroIds = antes.membroIds }
-            const r = await moverBase(atual, volta, 'menu', false, { semAviso: true })
+            const r = await moverBase(atual, volta, 'menu', false, { semAviso: true, posicaoReserva: antes.posicao })
             if (!r) return
             atual = r.demanda
           }
@@ -314,12 +344,13 @@ export function criarAcoes(qc: QueryClient, deps: DepsAcoes): AcoesCompletas {
     const lista = antes[campo]
     if (por === lista.includes(id)) return antes
     aplicarPatchDemanda(qc, antes.id, { [campo]: por ? [...lista, id] : lista.filter((x) => x !== id) })
+    const mutacao: MutacaoDemanda = { campos: [campo], naTela: demandaConhecida(qc, antes.id) }
     const rota = campo === 'membroIds' ? 'membros' : 'etiquetas'
     try {
       const saida = por
         ? await api<DemandaSaida>('POST', `${caminho(antes.id)}/${rota}`, { corpo: campo === 'membroIds' ? { usuarioId: id } : { etiquetaId: id } })
         : await api<DemandaSaida>('DELETE', `${caminho(antes.id)}/${rota}/${encodeURIComponent(id)}`)
-      aplicarDemandaDoServidor(qc, saida.demanda, [campo])
+      aplicarDemandaDoServidor(qc, saida.demanda, mutacao)
       return saida.demanda
     } catch (e) {
       // volta só este item (outra pessoa pode ter mexido no resto do conjunto)

@@ -47,6 +47,24 @@ export function posicaoNoIndice(visiveis: readonly Pick<Demanda, 'id'>[], indice
   return {}
 }
 
+/** A posição relativa da chave `alvo` na lista em ordem: logo depois do último card antes dela; nenhum antes = topo. */
+export function posicaoPorChave(lista: readonly Pick<Demanda, 'id' | 'posicao'>[], alvo: number): PosicaoRelativa {
+  const antes = lista.filter((d) => d.posicao < alvo)
+  return antes.length ? { depoisDeId: antes.at(-1)!.id } : { depoisDeId: null }
+}
+
+/**
+ * A posição relativa ainda vale na coluna? `lista` = os cards da coluna agora, em ordem e sem o que se move. Se o
+ * vizinho de referência saiu dela (outra pessoa o moveu durante o arraste, ou depois do movimento que o Desfazer
+ * desfaz), o servidor recusaria com 400: refaz pela chave `alvo` (onde o card ficaria); sem `alvo`, no fim.
+ */
+export function posicaoValida(lista: readonly Pick<Demanda, 'id' | 'posicao'>[], rel: PosicaoRelativa | undefined,
+  alvo: number | null): PosicaoRelativa | undefined {
+  const ref = typeof rel?.depoisDeId === 'string' ? rel.depoisDeId : rel?.depoisDeId === null ? null : rel?.antesDeId
+  if (ref === undefined || ref === null || lista.some((d) => d.id === ref)) return rel
+  return alvo === null ? {} : posicaoPorChave(lista, alvo)
+}
+
 /** Onde a demanda está agora, como posição relativa (o Desfazer volta para cá). */
 export function lugarAtual(demandas: readonly Demanda[], d: Demanda): { colunaId: Id; posicao: PosicaoRelativa } {
   const lista = cardsDaColuna(demandas, d.colunaId, d.id)

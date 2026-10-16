@@ -56,13 +56,80 @@ describe('cache do bootstrap', () => {
     assert.equal(qc.getQueryData<{ demanda: { titulo: string } }>(['demanda', 1])!.demanda.titulo, 'Só leitura')
   })
 
-  test('resposta do servidor mais velha que o cache só traz os campos da mutação', () => {
-    const qc = cacheCom(bootstrap({ demandas: [demanda({ titulo: 'Mudado por outra pessoa', atualizadoEm: '2026-10-14T13:00:02.000Z', colunaId: 'c-rafa' })] }))
-    aplicarDemandaDoServidor(qc, demanda({ titulo: 'Velho', colunaId: 'c-bia', posicao: 9, atualizadoEm: '2026-10-14T13:00:01.000Z' }), ['colunaId', 'posicao'])
+  test('resposta do servidor mais velha que o cache só corrige o que a mutação mexeu e ninguém tocou depois', () => {
+    // p1 move (previsão: posição 1536); o servidor grava em 1600; depois p2 muda o título e o evento chega antes da resposta
+    const qc = cacheCom(bootstrap({ demandas: [demanda()] }))
+    aplicarPatchDemanda(qc, 'd1', { colunaId: 'c-bia', posicao: 1536 })
+    const naTela = bootDe(qc).demandas[0]
+    tratarDemanda(evento({ e: 'demanda', id: 'd1', d: 'd1', t: 'p2', a: 'u-rafa', op: 'upsert', c: ['titulo', 'rev', 'atualizadoEm'],
+      p: { titulo: 'Mudado por outra pessoa', rev: 2, atualizadoEm: '2026-10-14T13:00:02.000Z' } }), qc)
+    aplicarDemandaDoServidor(qc, demanda({ colunaId: 'c-bia', posicao: 1600, atualizadoEm: '2026-10-14T13:00:01.000Z' }),
+      { campos: ['colunaId', 'posicao'], naTela })
     const d = bootDe(qc).demandas[0]
     assert.equal(d.titulo, 'Mudado por outra pessoa')
     assert.equal(d.colunaId, 'c-bia')
-    assert.equal(d.posicao, 9)
+    assert.equal(d.posicao, 1600)
+    assert.equal(d.rev, 2)
+    assert.equal(d.atualizadoEm, '2026-10-14T13:00:02.000Z')
+  })
+
+  describe('corrida: o evento de p2 chega antes da resposta de p1 (o servidor gravou p1 primeiro)', () => {
+    const T1 = '2026-10-14T13:00:01.000Z', T2 = '2026-10-14T13:00:02.000Z'
+    const deP2 = (p: Partial<ReturnType<typeof demanda>>) =>
+      evento<EventoDe<'demanda'>>({ e: 'demanda', id: 'd1', d: 'd1', t: 'p2', a: 'u-caio', op: 'upsert', c: Object.keys(p) as never, p })
+
+    test('mover: p1 aperta "." (Rafa) e p2 leva para a Bia: fica na Bia', () => {
+      const qc = cacheCom(bootstrap({ demandas: [demanda()] }))
+      aplicarPatchDemanda(qc, 'd1', { colunaId: 'c-rafa', membroIds: ['u-rafa'], statusDesde: T1 })
+      const naTela = bootDe(qc).demandas[0]
+      tratarDemanda(deP2({ colunaId: 'c-bia', membroIds: ['u-bia'], posicao: 1024, statusDesde: T2, atualizadoEm: T2 }), qc)
+      aplicarDemandaDoServidor(qc, demanda({ colunaId: 'c-rafa', membroIds: ['u-rafa'], statusDesde: T1, atualizadoEm: T1 }),
+        { campos: ['colunaId', 'quadroId', 'posicao', 'statusDesde', 'membroIds', 'etiquetaIds', 'concluidaEm', 'concluidaPor'], naTela })
+      const d = bootDe(qc).demandas[0]
+      assert.equal(d.colunaId, 'c-bia')
+      assert.deepEqual(d.membroIds, ['u-bia'])
+      assert.equal(d.statusDesde, T2)
+    })
+
+    test('título: p1 grava o dele e p2 grava outro por cima: fica o de p2 e o rev não desce', () => {
+      const qc = cacheCom(bootstrap({ demandas: [demanda({ titulo: 'Antes', rev: 1 })] }))
+      aplicarPatchDemanda(qc, 'd1', { titulo: 'Título de p1' })
+      const naTela = bootDe(qc).demandas[0]
+      tratarDemanda(deP2({ titulo: 'Título de p2', rev: 3, atualizadoEm: T2 }), qc)
+      aplicarDemandaDoServidor(qc, demanda({ titulo: 'Título de p1', rev: 2, atualizadoEm: T1 }),
+        { campos: ['titulo', 'descricaoAtualizadaEm', 'prazo', 'prazoHora'], naTela })
+      const d = bootDe(qc).demandas[0]
+      assert.equal(d.titulo, 'Título de p2')
+      assert.equal(d.rev, 3)
+    })
+
+    test('título de p1 e p2 só move: fica o título de p1, o lugar de p2 e o rev novo da resposta', () => {
+      const qc = cacheCom(bootstrap({ demandas: [demanda({ titulo: 'Antes', rev: 1 })] }))
+      aplicarPatchDemanda(qc, 'd1', { titulo: 'Título de p1' })
+      const naTela = bootDe(qc).demandas[0]
+      tratarDemanda(deP2({ colunaId: 'c-bia', posicao: 1024, atualizadoEm: T2 }), qc)
+      aplicarDemandaDoServidor(qc, demanda({ titulo: 'Título de p1', rev: 2, atualizadoEm: T1 }),
+        { campos: ['titulo', 'descricaoAtualizadaEm', 'prazo', 'prazoHora'], naTela })
+      const d = bootDe(qc).demandas[0]
+      assert.equal(d.titulo, 'Título de p1')
+      assert.equal(d.colunaId, 'c-bia')
+      assert.equal(d.rev, 2, 'o próximo If-Match de p1 vai com o rev da gravação dele')
+    })
+
+    test('membros: p1 entra (Espaço) e p2 entra também: os dois ficam', () => {
+      const qc = cacheCom(bootstrap({ demandas: [demanda()] }))
+      aplicarPatchDemanda(qc, 'd1', { membroIds: [EU] })
+      const naTela = bootDe(qc).demandas[0]
+      tratarDemanda(deP2({ membroIds: [EU, 'u-caio'], atualizadoEm: T2 }), qc)
+      aplicarDemandaDoServidor(qc, demanda({ membroIds: [EU], atualizadoEm: T1 }), { campos: ['membroIds'], naTela })
+      assert.deepEqual(bootDe(qc).demandas[0].membroIds, [EU, 'u-caio'])
+    })
+
+    test('sem a mutação (resposta de interceptador, arquivar), o cache mais novo fica como está', () => {
+      const qc = cacheCom(bootstrap({ demandas: [demanda({ titulo: 'Novo', atualizadoEm: T2 })] }))
+      aplicarDemandaDoServidor(qc, demanda({ titulo: 'Velho', atualizadoEm: T1 }))
+      assert.equal(bootDe(qc).demandas[0].titulo, 'Novo')
+    })
   })
 
   test('aplicarNoBootstrap: upsert e delete por id', () => {

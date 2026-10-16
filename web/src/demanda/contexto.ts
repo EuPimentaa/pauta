@@ -13,8 +13,11 @@ import { abrirDialogo, navegar } from '../dialogos/estado.ts'
 export function montarContextoDemanda(b: Bootstrap, demanda: Demanda, extra: {
   detalhe?: DemandaDetalhe; quadro?: Quadro | null; coluna?: Coluna | null
 } = {}): ContextoDemanda | null {
-  const quadro = extra.quadro ?? b.quadros.find((q) => q.id === demanda.quadroId) ?? extra.detalhe?.quadro
-  const coluna = extra.coluna ?? b.colunas.find((c) => c.id === demanda.colunaId) ?? extra.detalhe?.coluna
+  // o bootstrap acompanha o mover; o detalhe só vale para a demanda fora dele (e só se for o lugar dela)
+  const doDetalheQ = extra.detalhe?.quadro.id === demanda.quadroId ? extra.detalhe.quadro : undefined
+  const doDetalheC = extra.detalhe?.coluna.id === demanda.colunaId ? extra.detalhe.coluna : undefined
+  const quadro = extra.quadro ?? b.quadros.find((q) => q.id === demanda.quadroId) ?? doDetalheQ
+  const coluna = extra.coluna ?? b.colunas.find((c) => c.id === demanda.colunaId) ?? doDetalheC
   if (!quadro || !coluna) return null
   const eu = b.eu
   return {

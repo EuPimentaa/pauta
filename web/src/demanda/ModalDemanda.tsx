@@ -20,6 +20,7 @@ import { useDoBootstrap } from '../api/seletores.ts'
 import { abrirDialogo } from '../dialogos/estado.ts'
 import type { ContextoDemanda, ExtensaoAcaoDemanda, ExtensaoSecaoDemanda, UtilModal } from '../extensoes/tipos.ts'
 import { useTituloAba } from '../lib/app.ts'
+import { useCamada } from '../lib/camadas.ts'
 import type { Ancora } from '../lib/posicao.ts'
 import { useAbrirSobreposta } from '../sessao/sobreposta.tsx'
 import { useRegistro, type ModuloRegistro } from '../sessao/registro.ts'
@@ -41,11 +42,19 @@ function Titulo({ ctx, editar }: { ctx: ContextoDemanda; editar(titulo: string):
   const [editando, setEditando] = useState(false)
   const [texto, setTexto] = useState(ctx.demanda.titulo)
   const feito = useRef(false)
+  const botao = useRef<HTMLButtonElement>(null)
+  const voltarFoco = useRef(false)
+  // em edição, o campo é uma camada: o Esc (que as camadas ouvem na captura da janela) sai da edição em vez de fechar
+  // o modal inteiro
+  useCamada(editando, { aoEsc: () => { feito.current = true; voltarFoco.current = true; setEditando(false) } })
+  useEffect(() => {
+    if (!editando && voltarFoco.current) { voltarFoco.current = false; botao.current?.focus() }
+  }, [editando])
   if (ctx.somenteLeitura) return <h2 className="modal-demanda-titulo">{ctx.demanda.titulo}</h2>
   if (!editando) {
     return (
       <h2 className="modal-demanda-titulo">
-        <button type="button" className="modal-demanda-titulo-botao" title="Editar o título"
+        <button ref={botao} type="button" className="modal-demanda-titulo-botao" title="Editar o título"
           onClick={() => { feito.current = false; setTexto(ctx.demanda.titulo); setEditando(true) }}>
           {ctx.demanda.titulo}
         </button>
@@ -71,8 +80,7 @@ function Titulo({ ctx, editar }: { ctx: ContextoDemanda; editar(titulo: string):
       onChange={(e) => setTexto(e.target.value)}
       onBlur={salvar}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); salvar() }
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); feito.current = true; setEditando(false) }
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); voltarFoco.current = true; salvar() }
       }}
     />
   )
@@ -150,8 +158,9 @@ export function ConteudoModal({ demanda, detalhe, fechar }: PropsModalDemanda) {
   const [menu, setMenu] = useState<{ ancora: Ancora; itens: ItemMenuUi[] } | null>(null)
   useEscopoAtalho('modal')
 
-  const ctx = useMemo(() => (boot ? montarContextoDemanda(boot, demanda, { detalhe, quadro: detalhe?.quadro, coluna: detalhe?.coluna }) : null),
-    [boot, demanda, detalhe])
+  // quadro e coluna do bootstrap (acompanham o mover); os do detalhe só para a demanda fora dele (arquivada, quadro
+  // arquivado), que não muda de lugar
+  const ctx = useMemo(() => (boot ? montarContextoDemanda(boot, demanda, { detalhe }) : null), [boot, demanda, detalhe])
   const util = useMemo(() => montarUtilModal(qc, fechar), [qc, fechar])
   useTituloAba(`#${demanda.numero} ${demanda.titulo}`)
 

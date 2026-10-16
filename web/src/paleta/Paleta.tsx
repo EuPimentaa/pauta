@@ -12,6 +12,7 @@ import type { Comando, ContextoAcao, FontePaleta, ResultadoPaleta } from '../ext
 import { useDemanda } from '../api/seletores.ts'
 import { useContextoAcao } from '../dialogos/contexto.ts'
 import { lerLocal, gravarLocal } from '../lib/armazenamento.ts'
+import { EH_MAC } from '../lib/teclas.ts'
 import { useRegistro } from '../sessao/registro.ts'
 import { Kbd } from '../ui/Kbd.tsx'
 import { Modal } from '../ui/Modal.tsx'
@@ -164,6 +165,12 @@ function Busca() {
       value={valor}
       onValueChange={setSelecionado}
       onKeyDown={(e) => {
+        // Cmd/Ctrl+K de novo fecha (o despachante não vê teclas com a paleta aberta; o cmdk usaria Ctrl+K para subir)
+        if (e.key.toLowerCase() === 'k' && (EH_MAC ? e.metaKey : e.ctrlKey) && !e.altKey && !e.shiftKey) {
+          e.preventDefault()
+          fecharPaleta()
+          return
+        }
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
           const alvo = porValor.get(valor)
           if (alvo?.r?.caminho) { e.preventDefault(); escolher(alvo, true) }

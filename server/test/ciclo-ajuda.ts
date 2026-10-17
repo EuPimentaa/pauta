@@ -4,7 +4,7 @@
  * navegador manda).
  */
 import { randomUUID } from 'node:crypto'
-import type { Demanda, EntregarVersaoSaida, EnviarAoClienteSaida, NovoItem, PaginaAprovacao, Usuario } from '../../shared/tipos/index.ts'
+import type { Demanda, EntregarVersaoSaida, EnviarAoClienteSaida, NovoItem, Usuario } from '../../shared/tipos/index.ts'
 import { tx } from '../src/db.ts'
 import { salvarUpload } from '../src/servicos/arquivos.ts'
 import { aguardarTestesDrive } from '../src/servicos/ciclo.ts'
@@ -103,7 +103,7 @@ export function publico(a: Ambiente, ip = '200.1.1.1') {
     return { status: r.status, corpo: json, texto, headers: r.headers }
   }
   return {
-    pagina: (token: string) => enviar('GET', `/api/publico/a/${token}`) as Promise<Resposta<PaginaAprovacao>>,
+    pagina: (token: string) => enviar('GET', `/api/publico/a/${token}`),
     visto: (token: string) => enviar('POST', `/api/publico/a/${token}/visto`),
     decidir: (token: string, corpo: Record<string, unknown>, chave: string | null = randomUUID()) =>
       enviar('POST', `/api/publico/a/${token}/decisao`, corpo, chave ? { 'Idempotency-Key': chave } : {}),

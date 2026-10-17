@@ -33,7 +33,7 @@ describe('GET /api/publico/a/:token', () => {
     assert.equal(r.status, 200, r.texto)
     const depois = um<{ acessos: number; ultimo_acesso_em: string | null }>(a.db, 'SELECT acessos, ultimo_acesso_em FROM link_publico')!
     assert.deepEqual(depois, antes)
-    const p = r.corpo
+    const p = r.corpo as PaginaAprovacao
     assert.equal(p.cliente.sigla, 'HE')
     assert.equal(p.contato!.nome, 'Fulana')
     assert.equal(p.itens.length, 1)

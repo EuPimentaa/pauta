@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import type { EnviarAoClienteSaida, LinkPublicoComUrl } from '../../shared/tipos/index.ts'
 import { todos, um } from '../src/db.ts'
 import { eventos, ultimoSeq } from './ajuda.ts'
-import { ambiente, enviarAoCliente, entregar, linkDrive, publico, situacaoDrive, tokenDe } from './ciclo-ajuda.ts'
+import { ambiente, enviarAoCliente, enviarPng, entregar, linkDrive, publico, situacaoDrive, tokenDe } from './ciclo-ajuda.ts'
 
 describe('POST /api/demandas/:id/enviar', () => {
   test('sem cliente ou sem versão → 422; equipe → 403; por fora exige o canal', async () => {
@@ -78,6 +78,14 @@ describe('POST /api/demandas/:id/enviar', () => {
     assert.deepEqual(r.corpo.erro.detalhes.itens.map((i: { nome: string }) => i.nome), ['Arte'])
     assert.equal(um<{ n: number }>(a.db, 'SELECT count(*) AS n FROM envio')!.n, 0)
     assert.equal(um<{ n: number }>(a.db, 'SELECT count(*) AS n FROM link_publico')!.n, 0)
+    // "[Enviar arquivo (até 10 MB)]": com um arquivo na versão o link passa, e a página deixa o Drive privado de fora
+    const comArquivo = await a.criarDemanda({ colunaId: a.coluna('criacao', 'Design').id, titulo: 'Banner' })
+    const v2 = await entregar(a, comArquivo, { itens: [{ tipo: 'link', url: linkDrive('privado-9999'), nome: 'Arte' }] })
+    await a.como(a.pessoas.design).post(`/api/versoes/${v2.versao.id}/itens`, { itens: [{ tipo: 'arquivo', arquivoId: enviarPng(a, a.pessoas.design) }] })
+    const passou = await a.como(a.pessoas.am).post(`/api/demandas/${comArquivo.id}/enviar`, { via: 'link' })
+    assert.equal(passou.status, 200, passou.texto)
+    const pag = (await publico(a).pagina(tokenDe(passou.corpo.link.url))).corpo
+    assert.deepEqual(pag.itens[0].versao.itens.map((i: { tipo: string }) => i.tipo), ['arquivo'])
     // o compartilhamento foi aberto: testar de novo libera
     situacaoDrive('privado-9999', 'publico')
     const ok = await a.como(a.pessoas.am).post(`/api/demandas/${d.id}/enviar`, { via: 'link' })

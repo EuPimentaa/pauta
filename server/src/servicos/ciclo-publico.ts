@@ -78,6 +78,8 @@ function versaoPublica(db: Db, versaoId: Id, enviadaEm: string): VersaoPublica {
   const minutos = lerConfig(db).linkPublicoArquivoMinutos
   const itens: ItemVersaoPublico[] = []
   for (const i of v.itens) {
+    // link do Drive privado nunca vai ao cliente (veria uma tela de login): o envio só passa com um arquivo no lugar
+    if (i.tipo === 'link' && i.url && i.driveStatus === 'privado') continue
     if (i.tipo === 'link' && i.url) {
       const drive = i.provedor === 'drive' ? lerLinkDrive(i.url) : null
       itens.push({

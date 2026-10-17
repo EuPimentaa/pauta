@@ -6,7 +6,7 @@ import type {
   DataLocal, Demanda, EnviarAoClienteEntrada, EnviarAoClienteSaida, Envio, Id, LinkPublicoComUrl, LinkPublicoResumo,
   ModeloWhatsapp, TextoWhatsappSaida, VersaoComItens,
 } from '../../../shared/tipos/index.ts'
-import { diaUtilAnterior, somarDiasUteis } from '../../../shared/logica/datas.ts'
+import { prazoRetornoPadrao as prazoRetornoPuro } from '../../../shared/logica/ciclo-prazos.ts'
 import { textoWhatsapp } from '../../../shared/logica/texto-whatsapp.ts'
 import type { Ator } from '../auth.ts'
 import { config } from '../config.ts'
@@ -92,14 +92,7 @@ function preparar(db: Db, demandaId: Id, e: EnviarAoClienteEntrada, ator: Ator):
 
 /** Prazo de retorno padrão: hoje + retornoPrazoDiasUteis, sem passar da véspera útil da publicação (nem antes de hoje). */
 export function prazoRetornoPadrao(db: Db, d: Pick<Demanda, 'publicacaoData'>): DataLocal {
-  const fer = feriados(db)
-  const h = hoje()
-  let prazo = somarDiasUteis(h, lerConfig(db).retornoPrazoDiasUteis, fer)
-  if (d.publicacaoData) {
-    const vespera = diaUtilAnterior(d.publicacaoData, fer)
-    if (vespera < prazo) prazo = vespera < h ? h : vespera
-  }
-  return prazo
+  return prazoRetornoPuro(hoje(), lerConfig(db).retornoPrazoDiasUteis, d.publicacaoData, feriados(db))
 }
 
 /**
@@ -116,8 +109,10 @@ export async function enviarAoCliente(db: Db, demandaId: Id, e: EnviarAoClienteE
 function gravarEnvio(db: Db, demandaId: Id, e: EnviarAoClienteEntrada, ator: Ator): EnviarAoClienteSaida {
   const { d, versao, contatoId } = preparar(db, demandaId, e, ator)
   if (e.via === 'link') {
+    // Drive privado bloqueia, a não ser que a versão tenha um arquivo enviado pelo app ("[Enviar arquivo (até 10 MB)]"
+    // do diálogo): a página pública mostra o arquivo e deixa de fora o link que pediria login
     const privados = versao.itens.filter((i) => i.driveStatus === 'privado')
-    if (privados.length > 0) {
+    if (privados.length > 0 && !versao.itens.some((i) => i.tipo === 'arquivo')) {
       throw new ErroHttp(422, 'drive_privado', 'O cliente verá uma tela de login: abra o compartilhamento do Drive, envie o arquivo pelo app ou mande por fora.',
         { itens: privados.map((i) => ({ itemId: i.id, nome: i.nome, url: i.url })) })
     }

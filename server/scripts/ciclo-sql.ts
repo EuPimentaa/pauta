@@ -38,19 +38,24 @@ function ultimaVersao(db: Db, demandaId: Id, enviada: boolean): Id {
   return v.id
 }
 
-/** Entrega Vn na rodada aberta com um link do Drive público (os gatilhos põem n_versoes e versao_atual_id). */
+/**
+ * Entrega Vn na rodada aberta com um link do Drive público (os gatilhos põem n_versoes e versao_atual_id). Grava a
+ * miniatura pública como o teste do Drive do F2 grava (`previa_url`; pedido 2 do F2, integração 3B).
+ */
 export function entregarPorSql(db: Db, demandaId: Id, autorId: Id,
   item: { nome: string; url: string } = { nome: 'Arte final', url: 'https://drive.google.com/file/d/arte-v1/view' }): Id {
   const instante = agora()
+  const idDrive = /\/file\/(?:u\/\d+\/)?d\/([A-Za-z0-9_-]{2,200})(?:\/|$)/.exec(new URL(item.url).pathname)?.[1]
+  const previa = idDrive ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(idDrive)}&sz=w400` : null
   const rodada = um<{ id: string }>(db, 'SELECT id FROM rodada WHERE demanda_id = ? AND fechada_em IS NULL', demandaId)
   if (!rodada) throw new Error(`demanda ${demandaId} sem rodada aberta`)
   const numero = Number(um<{ n: number | null }>(db, 'SELECT max(numero) AS n FROM versao WHERE demanda_id = ?', demandaId)!.n ?? 0) + 1
   const versao = novoId()
   rodar(db, 'INSERT INTO versao (id, demanda_id, numero, rodada_id, criada_por, criada_em) VALUES (?, ?, ?, ?, ?, ?)',
     versao, demandaId, numero, rodada.id, autorId, instante)
-  rodar(db, `INSERT INTO versao_item (id, versao_id, demanda_id, tipo, nome, url, provedor, drive_status, drive_testado_em, pos, criado_em)
-             VALUES (?, ?, ?, 'link', ?, ?, 'drive', 'publico', ?, 1024, ?)`,
-    novoId(), versao, demandaId, item.nome, item.url, instante, instante)
+  rodar(db, `INSERT INTO versao_item (id, versao_id, demanda_id, tipo, nome, url, provedor, drive_status, drive_testado_em, previa_url, pos, criado_em)
+             VALUES (?, ?, ?, 'link', ?, ?, 'drive', 'publico', ?, ?, 1024, ?)`,
+    novoId(), versao, demandaId, item.nome, item.url, instante, previa, instante)
   return versao
 }
 

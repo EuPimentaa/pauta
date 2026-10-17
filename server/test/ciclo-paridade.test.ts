@@ -2,7 +2,6 @@
  * Paridade da fixture (PLANO §1.1.1): os serviços reais do ciclo (entregar, enviar por fora sem automação, retorno
  * aprovado e anular) gravam as mesmas linhas que `criarDemanda({ ate })` (scripts/ciclo-sql.ts, do núcleo), fora ids
  * e instantes. Diferenças que são do serviço, não da trilha (e por isso ficam fora da comparação):
- * - `versao_item.previa_url`: o teste do Drive do serviço guarda a miniatura pública (o SQL não testa nada);
  * - `demanda.atualizado_por` na entrega: o serviço grava quem entregou (toda UPDATE grava o autor); o SQL só deixa os
  *   gatilhos mexerem na demanda;
  * - o envio pelo serviço leva `prazoRetorno: null` (o padrão seria hoje + 2 dias úteis; o SQL não grava prazo).
@@ -31,7 +30,6 @@ function retrato(db: Db, demandaId: string, opcoes: { semAutorDaDemanda?: boolea
   const demanda = todos<Linha>(db, `SELECT id, quadro_id, coluna_id, envio_pendente_em, retorno_em, aprovada_em, aprovada_versao_id,
     versao_atual_id, versao_enviada_id, n_versoes, rodada_atual, atualizado_por FROM demanda WHERE id = ?`, demandaId)
   if (opcoes.semAutorDaDemanda) delete demanda[0]!.atualizado_por
-  for (const i of itens) delete i.previa_url
   const normal = (linhas: Linha[]) => linhas.map((l) => Object.fromEntries(Object.entries(l).map(([k, v]) => [k,
     typeof v === 'string' && INSTANTE.test(v) ? '<instante>' : typeof v === 'string' && rotulos.has(v) ? rotulos.get(v)! : v])))
   return { demanda: normal(demanda), versao: normal(versoes), versao_item: normal(itens), rodada: normal(rodadas), envio: normal(envios),

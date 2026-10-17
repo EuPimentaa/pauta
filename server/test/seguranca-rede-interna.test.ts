@@ -135,6 +135,18 @@ describe('decisão pelo link vinda da rede de uma sessão interna', () => {
     // sem IP de verdade não casa (o socket desconhecido dos testes, vazio)
     assert.deepEqual(pessoasDaRede(a.db, 'desconhecido'), [])
   })
+
+  test('a visita da mesma rede não conta como do cliente (acessos e link.visto); a de outra rede conta', async () => {
+    const { a, token } = await comLink()
+    await usarAppDe(a, a.pessoas.am, ESCRITORIO)
+    assert.equal((await publico(a, ESCRITORIO).visto(token)).status, 204)
+    const acessos = () => um<{ n: number }>(a.db, 'SELECT acessos AS n FROM link_publico')!.n
+    assert.equal(acessos(), 0)
+    assert.equal(atividades(a, 'link.visto').length, 0)
+    assert.equal((await publico(a, '189.40.1.2').visto(token)).status, 204)
+    assert.equal(acessos(), 1)
+    assert.equal(atividades(a, 'link.visto').length, 1)
+  })
 })
 
 describe('quem recebe o endereço do link fica no histórico (link.exibido)', () => {

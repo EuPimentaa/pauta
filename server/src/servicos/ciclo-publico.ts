@@ -225,13 +225,16 @@ export function paginaAprovacao(db: Db, token: string): PaginaAprovacao {
 
 const SEIS_HORAS = 6 * 3_600_000
 
-/** POST /api/publico/a/:token/visto: soma o acesso; `link.visto` no máximo a cada 6 h. */
+/**
+ * POST /api/publico/a/:token/visto: soma o acesso; `link.visto` no máximo a cada 6 h. Não conta a prévia interna (sessão
+ * no cookie) nem a visita da mesma rede de uma sessão interna recente (o endereço copiado numa aba anônima ou no celular
+ * de quem é da agência): "O cliente abriu o link" seria falso. A decisão dessa rede vale, mas fica marcada (`decidir`).
+ */
 export function registrarVisto(db: Db, token: string, ator: Ator, opcoes: { previaInterna: boolean }): void {
   const link = linkAtivoPeloToken(db, token)
   const demandas = demandasDoLink(db, link)
   if (demandas.length === 0) throw linkInativo()
-  // quem tem sessão interna ("Ver como o cliente", o link copiado) não é o cliente abrindo o link
-  if (opcoes.previaInterna) return
+  if (opcoes.previaInterna || pessoasDaRede(db, ator.ip).length > 0) return
   const instante = agora()
   rodar(db, 'UPDATE link_publico SET acessos = acessos + 1, ultimo_acesso_em = ? WHERE id = ?', instante, link.id)
   const ultimo = um<{ m: string | null }>(db, `SELECT max(criado_em) AS m FROM atividade WHERE tipo = 'link.visto'

@@ -908,8 +908,9 @@ HTML de `/a/:token`); `/a/*` e `/api/publico/*` mascarados nos logs. Token: `ran
   encerradas ou vencidas; a sessão guarda o IP da última requisição, §1). Aparece como `Aprovacao.redeInterna` (o
   modal mostra "Da mesma rede que Pri" na linha da decisão), em `retorno.registrado.redeInterna` (o histórico diz
   "aprovou a V1 pelo link · da mesma rede que Pri"), na trilha do cliente (§4.10, com o aparelho para o admin) e na
-  notificação, que termina com "· da mesma rede que Pri" e vai também aos admins. Quem recebeu o endereço do link fica
-  em `link.exibido` (§4.16).
+  notificação, que termina com "· da mesma rede que Pri" e vai também aos admins. A visita dessa rede não conta como do
+  cliente (`/visto` sem efeito, como na prévia: "O cliente abriu o link" seria falso). Quem recebeu o endereço do link
+  fica em `link.exibido` (§4.16).
 - **"Enviada por este link"** = existe `envio` com aquela `versao_id` e `link_id` = o link. Nenhuma rota pública lê
   `demanda.versao_atual_id` (pode ser trabalho interno ainda não enviado).
 - **Itens ignorados:** demanda arquivada, excluída (excluir também revoga) ou de outro cliente que não o do link (o
@@ -929,7 +930,8 @@ HTML de `/a/:token`); `/a/*` e `/api/publico/*` mascarados nos logs. Token: `ran
 
 #### `POST /api/publico/a/:token/visto`
 Chamado pelo JS da página. Soma `acessos`, grava `ultimoAcessoEm`; `link.visto` no máximo uma vez a cada 6 h. `204`.
-Com sessão interna no cookie (prévia interna): `204` sem efeito. **SSE:** `link_publico` (gestão).
+Com sessão interna no cookie (prévia interna) ou da mesma rede de uma sessão interna das últimas 24 h (acima): `204`
+sem efeito. **SSE:** `link_publico` (gestão).
 
 #### `POST /api/publico/a/:token/decisao`
 - **Header:** `Idempotency-Key` (obrigatório). **Corpo:** `DecisaoPublicaEntrada`. **Resposta:** `200 DecisaoPublicaSaida`.

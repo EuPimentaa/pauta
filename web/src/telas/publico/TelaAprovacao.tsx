@@ -66,7 +66,7 @@ function detalheDoItem(i: ItemVersaoPublico): string {
 }
 
 /** "2 imagens e 1 link" (o que a versão traz). */
-export function resumoDosItens(itens: readonly ItemVersaoPublico[]): string {
+function resumoDosItens(itens: readonly ItemVersaoPublico[]): string {
   const contar = (n: number, um: string, varios: string) => (n ? `${n} ${n === 1 ? um : varios}` : null)
   const imagens = itens.filter((i) => i.imagem).length
   const videos = itens.filter(ehVideo).length

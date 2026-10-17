@@ -14,9 +14,15 @@ export function focoNaCarga(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches
 }
 
+/**
+ * Paradas do Tab dentro de `raiz`, na ordem do documento. Quem tem `tabindex="-1"` fica de fora mesmo sendo botão ou
+ * campo (as abas inativas e os itens de foco itinerante): o foco inicial cai na aba escolhida, não na primeira, e a
+ * armadilha do Tab vê o último elemento que o Tab alcança de verdade.
+ */
 export function focaveis(raiz: HTMLElement): HTMLElement[] {
   return Array.from(raiz.querySelectorAll<HTMLElement>(SELETOR)).filter(
-    (el) => !el.closest('[inert]') && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden',
+    (el) => el.getAttribute('tabindex') !== '-1' && !el.closest('[inert]') && el.getClientRects().length > 0
+      && getComputedStyle(el).visibility !== 'hidden',
   )
 }
 

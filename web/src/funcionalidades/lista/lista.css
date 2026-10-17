@@ -1,0 +1,262 @@
+/*
+ * F6 (lista): Lista e Calendário do quadro, filtros do cabeçalho e a faixa de colunas do celular. Só tokens da marca
+ * (estilos/tokens.css); cor por item com data-cor (--cor, --cor-bg, --cor-ink, --cor-ponto). Anéis de foco em @layer foco.
+ */
+@layer components {
+  /* ─────────────── raiz das visões ─────────────── */
+  .lista {
+    flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3);
+    padding: var(--space-3) var(--space-5) var(--space-4); min-width: 0;
+  }
+  .lista-centro { display: grid; place-items: center; }
+  .lista-barra { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); min-width: 0; }
+  .lista-barra-campo { display: inline-flex; align-items: center; gap: var(--space-2); }
+  .lista-barra-campo .ui-campo-grupo { gap: 0; }
+  .lista-barra-rotulo { color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); white-space: nowrap; }
+  .lista-barra-campos { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+  .lista-barra-campos .ui-check { font-size: var(--fs-meta); line-height: var(--lh-meta); align-items: center; }
+  .lista-barra-fim { margin-left: auto; }
+  .lista-barra[data-celular] { flex-wrap: nowrap; gap: var(--space-2); }
+  .lista-barra[data-celular] .lista-barra-campo { min-width: 0; }
+  .lista-barra[data-celular] .ui-entrada { min-width: 0; max-width: 150px; }
+  .lista-barra-dica { margin-left: auto; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .lista-aviso {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); padding: 10px 14px;
+    border-radius: var(--radius-md); background: color-mix(in oklab, var(--surface) 88%, transparent); box-shadow: 0 0 0 1px var(--border);
+    color: var(--text-2); font: 400 var(--fs-body) / var(--lh-body) var(--font);
+  }
+  .lista-aviso svg { width: 16px; height: 16px; flex: none; }
+
+  /* ─────────────── tabela (desktop) ─────────────── */
+  .lista-tabela {
+    position: relative; flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
+    border-radius: var(--radius-lg); background: var(--surface-card);
+    box-shadow: 0 0 0 1px var(--border-card), 0 1px 2px var(--shadow-c1);
+  }
+  .lista-cabeca { position: sticky; top: 0; z-index: 3; background: var(--surface-card); }
+  .lista-linha {
+    display: grid; grid-template-columns: var(--lista-colunas); min-width: var(--lista-min); align-items: center;
+    padding: 0 8px;
+  }
+  .lista-linha-cabeca { height: 40px; border-bottom: 1px solid var(--border); }
+  .lista-corpo { position: relative; min-width: var(--lista-min); }
+  .lista-linha-demanda, .lista-linha-grupo, .lista-linha-vazia { position: absolute; top: 0; left: 0; right: 0; }
+  .lista-linha-demanda {
+    height: 44px; border-bottom: 1px solid color-mix(in oklab, var(--border) 70%, transparent); cursor: pointer; outline: none;
+    transition: background-color var(--dur-1) var(--ease);
+  }
+  .lista-linha-demanda:hover { background: var(--surface-hover); }
+  .lista-linha-demanda[data-prioridade="alta"]::before, .lista-linha-demanda[data-prioridade="urgente"]::before {
+    content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--label-ambar);
+  }
+  .lista-linha-demanda[data-prioridade="urgente"]::before { background: var(--danger); }
+  .lista-linha-demanda[data-concluida="true"] .lista-titulo { color: var(--text-2); }
+  .lista-linha-demanda[data-fantasma="true"] { opacity: .45; }
+  .lista-linha-demanda[data-marca]::after {
+    content: ''; position: absolute; left: 8px; right: 8px; height: 2px; border-radius: 2px; background: var(--accent); pointer-events: none;
+  }
+  .lista-linha-demanda[data-marca="antes"]::after { top: -1px; }
+  .lista-linha-demanda[data-marca="depois"]::after { bottom: -1px; }
+  .lista-tabela[data-arrastando="true"] .lista-linha-demanda { cursor: grabbing; }
+  .lista-tabela[data-arrastando="true"] .lista-linha-demanda:hover { background: transparent; }
+
+  .lista-celula {
+    display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; padding: 0 6px;
+    color: var(--text); font: 400 var(--fs-meta) / var(--lh-meta) var(--font);
+  }
+  .lista-numero { color: var(--text-3); font: 500 var(--fs-meta) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; }
+  .lista-titulo {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text); font: 500 var(--fs-body) / var(--lh-body) var(--font);
+  }
+  .lista-ordenar {
+    display: inline-flex; align-items: center; gap: 3px; max-width: calc(100% + 8px); height: 28px; margin-left: -4px; padding: 0 4px;
+    border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-2);
+    font: 600 var(--fs-meta) / 1 var(--font); white-space: nowrap; cursor: pointer;
+  }
+  .lista-ordenar span { overflow: hidden; text-overflow: ellipsis; }
+  /* a seta só aparece na coluna ordenada (e no hover): sem ela, o rótulo cabe inteiro */
+  .lista-ordenar svg { display: none; width: 13px; height: 13px; flex: none; }
+  .lista-ordenar:hover { background: var(--veu-1); color: var(--text); }
+  .lista-ordenar:is(:hover, :focus-visible) svg { display: block; opacity: .7; }
+  .lista-ordenar[data-ativa] { color: var(--text); }
+  .lista-ordenar[data-ativa] svg { display: block; opacity: 1; }
+
+  /* linha de grupo */
+  .lista-linha-grupo {
+    height: 44px; background: color-mix(in oklab, var(--surface-sunken) 75%, var(--surface-card));
+    border-bottom: 1px solid var(--border);
+  }
+  .lista-grupo-celula { grid-column: 1 / -1; display: flex; align-items: center; min-width: 0; }
+  .lista-grupo-botao {
+    position: sticky; left: 8px; display: inline-flex; align-items: center; gap: 8px; max-width: min(100%, 640px); height: 32px;
+    padding: 0 10px 0 6px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text);
+    font: 600 var(--fs-col) / var(--lh-col) var(--font); text-align: left; cursor: pointer;
+  }
+  .lista-grupo-botao:hover { background: var(--veu-1); }
+  .lista-grupo-seta { width: 16px; height: 16px; flex: none; color: var(--text-2); }
+  .lista-grupo-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lista-linha-grupo[data-alvo="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 55%, transparent); }
+  .lista-linha-grupo[data-alvo="true"] .lista-grupo-botao { color: var(--accent-ink); }
+  .lista-linha-vazia { height: 40px; }
+  .lista-vazia-celula { grid-column: 1 / -1; padding: 0 0 0 40px; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .lista-linha-vazia[data-alvo="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 55%, transparent); }
+  .lista-linha-vazia[data-alvo="true"] .lista-vazia-celula { color: var(--accent-ink); }
+
+  /* células */
+  .lista-ponto { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--cor-ponto, var(--border-control)); box-shadow: inset 0 0 0 1px rgb(0 0 0 / .1); }
+  .lista-coluna { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-2); }
+  .lista-coluna-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lista-etiquetas { display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; white-space: nowrap; }
+  .lista-etiquetas .ui-etiqueta { flex: 0 1 auto; min-width: 0; height: 18px; max-width: 96px; }
+  .lista-etiquetas .ui-etiqueta span { overflow: hidden; text-overflow: ellipsis; }
+  .lista-mais { flex: none; color: var(--text-2); font: 500 var(--fs-meta) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; }
+  .lista-prioridade { display: inline-flex; align-items: center; gap: 5px; color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); white-space: nowrap; }
+  .lista-prioridade svg { width: 13px; height: 13px; flex: none; }
+  .lista-prioridade[data-prioridade="baixa"] svg { color: var(--text-3); }
+  .lista-prioridade[data-prioridade="media"] svg { color: var(--info-ink); }
+  .lista-prioridade[data-prioridade="alta"] svg { color: var(--warning-ink); }
+  .lista-prioridade[data-prioridade="urgente"] { color: var(--danger-ink); }
+  .lista-prioridade[data-prioridade="urgente"] svg { color: var(--danger-ink); fill: currentColor; }
+  .lista-prazo { white-space: nowrap; }
+  .lista-data { color: var(--text-2); font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; }
+  .lista-concluida { display: inline-flex; align-items: center; gap: 4px; color: var(--success-ink); font: 500 var(--fs-meta) / 1 var(--font); white-space: nowrap; }
+  .lista-concluida svg { width: 13px; height: 13px; stroke-width: 3; }
+  .lista-celula .ui-chip-cliente { max-width: 100%; }
+
+  /* a linha que anda com o ponteiro */
+  .lista-sobreposta {
+    display: flex; align-items: center; gap: 8px; min-width: 0; padding: 10px 14px; cursor: grabbing;
+    border-radius: var(--radius-md); background: var(--surface-card); border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-drag); transform: rotate(1deg);
+  }
+  .lista-sobreposta .lista-titulo { flex: 1; }
+  .lista-sobreposta-destino { flex: none; color: var(--text-2); font: 600 var(--fs-meta) / 1 var(--font); white-space: nowrap; }
+
+  /* ─────────────── lista no celular ─────────────── */
+  .lista-celular { position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0 -16px; padding: 0 16px var(--space-6); }
+  .lista-cel-grupo + .lista-cel-grupo { margin-top: var(--space-2); }
+  .lista-cel-cabeca {
+    position: sticky; top: 0; z-index: 2; margin: 0 -16px; padding: 6px 10px;
+    background: var(--surface); box-shadow: 0 1px 0 var(--border);
+  }
+  .lista-cel-cabeca .lista-grupo-botao { position: static; width: 100%; max-width: none; }
+  .lista-cel-cabeca .ui-contador { margin-left: auto; }
+  .lista-cel-cards { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
+  .lista-cel-card > .cartao { content-visibility: auto; contain-intrinsic-size: auto 88px; }
+  .lista-cel-vazio { padding: 6px 4px; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+
+  /* ─────────────── calendário ─────────────── */
+  .lista-cal-corpo { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+  .lista-cal-sem { margin-top: var(--space-4); }
+  .lista-cal-sem-dica { color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+
+  /* ─────────────── filtros no cabeçalho ─────────────── */
+  .lista-filtros { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+  .lista-busca { width: 200px; }
+  .lista-painel-texto .lista-busca, .lista-painel .lista-busca { width: 100%; }
+  .lista-busca input::-webkit-search-cancel-button { display: none; }
+  .lista-busca-limpar {
+    display: grid; place-items: center; width: 24px; height: 24px; margin-right: -4px; padding: 0; border: 0; border-radius: var(--radius-sm);
+    background: transparent; color: var(--text-2); cursor: pointer;
+  }
+  .lista-busca-limpar:hover { background: var(--veu-1); color: var(--text); }
+  .lista-busca-limpar svg { width: 14px; height: 14px; }
+  .lista-filtros-n {
+    display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px; border-radius: var(--radius-full);
+    background: var(--text); color: var(--surface); font: 600 var(--fs-micro) / 1 var(--font); font-variant-numeric: lining-nums tabular-nums;
+  }
+  .lista-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+  .lista-chip {
+    display: inline-flex; align-items: center; gap: 2px; height: 28px; max-width: 280px; padding: 0 3px 0 10px; border-radius: var(--radius-full);
+    background: var(--surface-card); box-shadow: inset 0 0 0 1px var(--border-control); color: var(--text);
+    font: 500 var(--fs-meta) / 1 var(--font);
+  }
+  .lista-chip-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lista-chip-tirar {
+    display: grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: var(--radius-full);
+    background: transparent; color: var(--text-2); cursor: pointer;
+  }
+  .lista-chip-tirar:hover { background: var(--veu-2); color: var(--text); }
+  .lista-chip-tirar svg { width: 13px; height: 13px; }
+  @media (max-width: 767.98px) {
+    /* no celular os chips rolam numa linha só, abaixo do título */
+    .lista-filtros[data-celular] .lista-chips { position: relative; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; order: 2; }
+    .lista-filtros[data-celular] .lista-chips::-webkit-scrollbar { display: none; }
+    .lista-filtros[data-celular] .lista-chip { flex: none; }
+  }
+
+  /* ─────────────── painel de filtros ─────────────── */
+  .ui-popover.lista-painel { display: flex; flex-direction: column; max-width: min(640px, calc(100vw - 16px)); overflow: hidden; }
+  .lista-painel-corpo { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-3) var(--space-4) var(--space-2); }
+  .lista-painel-texto { margin-bottom: var(--space-4); }
+  .lista-painel-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4) var(--space-6); }
+  .lista-painel-coluna { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+  .lista-painel-secao { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+  .lista-painel-secao-cabeca { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+  .lista-painel-titulo { color: var(--text-2); font: 600 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .lista-painel-lista { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .lista-painel-lista[data-rola] { position: relative; max-height: 188px; overflow-y: auto; padding: 2px 4px 2px 2px; }
+  .lista-painel-lista .ui-check { align-items: center; }
+  .lista-painel-opcao { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
+  .lista-painel-detalhe { color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .lista-painel-nome { overflow-wrap: anywhere; }
+  .lista-painel-nada { color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .lista-sigla { display: inline-flex; align-items: center; gap: 5px; color: var(--cor-ink); font: 600 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .lista-painel-pilulas { display: flex; flex-wrap: wrap; gap: 6px; }
+  .lista-pilula, .lista-etiqueta-filtro {
+    display: inline-flex; align-items: center; gap: 5px; height: 28px; max-width: 100%; padding: 0 10px; border: 0; border-radius: var(--radius-full);
+    background: transparent; box-shadow: inset 0 0 0 1px var(--border-control); color: var(--text);
+    font: 500 var(--fs-meta) / 1 var(--font); white-space: nowrap; cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+  }
+  .lista-pilula:hover, .lista-etiqueta-filtro:hover { background: var(--veu-1); }
+  .lista-pilula[aria-pressed="true"] { background: var(--veu-2); box-shadow: inset 0 0 0 1.5px var(--text); }
+  .lista-pilula svg, .lista-etiqueta-filtro svg { width: 13px; height: 13px; flex: none; }
+  .lista-pilula .lista-prioridade { gap: 0; }
+  /* etiqueta: desligada com contorno na cor e +; ligada como no card, com ✓ (a largura não muda) */
+  .lista-etiqueta-filtro { box-shadow: inset 0 0 0 1.5px var(--cor); }
+  .lista-etiqueta-filtro svg { color: var(--text-2); }
+  .lista-etiqueta-filtro[aria-pressed="true"] { background: var(--cor-bg); color: var(--cor-ink); box-shadow: inset 0 0 0 1.5px var(--cor-ink); }
+  .lista-etiqueta-filtro[aria-pressed="true"] svg { color: var(--cor-ink); stroke-width: 3; }
+  .lista-etiqueta-sem-nome { font-style: italic; }
+  .lista-painel-rodape {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--border);
+  }
+  .lista-painel-resumo { margin-right: auto; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); font-variant-numeric: lining-nums tabular-nums; }
+  .ui-folha .lista-painel-corpo { padding: 0 var(--space-2); overflow: visible; }
+  .ui-folha .lista-painel-grade { grid-template-columns: minmax(0, 1fr); }
+  .ui-folha .lista-painel-rodape { position: sticky; bottom: calc(-1 * var(--space-4)); margin: var(--space-3) calc(-1 * var(--space-2)) calc(-1 * var(--space-4)); background: var(--surface-raised); }
+
+  /* ─────────────── faixa de colunas (celular) ─────────────── */
+  .lista-faixa-linha { order: 99; flex: 0 0 calc(100% + 32px); min-width: 0; margin: 0 -16px; }
+  .lista-faixa-linha:empty { display: none; }
+  /* relative: o texto só para leitor de tela (sr-only, absoluto) fica preso na faixa e não alarga a página */
+  .lista-faixa {
+    position: relative; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 16px; scroll-padding-inline: 16px;
+  }
+  .lista-faixa::-webkit-scrollbar { display: none; }
+  .lista-faixa-chip {
+    flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 0; border-radius: var(--radius-full);
+    background: color-mix(in oklab, var(--surface-card) 82%, transparent); box-shadow: inset 0 0 0 1px var(--border);
+    color: var(--text); font: 500 var(--fs-meta) / 1 var(--font); white-space: nowrap; cursor: pointer;
+  }
+  .lista-faixa-chip[aria-current="true"] {
+    background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+  .lista-faixa-nome { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+  .lista-faixa-n { color: var(--text-2); font-variant-numeric: lining-nums tabular-nums; }
+  .lista-faixa-chip[aria-current="true"] .lista-faixa-n { color: var(--accent-ink); }
+
+  @media (max-width: 767.98px) {
+    .lista { padding: var(--space-3) 16px 0; gap: var(--space-2); }
+    .lista-barra-dica { display: none; }
+  }
+}
+
+@layer foco {
+  .lista-linha-demanda:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+  .lista-grupo-botao:focus-visible, .lista-ordenar:focus-visible, .lista-chip-tirar:focus-visible, .lista-pilula:focus-visible,
+  .lista-etiqueta-filtro:focus-visible, .lista-faixa-chip:focus-visible, .lista-busca-limpar:focus-visible { box-shadow: var(--focus-ring); }
+}

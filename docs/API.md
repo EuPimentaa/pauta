@@ -737,7 +737,8 @@ gatilhos. "Com quem está a bola" e o "parado há": §5.4.
   demanda"). Sem rodada aberta (a peça já foi aprovada) → `422`: o caminho é anular a aprovação ou pedir ajuste
   interno, que abre a rodada seguinte. Depois do commit, testa em segundo plano os links do Drive e grava `driveStatus` (emite `versao` de novo).
 - **Atividade:** `versao.entregue`. **SSE:** `versao` (com itens), `demanda` (`nVersoes`, `versaoAtualId`).
-  **Notifica:** `versao_entregue` ao AM da demanda (se não for o ator).
+  **Notifica:** `versao_entregue` ao AM da demanda (se não for o ator); sem AM (cliente criado pela equipe, só com
+  sigla e nome), a todas as pessoas ativas do atendimento (sem nenhuma, aos admins), com "· sem atendimento" no resumo.
 
 #### `PATCH /api/versoes/:id`
 Autor da versão, atendimento, admin. **Corpo:** `EditarVersaoEntrada`. `200 VersaoComItens`. **SSE:** `versao`.
@@ -776,7 +777,9 @@ Qualquer usuário. **Corpo:** `TestarDriveEntrada`. **Resposta:** `200 TestarDri
   `link_publico_item`. `via: 'fora'`: exige `canal`; sem link.
 - Grava `envio` com `quadro_id` = o quadro em que a demanda está **antes** da automação (a decisão do cliente vai rodar
   as automações deste quadro, §5.5), o primeiro envio da versão (`enviadaClienteEm`, `enviadaVia`), `envioPendenteEm =
-  agora` (a bola vai ao cliente) e roda a automação `enviado_ao_cliente` do quadro atual (§5.5).
+  agora` (a bola vai ao cliente) e roda a automação `enviado_ao_cliente` do quadro atual (§5.5). Demanda sem AM: quem
+  envia passa a ser o AM dela (`demanda.editada` com `atendimentoId`), para receber a decisão e ver a peça parada no
+  Início.
 - **Atividade:** `versao.enviada` (+ `link.gerado`, + `demanda.movida` com `via: 'automacao'`).
   **SSE:** `envio`, `versao`, `demanda` (interno); `link_publico` (gestão).
 
@@ -797,7 +800,8 @@ Qualquer usuário. **Corpo:** `TestarDriveEntrada`. **Resposta:** `200 TestarDri
   - Print (`evidenciaArquivoId`) vira anexo `evidencia` ligado à aprovação (não sai mais: §4.15).
 - **Erros:** acima e `400 validacao` (ajuste sem linhas).
 - **Atividade:** `retorno.registrado` (+ `rodada.aberta`, `demanda.movida`). **SSE:** `aprovacao`, `demanda`,
-  `rodada`, `checklist`, `checklist_item`, `anexo`. **Notifica:** membros e AM (menos o ator): `aprovada` ou `ajuste_pedido`.
+  `rodada`, `checklist`, `checklist_item`, `anexo`. **Notifica:** membros, AM e quem enviou a versão (menos o ator):
+  `aprovada` ou `ajuste_pedido`.
 
 #### `POST /api/demandas/:id/aprovado-whatsapp`
 - **Quem:** atendimento, admin. Atalho de 1 clique = retorno `aprovado`, `canal='whatsapp'`, contato padrão.
@@ -1109,7 +1113,8 @@ Lançar e cronômetro ficam no modal (§4.15).
   notificação gera `evento` `notificacao` com público `usuario`.
 - Tipos (`TIPOS_NOTIFICACAO`): `membro`, `mencao`, `comentario`, `versao_entregue`, `aprovada`, `ajuste_pedido`,
   `prazo`, `atrasada`, `chegou`. Os do ciclo (F2, `servicos/ciclo.ts`): `versao_entregue` ao AM ("Rafa entregou a V2
-  de #123 …"); `aprovada`/`ajuste_pedido` aos membros de antes da automação e ao AM ("Fulana aprovou a V2 de #123 …",
+  de #123 …"; sem AM, ao atendimento ativo ou, sem ele, aos admins); `aprovada`/`ajuste_pedido` aos membros de antes
+  da automação, ao AM e a quem enviou a versão ("Fulana aprovou a V2 de #123 …",
   "Fulana pediu 2 ajustes na V1 de #123 …"; pelo link o ator é o cliente e `atorId` vem nulo); o ajuste interno avisa
   os membros. O sino (F3) monta o link `/d/:numero` pelo `demandaId` e mostra o ícone do tipo quando não há ator.
 - **`chegou`** (aos seguidores do quadro): só quando uma demanda **entra** no quadro (criada por outra pessoa, ou vinda

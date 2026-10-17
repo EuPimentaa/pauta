@@ -100,6 +100,19 @@ function versaoDesatualizada(db: Db, versaoId: Id, acao: string): ErroHttp {
 
 const plural = (n: number, um_: string, varios: string) => `${n} ${n === 1 ? um_ : varios}`
 
+/** Quem fica sabendo de uma demanda sem AM: as pessoas ativas do atendimento; sem nenhuma, os admins ativos. */
+export function atendimentoSemAm(db: Db): Id[] {
+  const ids = (papel: string) => todos<{ id: string }>(db, 'SELECT id FROM usuario WHERE papel = ? AND ativo = 1 ORDER BY id', papel).map((l) => l.id)
+  const atendimento = ids('atendimento')
+  return atendimento.length > 0 ? atendimento : ids('admin')
+}
+
+/** Quem enviou ao cliente a versão (o último envio dela), para saber da decisão mesmo sem ser o AM. */
+function quemEnviou(db: Db, versaoId: Id): Id | null {
+  return um<{ enviado_por: string }>(db, 'SELECT enviado_por FROM envio WHERE versao_id = ? ORDER BY enviado_em DESC, rowid DESC LIMIT 1',
+    versaoId)?.enviado_por ?? null
+}
+
 // ─────────────────────────────── itens de versão ───────────────────────────────
 
 const NOME_PROVEDOR: Partial<Record<Provedor, string>> = {
@@ -224,9 +237,13 @@ export function entregarVersao(db: Db, demandaId: Id, e: EntregarVersaoEntrada, 
   // o gatilho versao_contar_ai já pôs n_versoes e versao_atual_id; aqui o autor e o instante da mudança
   atualizarLinhaDemanda(db, demandaId, {}, ator)
   emitirMudancasDemanda(db, antes, ator)
+  // sem AM (cliente criado pela equipe, só com sigla e nome), o atendimento inteiro fica sabendo (sem atendimento
+  // ativo, os admins); quem enviar ao cliente passa a ser o AM da demanda (gravarEnvio)
+  const resumo = `${nomeDoAtor(ator) ?? 'Alguém'} entregou a V${numero} de ${rotuloDemanda(db, demandaId)}`
   if (antes.atendimentoId) {
-    notificar(db, { para: antes.atendimentoId, tipo: 'versao_entregue', demandaId, atividadeId, ator,
-      resumo: `${nomeDoAtor(ator) ?? 'Alguém'} entregou a V${numero} de ${rotuloDemanda(db, demandaId)}` })
+    notificar(db, { para: antes.atendimentoId, tipo: 'versao_entregue', demandaId, atividadeId, ator, resumo })
+  } else {
+    notificar(db, { para: atendimentoSemAm(db), tipo: 'versao_entregue', demandaId, atividadeId, ator, resumo: `${resumo} · sem atendimento` })
   }
   testarEmSegundoPlano(db, versaoId, drive, ator)
   return { versao, demanda: carregarDemanda(db, demandaId) }
@@ -367,7 +384,9 @@ export function registrarRetorno(db: Db, p: ParametrosRetorno): RegistrarRetorno
   atualizarLinhaDemanda(db, antes.id, { retorno_em: retornoEm }, p.ator)
   emitirMudancasDemanda(db, posAutomacao, p.ator)
 
-  const para = [...antes.membroIds, ...(antes.atendimentoId ? [antes.atendimentoId] : [])]
+  // membros e AM de antes da decisão, e quem enviou a versão (ficou sabendo mesmo que o AM seja outro)
+  const enviou = quemEnviou(db, versaoId)
+  const para = [...antes.membroIds, ...(antes.atendimentoId ? [antes.atendimentoId] : []), ...(enviou ? [enviou] : [])]
   const rotulo = rotuloDemanda(db, antes.id)
   const Quem = quem.charAt(0).toUpperCase() + quem.slice(1)
   notificar(db, {

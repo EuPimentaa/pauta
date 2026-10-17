@@ -266,3 +266,56 @@ describe('página pública e o retorno manual se enxergam', () => {
     assert.match(pag.itens[0]!.proximoPasso!, /^Aprovado V1 por Fulana em 14\/10 às 10:00$/)
   })
 })
+
+describe('cliente sem AM (criado pela equipe, só com sigla e nome)', () => {
+  test('a entrega avisa o atendimento; quem envia vira o AM e recebe a decisão do cliente', async () => {
+    const a = await ambiente()
+    const cli = await a.como(a.pessoas.design).post('/api/clientes', { sigla: 'PDV', nome: 'Padaria do Vale' })
+    assert.equal(cli.status, 201, cli.texto)
+    assert.equal(cli.corpo.atendimentoId ?? null, null)
+    const d0 = await a.criarDemanda({ como: a.pessoas.design, clienteId: cli.corpo.id, colunaId: a.coluna('criacao', 'Design').id })
+    assert.equal(d0.atendimentoId, null)
+
+    // sem AM, a entrega vai ao atendimento inteiro (não ao admin, que só recebe sem atendimento ativo)
+    const v1 = await entregar(a, d0)
+    for (const p of [a.pessoas.am, a.pessoas.am2]) {
+      assert.ok(notificacoesDe(a.db, p.id).some((n) => n.tipo === 'versao_entregue' && n.resumo.endsWith('· sem atendimento')), p.nome)
+    }
+    assert.ok(!notificacoesDe(a.db, a.pessoas.admin.id).some((n) => n.tipo === 'versao_entregue'))
+
+    // quem envia passa a ser o AM (com a atividade de quem era: ninguém)
+    const env = await enviarAoCliente(a, v1.demanda, { contatoId: null })
+    assert.equal(env.demanda.atendimentoId, a.pessoas.am.id)
+    const editada = um<{ dados: string; antes: string }>(a.db, `SELECT dados, antes FROM atividade WHERE demanda_id = ? AND tipo = 'demanda.editada'`, d0.id)!
+    assert.deepEqual(JSON.parse(editada.dados), { campos: ['atendimentoId'] })
+    assert.deepEqual(JSON.parse(editada.antes), { atendimentoId: null })
+
+    // a decisão do cliente chega a quem enviou
+    const token = tokenDe(env.link!.url)
+    const pag = (await publico(a).pagina(token)).corpo as PaginaAprovacao
+    const r = await publico(a).decidir(token, { demandaId: d0.id, versaoId: pag.itens[0]!.versao!.id, decisao: 'aprovado', nomeInformado: 'Seu Joaquim' })
+    assert.equal(r.status, 200, r.texto)
+    assert.ok(notificacoesDe(a.db, a.pessoas.am.id).some((n) => n.tipo === 'aprovada' && n.demanda_id === d0.id))
+  })
+
+  test('sem ninguém no atendimento, a entrega sem AM avisa os admins', async () => {
+    const a = await ambiente()
+    for (const p of [a.pessoas.am, a.pessoas.am2]) {
+      assert.equal((await a.como(a.pessoas.admin).patch(`/api/pessoas/${p.id}`, { ativo: false })).status, 200)
+    }
+    const cli = await a.como(a.pessoas.design).post('/api/clientes', { sigla: 'PDV', nome: 'Padaria do Vale' })
+    const d0 = await a.criarDemanda({ como: a.pessoas.design, clienteId: cli.corpo.id, colunaId: a.coluna('criacao', 'Design').id })
+    await entregar(a, d0)
+    assert.ok(notificacoesDe(a.db, a.pessoas.admin.id).some((n) => n.tipo === 'versao_entregue'))
+  })
+
+  test('o retorno avisa quem enviou mesmo quando o AM é outra pessoa', async () => {
+    const a = await ambiente()
+    const d = await a.criarDemanda({ ate: 'entregue' })
+    await enviarAoCliente(a, d, { como: a.pessoas.am2, via: 'fora' })
+    const r = await a.como(a.pessoas.admin).post(`/api/demandas/${d.id}/retorno`, { decisao: 'ajuste', linhas: ['Trocar a cor'] })
+    assert.equal(r.status, 200, r.texto)
+    assert.ok(notificacoesDe(a.db, a.pessoas.am.id).some((n) => n.tipo === 'ajuste_pedido'), 'o AM')
+    assert.ok(notificacoesDe(a.db, a.pessoas.am2.id).some((n) => n.tipo === 'ajuste_pedido'), 'quem enviou')
+  })
+})

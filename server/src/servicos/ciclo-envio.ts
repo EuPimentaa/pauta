@@ -147,6 +147,13 @@ function gravarEnvio(db: Db, demandaId: Id, e: EnviarAoClienteEntrada, ator: Ato
     link = { id: linkId, url: url!, expiraEm: l.expiraEm }
   }
 
+  // demanda sem AM (cliente criado pela equipe, só com sigla e nome): quem envia ao cliente vira o AM dela, para
+  // receber a decisão e ver a peça parada no Início ("Com o cliente há mais de 2 dias úteis")
+  if (!d.atendimentoId) {
+    atualizarLinhaDemanda(db, d.id, { atendimento_id: ator.usuario!.id }, ator)
+    registrarAtividade(db, { tipo: 'demanda.editada', ator, demandaId: d.id, dados: { campos: ['atendimentoId'] }, antes: { atendimentoId: null } })
+  }
+
   const envioId = novoId()
   rodar(db, `INSERT INTO envio (id, demanda_id, quadro_id, versao_id, via, canal, link_id, contato_id, prazo_retorno, prazo_retorno_hora,
                enviado_por, enviado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

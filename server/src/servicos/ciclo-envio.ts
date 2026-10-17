@@ -247,12 +247,29 @@ export function linksDaDemanda(db: Db, demandaId: Id, ator: Ator): LinkPublicoCo
     ORDER BY l.criado_em DESC, l.rowid DESC`, demandaId).map((l) => ({ ...carregarLink(db, String(l.id)), url: urlDoLink(l) ?? '' }))
 }
 
+/** Revoga (o link ainda não revogado): grava quem e quando, `link.revogado` em cada demanda e o evento para a gestão. */
+function revogar(db: Db, link: LinkPublicoResumo, ator: Ator): LinkPublicoResumo {
+  rodar(db, 'UPDATE link_publico SET revogado_em = ?, revogado_por = ? WHERE id = ?', agora(), ator.usuario!.id, link.id)
+  for (const demandaId of link.demandaIds) registrarAtividade(db, { tipo: 'link.revogado', ator, demandaId, dados: { linkId: link.id } })
+  return emitirLink(db, link.id, ator)
+}
+
 /** POST /api/links-publicos/:id/revogar (atendimento, admin). Já revogado → 409. */
 export function revogarLink(db: Db, linkId: Id, ator: Ator): LinkPublicoResumo {
   exigir(ator, 'ciclo.cliente')
   const link = carregarLink(db, linkId)
   if (link.revogadoEm) throw conflito('Este link já foi revogado.')
-  rodar(db, 'UPDATE link_publico SET revogado_em = ?, revogado_por = ? WHERE id = ?', agora(), ator.usuario!.id, linkId)
-  for (const demandaId of link.demandaIds) registrarAtividade(db, { tipo: 'link.revogado', ator, demandaId, dados: { linkId } })
-  return emitirLink(db, linkId, ator)
+  return revogar(db, link, ator)
+}
+
+/**
+ * Desativar ("excluir") um contato revoga os links ativos dele, na transação de quem desativa (API.md §4.10): o link
+ * pergunta "Você é Luíza?" e a decisão sairia no nome de quem não aprova mais. Quem pode editar o cliente (atendimento
+ * da carteira, admin) já pode revogar. Devolve quantos revogou.
+ */
+export function revogarLinksDoContato(db: Db, contatoId: Id, ator: Ator): number {
+  const ids = todos<{ id: string }>(db, 'SELECT id FROM link_publico WHERE contato_id = ? AND revogado_em IS NULL AND expira_em > ?',
+    contatoId, agora()).map((l) => l.id)
+  for (const id of ids) revogar(db, carregarLink(db, id), ator)
+  return ids.length
 }

@@ -15,6 +15,7 @@ import type { Ator } from '../auth.ts'
 import { agora, agoraData, novoId, rodar, todos, um, type Db } from '../db.ts'
 import { conflito, naoEncontrado, validacao } from '../erros.ts'
 import { registrarAtividade } from './atividade.ts'
+import { revogarLinksDoContato } from './ciclo-envio.ts'
 import { exigirHttps } from './demandas.ts'
 import { emitirDelete, emitirObjeto } from './eventos.ts'
 import { mapear } from './mapear.ts'
@@ -279,18 +280,23 @@ export function criarContato(db: Db, clienteId: Id, e: CriarContatoEntrada, ator
   }, ator, true)
 }
 
-/** "Excluir" = ativo false (e deixa de ser o padrão). */
+/**
+ * "Excluir" = ativo false (e deixa de ser o padrão). Desativar revoga, na mesma transação, os links públicos ativos do
+ * contato (`revogarLinksDoContato`: atividade `link.revogado` e evento para a gestão); reativar não os devolve.
+ */
 export function editarContato(db: Db, clienteId: Id, contatoId: Id, e: EditarContatoEntrada, ator: Ator): ClienteContato {
   const atual = carregarContato(db, clienteId, contatoId)
   const ativo = e.ativo ?? atual.ativo
   const aprova = e.aprova ?? atual.aprova
   let padrao = e.padrao ?? atual.padrao
   if (e.padrao === undefined && (!ativo || !aprova)) padrao = false
-  return gravarContato(db, clienteId, contatoId, {
+  const contato = gravarContato(db, clienteId, contatoId, {
     nome: e.nome?.trim() ?? atual.nome, cargo: e.cargo !== undefined ? texto(e.cargo) : atual.cargo,
     whatsapp: e.whatsapp !== undefined ? texto(e.whatsapp) : atual.whatsapp,
     email: e.email !== undefined ? (texto(e.email)?.toLowerCase() ?? null) : atual.email, aprova, padrao, ativo,
   }, ator, false)
+  if (atual.ativo && !ativo) revogarLinksDoContato(db, contatoId, ator)
+  return contato
 }
 
 function carregarLink(db: Db, clienteId: Id, linkId: Id): ClienteLink {

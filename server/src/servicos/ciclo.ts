@@ -325,7 +325,8 @@ export function registrarRetorno(db: Db, p: ParametrosRetorno): RegistrarRetorno
   if (p.versaoId && p.versaoId !== versaoId) throw versaoDesatualizada(db, versaoId, 'Registre o retorno sobre')
   if (decisaoValida(db, versaoId)) throw new ErroHttp(409, 'ja_decidida', 'Esta versão já tem uma decisão do cliente.')
   const versao = carregarVersaoSemItens(db, versaoId)
-  const contatoId = p.via === 'manual' ? contatoDoCliente(db, antes.clienteId!, p.contatoId) : (p.contatoId ?? null)
+  // pelo link, o contato que a página conferiu (o do link ou nenhum) também precisa estar ativo e ser do cliente
+  const contatoId = contatoDoCliente(db, antes.clienteId!, p.via === 'manual' ? p.contatoId : (p.contatoId ?? null))
   const nomeInformado = p.nomeInformado?.trim().slice(0, 120) || null
   const itens = p.decisao === 'ajuste' ? linhasParaItens((p.linhas ?? []).join('\n')) : []
   if (p.decisao === 'ajuste' && itens.length === 0) throw validacao('Escreva pelo menos um ajuste, um por linha.', { linhas: 'vazio' })

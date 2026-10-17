@@ -148,7 +148,11 @@ function DialogoContato({ cliente, contato, aoFechar }: { cliente: Cliente; cont
     if (!contato) return
     try {
       await editarContato(qc, cliente, contato, { ativo: false })
-      avisar(`${contato.nome} saiu dos contatos.`, { desfazer: async () => { await editarContato(qc, cliente, contato, { ativo: true }) } })
+      // o servidor revoga os links de aprovação abertos para o contato (desfazer não os devolve: envie de novo)
+      avisar(`${contato.nome} saiu dos contatos.`, {
+        descricao: 'Os links de aprovação deste contato pararam de valer.',
+        desfazer: async () => { await editarContato(qc, cliente, contato, { ativo: true }) },
+      })
       aoFechar()
     } catch (e) { setErro(e) }
   }

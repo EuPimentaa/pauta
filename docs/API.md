@@ -458,6 +458,9 @@ Qualquer usuário. `200 Cliente` (contatos, links, apelidos, responsáveis, cont
 #### `POST /api/clientes/:id/contatos` · `PATCH /api/clientes/:id/contatos/:contatoId`
 - **Corpo:** `CriarContatoEntrada` / `EditarContatoEntrada`. `padrao: true` desmarca o anterior (mesma transação).
   "Excluir" = `ativo: false`. **Resposta:** `201`/`200 ClienteContato`. **SSE:** `cliente_contato`, `cliente` (pendências).
+- Desativar revoga, na mesma transação, os links públicos ativos do contato (como `POST /api/links-publicos/:id/revogar`:
+  **Atividade** `link.revogado` em cada demanda, **SSE** `link_publico` para a gestão); reativar não os devolve. O link
+  de contato inativo vale como inativo (`410`, §4.17). Segurança da leva 2, achado 3.
 
 #### `POST /api/clientes/:id/links` · `PATCH /api/clientes/:id/links/:linkId` · `DELETE /api/clientes/:id/links/:linkId`
 - **Corpo:** `CriarLinkClienteEntrada` / `EditarLinkClienteEntrada` (só https). `DELETE` apaga de fato (`204`).
@@ -876,7 +879,8 @@ HTML de `/a/:token`); `/a/*` e `/api/publico/*` mascarados nos logs. Token: `ran
   outro jeito), ou "A peça desta versão foi enviada por outro meio." quando a versão não tem nada que o cliente veja
   (só caminho de rede, envio de antes da trava): a página esconde os botões; `modeloNome` = nome do modelo da demanda. Arquivos e o logo do
   cliente por URL assinada (`urlAssinada(id, linkPublicoArquivoMinutos)`).
-- **Erros:** `404` token desconhecido; `410 link_inativo` expirado, revogado ou sem itens.
+- **Erros:** `404` token desconhecido; `410 link_inativo` expirado, revogado, de contato desativado ou sem itens (vale
+  para `/visto` e para a decisão).
 
 #### `POST /api/publico/a/:token/visto`
 Chamado pelo JS da página. Soma `acessos`, grava `ultimoAcessoEm`; `link.visto` no máximo uma vez a cada 6 h. `204`.
@@ -885,7 +889,7 @@ Com sessão interna no cookie (prévia interna): `204` sem efeito. **SSE:** `lin
 #### `POST /api/publico/a/:token/decisao`
 - **Header:** `Idempotency-Key` (obrigatório). **Corpo:** `DecisaoPublicaEntrada`. **Resposta:** `200 DecisaoPublicaSaida`.
 - **Ordem:**
-  1. sem chave → `400 validacao`; link expirado/revogado → `410 link_inativo`; sessão interna no cookie → `403
+  1. sem chave → `400 validacao`; link expirado/revogado/de contato desativado → `410 link_inativo`; sessão interna no cookie → `403
      previa_interna` (prévia interna, acima);
   2. `hash` = sha256 de `demandaId|versaoId|decisao|linhas unidas por \n|contatoId|nomeInformado`; busca
      (`link_id`, chave) **antes de qualquer outra validação**: achou com o mesmo `idempotency_hash` → `200` com o estado
@@ -900,7 +904,8 @@ Com sessão interna no cookie (prévia interna): `204` sem efeito. **SSE:** `lin
      enviada por este link (`DetalhesVersaoDesatualizada`: "Chegou a V3");
   5. sem decisão válida na versão (`409 ja_decidida`); a versão tem algum item que o cliente vê (senão `409 conflito`
      "A peça desta versão foi enviada por outro meio. Fale com o seu atendimento.");
-  6. identidade: `contatoId` nulo ou igual a `link_publico.contato_id` (senão `400 validacao`); sem `contatoId`,
+  6. identidade: `contatoId` nulo ou igual a `link_publico.contato_id` (senão `400 validacao`; o `registrarRetorno()`
+     confere de novo que o contato está ativo e é do cliente, como no manual); sem `contatoId`,
      `nomeInformado` obrigatório (1 a 120 caracteres, texto puro); ajuste com pelo menos 1 linha (`400 validacao`);
   7. grava a `aprovacao` com a chave, o hash, `ip_hmac` (HMAC-SHA256 com `SEGREDO`) e `user_agent`, e roda
      `registrarRetorno()` com `via='link'`, motivo `cliente_mudou` e prazo padrão (hoje + `ajustePrazoDiasUteis`),

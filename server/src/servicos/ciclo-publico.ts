@@ -36,6 +36,7 @@ interface LinkLinha {
   contato_id: string | null
   expira_em: string
   revogado_em: string | null
+  contato_ativo: number | null
 }
 
 export const TEXTO_LINK_INATIVO = 'Este link de aprovação não está mais ativo. Peça um novo ao seu atendimento.'
@@ -48,12 +49,16 @@ export const TEXTO_PREVIA_INTERNA = 'Você está vendo como o cliente: só ele p
 const linkInativo = () => new ErroHttp(410, 'link_inativo', TEXTO_LINK_INATIVO)
 const naoAguarda = () => new ErroHttp(409, 'conflito', TEXTO_NAO_AGUARDA)
 
-/** Link pelo token (sha256 no banco). Desconhecido → 404; expirado ou revogado → 410. */
+/**
+ * Link pelo token (sha256 no banco). Desconhecido → 404; expirado, revogado ou de contato desativado → 410 (desativar o
+ * contato revoga os links dele; a conferência aqui cobre os desativados antes disso).
+ */
 function linkAtivoPeloToken(db: Db, token: string): LinkLinha {
   if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) throw naoEncontrado('Link não encontrado.')
-  const l = um<LinkLinha>(db, 'SELECT id, cliente_id, contato_id, expira_em, revogado_em FROM link_publico WHERE token_hash = ?', hashToken(token))
+  const l = um<LinkLinha>(db, `SELECT l.id, l.cliente_id, l.contato_id, l.expira_em, l.revogado_em, c.ativo AS contato_ativo
+    FROM link_publico l LEFT JOIN cliente_contato c ON c.id = l.contato_id WHERE l.token_hash = ?`, hashToken(token))
   if (!l) throw naoEncontrado('Link não encontrado.')
-  if (l.revogado_em || l.expira_em <= agora()) throw linkInativo()
+  if (l.revogado_em || l.expira_em <= agora() || (l.contato_id && l.contato_ativo !== 1)) throw linkInativo()
   return l
 }
 

@@ -1,12 +1,14 @@
 /**
  * Diálogo `atalhos` (o "?"): a lista gerada de atalhos() de todas as funcionalidades, por grupo, com as teclas que
- * fazem a mesma coisa juntas ("J ou ↓"), onde valem (no quadro, num card, no modal) e um filtro.
+ * fazem a mesma coisa juntas ("J ou ↓"), onde valem (no quadro, num card, no modal) e um filtro. Entram também os
+ * que a casca escuta sozinha (ATALHOS_CASCA: o [ que recolhe o menu).
  */
 import './atalhos.css'
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import type { Atalho, EscopoAtalho, PropsDialogo } from '../../extensoes/tipos.ts'
 import { MolduraDialogo, useContextoAcao } from '../../dialogos/index.ts'
+import { ATALHOS_CASCA } from '../../casca/estado.ts'
 import { useRegistro } from '../../sessao/registro.ts'
 import { Campo } from '../../ui/Campo.tsx'
 import { Kbd } from '../../ui/Kbd.tsx'
@@ -20,7 +22,9 @@ export default function ListaAtalhos(_props: PropsDialogo<'atalhos'>) {
   const reg = useRegistro()
   const ctx = useContextoAcao()
   const [filtro, setFiltro] = useState('')
-  const grupos = useMemo(() => agruparAtalhos(reg.atalhos() as Atalho[], filtro), [reg, filtro])
+  const grupos = useMemo(() => agruparAtalhos([...(reg.atalhos() as Atalho[]),
+    ...ATALHOS_CASCA.map((a): Pick<Atalho, 'id' | 'teclas' | 'descricao' | 'escopo' | 'grupo'> => ({ ...a, id: `casca-${a.teclas}`, escopo: 'global' }))], filtro),
+  [reg, filtro])
   const desligados = ctx.eu.prefs.atalhos === false
   return (
     <MolduraDialogo titulo="Atalhos do teclado" tamanho="m">

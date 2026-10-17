@@ -246,6 +246,11 @@
     .pnl-agenda-campos { flex-wrap: nowrap; }
     .pnl-filtro { flex: none; }
     .pnl-agenda-quadros { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 2px 16px; }
+    /* as faixas roláveis esmaecem na borda: dá para ver que há mais para o lado */
+    .pnl-agenda-filtros, .pnl-agenda-quadros {
+      -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 28px), transparent 100%);
+      mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 28px), transparent 100%);
+    }
     .pnl-legenda { flex: none; }
     .pnl-semana { grid-template-columns: repeat(7, minmax(40px, 1fr)); gap: 4px; }
     .pnl-semana-dia { padding: 8px 6px; gap: 3px; }

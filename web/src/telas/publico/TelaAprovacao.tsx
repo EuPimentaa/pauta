@@ -1,7 +1,7 @@
 /**
  * Página pública de aprovação (/a/:token; F2; SPEC §5.4): sem login, celular primeiro. Mostra o logo do cliente e
  * "por Melt", a última versão enviada por este link (prévia estática; o Drive, o YouTube e o Figma só abrem embutidos
- * no toque), a nota, a conversa visível ao cliente e as versões anteriores. [Aprovar] abre uma folha de confirmação;
+ * no toque), a conversa visível ao cliente e as versões anteriores. [Aprovar] abre uma folha de confirmação;
  * [Pedir ajuste] pede "um ajuste por linha". A identidade é pedida na hora da decisão ("Você é Fulana?" ou o nome,
  * lembrado no aparelho). 409 de versão nova recarrega a prévia ("Chegou a V3"); a decisão vai com Idempotency-Key.
  * Leve: nada de bootstrap, SSE, registro de extensões nem Markdown (o texto do cliente e da agência é texto puro).
@@ -339,7 +339,6 @@ function Item({ pagina, item, token, ampliar, mensagem, depois }: {
             Retorno até {formatarPrazo(item.prazoRetorno, item.prazoRetornoHora ?? HORA_PADRAO_PRAZO)}</span></p>
         )}
       </div>
-      {v?.nota && <p className="pub-nota"><strong>Nota da agência</strong>{v.nota}</p>}
       {v && v.itens.length > 0 && <ul className="pub-previas" aria-label={`O que foi enviado na V${v.numero}`}>{v.itens.map((i, k) => <Previa key={k} i={i} ampliar={ampliar} />)}</ul>}
       <SeloDecisao item={item} mensagem={mensagem} />
       {aguarda && <Decidir pagina={pagina} item={item} token={token} depois={depois} />}

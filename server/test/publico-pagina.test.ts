@@ -42,7 +42,7 @@ describe('GET /api/publico/a/:token', () => {
     assert.equal(item.decisao, null)
     assert.equal(item.proximoPasso, null)
     assert.equal(item.prazoRetorno, '2026-10-16')
-    assert.equal(item.versao!.nota, 'Primeira proposta')
+    assert.equal(item.versao!.nota, null, 'a nota interna da versão não vai ao cliente')
     assert.deepEqual(item.versao!.itens.map((i) => i.tipo), ['link', 'arquivo'])
     assert.equal(item.versao!.itens[0]!.embutivel, true)
     assert.match(item.versao!.itens[0]!.previaUrl!, /drive\.google\.com\/thumbnail/)

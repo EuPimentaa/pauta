@@ -93,7 +93,8 @@ function versaoPublica(db: Db, versaoId: Id, enviadaEm: string): VersaoPublica {
       itens.push({ tipo: 'arquivo', nome: i.nome, url, previaUrl: i.arquivo.imagem ? `${url}&inline=1` : null, imagem: i.arquivo.imagem, embutivel: false })
     }
   }
-  return { id: v.id, numero: v.numero, nota: v.nota, enviadaEm, itens }
+  // A nota da versão é recado interno da equipe para o atendimento: nunca vai ao cliente.
+  return { id: v.id, numero: v.numero, nota: null, enviadaEm, itens }
 }
 
 /** "14/10 às 14:03" (horário de São Paulo). */

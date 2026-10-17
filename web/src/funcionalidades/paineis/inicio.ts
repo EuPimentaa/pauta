@@ -2,7 +2,7 @@
  * Listas do Início calculadas do bootstrap (as mesmas funções de shared/logica/paineis.ts que o servidor usa): o card
  * entra e sai do Início na hora em que muda, aqui ou em outra janela (o tempo real já aplicou no bootstrap).
  */
-import { useCallback, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { Bootstrap, Demanda, Id, MinhasPorPrazo, PapelColuna } from '@shared/tipos/index.ts'
 import { comClienteParado, minhasPorPrazo, resumoInicio } from '@shared/logica/paineis.ts'
 import { useEu } from '../../api/auth.ts'
@@ -32,7 +32,10 @@ export function useDadosInicio(): DadosInicio {
   const agora = useAgora()
   const euId = eu.usuario.id
   const veParado = eu.usuario.papel === 'atendimento' || eu.usuario.papel === 'admin'
-  const papelDe = useCallback((id: Id): PapelColuna => colunas?.find((c) => c.id === id)?.papel ?? 'normal', [colunas])
+  const papelDe = useMemo(() => {
+    const papeis = new Map<Id, PapelColuna>((colunas ?? []).map((c) => [c.id, c.papel]))
+    return (id: Id): PapelColuna => papeis.get(id) ?? 'normal'
+  }, [colunas])
   return useMemo(() => {
     const minhas = minhasPorPrazo(demandas, papelDe, euId, agora)
     return {

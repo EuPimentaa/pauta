@@ -144,8 +144,10 @@ export default function TelaHoras() {
   const [lancando, setLancando] = useState(false)
   const botaoLancar = useRef<HTMLButtonElement>(null)
 
-  const semana = useApontamentos({ usuarioId: pessoaId, de: dias[0], ate: dias[6] })
-  const doMes = useApontamentos({ usuarioId: eu.usuario.id, de: mes.de, ate: mes.ate })
+  const consultaSemana = { usuarioId: pessoaId, de: dias[0], ate: dias[6] }
+  const semana = useApontamentos(consultaSemana)
+  // os totais do mês só para atendimento e admin (a equipe repete a consulta da semana: a mesma chave, sem pedido a mais)
+  const doMes = useApontamentos(veClientes ? { usuarioId: eu.usuario.id, de: mes.de, ate: mes.ate } : consultaSemana)
 
   // o cronômetro ligado ou parado nesta janela (topo, T no card) muda a lista: o próprio eco não chega pelo tempo real
   const cronometro = useDoBootstrap(selCronometro)

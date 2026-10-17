@@ -111,8 +111,19 @@ Papéis: `admin`, `atendimento`, `equipe` (`shared/tipos/nucleo.ts`). **Admin po
 | Editar e excluir apontamento (`apontamento.editar`) | sim | o próprio | o próprio |
 | Clientes: criar | sim | sim | só sigla e nome (`CAMPOS_CLIENTE_EQUIPE`; nasce com a pendência `sem_am`) |
 | Clientes: editar (dados, apelidos, responsáveis, contatos, links) | todos | os da carteira (`atendimentoId` = eu) e os sem AM | não |
-| Horas de outra pessoa | sim | não (só o total por cliente e mês, §4.20) | não |
+| Horas de outra pessoa: os lançamentos, o total por pessoa, quem lançou (abaixo, os totais) | sim | não | não |
+| Total de horas da demanda (`minutosRegistrados`, sem dizer de quem) | sim | sim | sim |
+| Total de horas por cliente e mês inteiro (`porCliente`, §4.20) | com o recorte pedido | sim | não |
 | Excluir (anonimizar) demanda | sim | não | não |
+
+**Totais de horas** (decisão da verificação da leva 2, achado 4): o total de uma demanda é de todo usuário interno (o
+card, o "Total · meu" e a estimativa do modal, o evento ao vivo com `a` e `t` nulos) e o atendimento recebe também o
+total por cliente e mês inteiro. Os totais não dizem quem lançou, mas com poucas pessoas numa demanda a diferença entre
+o total e os próprios minutos, ou entre duas leituras do total, mostra o que outra pessoa lançou. É aceito: esconder o
+total tiraria da equipe a comparação com a estimativa. Fica protegido o que daria as horas de alguém sem depender de
+quem mais trabalhou ali: a lista de lançamentos de outra pessoa, o total por pessoa, o `tempo.lancado` de outra pessoa
+no histórico, o evento `apontamento` (dono e admin) e o recorte por dia e por demanda do total por cliente (que
+deixaria reconstruir qualquer dia do passado).
 
 Toda regra de papel fica em `server/src/servicos/permissoes.ts` (usa `shared/logica/permissoes.ts`, com a lista
 `AcaoPermissao` do `docs/PLANO.md` §1.1.2, que o front usa para esconder o que não pode). Negado: `403 sem_permissao`
@@ -1034,10 +1045,11 @@ Lançar e cronômetro ficam no modal (§4.15).
   `400`). **Resposta:** `ListarApontamentosSaida`.
 - Equipe: só os próprios. Atendimento: os próprios + `porCliente` (de todas as pessoas, só o total **por cliente e mês
   inteiro**: o período vira os meses que ele toca e `demandaId` não vale para o total; com uma demanda e um dia, o
-  total menos os próprios dava as horas de outra pessoa; segurança da leva 2, achado 4). Admin: os do filtro (todos,
-  sem `usuarioId`) + `porCliente` + `porPessoa`, com o recorte pedido. `usuarioId` de outra pessoa sem ser admin: `403`.
-  Excluídos (`excluido_em`) não entram; cronômetro ligado entra sem minutos (não soma). `extras` = demandas dos itens
-  fora do bootstrap.
+  total menos os próprios dava as horas de qualquer dia de outra pessoa; segurança da leva 2, achado 4). Admin: os do
+  filtro (todos, sem `usuarioId`) + `porCliente` + `porPessoa`, com o recorte pedido. `usuarioId` de outra pessoa sem
+  ser admin: `403`. Excluídos (`excluido_em`) não entram; cronômetro ligado entra sem minutos (não soma). `extras` =
+  demandas dos itens fora do bootstrap. O total da demanda (`minutosRegistrados`) segue de todos: ver "Totais de horas"
+  no §2 (o que a diferença entre totais mostra e por que é aceito).
 
 #### `PATCH /api/apontamentos/:id` · `DELETE /api/apontamentos/:id`
 - **Quem:** o dono ou admin (`pode('apontamento.editar')`). **Corpo:** `EditarApontamentoEntrada`. Cronômetro ligado

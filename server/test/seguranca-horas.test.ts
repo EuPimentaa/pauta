@@ -2,13 +2,17 @@
  * Segurança 4 (revisão da leva 2): o atendimento não vê horas de outra pessoa (API.md §2). O `porCliente` que ele
  * recebe sai só por cliente e mês inteiro: o recorte por demanda e por dia não vale para o total de todas as pessoas
  * (com uma demanda e um dia, "54 − 12 próprios" dava os 42 min da Bia). O admin continua livre.
+ *
+ * Verificação: o total da demanda (`minutosRegistrados`) é de todos e, com uma pessoa a mais, "total − meus" dá as horas
+ * dela. Decisão (API.md §2, "Totais de horas"): o total fica (a equipe compara com a estimativa) e não diz de quem são
+ * os minutos; o que dá as horas de alguém por si só segue fechado. O último bloco fixa essa fronteira.
  */
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { Apontamento } from '../../shared/tipos/index.ts'
+import type { Apontamento, Atividade } from '../../shared/tipos/index.ts'
 import { tx } from '../src/db.ts'
 import { lancarApontamento } from '../src/servicos/horas.ts'
-import { ambiente, type Ambiente, type NomePessoa } from './ajuda.ts'
+import { ambiente, eventos, ultimoSeq, type Ambiente, type NomePessoa } from './ajuda.ts'
 
 function lancar(a: Ambiente, quem: NomePessoa, demandaId: string, minutos: number, data: string): void {
   tx(a.db, () => lancarApontamento(a.db, { demandaId, ator: a.ator(a.pessoas[quem]), entrada: { minutos, data } }))
@@ -53,5 +57,40 @@ describe('porCliente do atendimento', () => {
     const r = await a.como(a.pessoas.admin).get(`/api/apontamentos?demandaId=${d.id}&de=2026-10-14&ate=2026-10-14`)
     assert.deepEqual(r.corpo.porCliente, [{ clienteId: a.clientes.he.id, minutos: 54 }])
     assert.deepEqual(r.corpo.porPessoa, [{ usuarioId: a.pessoas.design.id, minutos: 42 }, { usuarioId: a.pessoas.am.id, minutos: 12 }])
+  })
+})
+
+describe('total da demanda: de todos e sem dizer de quem (API.md §2, "Totais de horas")', () => {
+  test('equipe fora da demanda vê o total e só os próprios; nenhum caminho diz de quem são os outros minutos', async () => {
+    const { a, d } = await cenario()
+    const duda = a.como(a.pessoas.web) // da equipe, fora da demanda e sem horas nela
+    const det = (await duda.get(`/api/demandas/${d.numero}`)).corpo
+    assert.equal(det.demanda.minutosRegistrados, 114, 'o total (42 + 12 + 60) é de todos')
+    assert.deepEqual(det.tempo, { totalMin: 114, meusMin: 0 }, 'o detalhe só traz o total e os meus, sem divisão por pessoa')
+    assert.deepEqual((await a.como(a.pessoas.am).get(`/api/demandas/${d.numero}`)).corpo.tempo, { totalMin: 114, meusMin: 12 })
+
+    const historico = (await duda.get(`/api/demandas/${d.id}/historico`)).corpo.itens as Atividade[]
+    assert.equal(historico.filter((x) => x.tipo === 'tempo.lancado').length, 0, 'os lançamentos dos outros não aparecem no histórico')
+    const lista = (await duda.get('/api/apontamentos?de=2026-09-01&ate=2026-10-31')).corpo
+    assert.deepEqual(lista.itens, [])
+    assert.equal(lista.porCliente, undefined)
+    assert.equal(lista.porPessoa, undefined)
+    assert.equal((await duda.get(`/api/apontamentos?usuarioId=${a.pessoas.design.id}`)).status, 403)
+
+    // um lançamento novo: o total ao vivo chega a todos sem ator nem trace; o lançamento, só ao dono e aos admins
+    const desde = ultimoSeq(a.db)
+    lancar(a, 'design', d.id, 7, '2026-10-14')
+    const evs = eventos(a.db, desde)
+    const total = evs.find((e) => e.entidade === 'demanda' && e.patch && 'minutosRegistrados' in e.patch)!
+    assert.deepEqual(total.patch, { minutosRegistrados: 121 })
+    assert.equal(total.publico, 'interno')
+    assert.equal(total.ator_id, null)
+    assert.equal(total.trace_id, null)
+    const doLancamento = evs.filter((x) => x.entidade === 'apontamento')
+    assert.ok(doLancamento.length > 0)
+    for (const e of doLancamento) {
+      assert.equal(e.publico, 'usuario_admin')
+      assert.equal(e.usuario_id, a.pessoas.design.id)
+    }
   })
 })

@@ -1,0 +1,10 @@
+/** Diálogos do ciclo (F2), num chunk só: as extensões de extensoes/dialogos/ciclo-* os carregam sob demanda. */
+import '../ciclo.css'
+export { default as EntregarVersao } from './EntregarVersao.tsx'
+export { default as EnviarAoCliente } from './EnviarAoCliente.tsx'
+export { default as RegistrarRetorno } from './RegistrarRetorno.tsx'
+export { default as AjusteInterno } from './AjusteInterno.tsx'
+export { default as AnularAprovacao } from './AnularAprovacao.tsx'
+export { default as CopiarWhatsapp } from './CopiarWhatsapp.tsx'
+export { default as EnviarAoSoltar } from './EnviarAoSoltar.tsx'
+export { default as AutomacoesQuadro } from './AutomacoesQuadro.tsx'

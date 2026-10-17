@@ -304,6 +304,17 @@ export interface ParametrosRetorno {
   idempotencia?: { chave: string; hash: string }
   ipHmac?: string | null
   userAgent?: string | null
+  /** Só pelo link: pessoas com sessão interna recente na mesma rede da decisão (`pessoasDaRede`, API.md §4.17). */
+  redeInterna?: Id[]
+}
+
+/** "Pri", "Pri e Gabi", "Pri, Gabi e Alice" (apelido ou primeiro nome, como nos resumos). */
+function nomesDasPessoas(db: Db, ids: Id[]): string {
+  const nomes = ids.map((id) => {
+    const u = um<{ nome: string; apelido: string | null }>(db, 'SELECT nome, apelido FROM usuario WHERE id = ?', id)
+    return u ? (u.apelido ?? u.nome.split(' ')[0]!) : 'alguém'
+  })
+  return nomes.length <= 1 ? (nomes[0] ?? '') : `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}`
 }
 
 /**
@@ -314,7 +325,9 @@ export interface ParametrosRetorno {
  * - aprovado: aprovadaEm/aprovadaVersaoId e fecha a rodada; ajuste: abre a rodada N+1 com "Ajustes R{N+1}";
  * - limpa o envio pendente, roda a automação `aprovado`/`ajuste_pedido` DO QUADRO DO ENVIO e grava
  *   retornoEm = max(agora, statusDesde) (a bola volta à equipe mesmo sem automação, §5.4);
- * - notifica os membros e o AM de antes da decisão (quem a automação pôs recebe `membro`).
+ * - notifica os membros e o AM de antes da decisão (quem a automação pôs recebe `membro`); pelo link vinda da mesma
+ *   rede de uma sessão interna (`redeInterna`), a decisão guarda quem eram, o resumo diz "· da mesma rede que Pri" e os
+ *   admins também recebem.
  */
 export function registrarRetorno(db: Db, p: ParametrosRetorno): RegistrarRetornoSaida {
   const antes = demandaViva(db, p.demandaId)
@@ -359,18 +372,20 @@ export function registrarRetorno(db: Db, p: ParametrosRetorno): RegistrarRetorno
 
   const instante = agora()
   const aprovacaoId = novoId()
+  // pelo link e da mesma rede de uma sessão interna recente: a decisão vale, mas fica marcada (imutável, gatilho da 090)
+  const redeInterna = p.via === 'link' ? [...new Set(p.redeInterna ?? [])] : []
   rodar(db, `INSERT INTO aprovacao (id, demanda_id, versao_id, decisao, via, canal, link_id, contato_id, nome_informado, registrado_por,
                comentario, motivo, rodada_aberta_id, evidencia_anexo_id, quadro_antes_id, coluna_antes_id, idempotency_key,
-               idempotency_hash, ip_hmac, user_agent, criado_em)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               idempotency_hash, ip_hmac, user_agent, rede_interna, criado_em)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     aprovacaoId, antes.id, versaoId, p.decisao, p.via, p.via === 'manual' ? (p.canal ?? 'whatsapp') : null, p.linkId ?? null, contatoId,
     nomeInformado, p.via === 'manual' ? p.ator.usuario!.id : null, p.decisao === 'ajuste' ? itens.join('\n') : null, motivo,
     rodada?.id ?? null, evidenciaId, antes.quadroId, antes.colunaId, p.idempotencia?.chave ?? null, p.idempotencia?.hash ?? null,
-    p.ipHmac ?? null, p.userAgent?.slice(0, 300) || null, instante)
+    p.ipHmac ?? null, p.userAgent?.slice(0, 300) || null, redeInterna.length > 0 ? JSON.stringify(redeInterna) : null, instante)
 
   // a atividade vem antes da automação: anular sabe que movimento foi o da decisão (o primeiro depois dela)
   const atividadeId = registrarAtividade(db, { tipo: 'retorno.registrado', ator: p.ator, demandaId: antes.id,
-    dados: { aprovacaoId, versaoNumero: versao.numero, decisao: p.decisao, via: p.via, quem } })
+    dados: { aprovacaoId, versaoNumero: versao.numero, decisao: p.decisao, via: p.via, quem, ...(redeInterna.length > 0 ? { redeInterna } : {}) } })
 
   const meio = carregarDemanda(db, antes.id)
   if (p.decisao === 'aprovado') {
@@ -394,16 +409,21 @@ export function registrarRetorno(db: Db, p: ParametrosRetorno): RegistrarRetorno
   atualizarLinhaDemanda(db, antes.id, { retorno_em: retornoEm }, p.ator)
   emitirMudancasDemanda(db, posAutomacao, p.ator)
 
-  // membros e AM de antes da decisão, e quem enviou a versão (ficou sabendo mesmo que o AM seja outro)
+  // membros e AM de antes da decisão, e quem enviou a versão (ficou sabendo mesmo que o AM seja outro); com a marca da
+  // rede interna, também os admins, e o resumo termina com ela (cortado antes dela, se passar de 300)
   const enviou = quemEnviou(db, versaoId)
-  const para = [...antes.membroIds, ...(antes.atendimentoId ? [antes.atendimentoId] : []), ...(enviou ? [enviou] : [])]
+  const admins = redeInterna.length > 0
+    ? todos<{ id: string }>(db, "SELECT id FROM usuario WHERE papel = 'admin' AND ativo = 1").map((l) => l.id) : []
+  const para = [...antes.membroIds, ...(antes.atendimentoId ? [antes.atendimentoId] : []), ...(enviou ? [enviou] : []), ...admins]
   const rotulo = rotuloDemanda(db, antes.id)
   const Quem = quem.charAt(0).toUpperCase() + quem.slice(1)
+  const base = p.decisao === 'aprovado'
+    ? `${Quem} aprovou a V${versao.numero} de ${rotulo}`
+    : `${Quem} pediu ${plural(itens.length, 'ajuste', 'ajustes')} na V${versao.numero} de ${rotulo}`
+  const sufixo = redeInterna.length > 0 ? ` · da mesma rede que ${nomesDasPessoas(db, redeInterna)}` : ''
   notificar(db, {
     para, tipo: p.decisao === 'aprovado' ? 'aprovada' : 'ajuste_pedido', demandaId: antes.id, atividadeId, ator: p.ator,
-    resumo: p.decisao === 'aprovado'
-      ? `${Quem} aprovou a V${versao.numero} de ${rotulo}`
-      : `${Quem} pediu ${plural(itens.length, 'ajuste', 'ajustes')} na V${versao.numero} de ${rotulo}`,
+    resumo: sufixo ? `${base.slice(0, Math.max(40, 300 - sufixo.length))}${sufixo}`.slice(0, 300) : base,
   })
   return { aprovacao: carregarAprovacao(db, aprovacaoId), demanda: carregarDemanda(db, antes.id), rodada, checklist, sugerirExtra, automacao }
 }

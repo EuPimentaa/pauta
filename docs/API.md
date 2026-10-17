@@ -20,7 +20,8 @@ Sumário: [1 Convenções](#1-convenções) · [2 Permissões](#2-permissões) �
   logout a tira e o index.html servido pelo Node a acerta com a sessão de verdade; sem ela, o app em produção vai direto
   para /entrar sem pedir o bootstrap (o 401 esperado não suja o console). Integração 3A.
   `exigirUsuario` confere em **toda** requisição: sessão com `revogada_em` nulo e `expira_em > agora`, e `usuario.ativo = 1`.
-  Sem sessão válida: `401 nao_autenticado`. Rotas sem sessão: `GET /api/saude`, `POST /api/auth/login`,
+  A sessão guarda o IP da última requisição (`sessao.ip`, gravado só quando muda), que marca a decisão pública vinda
+  da mesma rede (§4.17). Sem sessão válida: `401 nao_autenticado`. Rotas sem sessão: `GET /api/saude`, `POST /api/auth/login`,
   `POST /api/auth/convite/consultar`, `POST /api/auth/convite`, `POST /api/auth/redefinicao/consultar`,
   `POST /api/auth/redefinicao`, `/api/publico/*`.
 - **Anti-CSRF:** toda mutação (POST, PATCH, PUT, DELETE), inclusive login e página pública, exige o header
@@ -468,7 +469,10 @@ Qualquer usuário. `200 Cliente` (contatos, links, apelidos, responsáveis, cont
 
 #### `GET /api/clientes/:id/aprovacoes` · cadastros
 Qualquer usuário. `200 ItemTrilhaCliente[]` (mais novas primeiro), inclusive anuladas. Pelo **id** (a sigla dá `404`);
-`quem` = o contato, o nome informado no link ou "registrado por <apelido>".
+`quem` = o contato, o nome informado no link ou "registrado por <apelido>". `redeInterna` = a marca da decisão pelo
+link vinda da mesma rede de uma sessão interna (§4.17; a tela mostra "da mesma rede que Pri"); `dispositivo` = o
+aparelho e o navegador da decisão pelo link ("iPhone · Safari", "curl/8.4.0"), só para o admin (nulo para os outros e
+depois que o job apaga o user-agent, em 12 meses).
 
 ### 4.11 Configuração · cadastros
 
@@ -667,7 +671,8 @@ Demanda excluída → `404`.
 #### `GET /api/demandas/:id/historico`
 Qualquer usuário. **Consulta:** `ListarHistoricoConsulta`. `200 Pagina<Atividade>` (mais novas primeiro). Omite
 `tempo.lancado` de outra pessoa (só o próprio ator e o admin veem); "outra pessoa" é a **dona do apontamento**, não
-quem agiu (quem arquiva a demanda e para o cronômetro de outra pessoa não vê as horas dela). Demanda excluída → `404`.
+quem agiu (quem arquiva a demanda e para o cronômetro de outra pessoa não vê as horas dela). `link.exibido` (quem
+recebeu o endereço do link de aprovação, §4.16) só o admin vê. Demanda excluída → `404`.
 
 #### `POST /api/demandas/:id/comentarios`
 - **Corpo:** `CriarComentarioEntrada`. **Resposta:** `201 ComentarioSaida`.
@@ -856,9 +861,14 @@ Qualquer usuário. **Corpo:** `TestarDriveEntrada`. **Resposta:** `200 TestarDri
 #### `GET /api/demandas/:id/whatsapp?modelo=envio|lembrete|aprovado|ajuste`
 - **Quem:** atendimento, admin. **Resposta:** `200 TextoWhatsappSaida` (§6). O lembrete reusa o mesmo link.
 - **Erros:** `409 conflito` sem envio (envio/lembrete) ou sem decisão (aprovado/ajuste).
+- **Atividade:** com o endereço de um link ativo no texto (envio, lembrete), `link.exibido`, como em `GET /links`.
 
 #### `GET /api/demandas/:id/links`
-Atendimento, admin. `200 LinkPublicoComUrl[]` (decifra o token para reexibir o link).
+Atendimento, admin. `200 LinkPublicoComUrl[]` (decifra o token para reexibir o link; só os ativos vêm com `url`, os
+revogados e vencidos com `url: ''`). Quem recebe o endereço de um link ativo fica no histórico: `link.exibido` na
+demanda, no máximo uma vez a cada 6 h por pessoa e link (só o admin vê a linha, §4.15). Com o endereço, alguém da
+agência abre o link fora do app e decide como o cliente (§4.17): o histórico diz quem o tinha. A leitura grava, por
+isso roda numa transação. Segurança da leva 2, verificação do achado 2.
 
 #### `POST /api/links-publicos/:id/revogar`
 - **Quem:** atendimento, admin. **Resposta:** `200 LinkPublicoResumo`. **Erros:** `409 conflito` já revogado.
@@ -880,6 +890,15 @@ HTML de `/a/:token`); `/a/*` e `/api/publico/*` mascarados nos logs. Token: `ran
   este link." (senão a decisão iria como do cliente, `registrado_por` nulo e nome livre, sem rastro de quem a tomou).
   A página lê a dica `pauta_sessao` (§1) e mostra a faixa "Prévia: os botões não valem para você" com Aprovar e Pedir
   ajuste desligados; o 403 que chegar sem a dica também a liga. Sessão revogada ou vencida não conta como sessão.
+- **Mesma rede de uma sessão interna** (verificação do achado 2): sem o cookie (o endereço copiado e aberto numa aba
+  anônima, no próprio celular ou por curl) não há como saber quem decide, e recusar barraria o cliente que está na rede
+  da agência. A decisão vale, mas fica marcada: `aprovacao.rede_interna` (migração 090, imutável) guarda as pessoas
+  com sessão usada nas últimas 24 h a partir da mesma rede (IPv4 igual; IPv6 no mesmo /64; contam as sessões
+  encerradas ou vencidas; a sessão guarda o IP da última requisição, §1). Aparece como `Aprovacao.redeInterna` (o
+  modal mostra "Da mesma rede que Pri" na linha da decisão), em `retorno.registrado.redeInterna` (o histórico diz
+  "aprovou a V1 pelo link · da mesma rede que Pri"), na trilha do cliente (§4.10, com o aparelho para o admin) e na
+  notificação, que termina com "· da mesma rede que Pri" e vai também aos admins. Quem recebeu o endereço do link fica
+  em `link.exibido` (§4.16).
 - **"Enviada por este link"** = existe `envio` com aquela `versao_id` e `link_id` = o link. Nenhuma rota pública lê
   `demanda.versao_atual_id` (pode ser trabalho interno ainda não enviado).
 - **Itens ignorados:** demanda arquivada, excluída (excluir também revoga) ou de outro cliente que não o do link (o
@@ -922,10 +941,12 @@ Com sessão interna no cookie (prévia interna): `204` sem efeito. **SSE:** `lin
   6. identidade: `contatoId` nulo ou igual a `link_publico.contato_id` (senão `400 validacao`; o `registrarRetorno()`
      confere de novo que o contato está ativo e é do cliente, como no manual); sem `contatoId`,
      `nomeInformado` obrigatório (1 a 120 caracteres, texto puro); ajuste com pelo menos 1 linha (`400 validacao`);
-  7. grava a `aprovacao` com a chave, o hash, `ip_hmac` (HMAC-SHA256 com `SEGREDO`) e `user_agent`, e roda
-     `registrarRetorno()` com `via='link'`, motivo `cliente_mudou` e prazo padrão (hoje + `ajustePrazoDiasUteis`),
-     inclusive a automação do quadro do envio (§5.5) e o `retornoEm`.
-- **Atividade:** `retorno.registrado` (ator_tipo `cliente`). **SSE/Notifica:** como `POST /retorno`.
+  7. grava a `aprovacao` com a chave, o hash, `ip_hmac` (HMAC-SHA256 com `SEGREDO`), `user_agent` e `rede_interna`
+     (as pessoas com sessão recente na mesma rede, acima), e roda `registrarRetorno()` com `via='link'`, motivo
+     `cliente_mudou` e prazo padrão (hoje + `ajustePrazoDiasUteis`), inclusive a automação do quadro do envio (§5.5) e
+     o `retornoEm`.
+- **Atividade:** `retorno.registrado` (ator_tipo `cliente`; com a marca, `redeInterna`). **SSE/Notifica:** como
+  `POST /retorno`; com a marca, também aos admins e com "· da mesma rede que Pri" no fim do resumo.
 
 #### `GET /api/publico/arquivos/:id?l=&exp=&sig=`
 `l` = o id do link que emitiu a URL; `sig` = HMAC-SHA256(`SEGREDO`, `arquivo-publico|${l}|${id}|${exp}`) em base64url;
@@ -1159,7 +1180,8 @@ Lançar e cronômetro ficam no modal (§4.15).
   `prazo`, `atrasada`, `chegou`. Os do ciclo (F2, `servicos/ciclo.ts`): `versao_entregue` ao AM ("Rafa entregou a V2
   de #123 …"; sem AM, ao atendimento ativo ou, sem ele, aos admins); `aprovada`/`ajuste_pedido` aos membros de antes
   da automação, ao AM e a quem enviou a versão ("Fulana aprovou a V2 de #123 …",
-  "Fulana pediu 2 ajustes na V1 de #123 …"; pelo link o ator é o cliente e `atorId` vem nulo); o ajuste interno avisa
+  "Fulana pediu 2 ajustes na V1 de #123 …"; pelo link o ator é o cliente e `atorId` vem nulo; pelo link e da mesma
+  rede de uma sessão interna, também aos admins, com "· da mesma rede que Pri" no fim, §4.17); o ajuste interno avisa
   os membros. O sino (F3) monta o link `/d/:numero` pelo `demandaId` e mostra o ícone do tipo quando não há ator.
 - **`chegou`** (aos seguidores do quadro): só quando uma demanda **entra** no quadro (criada por outra pessoa, ou vinda
   de outro quadro) e, depois de aplicados os membros (§5.1), **nenhum membro é da equipe do quadro** (quadro sem

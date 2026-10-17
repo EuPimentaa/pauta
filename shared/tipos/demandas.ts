@@ -201,7 +201,7 @@ export const TIPOS_ATIVIDADE = [
   'demanda.arquivada', 'demanda.restaurada', 'demanda.excluida', 'demanda.copiada', 'demanda.repetida',
   'rodada.aberta', 'rodada.extra_marcada', 'rodada.extra_desmarcada',
   'versao.entregue', 'versao.itens_adicionados', 'versao.editada', 'versao.enviada', 'link.gerado', 'link.revogado', 'link.visto',
-  'retorno.registrado', 'aprovacao.anulada',
+  'link.exibido', 'retorno.registrado', 'aprovacao.anulada',
   'comentario.criado', 'comentario.editado', 'comentario.excluido',
   'anexo.adicionado', 'anexo.removido',
   'checklist.criado', 'checklist.removido', 'checklist.item_feito', 'checklist.item_desfeito',
@@ -270,7 +270,17 @@ export interface MapaDadosAtividade {
   'link.gerado': { linkId: Id }
   'link.revogado': { linkId: Id }
   'link.visto': { linkId: Id }
-  'retorno.registrado': { aprovacaoId: Id; versaoNumero: number; decisao: 'aprovado' | 'ajuste'; via: 'link' | 'manual'; quem: string }
+  /**
+   * Alguém da agência recebeu o endereço do link (GET /links, texto do WhatsApp com o link), no máximo uma vez a cada
+   * 6 h por pessoa e link. Com o endereço dá para decidir fora do app como o cliente: o histórico diz quem o tinha
+   * (só o admin vê esta linha; API.md §4.16).
+   */
+  'link.exibido': { linkId: Id }
+  'retorno.registrado': {
+    aprovacaoId: Id; versaoNumero: number; decisao: 'aprovado' | 'ajuste'; via: 'link' | 'manual'; quem: string
+    /** Pelo link, da mesma rede de uma sessão interna das últimas 24 h: as pessoas (`Aprovacao.redeInterna`). */
+    redeInterna?: Id[]
+  }
   'aprovacao.anulada': { aprovacaoId: Id; versaoNumero: number; voltou: boolean }
   'comentario.criado': { comentarioId: Id; visivelCliente: boolean }
   'comentario.editado': { comentarioId: Id }

@@ -141,11 +141,15 @@ export function fraseAtividade(a: Atividade, n: NomesAtividade): FraseAtividade 
     case 'link.gerado': return f('gerou um link de aprovação', 'envio')
     case 'link.revogado': return f('revogou o link de aprovação', 'ciclo')
     case 'link.visto': return { ator: 'O cliente', texto: 'abriu o link de aprovação', grupo: 'visto' }
+    // só o admin recebe esta linha (API.md §4.16): quem tinha o endereço do link
+    case 'link.exibido': return f('recebeu o endereço do link de aprovação', 'ciclo')
     case 'retorno.registrado': {
       const x = d as MapaDadosAtividade['retorno.registrado']
       const decisao = x.decisao === 'aprovado' ? `aprovou a V${x.versaoNumero}` : `pediu ajuste na V${x.versaoNumero}`
       const grupo = x.decisao === 'aprovado' ? 'aprovacao' : 'ajuste'
-      if (x.via === 'link') return { ator: x.quem || 'O cliente', texto: `${decisao} pelo link`, grupo }
+      // da mesma rede de uma sessão interna recente (API.md §4.17): pode ser alguém da agência no lugar do cliente
+      const rede = x.redeInterna?.length ? ` · da mesma rede que ${juntar(x.redeInterna.map((id) => nomeDe(id)))}` : ''
+      if (x.via === 'link') return { ator: x.quem || 'O cliente', texto: `${decisao} pelo link${rede}`, grupo }
       return f(`registrou: ${x.quem} ${decisao}`, grupo)
     }
     case 'aprovacao.anulada': return f(`anulou a aprovação da V${(d as MapaDadosAtividade['aprovacao.anulada']).versaoNumero}`, 'ciclo')

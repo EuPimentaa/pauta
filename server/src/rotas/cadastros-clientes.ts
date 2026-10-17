@@ -3,5 +3,5 @@ import { exigirUsuario, type App } from '../auth.ts'
 import { trilhaDoCliente } from '../servicos/cadastros-trilha.ts'
 
 export function registrar(app: App): void {
-  app.get('/api/clientes/:id/aprovacoes', exigirUsuario, (c) => c.json(trilhaDoCliente(c.get('db'), c.req.param('id'))))
+  app.get('/api/clientes/:id/aprovacoes', exigirUsuario, (c) => c.json(trilhaDoCliente(c.get('db'), c.req.param('id'), c.get('ator'))))
 }

@@ -111,6 +111,12 @@ export interface Aprovacao {
   criadoEm: Instante
   anuladaEm: Instante | null
   anuladaPor: Id | null
+  /**
+   * Decisão pelo link vinda da mesma rede de uma sessão interna das últimas 24 h (IPv4 igual, IPv6 no mesmo /64): as
+   * pessoas dessas sessões (API.md §4.17). Pode ser alguém da agência decidindo no lugar do cliente, ou o cliente na
+   * rede da agência; a decisão vale, mas fica marcada. Vazia no manual e sem coincidência.
+   */
+  redeInterna: Id[]
 }
 
 // ─────────────────────────────── DTOs ───────────────────────────────

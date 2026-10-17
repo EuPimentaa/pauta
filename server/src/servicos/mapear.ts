@@ -365,6 +365,7 @@ export const mapear = {
       criadoEm: String(l.criado_em),
       anuladaEm: s(l.anulada_em),
       anuladaPor: s(l.anulada_por),
+      redeInterna: json<string[]>(l.rede_interna, []),
     }
   },
 

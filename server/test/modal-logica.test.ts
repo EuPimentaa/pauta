@@ -80,6 +80,11 @@ describe('frase do histórico', () => {
     assert.equal(fraseAtividade(a('tempo.lancado', { minutos: 90, origem: 'cronometro', apontamentoId: 'x' }), nomes).texto, 'registrou 1h30 no cronômetro')
     assert.deepEqual(fraseAtividade(a('retorno.registrado', { decisao: 'ajuste', via: 'link', versaoNumero: 2, quem: 'Fulana', aprovacaoId: 'x' },
       { atorTipo: 'cliente', atorId: null }), nomes), { ator: 'Fulana', texto: 'pediu ajuste na V2 pelo link', grupo: 'ajuste' })
+    // segurança da leva 2: decisão pelo link da mesma rede de uma sessão interna; quem recebeu o endereço do link
+    assert.deepEqual(fraseAtividade(a('retorno.registrado', { decisao: 'aprovado', via: 'link', versaoNumero: 1, quem: 'Diretora', aprovacaoId: 'x',
+      redeInterna: ['u1', 'u2'] }, { atorTipo: 'cliente', atorId: null }), nomes),
+    { ator: 'Diretora', texto: 'aprovou a V1 pelo link · da mesma rede que Rafa e você', grupo: 'aprovacao' })
+    assert.deepEqual(fraseAtividade(a('link.exibido', { linkId: 'l' }), nomes), { ator: 'Rafa', texto: 'recebeu o endereço do link de aprovação', grupo: 'ciclo' })
     assert.equal(juntar(['a', 'b', 'b', 'c']), 'a, b e c')
   })
 })

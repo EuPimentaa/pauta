@@ -614,6 +614,12 @@ deveFalhar(db, insApr, ['ap2', 'aprovado', 'ct1', null, 'q-soc', 'k-s-fila'], 'U
 deveFalhar(db, insApr, ['ap3', 'ajuste', 'ct1', null, 'q-soc', 'k-s-fila'], 'CHECK', 'ajuste sem comentário é recusado')
 deveFalhar(db, "UPDATE aprovacao SET decisao = 'ajuste' WHERE id = 'ap1'", [], 'aprovacao_imutavel', 'decisão é imutável')
 rodar(db, "UPDATE aprovacao SET anulada_em = ?, anulada_por = 'u-am' WHERE id = 'ap1'", agora())
+// 090: quem da agência usava a mesma rede da decisão pelo link (lista JSON de ids), imutável como o resto
+deveFalhar(db, `INSERT INTO aprovacao (id, demanda_id, versao_id, decisao, via, canal, contato_id, registrado_por, quadro_antes_id,
+  coluna_antes_id, rede_interna) VALUES ('ap9', 'd1', 'v1', 'aprovado', 'manual', 'whatsapp', 'ct1', 'u-am', 'q-soc', 'k-s-fila', ?)`,
+['{"u-am":1}'], 'CHECK', 'rede_interna é uma lista JSON')
+deveFalhar(db, `UPDATE aprovacao SET rede_interna = '["u-am"]' WHERE id = 'ap1'`, [], 'aprovacao_imutavel',
+  'a marca da rede interna não se põe nem se tira depois da decisão')
 rodar(db, "INSERT INTO anexo (id, demanda_id, finalidade, tipo, nome, url, pos) VALUES ('ax-ev','d1','evidencia','link','Print','https://drive.google.com/p',20)")
 rodar(db, insAprEvid, 'ap4', 'ax-ev')
 conferir(um(db, "SELECT count(*) n FROM aprovacao WHERE versao_id = 'v1'")!.n === 2, 'anular libera nova decisão na versão')

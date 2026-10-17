@@ -15,7 +15,7 @@ import type {
 import { dataLocalDe, formatarPrazo, horaLocalDe } from '../../../shared/logica/datas.ts'
 import { linhasParaItens } from '../../../shared/logica/texto.ts'
 import { primeiroNome } from '../../../shared/logica/texto-whatsapp.ts'
-import type { Ator } from '../auth.ts'
+import { pessoasDaRede, type Ator } from '../auth.ts'
 import { config } from '../config.ts'
 import { agora, marcadores, rodar, todos, um, type Db } from '../db.ts'
 import { ErroHttp, naoEncontrado, validacao } from '../erros.ts'
@@ -264,7 +264,9 @@ function nomeLimpo(s: string | null | undefined): string {
  * (só o cliente decide pelo link: a decisão iria como dele, sem rastro de quem a tomou); a chave (por link) antes do
  * resto; a demanda é item do link, viva e do cliente dele; versão já decidida → 409 ja_decidida; sem envio pendente por
  * este link → 409 "não aguarda"; versão antiga → 409 versao_desatualizada com a atual; identidade (o contato do link ou
- * um nome); ajuste com linha; então `registrarRetorno()` com via 'link'. Roda dentro da transação de quem chama.
+ * um nome); ajuste com linha; então `registrarRetorno()` com via 'link', marcada com quem da agência usou a mesma rede nas
+ * últimas 24 h (`pessoasDaRede`: o endereço do link aberto fora do app, numa aba anônima ou em outro aparelho, decide
+ * como o cliente; a marca deixa isso visível na trilha). Roda dentro da transação de quem chama.
  */
 export function decidir(db: Db, token: string, chave: string, e: DecisaoPublicaEntrada, ator: Ator, userAgent: string | null,
   opcoes: { previaInterna: boolean }): DecisaoPublicaSaida {
@@ -310,7 +312,7 @@ export function decidir(db: Db, token: string, chave: string, e: DecisaoPublicaE
   registrarRetorno(db, {
     demandaId: d.id, ator, via: 'link', versaoId: e.versaoId, decisao: e.decisao, linhas: e.linhas, motivo: 'cliente_mudou',
     contatoId: e.contatoId ?? null, nomeInformado, linkId: link.id, idempotencia: { chave, hash },
-    ipHmac: ator.ip ? hmac(ator.ip) : null, userAgent,
+    ipHmac: ator.ip ? hmac(ator.ip) : null, userAgent, redeInterna: pessoasDaRede(db, ator.ip),
   })
   const item = itemPublico(db, link, d.id)!
   return { item, mensagem: mensagemDaDecisao(item) }

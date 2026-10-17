@@ -56,6 +56,21 @@ export function emitirLink(db: Db, id: Id, ator: Ator): LinkPublicoResumo {
   return link
 }
 
+const SEIS_HORAS = 6 * 3_600_000
+
+/**
+ * Quem recebeu o endereço de um link ativo (GET /links, texto do WhatsApp com o link): `link.exibido` na demanda, no
+ * máximo uma vez a cada 6 h por pessoa e link (API.md §4.16). Com o endereço dá para abrir o link fora do app (aba
+ * anônima, outro aparelho) e decidir como o cliente; o histórico (só o admin vê esta linha) diz quem o tinha.
+ */
+function registrarExibicao(db: Db, demandaId: Id, linkId: Id, ator: Ator): void {
+  if (!ator.usuario) return
+  const ultimo = um<{ m: string | null }>(db, `SELECT max(criado_em) AS m FROM atividade WHERE demanda_id = ? AND tipo = 'link.exibido'
+    AND ator_id = ? AND json_extract(dados, '$.linkId') = ?`, demandaId, ator.usuario.id, linkId)!.m
+  if (ultimo && Date.parse(agora()) - Date.parse(ultimo) < SEIS_HORAS) return
+  registrarAtividade(db, { tipo: 'link.exibido', ator, demandaId, dados: { linkId } })
+}
+
 /** O link ativo da demanda para o contato (o mais novo), se houver. */
 function linkAtivo(db: Db, d: Demanda, contatoId: Id | null): Linha | undefined {
   return um<Linha>(db, `
@@ -208,15 +223,17 @@ export function textoParaWhatsapp(db: Db, demandaId: Id, modelo: ModeloWhatsapp,
     const envio = mapear.envio(l)
     const versao = carregarVersaoSemItens(db, envio.versaoId)
     let url: string | null = null
+    let linkId: Id | null = null
     if (envio.linkId) {
       const lk = um<Linha>(db, 'SELECT * FROM link_publico WHERE id = ? AND revogado_em IS NULL AND expira_em > ?', envio.linkId, agora())
-      if (lk) url = urlDoLink(lk)
+      if (lk) { url = urlDoLink(lk); linkId = String(lk.id) }
     }
     if (!url && modelo === 'lembrete' && d.clienteId) {
       const lk = linkAtivo(db, d, envio.contatoId)
-      if (lk) url = urlDoLink(lk)
+      if (lk) { url = urlDoLink(lk); linkId = String(lk.id) }
     }
     if (modelo === 'envio' && envio.via === 'fora') url = null
+    if (url && linkId) registrarExibicao(db, d.id, linkId, ator)
     const texto = textoWhatsapp(modelo, {
       contatoNome: nomeDoContato(db, envio.contatoId), titulo: d.titulo, versao: versao.numero, url,
       prazoRetorno: envio.prazoRetorno, prazoRetornoHora: envio.prazoRetornoHora,
@@ -239,12 +256,21 @@ export function textoParaWhatsapp(db: Db, demandaId: Id, modelo: ModeloWhatsapp,
 
 // ─────────────────────────────── links da demanda ───────────────────────────────
 
-/** GET /api/demandas/:id/links (atendimento, admin): os links que levam a demanda, mais novos primeiro, com a URL. */
+/**
+ * GET /api/demandas/:id/links (atendimento, admin): os links que levam a demanda, mais novos primeiro. A URL só vai nos
+ * ativos (os outros não abrem mais: `url` vazia), e quem a recebe fica no histórico (`link.exibido`, a cada 6 h por
+ * pessoa e link). Roda dentro da transação de quem chama.
+ */
 export function linksDaDemanda(db: Db, demandaId: Id, ator: Ator): LinkPublicoComUrl[] {
   exigir(ator, 'ciclo.cliente')
-  demandaViva(db, demandaId)
+  const d = demandaViva(db, demandaId)
   return todos<Linha>(db, `SELECT l.* FROM link_publico l JOIN link_publico_item i ON i.link_id = l.id WHERE i.demanda_id = ?
-    ORDER BY l.criado_em DESC, l.rowid DESC`, demandaId).map((l) => ({ ...carregarLink(db, String(l.id)), url: urlDoLink(l) ?? '' }))
+    ORDER BY l.criado_em DESC, l.rowid DESC`, d.id).map((l) => {
+    const link = carregarLink(db, String(l.id))
+    const url = link.ativo ? urlDoLink(l) : null
+    if (url) registrarExibicao(db, d.id, link.id, ator)
+    return { ...link, url: url ?? '' }
+  })
 }
 
 /** Revoga (o link ainda não revogado): grava quem e quando, `link.revogado` em cada demanda e o evento para a gestão. */

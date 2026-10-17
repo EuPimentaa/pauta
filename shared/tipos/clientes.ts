@@ -160,4 +160,11 @@ export interface ItemTrilhaCliente {
   comentario: string | null
   criadoEm: Instante
   anuladaEm: Instante | null
+  /** Pelo link, da mesma rede de uma sessão interna das últimas 24 h: as pessoas (`Aprovacao.redeInterna`, API.md §4.17). */
+  redeInterna: Id[]
+  /**
+   * Só para o admin, nas decisões pelo link: o aparelho e o navegador, do user-agent gravado ("iPhone · Safari",
+   * "curl/8.4.0"); null para os outros, no manual e depois dos 12 meses (o job apaga o user-agent).
+   */
+  dispositivo: string | null
 }

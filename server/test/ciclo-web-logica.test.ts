@@ -78,7 +78,7 @@ describe('linha do tempo', () => {
   const ap = (id: string, versaoId: string, criadoEm: string, anulada = false): Aprovacao => ({
     id, demandaId: 'd', versaoId, decisao: 'aprovado', via: 'manual', canal: 'whatsapp', linkId: null, contatoId: null, nomeInformado: null,
     registradoPor: 'pri', comentario: null, motivo: null, rodadaAbertaId: null, evidenciaAnexoId: null, quadroAntesId: 'q', colunaAntesId: 'c',
-    criadoEm, anuladaEm: anulada ? 'x' : null, anuladaPor: anulada ? 'pri' : null,
+    criadoEm, anuladaEm: anulada ? 'x' : null, anuladaPor: anulada ? 'pri' : null, redeInterna: [],
   })
   test('rodadas e versões mais novas primeiro, com envios e decisões; a última decisão válida; entregue na rodada aberta', () => {
     const envio = { id: 'e1', versaoId: 'v1', enviadoEm: '2026-10-11T12:00:00.000Z' } as Envio

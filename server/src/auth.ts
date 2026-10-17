@@ -3,13 +3,14 @@
  * exigirPapel, a validação zod e o limite em memória (API.md §1 e §4.2).
  */
 import { randomBytes, scrypt as scryptCb, timingSafeEqual, type ScryptOptions } from 'node:crypto'
+import { isIP } from 'node:net'
 import type { Context, Hono, MiddlewareHandler } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { getConnInfo } from '@hono/node-server/conninfo'
 import type { ZodType } from 'zod'
 import type { Papel, Usuario } from '../../shared/tipos/index.ts'
 import { config } from './config.ts'
-import { agora, novoId, rodar, um, type Db } from './db.ts'
+import { agora, novoId, rodar, todos, um, type Db } from './db.ts'
 import { ErroHttp } from './erros.ts'
 import { gerarToken, hashToken } from './servicos/cripto.ts'
 import { lerConfig } from './servicos/config-app.ts'
@@ -59,6 +60,45 @@ export function ipReal(c: Context): string {
   } catch {
     return 'desconhecido'
   }
+}
+
+/**
+ * A rede de um IP, para saber se dois acessos vêm da mesma conexão (API.md §4.17): IPv4 inteiro (o roteador do
+ * escritório ou de casa põe todos os aparelhos atrás de um endereço) e IPv6 pelo /64 (cada aparelho da mesma rede tem o
+ * seu endereço, com o mesmo prefixo). O que não é IP ('desconhecido', vazio) → null, que não casa com nada.
+ */
+export function redeDoIp(ip: string | null | undefined): string | null {
+  let s = (ip ?? '').trim().toLowerCase().replace(/%.*$/, '')
+  const v4 = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(s)
+  if (v4) s = v4[1]!
+  const versao = isIP(s)
+  if (versao === 4) return s
+  if (versao !== 6) return null
+  // expande o "::" (um IPv4 no fim vale dois grupos) e fica com os quatro primeiros grupos
+  const grupos = (x: string) => (x ? x.split(':') : [])
+  const tamanho = (xs: string[]) => xs.reduce((n, g) => n + (g.includes('.') ? 2 : 1), 0)
+  const [cabeca, cauda] = s.includes('::') ? s.split('::') as [string, string] : [s, null]
+  const ini = grupos(cabeca)
+  const fim = cauda === null ? [] : grupos(cauda)
+  const todosGrupos = cauda === null ? ini : [...ini, ...Array<string>(Math.max(0, 8 - tamanho(ini) - tamanho(fim))).fill('0'), ...fim]
+  return `${todosGrupos.slice(0, 4).map((g) => (g.includes('.') ? g : parseInt(g, 16).toString(16))).join(':')}::/64`
+}
+
+/** Janela da marca "mesma rede" na decisão pública: sessões usadas nas últimas 24 h. */
+const JANELA_REDE_MS = 24 * 3_600_000
+
+/**
+ * Pessoas da agência com sessão usada nas últimas 24 h a partir da mesma rede do IP (`redeDoIp`; o IP da sessão é o da
+ * última requisição dela). Contam também as sessões encerradas ou vencidas: sair do app e decidir no mesmo navegador é
+ * o mesmo caso. Marca a decisão pelo link (API.md §4.17). Em ordem de id.
+ */
+export function pessoasDaRede(db: Db, ip: string): string[] {
+  const rede = redeDoIp(ip)
+  if (!rede) return []
+  const desde = new Date(Date.parse(agora()) - JANELA_REDE_MS).toISOString()
+  const sessoes = todos<{ usuario_id: string; ip: string }>(db,
+    'SELECT usuario_id, ip FROM sessao WHERE ip IS NOT NULL AND coalesce(ultimo_uso_em, criada_em) >= ?', desde)
+  return [...new Set(sessoes.filter((s) => redeDoIp(s.ip) === rede).map((s) => s.usuario_id))].sort()
 }
 
 // ─────────────────────────────── senhas ───────────────────────────────
@@ -158,13 +198,14 @@ interface LinhaSessao {
   usuario_id: string
   expira_em: string
   ultimo_uso_em: string | null
+  ip: string | null
 }
 
 /** Sessão válida pelo token do cookie: não revogada, não vencida e de pessoa ativa (API.md §1). */
 export function sessaoValida(db: Db, token: string | undefined): LinhaSessao | null {
   if (!token) return null
   const l = um<LinhaSessao>(db, `
-    SELECT s.id, s.usuario_id, s.expira_em, s.ultimo_uso_em FROM sessao s JOIN usuario u ON u.id = s.usuario_id
+    SELECT s.id, s.usuario_id, s.expira_em, s.ultimo_uso_em, s.ip FROM sessao s JOIN usuario u ON u.id = s.usuario_id
      WHERE s.token_hash = ? AND s.revogada_em IS NULL AND s.expira_em > ? AND u.ativo = 1`, hashToken(token), agora())
   return l ?? null
 }
@@ -187,7 +228,8 @@ function renovar(db: Db, c: Context, s: LinhaSessao, forcar: boolean): void {
 
 /**
  * 401 sem sessão válida. Confere em TODA requisição: sessão não revogada e não vencida, pessoa ativa. Põe o ator
- * `usuario` no contexto e renova a validade (no máximo a cada 10 min; GET /api/auth/eu sempre).
+ * `usuario` no contexto e renova a validade (no máximo a cada 10 min; GET /api/auth/eu sempre). A sessão guarda o IP da
+ * última requisição (grava só quando muda): é por ele que a decisão pública vinda da mesma rede fica marcada (§4.17).
  */
 export const exigirUsuario: MiddlewareHandler<Ambiente> = async (c, next) => {
   const db = c.get('db')
@@ -197,6 +239,7 @@ export const exigirUsuario: MiddlewareHandler<Ambiente> = async (c, next) => {
   const base = c.get('ator')
   c.set('ator', { tipo: 'usuario', usuario, papel: usuario.papel, traceId: base.traceId, ip: base.ip })
   renovar(db, c, s, c.req.method === 'GET' && c.req.path === '/api/auth/eu')
+  if (base.ip && s.ip !== base.ip) rodar(db, 'UPDATE sessao SET ip = ? WHERE id = ?', base.ip, s.id)
   await next()
 }
 

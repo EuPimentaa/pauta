@@ -15,10 +15,15 @@ export function registrar(app: App): void {
 
   app.get('/api/demandas/:id/whatsapp', exigirUsuario, (c) => {
     const { modelo } = validar(esquema.modeloWhatsapp, { modelo: c.req.query('modelo') ?? 'envio' })
-    return c.json(textoParaWhatsapp(c.get('db'), c.req.param('id'), modelo, c.get('ator')))
+    const db = c.get('db')
+    return c.json(tx(db, () => textoParaWhatsapp(db, c.req.param('id'), modelo, c.get('ator'))))
   })
 
-  app.get('/api/demandas/:id/links', exigirUsuario, (c) => c.json(linksDaDemanda(c.get('db'), c.req.param('id'), c.get('ator'))))
+  // quem recebe o endereço de um link ativo fica no histórico (link.exibido): por isso a leitura grava
+  app.get('/api/demandas/:id/links', exigirUsuario, (c) => {
+    const db = c.get('db')
+    return c.json(tx(db, () => linksDaDemanda(db, c.req.param('id'), c.get('ator'))))
+  })
 
   app.post('/api/links-publicos/:id/revogar', exigirUsuario, (c) => {
     const db = c.get('db')

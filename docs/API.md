@@ -896,11 +896,19 @@ Mesmos headers de `GET /api/arquivos/:id`; `&inline=1` (só imagem, como na rota
 "Minhas" = sou membro ou o AM (`ehMinha`, `shared/logica/quadro.ts`). Só demandas de quadros ativos e não arquivadas.
 
 #### `GET /api/inicio`
-- Qualquer usuário. `200 InicioSaida`: minhas abertas por prazo (`estadoPrazo` §5.2: atrasadas, hoje, esta semana até
-  domingo, depois, sem prazo; as com o cliente ficam em "depois"/"sem prazo" pelo prazo, nunca em atrasadas);
-  `comClienteParado` só para quem tem papel atendimento (as do próprio atendimento com o cliente há mais de
-  `clienteParadoDiasUteis`, §5.4; "Registrar retorno" só aparece com `envioPendenteEm`, senão o bloco mostra
-  "Abrir"); `mencoes` (últimas 10 `mencao`); `resumo`; `extras`.
+- Qualquer usuário. `200 InicioSaida`: minhas abertas por prazo (`estadoPrazo` §5.2: atrasadas, hoje, esta semana
+  de amanhã até domingo (no domingo ela é vazia), depois, sem prazo; as com o cliente ficam em "depois"/"sem prazo"
+  pelo prazo, nunca em atrasadas); `comClienteParado` para o atendimento e também para o **admin**, só nas demandas em
+  que a pessoa é o AM (`atendimentoId` = eu; a equipe nunca recebe o bloco): as com o cliente há mais de
+  `clienteParadoDiasUteis` (§5.4), mais antigas primeiro (dias úteis desde o envio, senão desde a entrada na coluna
+  `aguardando_cliente`); "Registrar retorno" só aparece com `envioPendenteEm`, senão o bloco mostra "Abrir". Na
+  tela, o admin só vê o bloco quando há alguma; o atendimento sempre ("Nenhuma peça parada com o cliente.").
+  `mencoes` (últimas 10 `mencao`); `resumo` (`comCliente` = as minhas abertas com a bola com o cliente); `extras`
+  (na prática vazio: as minhas abertas de quadros ativos estão todas no bootstrap).
+- As listas são as de `shared/logica/paineis.ts` (`minhasPorPrazo`, `comClienteParado`, `resumoInicio`), as mesmas
+  que o front calcula do bootstrap (o card entra e sai do Início na hora; `GET /api/inicio` serve as menções). Ordem
+  dentro de cada grupo: prazo, hora (sem hora = 18h), prioridade (urgente primeiro) e número; "sem prazo" por
+  prioridade e número; a com o cliente sem prazo vai para "sem prazo".
 - `primeirosPassos` só para admin, nulo quando concluído. Na ordem de `PASSOS_INICIAIS`, com o critério de `feito` (e
   o `caminho` de cada item):
   - `convidar_equipe` (`/config/pessoas`): pelo menos 2 usuários ativos. Vem primeiro para o modelo "Por pessoa" já
@@ -914,7 +922,10 @@ Mesmos headers de `GET /api/arquivos/:id`; `&inline=1` (só imagem, como na rota
     `POST /api/modelos-demanda/revisados`).
 
 #### `GET /api/agenda`
-- Qualquer usuário. **Consulta:** `AgendaConsulta` (`de`..`ate` inclusive, até 62 dias; senão `400`). **Resposta:**
+- Qualquer usuário. **Consulta:** `AgendaConsulta` (`de`..`ate` inclusive, até 62 dias; senão `400`; `ate` antes de
+  `de`, data inválida ou campo fora de `CAMPOS_AGENDA` → `400`). `quadroIds` e `campos` aceitam a chave repetida
+  (`quadroIds=a&quadroIds=b`, como o `comConsulta` do front) ou separados por vírgula; `soMinhas` e
+  `incluirConcluidas` aceitam `1`/`0`/`true`/`false`; quadro arquivado em `quadroIds` não traz nada. **Resposta:**
   `200 AgendaSaida`: as demandas de todos os quadros ativos (ou `quadroIds`) com a data pedida (`campos`, padrão
   prazo) no intervalo, "Só as minhas" opcional, concluídas incluídas por padrão; feriados do intervalo; `extras` =
   as que não estão no bootstrap (concluídas antigas).
@@ -922,10 +933,14 @@ Mesmos headers de `GET /api/arquivos/:id`; `&inline=1` (só imagem, como na rota
   (`useMudarPrazo` e `CalendarioDemandas` do núcleo-web, os mesmos do Calendário do quadro).
 
 #### `GET /api/notificacoes`
-Só as minhas. **Consulta:** `ListarNotificacoesConsulta`. `200 ListarNotificacoesSaida`.
+Só as minhas. **Consulta:** `ListarNotificacoesConsulta` (`limite` padrão 30, máximo 100, `400` acima; `antesDe` = id:
+as mais antigas que ele). `200 ListarNotificacoesSaida` (`proximo` = o id da última da página quando há mais;
+`naoLidas` é sempre o total da pessoa, não o da página).
 
 #### `POST /api/notificacoes/lidas`
-- **Corpo:** `MarcarLidasEntrada`. `204`. **SSE:** `notificacao` (usuário; patch `lidaEm`) para cada uma marcada.
+- **Corpo:** `MarcarLidasEntrada` (até 500 `ids`). `204`. Marca só as minhas ainda não lidas; ids de outra pessoa são
+  ignorados sem erro (não revela o que existe). **SSE:** `notificacao` (usuário; patch `lidaEm`) para cada uma marcada;
+  sem nada mudar, nenhum evento.
 
 ### 4.19 Arquivo · cadastros
 
@@ -1093,14 +1108,21 @@ Lançar e cronômetro ficam no modal (§4.15).
   mesmo fato (quem recebe `mencao` não recebe `comentario`; quem recebe `membro` não recebe `chegou`). Cada
   notificação gera `evento` `notificacao` com público `usuario`.
 - Tipos (`TIPOS_NOTIFICACAO`): `membro`, `mencao`, `comentario`, `versao_entregue`, `aprovada`, `ajuste_pedido`,
-  `prazo`, `atrasada`, `chegou`.
+  `prazo`, `atrasada`, `chegou`. Os do ciclo (F2, `servicos/ciclo.ts`): `versao_entregue` ao AM ("Rafa entregou a V2
+  de #123 …"); `aprovada`/`ajuste_pedido` aos membros de antes da automação e ao AM ("Fulana aprovou a V2 de #123 …",
+  "Fulana pediu 2 ajustes na V1 de #123 …"; pelo link o ator é o cliente e `atorId` vem nulo); o ajuste interno avisa
+  os membros. O sino (F3) monta o link `/d/:numero` pelo `demandaId` e mostra o ícone do tipo quando não há ator.
 - **`chegou`** (aos seguidores do quadro): só quando uma demanda **entra** no quadro (criada por outra pessoa, ou vinda
   de outro quadro) e, depois de aplicados os membros (§5.1), **nenhum membro é da equipe do quadro** (quadro sem
   equipe: nenhum membro). Nunca por automação numa coluna `aguardando_cliente` (o envio ao cliente não é trabalho
   novo para o quadro). Assim um quadro com coluna por pessoa ou com `responsavel_destino` quase não gera `chegou`.
-- **Jobs das 8h de São Paulo** (painéis; só em dia útil, contando `feriado`), sobre demandas abertas de quadros
-  ativos, para os membros (ou o AM, sem membros), **ignorando `estadoPrazo = 'pausado'`** (com o cliente):
-  - `prazo`: vencem hoje; sem repetir no mesmo dia (`notificacao_prazo_ix`);
+- **Jobs das 8h de São Paulo** (painéis, `server/src/tarefas/paineis-prazo.ts`; só em dia útil, contando `feriado`),
+  sobre demandas abertas de quadros ativos, para os membros **ativos** (sem nenhum ativo, o AM, se ativo),
+  **ignorando `estadoPrazo = 'pausado'`** (com o cliente). Como todo job, roda ao subir se perdeu o horário (servidor
+  desligado às 8h ou deploy depois das 8h): aí uma demanda que venceu às 18h do mesmo dia útil já sai como `atrasada`.
+  - `prazo`: estado `hoje` (vence hoje e a hora ainda não passou; com a hora já passada sai como `atrasada`); sem
+    repetir no mesmo dia (`notificacao_prazo_ix`). Resumo: "#123 Carrossel HE vence hoje, 18h" (com a sigla do
+    cliente, quando há);
   - `atrasada`: `estadoPrazo = 'atrasada'` e a pessoa ainda não recebeu `atrasada` desta demanda depois do prazo
     atual (`notificacao_atrasada_ix`): uma vez por pessoa, demanda e prazo; prazo novo (rodada, renegociação) pode
     avisar de novo. Resumo: "#123 Carrossel HE está atrasada desde qua, 15/10".

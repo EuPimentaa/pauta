@@ -7,12 +7,25 @@ import { useQuery, type QueryClient, type UseQueryResult } from '@tanstack/react
 import type { Bootstrap } from '@shared/tipos/index.ts'
 import { definirNomeApp } from '../lib/app.ts'
 import { marcarPessoaLocal } from '../lib/armazenamento.ts'
-import { api, type ErroDaApi } from './cliente.ts'
+import { ErroDaApi, api } from './cliente.ts'
 
 export const CHAVE_BOOTSTRAP = ['bootstrap'] as const
 
+/** Cookie de dica do servidor (auth.ts, COOKIE_DICA_SESSAO): "1" quando há sessão; não é segredo. */
+const DICA_SESSAO = 'pauta_sessao'
+const temDicaSessao = () => typeof document !== 'undefined' && document.cookie.split(/;\s*/).some((c) => c.startsWith(`${DICA_SESSAO}=`))
+
 export async function buscarBootstrap(sinal?: AbortSignal): Promise<Bootstrap> {
-  const b = await api<Bootstrap>('GET', '/api/bootstrap', { sinal, redirecionar401: false })
+  // em produção o index.html acerta a dica com a sessão: sem ela, nem pede (o 401 esperado sujava o console). No
+  // desenvolvimento o Vite serve o index.html e a dica pode faltar: pede sempre.
+  if (import.meta.env.PROD && !temDicaSessao()) throw new ErroDaApi(401, 'nao_autenticado', 'Entre para continuar.')
+  let b: Bootstrap
+  try {
+    b = await api<Bootstrap>('GET', '/api/bootstrap', { sinal, redirecionar401: false })
+  } catch (e) {
+    if (e instanceof ErroDaApi && e.status === 401) document.cookie = `${DICA_SESSAO}=; Max-Age=0; Path=/`
+    throw e
+  }
   definirNomeApp(b.app?.nome)
   // outra pessoa neste navegador: os rascunhos da anterior saem antes de qualquer tela os ler
   marcarPessoaLocal(b.eu.usuario.id)

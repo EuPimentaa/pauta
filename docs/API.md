@@ -16,6 +16,9 @@ Sumário: [1 Convenções](#1-convenções) · [2 Permissões](#2-permissões) �
 - **Sessão:** cookie `__Host-sid` em produção (httpOnly, Secure, SameSite=Lax, `Path=/`, sem `Domain`: um subdomínio
   irmão não consegue plantá-lo) e `sid` em desenvolvimento; 30 dias deslizantes. Valor = `randomBytes(32)` em
   base64url; o banco guarda só o sha256. Convite, redefinição e link público usam a mesma entropia e o mesmo hash.
+  Junto vai a **dica** `pauta_sessao=1` (não é segredo, sem httpOnly, mesma validade): o login e o convite a põem, o
+  logout a tira e o index.html servido pelo Node a acerta com a sessão de verdade; sem ela, o app em produção vai direto
+  para /entrar sem pedir o bootstrap (o 401 esperado não suja o console). Integração 3A.
   `exigirUsuario` confere em **toda** requisição: sessão com `revogada_em` nulo e `expira_em > agora`, e `usuario.ativo = 1`.
   Sem sessão válida: `401 nao_autenticado`. Rotas sem sessão: `GET /api/saude`, `POST /api/auth/login`,
   `POST /api/auth/convite/consultar`, `POST /api/auth/convite`, `POST /api/auth/redefinicao/consultar`,

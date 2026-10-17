@@ -102,10 +102,22 @@ export function nomeCookie(): string {
   return config.producao ? '__Host-sid' : 'sid'
 }
 
+/**
+ * Dica de que há sessão (não é segredo: "1", legível pelo JS): sem ela, o app em produção vai direto para /entrar, sem
+ * pedir o bootstrap e sem o 401 no console. Acompanha o cookie da sessão no login e no logout, e o index.html servido
+ * pelo Node a acerta com a sessão de verdade (vencida, revogada ou de antes da dica).
+ */
+export const COOKIE_DICA_SESSAO = 'pauta_sessao'
+
+function gravarDica(c: Context, dias: number): void {
+  setCookie(c, COOKIE_DICA_SESSAO, '1', { httpOnly: false, sameSite: 'Lax', path: '/', secure: config.producao, maxAge: dias * 86_400 })
+}
+
 function gravarCookie(c: Context, token: string, dias: number): void {
   setCookie(c, nomeCookie(), token, {
     httpOnly: true, sameSite: 'Lax', path: '/', secure: config.producao, maxAge: dias * 86_400,
   })
+  gravarDica(c, dias)
 }
 
 /** Cria a sessão (30 dias deslizantes), grava o cookie e o último acesso. Devolve o id da sessão. */
@@ -125,6 +137,14 @@ export function criarSessao(db: Db, c: Context, usuarioId: string, ip: string): 
 
 export function apagarCookie(c: Context): void {
   deleteCookie(c, nomeCookie(), { path: '/', secure: config.producao })
+  deleteCookie(c, COOKIE_DICA_SESSAO, { path: '/', secure: config.producao })
+}
+
+/** No index.html (produção): a dica acompanha a sessão de verdade. */
+export function atualizarDicaSessao(c: Context<Ambiente>): void {
+  const s = sessaoDaRequisicao(c)
+  if (s) gravarDica(c, lerConfig(c.get('db')).sessaoValidadeDias)
+  else if (getCookie(c, COOKIE_DICA_SESSAO)) deleteCookie(c, COOKIE_DICA_SESSAO, { path: '/', secure: config.producao })
 }
 
 /** Revoga as sessões da pessoa (menos `exceto`). Devolve quantas. */

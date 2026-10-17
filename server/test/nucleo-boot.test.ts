@@ -1,7 +1,7 @@
 /** Boot e operação: primeiro admin, front servido em produção (SPA e cabeçalhos), jobs diários e backup. */
 import { afterEach, describe, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -14,7 +14,7 @@ import { carregarTarefas, executarTarefa, tarefasDevidas, type Tarefa } from '..
 import { fazerBackup } from '../src/tarefas/nucleo-backup.ts'
 import { apagarIpsAntigos } from '../src/tarefas/nucleo-ip.ts'
 import { servirWeb } from '../src/web.ts'
-import { ambiente, clienteHttp, SENHA_TESTE } from './ajuda.ts'
+import { ambiente, clienteHttp, ORIGEM, SENHA_TESTE, sessaoPara } from './ajuda.ts'
 
 let restaurar: Config | null = null
 afterEach(() => {
@@ -118,6 +118,33 @@ describe('front em produção (web/dist)', () => {
       assert.equal(r.headers.get('cache-control'), 'no-cache', caminho)
       assert.equal(await r.text(), esperado, caminho)
     }
+  })
+
+  test('dica de sessão: o index.html a põe com sessão válida e a tira sem; login e logout também (sem 401 no console)', async () => {
+    const a = await ambiente()
+    restaurar = configurar({ producao: true })
+    const app = criarApp(a.db)
+    servirWeb(app, distFalso())
+    const token = sessaoPara(a.db, a.pessoas.design.id)
+    const com = await app.request('/q/criacao', { headers: { Cookie: `__Host-sid=${token}` } })
+    assert.match(com.headers.get('set-cookie') ?? '', /pauta_sessao=1;.*Max-Age=\d+.*Path=\//)
+    assert.doesNotMatch(com.headers.get('set-cookie') ?? '', /HttpOnly/, 'o JS lê a dica')
+    const vencida = await app.request('/', { headers: { Cookie: 'pauta_sessao=1; __Host-sid=token-que-nao-existe' } })
+    assert.match(vencida.headers.get('set-cookie') ?? '', /pauta_sessao=;.*Max-Age=0/)
+    const sem = await app.request('/')
+    assert.equal(sem.headers.get('set-cookie'), null, 'sem sessão e sem dica: nada')
+    // login põe a dica junto do cookie da sessão; logout tira as duas
+    const login = await app.request('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Id': randomUUID(), Origin: ORIGEM },
+      body: JSON.stringify({ email: a.pessoas.design.email, senha: SENHA_TESTE }),
+    })
+    assert.equal(login.status, 200)
+    assert.match(login.headers.get('set-cookie') ?? '', /pauta_sessao=1/)
+    const sid = /__Host-sid=([^;]+)/.exec(login.headers.get('set-cookie') ?? '')![1]
+    const sair = await app.request('/api/auth/logout', {
+      method: 'POST', headers: { Cookie: `__Host-sid=${sid}`, 'X-Trace-Id': randomUUID(), Origin: ORIGEM },
+    })
+    assert.match(sair.headers.get('set-cookie') ?? '', /pauta_sessao=;.*Max-Age=0/)
   })
 
   test('não sai da pasta (../ codificado) e sem web/dist não registra nada', async () => {

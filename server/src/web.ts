@@ -6,7 +6,8 @@
  */
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { extname, join, normalize, resolve, sep } from 'node:path'
-import type { App } from './auth.ts'
+import type { Context } from 'hono'
+import { atualizarDicaSessao, type Ambiente, type App } from './auth.ts'
 import { config } from './config.ts'
 
 const TIPOS: Record<string, string> = {
@@ -38,7 +39,11 @@ export function servirWeb(app: App, pasta: string): boolean {
   if (!existsSync(indice)) return false
   // lido uma vez: o arquivo só muda com um deploy novo, que reinicia o processo
   const html = comNomeApp(readFileSync(indice, 'utf8'), config.appNome)
-  const responderIndice = () => new Response(html, { headers: { 'Content-Type': TIPOS['.html']!, 'Cache-Control': 'no-cache' } })
+  // a dica de sessão (auth.ts) sai com o index.html: o app sabe, sem pedir nada, se vale tentar o bootstrap
+  const responderIndice = (c: Context<Ambiente>) => {
+    atualizarDicaSessao(c)
+    return c.body(html, 200, { 'Content-Type': TIPOS['.html']!, 'Cache-Control': 'no-cache' })
+  }
 
   app.get('*', (c) => {
     let caminho: string
@@ -50,7 +55,7 @@ export function servirWeb(app: App, pasta: string): boolean {
     if (caminho.startsWith('/api/')) return c.notFound()
     const alvo = normalize(join(raiz, caminho))
     const dentro = alvo === raiz || alvo.startsWith(raiz + sep)
-    if (alvo === indice) return responderIndice()
+    if (alvo === indice) return responderIndice(c)
     if (dentro && alvo !== raiz && existsSync(alvo) && statSync(alvo).isFile()) {
       const longo = caminho.startsWith('/assets/')
       return new Response(readFileSync(alvo), {
@@ -61,7 +66,7 @@ export function servirWeb(app: App, pasta: string): boolean {
       })
     }
     if (extname(caminho) && !caminho.endsWith('.html')) return c.text('Não encontrado.', 404)
-    return responderIndice()
+    return responderIndice(c)
   })
   return true
 }

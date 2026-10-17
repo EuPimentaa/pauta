@@ -92,6 +92,7 @@ export const CODIGOS_ERRO = [
   'csrf',                   // 403 falta X-Trace-Id ou Origin diferente de APP_URL
   'sem_permissao',          // 403 o papel não permite; a mensagem diz o motivo
   'campo_nao_permitido',    // 403 campo só do atendimento/admin; detalhes.campo
+  'previa_interna',         // 403 decisão pela página pública com sessão interna no cookie (só o cliente decide)
   'nao_encontrado',         // 404
   'conflito_rev',           // 409 If-Match diferente do rev atual; detalhes.atual: ConflitoRevDetalhes
   'versao_desatualizada',   // 409 chegou versão nova (link público ou retorno); detalhes.versaoAtual

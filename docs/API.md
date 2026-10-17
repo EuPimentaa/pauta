@@ -69,7 +69,7 @@ Sumário: [1 Convenções](#1-convenções) · [2 Permissões](#2-permissões) �
 |---|---|---|
 | 400 | `validacao` | zod recusou corpo ou consulta; ids de outro quadro; `detalhes.campos: { caminho: mensagem }` |
 | 401 | `nao_autenticado`, `credenciais_invalidas` | sem sessão; login errado (sem dizer qual dos dois) |
-| 403 | `csrf`, `sem_permissao`, `campo_nao_permitido` | ver acima; o papel não permite; campo só do atendimento (`detalhes.campo`) |
+| 403 | `csrf`, `sem_permissao`, `campo_nao_permitido`, `previa_interna` | ver acima; o papel não permite; campo só do atendimento (`detalhes.campo`); decisão pela página pública com sessão interna no cookie (§4.17) |
 | 404 | `nao_encontrado` | não existe ou foi excluída (anonimizada) |
 | 409 | `conflito_rev`, `versao_desatualizada`, `ja_decidida`, `conflito` | ver cada rota |
 | 410 | `link_inativo`, `token_invalido` | link público expirado/revogado; convite ou redefinição usado/revogado/expirado ou de pessoa inativa |
@@ -856,6 +856,12 @@ HTML de `/a/:token`); `/a/*` e `/api/publico/*` mascarados nos logs. Token: `ran
 
 - **Limites** (em memória, janela deslizante; um processo só): 30 por minuto por **IP+token** em
   `/api/publico/a/:token*`; 300 por minuto por IP em `/api/publico/arquivos/*`. Estouro: `429`.
+- **Prévia interna** (segurança da leva 2, achado 2): quem tem sessão interna válida no cookie (o atendimento no "Ver
+  como o cliente", o link copiado de `GET /api/demandas/:id/links`) vê a página, mas não é o cliente: `/visto` responde
+  `204` sem contar e a decisão responde `403 previa_interna` "Você está vendo como o cliente: só ele pode decidir por
+  este link." (senão a decisão iria como do cliente, `registrado_por` nulo e nome livre, sem rastro de quem a tomou).
+  A página lê a dica `pauta_sessao` (§1) e mostra a faixa "Prévia: os botões não valem para você" com Aprovar e Pedir
+  ajuste desligados; o 403 que chegar sem a dica também a liga. Sessão revogada ou vencida não conta como sessão.
 - **"Enviada por este link"** = existe `envio` com aquela `versao_id` e `link_id` = o link. Nenhuma rota pública lê
   `demanda.versao_atual_id` (pode ser trabalho interno ainda não enviado).
 - **Itens ignorados:** demanda arquivada, excluída (excluir também revoga) ou de outro cliente que não o do link (o
@@ -874,12 +880,13 @@ HTML de `/a/:token`); `/a/*` e `/api/publico/*` mascarados nos logs. Token: `ran
 
 #### `POST /api/publico/a/:token/visto`
 Chamado pelo JS da página. Soma `acessos`, grava `ultimoAcessoEm`; `link.visto` no máximo uma vez a cada 6 h. `204`.
-**SSE:** `link_publico` (gestão).
+Com sessão interna no cookie (prévia interna): `204` sem efeito. **SSE:** `link_publico` (gestão).
 
 #### `POST /api/publico/a/:token/decisao`
 - **Header:** `Idempotency-Key` (obrigatório). **Corpo:** `DecisaoPublicaEntrada`. **Resposta:** `200 DecisaoPublicaSaida`.
 - **Ordem:**
-  1. sem chave → `400 validacao`; link expirado/revogado → `410 link_inativo`;
+  1. sem chave → `400 validacao`; link expirado/revogado → `410 link_inativo`; sessão interna no cookie → `403
+     previa_interna` (prévia interna, acima);
   2. `hash` = sha256 de `demandaId|versaoId|decisao|linhas unidas por \n|contatoId|nomeInformado`; busca
      (`link_id`, chave) **antes de qualquer outra validação**: achou com o mesmo `idempotency_hash` → `200` com o estado
      atual do item, sem efeito; achou com outro hash → `422 idempotencia`;

@@ -97,6 +97,9 @@
     background: var(--warning-bg); color: var(--warning-ink); font: 500 var(--fs-body) / var(--lh-body) var(--font);
   }
   .pub-aviso svg { width: 18px; height: 18px; flex: none; margin-top: 2px; }
+  /* quem é da agência abriu o link do cliente: prévia, sem decisão */
+  .pub-aviso[data-tom="previa"] { background: var(--info-bg); color: var(--info-ink); font-weight: 400; }
+  .pub-aviso[data-tom="previa"] strong { font-weight: 600; }
   .pub-form { display: flex; flex-direction: column; gap: 14px; padding: 4px 0; }
   .pub-quem { display: flex; flex-direction: column; gap: 8px; border: 0; margin: 0; padding: 0; }
   .pub-quem legend { margin-bottom: 6px; font: 500 var(--fs-rotulo) / var(--lh-rotulo) var(--font); }

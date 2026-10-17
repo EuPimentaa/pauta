@@ -7,13 +7,10 @@ import { useQuery, type QueryClient, type UseQueryResult } from '@tanstack/react
 import type { Bootstrap } from '@shared/tipos/index.ts'
 import { definirNomeApp } from '../lib/app.ts'
 import { marcarPessoaLocal } from '../lib/armazenamento.ts'
+import { DICA_SESSAO, temDicaSessao } from '../lib/dica-sessao.ts'
 import { ErroDaApi, api } from './cliente.ts'
 
 export const CHAVE_BOOTSTRAP = ['bootstrap'] as const
-
-/** Cookie de dica do servidor (auth.ts, COOKIE_DICA_SESSAO): "1" quando há sessão; não é segredo. */
-const DICA_SESSAO = 'pauta_sessao'
-const temDicaSessao = () => typeof document !== 'undefined' && document.cookie.split(/;\s*/).some((c) => c.startsWith(`${DICA_SESSAO}=`))
 
 export async function buscarBootstrap(sinal?: AbortSignal): Promise<Bootstrap> {
   // em produção o index.html acerta a dica com a sessão: sem ela, nem pede (o 401 esperado sujava o console). No

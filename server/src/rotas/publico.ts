@@ -4,7 +4,7 @@
  * em /api/publico/a/:token*, 300 por minuto por IP nos arquivos.
  */
 import { HEADER_IDEMPOTENCIA } from '../../../shared/tipos/index.ts'
-import { corpoJson, limite, validar, type App } from '../auth.ts'
+import { corpoJson, limite, sessaoDaRequisicao, validar, type App } from '../auth.ts'
 import { tx } from '../db.ts'
 import { ErroHttp, validacao } from '../erros.ts'
 import { assinaturaValida, lerArquivo, respostaArquivo } from '../servicos/arquivos.ts'
@@ -16,9 +16,12 @@ export function registrar(app: App): void {
 
   app.get('/api/publico/a/:token', porToken, (c) => c.json(paginaAprovacao(c.get('db'), c.req.param('token'))))
 
+  // sessão interna válida no cookie (atendimento no "Ver como o cliente", o link copiado): a visita não conta e a decisão
+  // responde 403 previa_interna; a página mostra a faixa "Prévia" pela dica de sessão
   app.post('/api/publico/a/:token/visto', porToken, (c) => {
     const db = c.get('db')
-    tx(db, () => registrarVisto(db, c.req.param('token'), c.get('ator')))
+    const previaInterna = !!sessaoDaRequisicao(c)
+    tx(db, () => registrarVisto(db, c.req.param('token'), c.get('ator'), { previaInterna }))
     return c.body(null, 204)
   })
 
@@ -29,7 +32,8 @@ export function registrar(app: App): void {
     const e = validar(esquema.decisaoPublica, await corpoJson(c))
     const db = c.get('db')
     const userAgent = (c.req.header('user-agent') ?? '').slice(0, 300) || null
-    return c.json(tx(db, () => decidir(db, c.req.param('token'), chave, e, c.get('ator'), userAgent)))
+    const previaInterna = !!sessaoDaRequisicao(c)
+    return c.json(tx(db, () => decidir(db, c.req.param('token'), chave, e, c.get('ator'), userAgent, { previaInterna })))
   })
 
   app.get('/api/publico/arquivos/:id', limite('publico-arquivos', 300, 60), (c) => {

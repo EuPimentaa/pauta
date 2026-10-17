@@ -7,6 +7,8 @@
  * por linha"; a barra de decisão fica presa ao rodapé (no desktop, dentro da coluna). Depois de decidir, a tela volta ao
  * item e o foco vai para o selo. A identidade é pedida na hora da decisão ("Você é Fulana?" ou o nome, lembrado no
  * aparelho). 409 de versão nova recarrega a prévia ("Chegou a V3"); a decisão vai com Idempotency-Key.
+ * Quem é da agência (a dica de sessão no cookie, ou o 403 previa_interna) vê a faixa "Prévia: os botões não valem para
+ * você" e Aprovar/Pedir ajuste desligados: o servidor não aceita decisão nem conta a visita com sessão interna.
  * Leve: nada de bootstrap, SSE, registro de extensões nem Markdown (o texto do cliente e da agência é texto puro).
  */
 import './publico.css'
@@ -26,6 +28,7 @@ import { linhasParaItens } from '@shared/logica/texto.ts'
 import { primeiroNome } from '@shared/logica/texto-whatsapp.ts'
 import { api, ehErroDaApi, mensagemDeErro } from '../../api/cliente.ts'
 import { useNomeApp, useTituloAba } from '../../lib/app.ts'
+import { temDicaSessao } from '../../lib/dica-sessao.ts'
 import { Logo } from '../../ui/Marca.tsx'
 import { enderecoEmbutido } from '../../funcionalidades/ciclo/embutir.ts'
 
@@ -249,9 +252,14 @@ function Quem({ pagina, valor, mudar, erro }: { pagina: PaginaAprovacao; valor: 
   )
 }
 
-function Decidir({ pagina, item, token, depois }: {
+/** Id da faixa "Prévia" (os botões desligados apontam para ela). */
+const ID_PREVIA = 'pub-previa'
+
+function Decidir({ pagina, item, token, previa, depois }: {
   pagina: PaginaAprovacao; item: ItemAprovacaoPublico; token: string
-  depois(r: { tipo: 'ok'; saida: DecisaoPublicaSaida } | { tipo: 'recarregar'; aviso: string } | { tipo: 'inativo' }): void
+  /** Quem abriu tem sessão interna: os botões ficam desligados (o servidor responde 403 previa_interna). */
+  previa: boolean
+  depois(r: { tipo: 'ok'; saida: DecisaoPublicaSaida } | { tipo: 'recarregar'; aviso: string } | { tipo: 'previa'; aviso: string } | { tipo: 'inativo' }): void
 }) {
   const [aberta, setAberta] = useState<'aprovar' | 'ajuste' | null>(null)
   const [quem, setQuem] = useState(() => ({ sou: !!pagina.contato, nome: lerNome() }))
@@ -265,7 +273,7 @@ function Decidir({ pagina, item, token, depois }: {
   const n = versao.itens.length
 
   async function enviar(decisao: 'aprovado' | 'ajuste') {
-    if (enviando) return
+    if (enviando || previa) return
     setErro(null)
     setErroNome(null)
     const id: Identidade = pagina.contato && quem.sou
@@ -288,6 +296,13 @@ function Decidir({ pagina, item, token, depois }: {
       depois({ tipo: 'ok', saida })
     } catch (e) {
       if (ehErroDaApi(e) && e.status === 410) { depois({ tipo: 'inativo' }); return }
+      // sessão interna sem a dica (cookie da dica apagado): a página passa a ser prévia
+      if (ehErroDaApi(e) && e.codigo === 'previa_interna') {
+        setAberta(null)
+        chave.current = null
+        depois({ tipo: 'previa', aviso: e.mensagem })
+        return
+      }
       if (ehErroDaApi(e) && e.codigo === 'versao_desatualizada') {
         const atual = (e.detalhes as DetalhesVersaoDesatualizada | undefined)?.versaoAtual
         setAberta(null)
@@ -320,8 +335,10 @@ function Decidir({ pagina, item, token, depois }: {
           V{versao.numero}{n > 1 ? ` · ${n} itens` : ''}
           {item.prazoRetorno ? ` · retorno até ${formatarPrazo(item.prazoRetorno, null)}` : ''}
         </p>
-        <Botao tamanho="g" icone={Wrench} onClick={() => setAberta('ajuste')}>Pedir ajuste</Botao>
-        <Botao tamanho="g" variante="primario" icone={CheckCircle2} onClick={() => setAberta('aprovar')}>Aprovar</Botao>
+        <Botao tamanho="g" icone={Wrench} disabled={previa} aria-describedby={previa ? ID_PREVIA : undefined}
+          onClick={() => setAberta('ajuste')}>Pedir ajuste</Botao>
+        <Botao tamanho="g" variante="primario" icone={CheckCircle2} disabled={previa} aria-describedby={previa ? ID_PREVIA : undefined}
+          onClick={() => setAberta('aprovar')}>Aprovar</Botao>
       </div>
       <FolhaPublica aberta={aberta === 'aprovar'} aoFechar={fechar} titulo={`Aprovar a V${versao.numero} de “${item.titulo}”?`}>
         <form className="pub-form" onSubmit={(e) => { e.preventDefault(); void enviar('aprovado') }}>
@@ -414,8 +431,8 @@ function Anteriores({ item }: { item: ItemAprovacaoPublico }) {
   )
 }
 
-function Item({ pagina, item, token, ampliar, mensagem, depois }: {
-  pagina: PaginaAprovacao; item: ItemAprovacaoPublico; token: string; ampliar(url: string, nome: string): void; mensagem: string | null
+function Item({ pagina, item, token, previa, ampliar, mensagem, depois }: {
+  pagina: PaginaAprovacao; item: ItemAprovacaoPublico; token: string; previa: boolean; ampliar(url: string, nome: string): void; mensagem: string | null
   depois: Parameters<typeof Decidir>[0]['depois']
 }) {
   const v = item.versao
@@ -442,7 +459,7 @@ function Item({ pagina, item, token, ampliar, mensagem, depois }: {
           {v.itens.map((i, k) => <Previa key={k} i={i} n={k + 1} total={total} ampliar={ampliar} />)}
         </ul>
       )}
-      {aguarda && <Decidir pagina={pagina} item={item} token={token} depois={depois} />}
+      {aguarda && <Decidir pagina={pagina} item={item} token={token} previa={previa} depois={depois} />}
       {item.comentarios.length > 0 && (
         <section className="pub-secao" aria-label="Conversa">
           <h2 className="pub-secao-titulo">Conversa</h2>
@@ -486,6 +503,8 @@ export default function TelaAprovacao() {
   const [mensagens, setMensagens] = useState<Record<string, string>>({})
   const [zoom, setZoom] = useState<{ url: string; nome: string } | null>(null)
   const [decidido, setDecidido] = useState<{ demandaId: string; vez: number } | null>(null)
+  // a dica de sessão interna (o atendimento no "Ver como o cliente"): só prévia, os botões não valem para quem é da agência
+  const [previa, setPrevia] = useState(temDicaSessao)
   const visto = useRef(false)
   const pagina = estado.tipo === 'ok' ? estado.pagina : null
   useTituloAba(pagina ? `${pagina.itens[0]?.titulo ?? 'Aprovação'} · ${pagina.cliente.nome}` : 'Aprovação')
@@ -524,6 +543,7 @@ export default function TelaAprovacao() {
   const depois: Parameters<typeof Decidir>[0]['depois'] = (r) => {
     if (r.tipo === 'inativo') { setEstado({ tipo: 'inativo', ...INATIVO }); return }
     if (r.tipo === 'recarregar') { setAviso(r.aviso); void carregar(); window.scrollTo({ top: 0, behavior: reduzMovimento() ? 'auto' : 'smooth' }); return }
+    if (r.tipo === 'previa') { setPrevia(true); setAviso(null); window.scrollTo({ top: 0, behavior: reduzMovimento() ? 'auto' : 'smooth' }); return }
     setAviso(null)
     setMensagens((m) => ({ ...m, [r.saida.item.demandaId]: r.saida.mensagem }))
     setEstado((s) => (s.tipo === 'ok'
@@ -559,9 +579,15 @@ export default function TelaAprovacao() {
       )}
       {pagina && (
         <main className="pub-conteudo">
+          {previa && (
+            <p id={ID_PREVIA} className="pub-aviso" data-tom="previa" role="note">
+              <Eye aria-hidden="true" />
+              <span><strong>Prévia: os botões não valem para você.</strong> Só o cliente aprova ou pede ajuste por este link.</span>
+            </p>
+          )}
           {aviso && <p className="pub-aviso" role="alert"><AlertTriangle aria-hidden="true" />{aviso}</p>}
           {pagina.itens.map((item) => (
-            <Item key={item.demandaId} pagina={pagina} item={item} token={token} mensagem={mensagens[item.demandaId] ?? null}
+            <Item key={item.demandaId} pagina={pagina} item={item} token={token} previa={previa} mensagem={mensagens[item.demandaId] ?? null}
               ampliar={(url, nome) => setZoom({ url, nome })} depois={depois} />
           ))}
         </main>

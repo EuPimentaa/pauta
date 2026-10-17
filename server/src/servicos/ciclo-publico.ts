@@ -42,6 +42,8 @@ export const TEXTO_LINK_INATIVO = 'Este link de aprovação não está mais ativ
 export const TEXTO_NAO_AGUARDA = 'Esta peça não aguarda mais sua decisão.'
 /** Versão enviada por link sem nada que o cliente veja (só caminho de rede; envios de antes da trava do envio). */
 export const TEXTO_SEM_PECA = 'A peça desta versão foi enviada por outro meio.'
+/** Decisão com sessão interna no cookie (403 previa_interna): a agência vê como o cliente, mas não decide por ele. */
+export const TEXTO_PREVIA_INTERNA = 'Você está vendo como o cliente: só ele pode decidir por este link.'
 
 const linkInativo = () => new ErroHttp(410, 'link_inativo', TEXTO_LINK_INATIVO)
 const naoAguarda = () => new ErroHttp(409, 'conflito', TEXTO_NAO_AGUARDA)
@@ -192,10 +194,12 @@ export function paginaAprovacao(db: Db, token: string): PaginaAprovacao {
 const SEIS_HORAS = 6 * 3_600_000
 
 /** POST /api/publico/a/:token/visto: soma o acesso; `link.visto` no máximo a cada 6 h. */
-export function registrarVisto(db: Db, token: string, ator: Ator): void {
+export function registrarVisto(db: Db, token: string, ator: Ator, opcoes: { previaInterna: boolean }): void {
   const link = linkAtivoPeloToken(db, token)
   const demandas = demandasDoLink(db, link)
   if (demandas.length === 0) throw linkInativo()
+  // quem tem sessão interna ("Ver como o cliente", o link copiado) não é o cliente abrindo o link
+  if (opcoes.previaInterna) return
   const instante = agora()
   rodar(db, 'UPDATE link_publico SET acessos = acessos + 1, ultimo_acesso_em = ? WHERE id = ?', instante, link.id)
   const ultimo = um<{ m: string | null }>(db, `SELECT max(criado_em) AS m FROM atividade WHERE tipo = 'link.visto'
@@ -224,13 +228,16 @@ function nomeLimpo(s: string | null | undefined): string {
 }
 
 /**
- * POST /api/publico/a/:token/decisao (API.md §4.17), na ordem: link ativo; a chave (por link) antes de tudo; a demanda é
- * item do link, viva e do cliente dele; versão já decidida → 409 ja_decidida; sem envio pendente por este link → 409
- * "não aguarda"; versão antiga → 409 versao_desatualizada com a atual; identidade (o contato do link ou um nome);
- * ajuste com linha; então `registrarRetorno()` com via 'link'. Roda dentro da transação de quem chama.
+ * POST /api/publico/a/:token/decisao (API.md §4.17), na ordem: link ativo; sessão interna no cookie → 403 previa_interna
+ * (só o cliente decide pelo link: a decisão iria como dele, sem rastro de quem a tomou); a chave (por link) antes do
+ * resto; a demanda é item do link, viva e do cliente dele; versão já decidida → 409 ja_decidida; sem envio pendente por
+ * este link → 409 "não aguarda"; versão antiga → 409 versao_desatualizada com a atual; identidade (o contato do link ou
+ * um nome); ajuste com linha; então `registrarRetorno()` com via 'link'. Roda dentro da transação de quem chama.
  */
-export function decidir(db: Db, token: string, chave: string, e: DecisaoPublicaEntrada, ator: Ator, userAgent: string | null): DecisaoPublicaSaida {
+export function decidir(db: Db, token: string, chave: string, e: DecisaoPublicaEntrada, ator: Ator, userAgent: string | null,
+  opcoes: { previaInterna: boolean }): DecisaoPublicaSaida {
   const link = linkAtivoPeloToken(db, token)
+  if (opcoes.previaInterna) throw new ErroHttp(403, 'previa_interna', TEXTO_PREVIA_INTERNA)
   const hash = hashDecisao(e)
   const repetida = um<{ demanda_id: string; idempotency_hash: string }>(db,
     'SELECT demanda_id, idempotency_hash FROM aprovacao WHERE link_id = ? AND idempotency_key = ?', link.id, chave)

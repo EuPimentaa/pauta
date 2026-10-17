@@ -137,6 +137,12 @@
     .modal-demanda-lateral { order: -1; }
     .modal-demanda-faixa { margin: 0 var(--space-4) var(--space-3); }
   }
+  /* telas bem estreitas (360 px): a linha presa cabe sem cortar "Registrar retorno" (o primário perde o ícone) */
+  @media (max-width: 389.98px) {
+    .modal-demanda-barra { gap: 6px; padding-left: var(--space-2); padding-right: var(--space-2); }
+    .modal-demanda-primaria svg { display: none; }
+    .ui-check.modal-demanda-concluir { gap: 6px; padding: 0 10px 0 8px; }
+  }
 }
 
 @layer foco {

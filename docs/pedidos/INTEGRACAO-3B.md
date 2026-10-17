@@ -354,3 +354,11 @@ Primeiros passos · `b3328c1` Início "Com o cliente" · `db4e1db` Agenda e Cale
 `745d889` faixas da Agenda · `28e91b0` sinais e datas · `01e01da` Lista · `3b17406` `[` na lista · `c1b5791` e `45de5e1`
 prévia da rápida · `f9d2a72` aba Demandas do cliente · `d3a64c3` notificações anuladas · `8bb18c4` linha do modal a 360 px · `33edd0c` exportação da página pública · `5085874` PLANO
 · este registro.
+
+## Adendo: segurança da leva 2 (corrigida depois)
+
+A seção "Segurança" acima ficou desatualizada: os 3 médios e 4 baixos da revisão de segurança não tinham sido
+corrigidos nesta integração. Foram fechados numa rodada própria (`3467300`, `17bc612`..`efac828`) e verificados
+adversarialmente; as pendências da verificação foram fechadas em `8e84353`..`926c060` (migração
+`090_aprovacao_rede_interna.sql`). Limite aceito: quem copia o link e decide de outra rede não é detectável; sobram o
+registro `link.exibido` e o aparelho na trilha do admin. Total de horas da demanda visível a todos: decisão na API §2.

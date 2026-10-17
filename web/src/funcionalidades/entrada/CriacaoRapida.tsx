@@ -28,7 +28,7 @@ import { Kbd } from '../../ui/Kbd.tsx'
 import { criarRapida, useContextoRapida } from './api.ts'
 import {
   clientesEmAndamento, comporLinha, linhasColadas, marcadorDaPessoa, marcadorDoCliente, mencaoEmAndamento,
-  reconhecerAoDigitarEspaco, type ChipRapida,
+  reconhecerAoDigitarEspaco, tirarMarcador, type ChipRapida,
 } from './rapida-chips.ts'
 
 const MAX_LINHAS = 30
@@ -46,6 +46,8 @@ export default function CriacaoRapida({ ctx, fechar }: { ctx: ContextoColuna; fe
   const [semLista, setSemLista] = useState(false)
   const [linhas, setLinhas] = useState<string[] | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  /** Sigla nova cujo "Criar cliente" a pessoa recusou: o próximo Enter cria sem cliente. */
+  const [semClienteDe, setSemClienteDe] = useState<string | null>(null)
   const campo = useRef<HTMLTextAreaElement>(null)
   const raiz = useRef<HTMLFormElement>(null)
   const lista = useRef<HTMLDivElement>(null)
@@ -156,16 +158,38 @@ export default function CriacaoRapida({ ctx, fechar }: { ctx: ContextoColuna; fe
       setAviso(chips.length || texto.trim() ? 'Falta o título: escreva o que é a demanda.' : null)
       return
     }
-    const enviada = linha
+    // sigla que ainda não é cliente ("XYZ: Banner"): o Enter oferece criar o cliente; recusado, o Enter seguinte cria
+    // sem cliente e sem o "XYZ:" no título (integração 3A, revisão funcional 7)
+    const sigla = analise.siglaNova && !analise.clienteId ? analise.siglaNova : null
+    if (sigla && semClienteDe !== sigla) { void criarClienteECriar(sigla); return }
+    enviarLinha(sigla ? comporLinha(chips, tirarMarcador(texto, sigla)) : linha)
+  }
+
+  /** Limpa o campo e manda a linha (de volta ao campo se falhar). */
+  function enviarLinha(enviada: string) {
     const antes = { texto, chips }
     setTexto('')
     setChips([])
     setAviso(null)
+    setSemClienteDe(null)
     cursorDepois.current = 0
     enfileirar(enviada, () => {
       setTexto((t) => (t ? t : antes.texto))
       setChips((c) => (c.length ? c : antes.chips))
     })
+  }
+
+  async function criarClienteECriar(sigla: string) {
+    const r = await acao.abrirDialogo('criar-cliente', { sigla })
+    campo.current?.focus()
+    if (!r) {
+      setSemClienteDe(sigla)
+      setAviso(`${sigla} não é cliente. Enter de novo cria sem cliente (e sem “${sigla}:” no título).`)
+      return
+    }
+    // o cliente existe agora: a mesma linha cria com ele (o cliente vira chip)
+    const novos: ChipRapida[] = [{ tipo: 'cliente', id: r.cliente.id, marcador: `${r.cliente.sigla}:` }, ...chips.filter((c) => c.tipo !== 'cliente')]
+    enviarLinha(comporLinha(novos, tirarMarcador(texto, sigla)))
   }
 
   function criarLinhas(lista: string[]) {
@@ -181,10 +205,10 @@ export default function CriacaoRapida({ ctx, fechar }: { ctx: ContextoColuna; fe
     campo.current?.focus()
     if (!r) return
     const marcador = `${r.cliente.sigla}:`
-    // tira "XYZ:" (ou [XYZ], XYZ -) do começo do texto: o cliente vira chip
-    const semMarcador = texto.replace(new RegExp(`^\\s*(\\[${sigla}\\]|${sigla}\\s*:|${sigla}\\s+[-–—])\\s*`, 'i'), '')
     setChips((cs) => [{ tipo: 'cliente', id: r.cliente.id, marcador }, ...cs.filter((c) => c.tipo !== 'cliente')])
-    setTexto(semMarcador)
+    setTexto(tirarMarcador(texto, sigla))
+    setSemClienteDe(null)
+    setAviso(null)
   }
 
   // ─────────────── teclado ───────────────

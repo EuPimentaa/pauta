@@ -106,3 +106,10 @@ export function clientesEmAndamento(texto: string, cursor: number, clientes: rea
 export function linhasColadas(texto: string): string[] {
   return texto.split(/\r?\n/).map((l) => l.replace(/^\s*(?:[-*•–]|\d{1,3}[.)])\s+/u, '').trim()).filter(Boolean)
 }
+
+/** Tira o marcador da sigla do começo do texto ("XYZ: Banner", "[XYZ] Banner", "XYZ - Banner" → "Banner"). */
+export function tirarMarcador(texto: string, sigla: string): string {
+  const s = sigla.replace(/[^A-Za-z0-9]/g, '')
+  if (!s) return texto
+  return texto.replace(new RegExp(`^\\s*(?:\\[${s}\\]|${s}\\s*:|${s}\\s+[-–—])\\s*`, 'i'), '')
+}

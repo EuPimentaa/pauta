@@ -592,7 +592,9 @@ calculada no front com `shared/logica/rapida.ts`; esta rota confere).
   de usuário ativo; para quem não tem apelido, o primeiro nome, se só uma pessoa ativa o tiver) = membro (vários). O
   que não casar continua no título. Sigla no formato de marcador que não casa
   (1 a 12 de A–Z/0–9) → `siglaNova` (a interface oferece "Criar cliente XYZ" a todos os papéis, pelo diálogo
-  `criar-cliente`; o texto continua no título). Coluna de pessoa: a pessoa entra como membro.
+  `criar-cliente`; o texto continua no título). Na criação rápida, o Enter com `siglaNova` abre o `criar-cliente` e
+  cria com o cliente novo; recusado, o Enter seguinte cria sem cliente e o front tira o "XYZ:" do título (integração 3A).
+  Coluna de pessoa: a pessoa entra como membro.
 - Cliente = marcador ?? `clienteId` do contexto; AM pelo cliente; sem modelo; posição padrão = fim da coluna. Nunca
   `400` por faltar cliente (cliente é opcional). Coluna arquivada → `422`.
 - Atividade, SSE e notificações de `POST /api/demandas` (`origem='rapida'`).

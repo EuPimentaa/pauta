@@ -14,7 +14,7 @@ import {
 import { quadroAtualDaUrl } from '../../web/src/funcionalidades/entrada/lugar.ts'
 import { formularioSujo, paraGuardar, rascunhoValido } from '../../web/src/funcionalidades/entrada/rascunho.ts'
 import {
-  clientesEmAndamento, comporLinha, linhasColadas, marcadorDaPessoa, mencaoEmAndamento, reconhecerAoDigitarEspaco,
+  clientesEmAndamento, comporLinha, linhasColadas, marcadorDaPessoa, mencaoEmAndamento, reconhecerAoDigitarEspaco, tirarMarcador,
 } from '../../web/src/funcionalidades/entrada/rapida-chips.ts'
 
 const CLIENTES = [
@@ -229,5 +229,16 @@ describe('rascunho da Nova demanda (integração 3A)', () => {
     assert.equal(rascunhoValido({ ...ida, estado: { ...ida.estado, colunaId: 'c-arquivada' } }, agora, ctx)!.estado.colunaId, 'c-entrada')
     assert.equal(rascunhoValido(null, agora, ctx), null)
     assert.equal(rascunhoValido({ lixo: 1 } as never, agora, ctx), null)
+  })
+})
+
+describe('criação rápida: sigla nova (integração 3A)', () => {
+  test('tirarMarcador tira "XYZ:", "[XYZ]" e "XYZ -" do começo, sem caixa; o resto fica', () => {
+    assert.equal(tirarMarcador('XYZ: Banner da feira', 'XYZ'), 'Banner da feira')
+    assert.equal(tirarMarcador('  xyz : Banner', 'XYZ'), 'Banner')
+    assert.equal(tirarMarcador('[XYZ] Banner', 'XYZ'), 'Banner')
+    assert.equal(tirarMarcador('XYZ – Banner', 'XYZ'), 'Banner')
+    assert.equal(tirarMarcador('Banner XYZ: feira', 'XYZ'), 'Banner XYZ: feira', 'só no começo')
+    assert.equal(tirarMarcador('XYZW: Banner', 'XYZ'), 'XYZW: Banner')
   })
 })

@@ -31,8 +31,11 @@
 
   /* ─────────────── tabela (desktop) ─────────────── */
   .lista-tabela {
+    /* fundo das linhas e o do hover (opacos: o # e o título ficam presos à esquerda por cima do resto ao rolar de lado) */
+    --lista-fundo: var(--surface-card);
+    --lista-fundo-hover: color-mix(in oklab, var(--surface-card) 95%, var(--text));
     position: relative; flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
-    border-radius: var(--radius-lg); background: var(--surface-card);
+    border-radius: var(--radius-lg); background: var(--lista-fundo);
     box-shadow: 0 0 0 1px var(--border-card), 0 1px 2px var(--shadow-c1);
   }
   .lista-cabeca { position: sticky; top: 0; z-index: 3; background: var(--surface-card); }
@@ -47,20 +50,30 @@
     height: 44px; border-bottom: 1px solid color-mix(in oklab, var(--border) 70%, transparent); cursor: pointer; outline: none;
     transition: background-color var(--dur-1) var(--ease);
   }
-  .lista-linha-demanda:hover { background: var(--surface-hover); }
+  .lista-linha-demanda:hover { background: var(--lista-fundo-hover); }
   .lista-linha-demanda[data-prioridade="alta"]::before, .lista-linha-demanda[data-prioridade="urgente"]::before {
-    content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--label-ambar);
+    content: ''; position: absolute; z-index: 2; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--label-ambar);
   }
   .lista-linha-demanda[data-prioridade="urgente"]::before { background: var(--danger); }
   .lista-linha-demanda[data-concluida="true"] .lista-titulo { color: var(--text-2); }
   .lista-linha-demanda[data-fantasma="true"] { opacity: .45; }
   .lista-linha-demanda[data-marca]::after {
-    content: ''; position: absolute; left: 8px; right: 8px; height: 2px; border-radius: 2px; background: var(--accent); pointer-events: none;
+    content: ''; position: absolute; z-index: 2; left: 8px; right: 8px; height: 2px; border-radius: 2px; background: var(--accent); pointer-events: none;
   }
   .lista-linha-demanda[data-marca="antes"]::after { top: -1px; }
   .lista-linha-demanda[data-marca="depois"]::after { bottom: -1px; }
   .lista-tabela[data-arrastando="true"] .lista-linha-demanda { cursor: grabbing; }
   .lista-tabela[data-arrastando="true"] .lista-linha-demanda:hover { background: transparent; }
+  /* # e título presos à esquerda quando a tabela rola de lado (o fundo deixa 2 px em cima e embaixo para o anel de foco) */
+  .lista-celula:is([data-campo="numero"], [data-campo="titulo"]) {
+    --fundo-celula: var(--lista-fundo);
+    position: sticky; z-index: 1; align-self: stretch;
+    background: linear-gradient(var(--fundo-celula), var(--fundo-celula)) 0 2px / 100% calc(100% - 4px) no-repeat;
+  }
+  .lista-celula[data-campo="numero"] { left: 0; }
+  .lista-celula[data-campo="titulo"] { left: 60px; }
+  .lista-linha-demanda:hover > .lista-celula { --fundo-celula: var(--lista-fundo-hover); }
+  .lista-tabela[data-arrastando="true"] .lista-linha-demanda:hover > .lista-celula { --fundo-celula: var(--lista-fundo); }
 
   .lista-celula {
     display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; padding: 0 6px;

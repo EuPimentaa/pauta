@@ -168,7 +168,8 @@ export function notificarChegou(db: Db, p: { demandaId: Id; quadroId: Id; ator: 
 // src/servicos/mover.ts  (único caminho de troca de coluna/quadro; API §5.1 e §5.6; restaurar e reabrir também passam aqui)
 export function mover(db: Db, p: { demandaId: Id; ator: Ator; colunaId: Id; posicao?: PosicaoRelativa;
   via?: ViaMovimento; gatilho?: GatilhoAutomacao; etiquetasSemPar?: EtiquetasSemPar; etiquetaIds?: Id[];
-  membros?: MembrosAoMover; membroIds?: Id[]; rev?: number }): MoverSaida
+  membros?: MembrosAoMover; membroIds?: Id[]; rev?: number;
+  etiquetasTambemDe?: Id }): MoverSaida   // etiquetasTambemDe: o quadro do envio (automação de ajuste/aprovado, §5.5; integração 3B)
 // src/servicos/concluir.ts  (API §5.3; `automacao: false` quando quem chama é a coluna concluida)
 export function concluir(db: Db, p: { demandaId: Id; ator: Ator; concluida: boolean; via: 'checkbox' | 'coluna' | 'papel';
   repetir?: boolean; automacao?: boolean }): ConcluirSaida

@@ -392,7 +392,8 @@ reatribui (§5.1, passo 6).
 - **SSE:** `automacao` (interno).
 
 #### `DELETE /api/quadros/:id/automacoes/:gatilho`
-- **Quem:** admin, atendimento. **Resposta:** `204`. **SSE:** `automacao` (delete).
+- **Quem:** admin, atendimento. **Resposta:** `204` (também sem automação: idempotente). Quadro arquivado → `422`;
+  desconhecido → `404`. **SSE:** `automacao` (delete).
 
 ### 4.9 Modelos de demanda · entrada
 
@@ -733,7 +734,8 @@ gatilhos. "Com quem está a bola" e o "parado há": §5.4.
 - **Quem:** membros da demanda, o AM, atendimento, admin (os outros: `403` "Entre na demanda para entregar").
 - **Corpo:** `EntregarVersaoEntrada` (pelo menos 1 item). **Resposta:** `201 EntregarVersaoSaida`.
 - Cria Vn na rodada atual, com os itens; **não** muda a coluna. Demanda arquivada ou concluída → `422` ("Reabra a
-  demanda"). Depois do commit, testa em segundo plano os links do Drive e grava `driveStatus` (emite `versao` de novo).
+  demanda"). Sem rodada aberta (a peça já foi aprovada) → `422`: o caminho é anular a aprovação ou pedir ajuste
+  interno, que abre a rodada seguinte. Depois do commit, testa em segundo plano os links do Drive e grava `driveStatus` (emite `versao` de novo).
 - **Atividade:** `versao.entregue`. **SSE:** `versao` (com itens), `demanda` (`nVersoes`, `versaoAtualId`).
   **Notifica:** `versao_entregue` ao AM da demanda (se não for o ator).
 
@@ -748,8 +750,12 @@ Autor da versão, atendimento, admin. **Corpo:** `EditarVersaoEntrada`. `200 Ver
 
 #### `POST /api/versoes/:id/testar-drive`
 - **Quem:** qualquer usuário. Para cada link do Drive, busca `https://drive.google.com/thumbnail?id=<id>&sz=w400` sem
-  credenciais (timeout 5 s): imagem 200 → `publico` (vira `previaUrl`); redirecionamento/403 → `privado`; pasta →
-  `pasta` (só aviso); falha → `erro`. Grava em `versao_item`. **Resposta:** `200 TestarVersaoSaida`. **SSE:** `versao`.
+  credenciais (timeout 5 s por passo): a miniatura sempre redireciona (302) para `lh3.googleusercontent.com`, então o
+  teste segue até 3 redirecionamentos, só para `drive.google.com` e `*.googleusercontent.com`: imagem 200 → `publico`
+  (vira `previaUrl`); 401/403 ou redirecionamento para fora (a tela de login) → `privado`; pasta → `pasta` (só aviso);
+  404, 5xx ou rede → `erro`, que **não** bloqueia o envio (a tela diz "Não deu para testar"). Grava em `versao_item`.
+  **Resposta:** `200 TestarVersaoSaida`. **SSE:** `versao`. O teste que roda depois de entregar ou acrescentar itens sai
+  com ator sem trace (o resultado chega também à janela de quem entregou).
 
 #### `POST /api/drive/testar`
 Qualquer usuário. **Corpo:** `TestarDriveEntrada`. **Resposta:** `200 TestarDriveSaida`. Não grava nada.
@@ -757,11 +763,15 @@ Qualquer usuário. **Corpo:** `TestarDriveEntrada`. **Resposta:** `200 TestarDri
 #### `POST /api/demandas/:id/enviar` (Enviar ao cliente)
 - **Quem:** atendimento, admin. **Corpo:** `EnviarAoClienteEntrada`. **Resposta:** `200 EnviarAoClienteSaida`.
 - Exige cliente (`422` "Escolha o cliente antes de enviar") e versão entregue (`422` "Entregue uma versão antes");
-  demanda arquivada → `422`. A versão é a última entregue (pedir outra → `409 versao_desatualizada`). O contato
-  (`contatoId` ou o padrão) precisa ser ativo e do cliente (`400 validacao`; o gatilho `envio_contato_do_cliente`
-  também recusa). Prazo de retorno padrão: hoje + `retornoPrazoDiasUteis`, limitado à véspera útil da publicação.
-- `via: 'link'`: testa o Drive dos itens; algum `privado` → `422 drive_privado` (`detalhes.itens`). Reaproveita o
-  link ativo da demanda para o mesmo contato; senão gera token de 32 bytes, grava `token_hash` (sha256) e
+  demanda arquivada → `422`. A versão é a última entregue (pedir outra → `409 versao_desatualizada`); versão que já
+  tem decisão válida → `409 ja_decidida` (senão a peça ficaria "com o cliente" sem decisão possível). O contato
+  (`contatoId` ou, ausente, o padrão; `contatoId: null` = sem contato, e o link pergunta o nome) precisa ser ativo e
+  do cliente (`400 validacao`; o gatilho `envio_contato_do_cliente` também recusa). Prazo de retorno padrão: hoje + `retornoPrazoDiasUteis`, limitado à véspera útil da publicação.
+- `via: 'link'`: testa o Drive dos itens; algum `privado` → `422 drive_privado` (`detalhes.itens`), a não ser que a
+  versão tenha um arquivo enviado pelo app ("[Enviar arquivo (até 10 MB)]", `POST /api/versoes/:id/itens`): aí o envio
+  passa e a página pública deixa de fora o link privado. Caminho de rede nunca vai ao cliente (a tela avisa quando a
+  versão só tem caminhos). Reaproveita o link ativo da demanda para o mesmo contato (e estende a validade dele por mais
+  `linkPublicoValidadeDias` a partir deste envio); senão gera token de 32 bytes, grava `token_hash` (sha256) e
   `token_cifrado` (AES-256-GCM com chave derivada de `SEGREDO`), validade `linkPublicoValidadeDias`, e o
   `link_publico_item`. `via: 'fora'`: exige `canal`; sem link.
 - Grava `envio` com `quadro_id` = o quadro em que a demanda está **antes** da automação (a decisão do cliente vai rodar
@@ -801,7 +811,9 @@ Qualquer usuário. **Corpo:** `TestarDriveEntrada`. **Resposta:** `200 TestarDri
   passagem aberta em `demanda_movimento` é a que a decisão abriu, ou anterior a ela), devolve-a para `colunaAntesId`,
   se ativa (`demanda.movida` com `via: 'manual'`; os membros trocados pela automação voltam, pela atividade
   `demanda.movida` da decisão). **Resposta:** `200 AnularAprovacaoSaida` (`voltou`).
-- **Erros:** `409 conflito` (ajuste, já anulada ou não é a mais recente). **Atividade:** `aprovacao.anulada`
+- **Erros:** `409 conflito` (ajuste, já anulada, não é a mais recente ou já há uma rodada nova aberta, como depois de
+  um ajuste interno). Vale para a aprovação pelo link e pela equipe; o "Desfazer" do aviso só aparece na manual.
+  **Atividade:** `aprovacao.anulada`
   (+ `demanda.movida`). **SSE:** `aprovacao`, `demanda`, `rodada`.
 
 #### `POST /api/demandas/:id/ajuste-interno` (Pedir ajuste interno)
@@ -841,7 +853,10 @@ HTML de `/a/:token`); `/a/*` e `/api/publico/*` mascarados nos logs. Token: `ran
 #### `GET /api/publico/a/:token`
 - **Sem efeito colateral** (o robô de prévia do WhatsApp abre o link). **Resposta:** `200 PaginaAprovacao`.
 - Por item: `versao` = a de maior número enviada por este link; anteriores só as enviadas por este link; comentários
-  com `visivel_cliente = 1` e sem `excluido_em`; `modeloNome` = nome do modelo da demanda. Arquivos e o logo do
+  com `visivel_cliente = 1` e sem `excluido_em` (a menção sai trocada por "@Nome": a página mostra texto puro);
+  `proximoPasso` = `null` sem decisão e aguardando, ou "Esta peça não aguarda mais sua decisão." quando a versão do
+  link não tem decisão mas a peça não espera mais por ela (outra versão enviada por fora, envio pendente tratado de
+  outro jeito): a página esconde os botões; `modeloNome` = nome do modelo da demanda. Arquivos e o logo do
   cliente por URL assinada (`urlAssinada(id, linkPublicoArquivoMinutos)`).
 - **Erros:** `404` token desconhecido; `410 link_inativo` expirado, revogado ou sem itens.
 
@@ -857,6 +872,9 @@ Chamado pelo JS da página. Soma `acessos`, grava `ultimoAcessoEm`; `link.visto`
      (`link_id`, chave) **antes de qualquer outra validação**: achou com o mesmo `idempotency_hash` → `200` com o estado
      atual do item, sem efeito; achou com outro hash → `422 idempotencia`;
   3. a demanda é item do link, não arquivada, do mesmo cliente do link (`demanda.cliente_id = link_publico.cliente_id`);
+     se a versão pedida é a última enviada por este link e já tem decisão válida → `409 ja_decidida` (antes do "não
+     aguarda mais": de duas decisões simultâneas, a segunda recebe `ja_decidida`, porque a primeira já limpou o envio
+     pendente);
      tem **envio pendente** e `versao_enviada_id` foi enviada por este link; senão `409 conflito` "Esta peça não
      aguarda mais sua decisão" (sem itens nem versão nos detalhes);
   4. `versaoId` = `versao_enviada_id`; senão `409 versao_desatualizada` com `versaoAtual` = a versão de maior número
@@ -871,7 +889,7 @@ Chamado pelo JS da página. Soma `acessos`, grava `ultimoAcessoEm`; `link.visto`
 
 #### `GET /api/publico/arquivos/:id?exp=&sig=`
 `sig` = HMAC-SHA256(`SEGREDO`, `${id}.${exp}`) em base64url; `exp` em segundos Unix. Inválida ou vencida: `403`.
-Mesmos headers de `GET /api/arquivos/:id`.
+Mesmos headers de `GET /api/arquivos/:id`; `&inline=1` (só imagem, como na rota interna) serve a prévia da página.
 
 ### 4.18 Início, Agenda e notificações · painéis
 
@@ -1026,7 +1044,10 @@ Lançar e cronômetro ficam no modal (§4.15).
     que a demanda esteja em outro quadro esperando o cliente. É o vaivém Criação → Atendimento › Com o cliente →
     Criação › Fila (ajuste) → Social › Fila (aprovado), todo configurado na Criação.
 - Destino ativo → `mover()` para o **topo** da coluna de destino (`via: 'automacao'`, o `gatilho` vai na atividade;
-  mudar de quadro segue §5.6 com `etiquetasSemPar: 'deixar'` e os membros pelo `membros` da automação, §5.1).
+  mudar de quadro segue §5.6 com `etiquetasSemPar: 'deixar'` e os membros pelo `membros` da automação, §5.1). Com a
+  demanda esperando o cliente em outro quadro (ex.: Atendimento › Com o cliente), as etiquetas **guardadas no quadro
+  do envio** também casam por nome com o destino, além das atuais (`etiquetasTambemDe`; as sem par continuam guardadas
+  lá, sem aviso): no vaivém, "Alteração" chega ao Social › Fila e "Urgente" fica na Criação.
   Destino arquivado ou a demanda já está lá → nada (sem erro).
 - Gatilhos e quem chama: `enviado_ao_cliente` (enviar, F2), `ajuste_pedido` e `aprovado` (retorno pelo link ou
   manual, aprovado pelo WhatsApp, F2), `concluida` (`POST /concluir`, núcleo). Automações não disparam umas às
@@ -1099,7 +1120,9 @@ na Agenda ou no Calendário (PATCH), aprovação manual (anular). Gerar link e e
 ## 6. Textos para WhatsApp
 
 Tom da marca: direto, sem exclamação, com data no formato "qui, 16/10, 18h". `{contato}` = primeiro nome do contato
-(ou "tudo bem" sem contato), `{peca}` = nome do modelo (se houver) + título, `{v}` = número da versão.
+(sem contato: "Olá, tudo bem." no envio e no lembrete, "Obrigado." sem nome no aprovado e no ajuste), `{peca}` = nome
+do modelo (se houver; não se repete quando o título já começa com ele, "Carrossel de outubro") + título, `{v}` =
+número da versão. Lembrete sem link (envio por fora sem link ativo do contato) termina sem o endereço.
 
 | Modelo | Texto |
 |---|---|

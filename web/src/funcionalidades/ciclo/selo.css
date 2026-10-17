@@ -1,0 +1,13 @@
+/* Selo do ciclo no card (F2): "V2" com o estado e "R3/2". No rodapé do card, ao lado dos metadados do núcleo. */
+@layer components {
+  .cic-selo-card {
+    display: inline-flex; align-items: center; gap: 3px; height: 20px; padding: 0 6px; border-radius: var(--radius-xs);
+    background: var(--veu-1); color: var(--text-2); font: 600 var(--fs-meta) / 1 var(--font); white-space: nowrap;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  .cic-selo-card svg { width: 12px; height: 12px; flex: none; }
+  .cic-selo-card[data-estado="com_cliente"] { background: var(--info-bg); color: var(--info-ink); }
+  .cic-selo-card[data-estado="aprovada"] { background: var(--success-bg); color: var(--success-ink); }
+  .cic-selo-card[data-estado="ajuste"] { background: var(--warning-bg); color: var(--warning-ink); }
+  .cic-selo-card[data-estado="extra"] { background: var(--label-roxo-bg); color: var(--label-roxo-ink); }
+}

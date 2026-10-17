@@ -81,6 +81,7 @@ export default function ConfigFeriados() {
   const admin = eu.usuario.papel === 'admin'
   const hoje = hojeLocal()
   const [ano, setAno] = useState(Number(hoje.slice(0, 4)))
+  const [cadastrando, setCadastrando] = useState(false)
   const consulta = useFeriadosDoAno(ano)
 
   async function tirar(f: Feriado) {
@@ -110,15 +111,21 @@ export default function ConfigFeriados() {
           <h2 className="cad-titulo">Feriados</h2>
           <p className="cad-subtitulo">Dias que não contam como úteis no prazo dos modelos, nas repetições, nas rodadas e no "parado há". Um feriado novo não muda os prazos já marcados.</p>
         </div>
-        <div className="cad-acoes" role="group" aria-label="Ano">
-          <BotaoIcone icone={ChevronLeft} rotulo="Ano anterior" variante="secundario" onClick={() => setAno((a) => a - 1)} />
-          <span className="cad-titulo tabular" aria-live="polite">{ano}</span>
-          <BotaoIcone icone={ChevronRight} rotulo="Próximo ano" variante="secundario" onClick={() => setAno((a) => a + 1)} />
+        <div className="cad-acoes">
+          <div className="cad-acoes" role="group" aria-label="Ano">
+            <BotaoIcone icone={ChevronLeft} rotulo="Ano anterior" variante="secundario" onClick={() => setAno((a) => a - 1)} />
+            <span className="cad-titulo tabular" aria-live="polite">{ano}</span>
+            <BotaoIcone icone={ChevronRight} rotulo="Próximo ano" variante="secundario" onClick={() => setAno((a) => a + 1)} />
+          </div>
+          {admin && !cadastrando && (
+            <Botao variante="secundario" icone={CalendarPlus} onClick={() => setCadastrando(true)}>Cadastrar feriado</Botao>
+          )}
         </div>
       </header>
 
-      {admin && (
-        <Painel titulo={`Cadastrar feriado em ${ano}`} icone={CalendarPlus} id="cad-novo-feriado">
+      {admin && cadastrando && (
+        <Painel titulo={`Cadastrar feriado em ${ano}`} icone={CalendarPlus} id="cad-novo-feriado"
+          acoes={<Botao tamanho="p" variante="ghost" onClick={() => setCadastrando(false)}>Fechar</Botao>}>
           <div className="cad-painel-corpo"><NovoFeriado ano={ano} /></div>
         </Painel>
       )}

@@ -12,7 +12,8 @@ export interface PropsCheckbox extends Omit<InputHTMLAttributes<HTMLInputElement
   descricao?: ReactNode
   indeterminado?: boolean
   /** 'sucesso' para "Concluída" (verde); padrão laranja (seleção). */
-  tom?: 'acento' | 'sucesso'
+  /** 'neutro': tinta escura, para listas de "incluir" (colunas, o que copiar), onde o laranja competiria com o primário. */
+  tom?: 'acento' | 'sucesso' | 'neutro'
 }
 
 export function Checkbox({ children, descricao, indeterminado, tom = 'acento', className, disabled, ...input }: PropsCheckbox) {

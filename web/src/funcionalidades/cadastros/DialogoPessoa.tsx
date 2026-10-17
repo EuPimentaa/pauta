@@ -147,7 +147,7 @@ export function DialogoPessoa({ pessoa, aoFechar }: { pessoa: Usuario | null; ao
             <legend className="ui-rotulo mb-2">Equipes</legend>
             <div className="cad-grade">
               {equipes.map((e) => (
-                <Checkbox key={e.id} checked={doEquipes.has(e.id)}
+                <Checkbox key={e.id} tom="neutro" checked={doEquipes.has(e.id)}
                   onChange={(ev) => setDoEquipes((s) => { const n = new Set(s); if (ev.target.checked) n.add(e.id); else n.delete(e.id); return n })}>
                   <span className="inline-flex items-center gap-2"><span className="cad-ponto" data-cor={e.cor} aria-hidden="true" />{e.nome}</span>
                 </Checkbox>

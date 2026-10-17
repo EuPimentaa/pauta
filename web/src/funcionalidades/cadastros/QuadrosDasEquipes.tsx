@@ -165,7 +165,7 @@ function LinhaEquipe({ l, modelos, modelo, usuarios, tentou, mudar, bloqueada }:
         <span className="cad-equipe-nome">
           {criado
             ? <span className="cad-ponto" data-cor={l.equipe.cor} data-tamanho="g" aria-hidden="true" />
-            : <Checkbox checked={l.criar} disabled={desabilitada} onChange={(e) => mudar({ criar: e.target.checked })} aria-label={`Criar o quadro da equipe ${l.equipe.nome}`} />}
+            : <Checkbox tom="neutro" checked={l.criar} disabled={desabilitada} onChange={(e) => mudar({ criar: e.target.checked })} aria-label={`Criar o quadro da equipe ${l.equipe.nome}`} />}
           {l.equipe.nome}
           <span className="cad-nota">{membros.length === 0 ? 'sem pessoas' : `${membros.length} ${membros.length === 1 ? 'pessoa' : 'pessoas'}`}</span>
         </span>

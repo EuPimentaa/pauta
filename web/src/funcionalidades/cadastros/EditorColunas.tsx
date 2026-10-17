@@ -56,7 +56,7 @@ export function EditorColunas({ plano, aoMudar, automacoes, usuarios, erros, rot
           <div key={c.chave} className="cad-coluna" data-cor={c.manter && c.cor ? c.cor : undefined} data-desmarcada={c.manter ? undefined : ''}>
             {c.nova
               ? <BotaoIcone icone={Trash2} rotulo={`Tirar a coluna ${c.nome}`} tamanho="p" onClick={() => aoMudar(plano.filter((x) => x.chave !== c.chave))} />
-              : <Checkbox checked={c.manter} onChange={(e) => mudar(c.chave, { manter: e.target.checked })} aria-label={`Criar a coluna ${c.nome || i + 1}`} />}
+              : <Checkbox tom="neutro" checked={c.manter} onChange={(e) => mudar(c.chave, { manter: e.target.checked })} aria-label={`Criar a coluna ${c.nome || i + 1}`} />}
             <BotaoCor valor={c.cor} rotulo={`Cor da coluna ${c.nome}`} permitirSemCor aoMudar={(cor) => mudar(c.chave, { cor })} desabilitado={!c.manter} />
             <Campo rotulo={`Nome da coluna ${i + 1}`} rotuloOculto tamanho="p" value={c.nome} maxLength={60} disabled={!c.manter}
               onChange={(e) => mudar(c.chave, { nome: e.target.value })} erro={erro} />

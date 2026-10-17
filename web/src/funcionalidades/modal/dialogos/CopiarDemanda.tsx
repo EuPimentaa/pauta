@@ -67,7 +67,7 @@ export default function DialogoCopiarDemanda({ params, fechar }: PropsDialogo<'c
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-1 text-rotulo font-medium text-fg">Manter</legend>
           {opcoes.map((o) => (
-            <Checkbox key={o.id} checked={o.ha && manter[o.id]} disabled={!o.ha} descricao={o.ha ? o.detalhe : 'Nada para copiar.'}
+            <Checkbox key={o.id} tom="neutro" checked={o.ha && manter[o.id]} disabled={!o.ha} descricao={o.ha ? o.detalhe : 'Nada para copiar.'}
               onChange={(e) => setManter((m) => ({ ...m, [o.id]: e.target.checked }))}>
               {o.rotulo}
             </Checkbox>

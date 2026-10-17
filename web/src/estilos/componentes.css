@@ -120,6 +120,9 @@
      no claro; no escuro a -ink é a própria cor cheia) */
   .ui-check-caixa:has(input:checked), .ui-check-caixa:has(input:indeterminate) { background: var(--accent); border-color: var(--accent-ink); }
   .ui-check-caixa[data-tom="sucesso"]:has(input:checked) { background: var(--success); border-color: var(--success-ink); }
+  .ui-check-caixa[data-tom="neutro"]:has(input:checked), .ui-check-caixa[data-tom="neutro"]:has(input:indeterminate) {
+    background: var(--text); border-color: var(--text); color: var(--surface);
+  }
   .ui-check-caixa:has(input:checked) svg, .ui-check-caixa:has(input:indeterminate) svg { opacity: 1; transform: none; }
   .ui-check-caixa:has(input:disabled) { opacity: .5; }
   .ui-check-descricao { display: block; color: var(--text-3); font-size: var(--fs-meta); line-height: var(--lh-meta); margin-top: 2px; }

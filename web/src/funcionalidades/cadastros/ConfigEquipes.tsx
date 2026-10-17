@@ -184,7 +184,7 @@ export default function ConfigEquipes() {
           <h2 className="cad-titulo">Equipes</h2>
           <p className="cad-subtitulo">Cada equipe tem o seu quadro e o modelo que o "Criar os quadros das equipes" sugere.</p>
         </div>
-        <Botao variante="primario" icone={Plus} onClick={() => setEditando('nova')}>Nova equipe</Botao>
+        <Botao variante="secundario" icone={Plus} onClick={() => setEditando('nova')}>Nova equipe</Botao>
       </header>
       {lista.length === 0 && <EstadoVazio icone={Users} titulo="Nenhuma equipe." acoes={<Botao variante="secundario" onClick={() => setEditando('nova')}>Nova equipe</Botao>} />}
       {lista.map((e) => {

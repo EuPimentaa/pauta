@@ -179,19 +179,21 @@ export default function TelaModelos() {
             O modelo preenche a Nova demanda: o briefing vira a descrição, com o checklist, as etiquetas e o prazo em dias úteis.
           </p>
         </div>
-        {admin && (
-          <div className="modelos-revisado">
-            <span>{config.modelosRevisadosEm ? `Revisados em ${formatarPrazo(dataLocalDe(config.modelosRevisadosEm), null)}.` : 'Ainda não revisados.'}</span>
-            <Botao variante="secundario" tamanho="p" icone={Check} carregando={revisando} onClick={() => void revisei()}>Revisei os modelos</Botao>
-          </div>
-        )}
+        <div className="modelos-cabeca-acoes">
+          {admin && (
+            <div className="modelos-revisado">
+              <span>{config.modelosRevisadosEm ? `Revisados em ${formatarPrazo(dataLocalDe(config.modelosRevisadosEm), null)}.` : 'Ainda não revisados.'}</span>
+              <Botao variante="ghost" tamanho="p" icone={Check} carregando={revisando} onClick={() => void revisei()}>Revisei os modelos</Botao>
+            </div>
+          )}
+          {podeEditar && <Botao variante="secundario" icone={Plus} onClick={() => escolher('novo')}>Novo modelo</Botao>}
+        </div>
       </header>
 
       <div className="modelos-barra">
         <Selecao rotulo="Modelos de" tamanho="p" value={quadroId ?? ''} classeGrupo="modelos-escopo"
           opcoes={[{ valor: '', rotulo: 'Todos os quadros (globais)' }, ...quadrosAtivos.map((q) => ({ valor: q.id, rotulo: `Quadro ${q.nome}` }))]}
           onChange={(e) => mudarEscopo(e.target.value)} />
-        {podeEditar && <Botao variante="secundario" tamanho="p" icone={Plus} onClick={() => escolher('novo')}>Novo modelo</Botao>}
       </div>
       {!podeEditar && (
         <p className="modelos-nota"><Lock aria-hidden="true" /> Só o admin edita os modelos globais. Os de cada quadro, qualquer pessoa.</p>

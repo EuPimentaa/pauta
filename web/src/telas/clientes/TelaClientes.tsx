@@ -77,7 +77,7 @@ export default function TelaClientes() {
           <h1 className="cad-titulo">Clientes</h1>
           <p className="cad-subtitulo">{todos.length === 0 ? 'Sigla, nome, AM e o contato que aprova.' : `${todos.filter((c) => c.status !== 'ex').length} clientes ativos.`}</p>
         </div>
-        <Botao variante="primario" icone={Plus} onClick={() => void cadastrar()}>Cadastrar cliente</Botao>
+        <Botao variante="secundario" icone={Plus} onClick={() => void cadastrar()}>Cadastrar cliente</Botao>
       </header>
 
       {gestao && completar.length > 0 && filtro !== 'completar' && (

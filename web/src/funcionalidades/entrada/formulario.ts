@@ -9,14 +9,20 @@ import type {
 import { prazoDoModelo } from '../../../../shared/logica/prazo.ts'
 import { colunaDeEntrada } from '../../../../shared/logica/quadro.ts'
 
-/** Quadro de partida: o pedido; senão o aberto; senão o último usado; senão o primeiro favorito; senão o primeiro. */
+/**
+ * Quadro de partida: o pedido; senão o aberto; senão o último usado no aparelho; senão o primeiro favorito; senão o
+ * da minha equipe (o que sigo primeiro); senão um que sigo; senão o primeiro do menu. Assim, no primeiro dia ou num
+ * celular novo, a demanda de um designer nasce na Criação, não no Atendimento (o primeiro por posição).
+ */
 export function quadroInicial(quadros: readonly Quadro[], p: {
-  pedido?: Id | null; aberto?: Id | null; ultimo?: Id | null; favoritos?: readonly Id[]
+  pedido?: Id | null; aberto?: Id | null; ultimo?: Id | null; favoritos?: readonly Id[]; seguindo?: readonly Id[]; equipeIds?: readonly Id[]
 }): Quadro | null {
-  const ativos = quadros.filter((q) => q.arquivadoEm === null)
+  const ativos = [...quadros.filter((q) => q.arquivadoEm === null)].sort((a, b) => a.pos - b.pos)
   const achar = (id: Id | null | undefined) => (id ? ativos.find((q) => q.id === id) : undefined)
+  const seguindo = new Set(p.seguindo ?? [])
+  const daEquipe = (p.equipeIds ?? []).flatMap((e) => ativos.filter((q) => q.equipeId === e))
   return achar(p.pedido) ?? achar(p.aberto) ?? achar(p.ultimo) ?? (p.favoritos ?? []).map(achar).find(Boolean)
-    ?? [...ativos].sort((a, b) => a.pos - b.pos)[0] ?? null
+    ?? daEquipe.find((q) => seguindo.has(q.id)) ?? daEquipe[0] ?? ativos.find((q) => seguindo.has(q.id)) ?? ativos[0] ?? null
 }
 
 /** Coluna de partida: a pedida (se é deste quadro e está ativa); senão a coluna de entrada. */

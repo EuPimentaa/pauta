@@ -119,6 +119,12 @@ describe('Nova demanda (puro)', () => {
     assert.equal(quadroInicial(qs, { ultimo: 'a' })!.id, 'a')
     assert.equal(quadroInicial(qs, { favoritos: ['x', 'a'] })!.id, 'a')
     assert.equal(quadroInicial(qs, {})!.id, 'b', 'o primeiro do menu')
+    // sem favorito nem último usado (primeiro dia, celular novo): o quadro da minha equipe, não o primeiro do menu
+    const eq = [quadro('atend', { pos: 1, equipeId: 'eq-at' }), quadro('cri', { pos: 2, equipeId: 'eq-cri' }), quadro('cri2', { pos: 3, equipeId: 'eq-cri' })]
+    assert.equal(quadroInicial(eq, { equipeIds: ['eq-cri'] })!.id, 'cri')
+    assert.equal(quadroInicial(eq, { equipeIds: ['eq-cri'], seguindo: ['cri2'] })!.id, 'cri2', 'da equipe, o que sigo')
+    assert.equal(quadroInicial(eq, { seguindo: ['cri2'] })!.id, 'cri2', 'sem equipe com quadro: um que sigo')
+    assert.equal(quadroInicial(eq, { equipeIds: ['eq-cri'], favoritos: ['atend'] })!.id, 'atend', 'o favorito vem antes')
     const cs = [coluna('aguarda', 'a', { papel: 'aguardando_cliente', pos: 0 }), coluna('fila', 'a', { pos: 1 }), coluna('outra', 'b')]
     assert.equal(colunaInicial(cs, 'a')!.id, 'fila', 'a coluna de entrada é a primeira normal')
     assert.equal(colunaInicial(cs, 'a', 'aguarda')!.id, 'aguarda')

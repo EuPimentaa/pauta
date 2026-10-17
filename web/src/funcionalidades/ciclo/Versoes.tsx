@@ -2,7 +2,8 @@
  * "Versões e aprovação" (seção principal 300 do modal; SPEC §5.2, item 3): com quem está a bola, a linha do tempo por
  * rodada (V1…Vn com os itens, a prévia estática e o iframe só no clique, "enviada em… (link | por fora)", as decisões,
  * anuladas riscadas), "Rodada 3 · 2 inclusas" com [Marcar como extra] e os links de aprovação (atendimento).
- * Sem versão: o texto da §4.1 e [Entregar versão].
+ * Sem versão: o texto da §4.1 e [Entregar versão]. Da equipe e fora da demanda (não pode entregar): "Entre na demanda
+ * para entregar a versão." com [Entrar e entregar], que entra e abre o diálogo.
  */
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -15,6 +16,7 @@ import { formatarPrazo } from '@shared/logica/datas.ts'
 import { pode } from '@shared/logica/permissoes.ts'
 import type { ContextoDemanda } from '../../extensoes/tipos.ts'
 import { useClienteDetalhe } from '../../api/clientes.ts'
+import { useAcoes } from '../../api/demandas.ts'
 import { mensagemDeErro } from '../../api/cliente.ts'
 import { useUsuarios } from '../../api/seletores.ts'
 import { abrirDialogo } from '../../dialogos/estado.ts'
@@ -339,24 +341,50 @@ export default function Versoes({ ctx }: { ctx: ContextoDemanda }) {
   const contatos = cliente?.contatos ?? []
   const linha = useMemo(() => (det ? linhaDoTempo(det) : []), [det])
   const eu = { id: ctx.eu.usuario.id, papel: ctx.eu.usuario.papel }
-  const entregar = podeEntregar(d, eu) && !ctx.somenteLeitura && !d.concluidaEm && passoCiclo(d) !== 'aprovada' && passoCiclo(d) !== 'com_cliente'
+  const acoesNucleo = useAcoes()
+  const passo = passoCiclo(d)
+  const cabeEntrega = !ctx.somenteLeitura && !d.concluidaEm && passo !== 'aprovada' && passo !== 'com_cliente'
+  const entregar = cabeEntrega && podeEntregar(d, eu)
+  // da equipe e fora da demanda: entrar e já entregar (sem isso, o texto da §4.1 seria uma instrução sem saída)
+  const entrarParaEntregar = cabeEntrega && !entregar
+  const [entrando, setEntrando] = useState(false)
+  async function entrarEEntregar() {
+    setEntrando(true)
+    try {
+      const nova = await acoesNucleo.membros.entrar(d, eu.id)
+      if (nova) void abrirDialogo('entregar-versao', { demandaId: d.id })
+    } finally {
+      setEntrando(false)
+    }
+  }
   const extra = rodadaExtra(d)
   const ultima = det ? ultimaDecisao(det.aprovacoes) : null
   const anulavelId = ctx.atendimento && !ctx.somenteLeitura && ultima?.decisao === 'aprovado' ? ultima.id : null
   const meta = d.nVersoes > 0
     ? <span className="cic-selo" data-tom={extra ? 'extra' : undefined}>Rodada {d.rodadaAtual} · {d.rodadasInclusas} {d.rodadasInclusas === 1 ? 'inclusa' : 'inclusas'}</span>
     : null
-  const botaoEntregar = entregar && (
+  const botaoEntregar = entregar ? (
     <Botao variante="ghost" tamanho="p" icone={Plus} atalho="Shift+E" onClick={() => void abrirDialogo('entregar-versao', { demandaId: d.id })}>
       {d.nVersoes === 0 ? 'Entregar versão' : `Entregar V${d.nVersoes + 1}`}
     </Botao>
-  )
+  ) : entrarParaEntregar && d.nVersoes > 0 ? (
+    <Botao variante="ghost" tamanho="p" icone={Plus} carregando={entrando} onClick={() => void entrarEEntregar()}>Entrar e entregar</Botao>
+  ) : null
 
   return (
     <Secao id="versoes" icone={Layers} titulo="Versões e aprovação" meta={meta} acoes={botaoEntregar || undefined}>
       {!det ? <EsqueletoLinhas linhas={3} /> : d.nVersoes === 0 || det.versoes.length === 0 ? (
         <div className="cic-vazio-caixa">
-          <p className="cic-vazio">Nenhuma versão entregue. Cole o link do Drive ou o caminho da pasta de saída.</p>
+          {entregar ? (
+            <p className="cic-vazio">Nenhuma versão entregue. Cole o link do Drive ou o caminho da pasta de saída.</p>
+          ) : entrarParaEntregar ? (
+            <>
+              <p className="cic-vazio">Nenhuma versão entregue. Entre na demanda para entregar a versão.</p>
+              <Botao variante="secundario" tamanho="p" icone={Plus} carregando={entrando} onClick={() => void entrarEEntregar()}>Entrar e entregar</Botao>
+            </>
+          ) : (
+            <p className="cic-vazio">Nenhuma versão entregue.</p>
+          )}
         </div>
       ) : (
         <>

@@ -79,22 +79,31 @@ export function ChipDrive({ status }: { status: DriveStatus | 'nao_drive' | null
 
 const tamanho = (b: number) => (b < 1_048_576 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${String(Math.round((b / 1_048_576) * 10) / 10).replace('.', ',')} MB`)
 
-/** Um item da versão: prévia estática (imagem ou miniatura pública do Drive); "Ver aqui" abre o iframe dos hosts conhecidos. */
-export function ItemVersao({ i }: { i: VersaoItem }) {
+/**
+ * Um item da versão: prévia estática (imagem ou miniatura pública do Drive); "Ver aqui" abre o iframe dos hosts
+ * conhecidos. `compacto` (diálogos): a prévia vira miniatura de 44 px ao lado do nome. Miniatura que não carrega
+ * (arquivo do Drive que deixou de ser público) cai no ícone do provedor.
+ */
+export function ItemVersao({ i, compacto }: { i: VersaoItem; compacto?: boolean }) {
   const [embutir, setEmbutir] = useState(false)
+  const [falhou, setFalhou] = useState(false)
   const p = PROVEDOR[i.provedor ?? 'outro']
   const imagem = !!i.arquivo?.imagem
   const href = i.tipo === 'link' ? i.url : i.arquivo ? i.arquivo.url : null
-  const previa = imagem ? i.arquivo!.url : i.previaUrl
+  const previa = falhou ? null : imagem ? i.arquivo!.url : i.previaUrl
   const embutido = i.tipo === 'link' && i.url ? enderecoEmbutido(i.url) : null
   const Icone = i.tipo === 'arquivo' ? (imagem ? IconeImagem : i.arquivo?.mime === 'application/zip' ? FileArchive : FileText) : p.icone
   const detalhe = i.tipo === 'link' && i.url ? (i.provedor === 'outro' ? hostDe(i.url) : p.rotulo)
     : i.tipo === 'caminho' ? 'Pasta de rede' : i.arquivo ? tamanho(i.arquivo.bytes) : 'Arquivo'
   return (
-    <li className="cic-item" data-com-previa={previa ? '' : undefined}>
-      {previa ? (
+    <li className="cic-item" data-com-previa={previa && !compacto ? '' : undefined}>
+      {previa && compacto ? (
+        <span className="cic-item-miniatura" aria-hidden="true">
+          <img src={previa} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFalhou(true)} />
+        </span>
+      ) : previa ? (
         <a className="cic-item-previa" href={href ?? previa} target="_blank" rel="noopener noreferrer" aria-label={`Abrir ${i.nome}`}>
-          <img src={previa} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+          <img src={previa} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFalhou(true)} />
         </a>
       ) : (
         <span className="cic-item-miniatura" aria-hidden="true"><Icone /></span>
@@ -109,7 +118,7 @@ export function ItemVersao({ i }: { i: VersaoItem }) {
         </span>
       </div>
       <span className="cic-item-acoes">
-        {embutido && (
+        {embutido && !compacto && (
           <BotaoIcone icone={embutir ? X : Eye} rotulo={embutir ? 'Fechar a prévia' : 'Ver aqui'} tamanho="p" aria-expanded={embutir}
             onClick={() => setEmbutir((v) => !v)} />
         )}

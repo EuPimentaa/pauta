@@ -2,7 +2,8 @@
  * "Registrar retorno" (Shift+R; F2; SPEC §5.3): a decisão do cliente sobre a última versão enviada, registrada pelo
  * atendimento. Aprovado | Ajuste ("aprovado em parte" é ajuste com só o que muda); quem respondeu (o contato padrão
  * pré-escolhido, ou outra pessoa pelo nome); por onde; no ajuste, os pedidos (cada linha vira um item de "Ajustes
- * R{N+1}"), o motivo e o prazo novo; o print com Ctrl+V vira anexo de evidência.
+ * R{N+1}"), o motivo (sem nenhum pré-escolhido: quem registra escolhe) e o prazo novo; o print com Ctrl+V vira anexo
+ * de evidência. Sem decisão escolhida, o primário diz só "Registrar retorno" e o erro aparece junto das opções.
  */
 import { useId, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -17,6 +18,7 @@ import { useEnviarArquivo } from '../../../api/arquivos.ts'
 import { useClienteDetalhe } from '../../../api/clientes.ts'
 import { mensagemDeErro } from '../../../api/cliente.ts'
 import { useConfig, useFeriados, useListaFeriados } from '../../../api/seletores.ts'
+import { usePonteiroGrosso } from '../../../lib/midia.ts'
 import { MolduraDialogo } from '../../../dialogos/Moldura.tsx'
 import { Botao, BotaoIcone } from '../../../ui/Botao.tsx'
 import { Campo, Selecao } from '../../../ui/Campo.tsx'
@@ -45,13 +47,16 @@ export default function RegistrarRetorno({ params, fechar }: PropsDialogo<'regis
   const [nomeOutro, setNomeOutro] = useState('')
   const [canal, setCanal] = useState<Canal>('whatsapp')
   const [pedidos, setPedidos] = useState('')
-  const [motivo, setMotivo] = useState<MotivoRodada>('cliente_mudou')
+  const [motivo, setMotivo] = useState<MotivoRodada | ''>('')
   const prazoPadrao = useMemo(() => prazoAjustePadrao(hojeSP(new Date()), config.ajustePrazoDiasUteis, feriados), [config.ajustePrazoDiasUteis, feriados])
   const [prazo, setPrazo] = useState<{ data: DataLocal | null; hora: HoraLocal | null } | null>(null)
   const [print, setPrint] = useState<ArquivoInfo | null>(null)
   const [subindo, setSubindo] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [erroDecisao, setErroDecisao] = useState(false)
+  const [erroMotivo, setErroMotivo] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  const toque = usePonteiroGrosso()
   if (!d) return <NaoEncontrada fechar={() => fechar(null)} />
 
   const versao = det?.versoes.find((v) => v.id === d.versaoEnviadaId)
@@ -78,8 +83,9 @@ export default function RegistrarRetorno({ params, fechar }: PropsDialogo<'regis
 
   async function registrar() {
     if (enviando || !d) return
-    if (!decisao) { setErro('Escolha: aprovado ou ajuste.'); return }
+    if (!decisao) { setErroDecisao(true); return }
     if (decisao === 'ajuste' && itens.length === 0) { setErro('Escreva os ajustes, um por linha.'); return }
+    if (decisao === 'ajuste' && !motivo) { setErroMotivo(true); return }
     if (escolhido === OUTRA && !nomeOutro.trim() && contatos.length > 0) { setErro('Diga quem respondeu.'); return }
     setEnviando(true)
     setErro(null)
@@ -90,7 +96,7 @@ export default function RegistrarRetorno({ params, fechar }: PropsDialogo<'regis
         nomeInformado: escolhido === OUTRA ? (nomeOutro.trim() || null) : null,
         evidenciaArquivoId: print?.id ?? null,
         ...(decisao === 'ajuste' ? {
-          linhas: itens, motivo, ...(prazo?.data ? { prazo: prazo.data, prazoHora: prazo.hora } : {}),
+          linhas: itens, motivo: motivo || undefined, ...(prazo?.data ? { prazo: prazo.data, prazoHora: prazo.hora } : {}),
         } : {}),
       })
       fechar({ demanda: s.demanda })
@@ -108,7 +114,7 @@ export default function RegistrarRetorno({ params, fechar }: PropsDialogo<'regis
         <>
           <Botao onClick={() => fechar(null)}>Cancelar</Botao>
           <Botao type="submit" form={idForm} variante="primario" atalho="mod+enter" carregando={enviando} disabled={!d.envioPendenteEm}>
-            {decisao === 'ajuste' ? `Registrar ajuste${itens.length ? ` (${itens.length})` : ''}` : 'Registrar aprovação'}
+            {decisao === 'ajuste' ? `Registrar ajuste${itens.length ? ` (${itens.length})` : ''}` : decisao === 'aprovado' ? 'Registrar aprovação' : 'Registrar retorno'}
           </Botao>
         </>
       )}>
@@ -117,17 +123,20 @@ export default function RegistrarRetorno({ params, fechar }: PropsDialogo<'regis
         {!d.envioPendenteEm && <p className="cic-erro" role="alert">Nada aguardando o cliente nesta demanda.</p>}
         <fieldset className="cic-campo">
           <legend className="cic-rotulo">O que o cliente decidiu</legend>
-          <div className="cic-escolhas" role="radiogroup" aria-label="Decisão">
-            <button type="button" role="radio" aria-checked={decisao === 'aprovado'} data-tom="sucesso" className="cic-escolha" onClick={() => setDecisao('aprovado')}
-              data-autofocus={decisao === null ? '' : undefined}>
+          <div className="cic-escolhas" role="radiogroup" aria-label="Decisão" aria-invalid={erroDecisao || undefined}
+            aria-describedby={erroDecisao ? `${idForm}-erro-decisao` : undefined}>
+            <button type="button" role="radio" aria-checked={decisao === 'aprovado'} data-tom="sucesso" className="cic-escolha"
+              onClick={() => { setDecisao('aprovado'); setErroDecisao(false) }} data-autofocus={decisao === null ? '' : undefined}>
               <span className="inline-flex items-center gap-1.5 text-body font-semibold text-fg"><CheckCircle2 aria-hidden="true" className="size-4" />Aprovado</span>
               <span>Vale a versão como está.</span>
             </button>
-            <button type="button" role="radio" aria-checked={decisao === 'ajuste'} data-tom="aviso" className="cic-escolha" onClick={() => setDecisao('ajuste')}>
+            <button type="button" role="radio" aria-checked={decisao === 'ajuste'} data-tom="aviso" className="cic-escolha"
+              onClick={() => { setDecisao('ajuste'); setErroDecisao(false) }}>
               <span className="inline-flex items-center gap-1.5 text-body font-semibold text-fg"><Wrench aria-hidden="true" className="size-4" />Ajuste</span>
               <span>Inclui "aprovado em parte": só o que muda.</span>
             </button>
           </div>
+          {erroDecisao && <p id={`${idForm}-erro-decisao`} className="cic-erro" role="alert">Escolha o que o cliente decidiu: aprovado ou ajuste.</p>}
         </fieldset>
         {decisao === 'ajuste' && (
           <>
@@ -143,7 +152,8 @@ export default function RegistrarRetorno({ params, fechar }: PropsDialogo<'regis
               </p>
             </div>
             <div className="cic-grade">
-              <Selecao rotulo="Motivo" value={motivo} onChange={(e) => setMotivo(e.target.value as MotivoRodada)}
+              <Selecao rotulo="Motivo" value={motivo} vazia="Escolha o motivo" erro={erroMotivo ? 'Escolha o motivo do ajuste.' : undefined}
+                onChange={(e) => { setMotivo(e.target.value as MotivoRodada | ''); setErroMotivo(false) }}
                 opcoes={MOTIVOS_RODADA.map((m) => ({ valor: m, rotulo: ROTULO_MOTIVO_RODADA[m] }))} />
               <div className="cic-campo">
                 <span className="cic-rotulo" id={`${idForm}-prazo`}>Prazo da V{(versao?.numero ?? d.nVersoes) + 1}</span>
@@ -172,7 +182,7 @@ export default function RegistrarRetorno({ params, fechar }: PropsDialogo<'regis
           ) : (
             <label className="cic-soltar">
               <ImagePlus aria-hidden="true" className="size-4" />
-              <span>{subindo ? 'Enviando o print…' : 'Cole o print do WhatsApp (Ctrl+V) ou escolha a imagem'}</span>
+              <span>{subindo ? 'Enviando o print…' : toque ? 'Escolha a imagem do print' : 'Cole o print do WhatsApp (Ctrl+V) ou escolha a imagem'}</span>
               <input type="file" accept="image/*" className="sr-only" onChange={(e) => { const l = Array.from(e.target.files ?? []); e.target.value = ''; void colar(l) }} />
             </label>
           )}

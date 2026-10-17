@@ -98,6 +98,7 @@
     color: var(--text-2); overflow: hidden;
   }
   .cic-item-miniatura svg { width: 18px; height: 18px; }
+  .cic-item-miniatura img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .cic-item-previa {
     grid-column: 1 / -1; display: block; width: 100%; aspect-ratio: 4 / 3; border: 0; padding: 0; background: var(--surface);
     cursor: zoom-in; overflow: hidden;
@@ -196,7 +197,12 @@
 }
 
 @layer foco {
-  .cic-escolha:focus-visible, .cic-texto-whatsapp:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .cic-texto-whatsapp:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  /* foco das opções: contorno tracejado por fora, que não se confunde com a opção escolhida (anel cheio por dentro) */
+  .cic-escolha:focus-visible { outline: 2px dashed var(--accent); outline-offset: 3px; box-shadow: inset 0 0 0 1px var(--border-control); }
+  .cic-escolha[aria-checked="true"]:focus-visible { box-shadow: inset 0 0 0 2px var(--text); }
+  .cic-escolha[data-tom="sucesso"][aria-checked="true"]:focus-visible { box-shadow: inset 0 0 0 2px var(--success-ink); }
+  .cic-escolha[data-tom="aviso"][aria-checked="true"]:focus-visible { box-shadow: inset 0 0 0 2px var(--warning-ink); }
   .cic-item-previa:focus-visible { outline: none; box-shadow: inset 0 0 0 3px var(--accent); }
   .cic-soltar:has(input:focus-visible) { box-shadow: var(--focus-ring); }
   .cic-automacao-membros input:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 50%; }

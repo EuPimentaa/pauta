@@ -1,6 +1,7 @@
 /**
  * "Pedir ajuste interno" (F2; atendimento e admin): a rodada N+1 de origem interna, com os pedidos (uma linha por item
- * de "Ajustes R{N+1}"), o motivo e o prazo. Não move o card; os membros são avisados.
+ * de "Ajustes R{N+1}"), o motivo (sem nenhum pré-escolhido, para não culpar ninguém por padrão) e o prazo. Não move o
+ * card; os membros são avisados.
  */
 import { useId, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -27,7 +28,8 @@ export default function AjusteInterno({ params, fechar }: PropsDialogo<'ajuste-i
   const listaFeriados = useListaFeriados()
   const idForm = useId()
   const [pedidos, setPedidos] = useState('')
-  const [motivo, setMotivo] = useState<MotivoRodada>('erro_execucao')
+  const [motivo, setMotivo] = useState<MotivoRodada | ''>('')
+  const [erroMotivo, setErroMotivo] = useState(false)
   const [motivoTexto, setMotivoTexto] = useState('')
   const prazoPadrao = useMemo(() => prazoAjustePadrao(hojeSP(new Date()), config.ajustePrazoDiasUteis, feriados), [config.ajustePrazoDiasUteis, feriados])
   const [prazo, setPrazo] = useState<{ data: DataLocal | null; hora: HoraLocal | null } | null>(null)
@@ -40,6 +42,7 @@ export default function AjusteInterno({ params, fechar }: PropsDialogo<'ajuste-i
   async function pedir() {
     if (enviando || !d) return
     if (itens.length === 0) { setErro('Escreva os ajustes, um por linha.'); return }
+    if (!motivo) { setErroMotivo(true); return }
     setEnviando(true)
     setErro(null)
     try {
@@ -75,7 +78,8 @@ export default function AjusteInterno({ params, fechar }: PropsDialogo<'ajuste-i
           <p id={`${idForm}-ajuda`} className="cic-ajuda">Cada linha vira um item de "Ajustes R{proxima}". O card não muda de coluna.</p>
         </div>
         <div className="cic-grade">
-          <Selecao rotulo="Motivo" value={motivo} onChange={(e) => setMotivo(e.target.value as MotivoRodada)}
+          <Selecao rotulo="Motivo" value={motivo} vazia="Escolha o motivo" erro={erroMotivo ? 'Escolha o motivo do ajuste.' : undefined}
+            onChange={(e) => { setMotivo(e.target.value as MotivoRodada | ''); setErroMotivo(false) }}
             opcoes={MOTIVOS_RODADA.map((m) => ({ valor: m, rotulo: ROTULO_MOTIVO_RODADA[m] }))} />
           <div className="cic-campo">
             <span className="cic-rotulo" id={`${idForm}-prazo`}>Prazo da próxima versão</span>

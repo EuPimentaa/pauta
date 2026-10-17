@@ -1,9 +1,10 @@
 /**
- * "Enviar ao cliente" (F2; SPEC §5.3): a última versão entregue, o contato (o padrão do cliente pré-escolhido),
- * [Gerar link] ou [Enviei por fora] (WhatsApp, e-mail, reunião, outro) e o prazo de retorno. Por link, testa o Drive
- * dos itens ao abrir: privado bloqueia o link com [Abrir compartilhamento] [Testar de novo] [Enviar arquivo (até
- * 10 MB)]. Depois de enviar, mostra o link, o texto pronto para o WhatsApp e "Movida para Atendimento › Com o cliente"
- * quando a automação roda.
+ * "Enviar ao cliente" (F2; SPEC §5.3): a última versão entregue (lista compacta, para Como enviar, Para quem e o prazo
+ * caberem na primeira dobra), o contato (o padrão do cliente pré-escolhido), [Gerar link] ou [Enviei por fora]
+ * (WhatsApp, e-mail, reunião, outro) e o prazo de retorno. Por link, testa o Drive dos itens ao abrir: privado bloqueia
+ * o link com [Abrir compartilhamento] [Testar de novo] [Enviar arquivo (até 10 MB)]. Versão só com caminho de rede: o
+ * cliente não veria nada, então só "Enviei por fora" (ou acrescentar um arquivo). Depois de enviar, mostra o link, o
+ * texto pronto para o WhatsApp e "Movida para Atendimento › Com o cliente" quando a automação roda.
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -43,7 +44,7 @@ export default function EnviarAoCliente({ params, fechar }: PropsDialogo<'enviar
   const enviarArquivo = useEnviarArquivo()
   const idForm = useId()
   const arquivoRef = useRef<HTMLInputElement>(null)
-  const [via, setVia] = useState<'link' | 'fora'>('link')
+  const [viaEscolhida, setVia] = useState<'link' | 'fora'>('link')
   const [canal, setCanal] = useState<Canal>('whatsapp')
   const [contatoId, setContatoId] = useState<string | undefined>(undefined)
   const prazoPadrao = useMemo(() => prazoRetornoPadrao(hojeSP(new Date()), config.retornoPrazoDiasUteis, d?.publicacaoData ?? null, feriados),
@@ -80,6 +81,12 @@ export default function EnviarAoCliente({ params, fechar }: PropsDialogo<'enviar
   useEffect(() => { if (versao && temDrive && teste === null) void testar() }, [versao?.id, temDrive])
 
   if (!d) return <NaoEncontrada fechar={() => fechar(null)} />
+  // o que a página pública mostra: arquivo, ou link que não é Drive privado (caminho de rede nunca vai ao cliente)
+  const privadosIds = new Set(teste?.status === 'pronto' ? teste.privados.map((p) => p.id) : [])
+  const nadaVisivel = !!versao && !versao.itens.some((i) => i.tipo === 'arquivo'
+    || (i.tipo === 'link' && i.driveStatus !== 'privado' && !privadosIds.has(i.id)))
+  const soCaminhos = !!versao && versao.itens.length > 0 && versao.itens.every((i) => i.tipo === 'caminho')
+  const via = soCaminhos ? 'fora' : viaEscolhida
   const bloqueado = via === 'link' && teste?.status === 'pronto' && teste.privados.length > 0 && !teste.temArquivo
 
   async function enviar() {
@@ -168,7 +175,7 @@ export default function EnviarAoCliente({ params, fechar }: PropsDialogo<'enviar
         <>
           <Botao onClick={() => fechar(null)}>Cancelar</Botao>
           <Botao type="submit" form={idForm} variante="primario" icone={via === 'link' ? Link2 : Send} atalho="mod+enter" carregando={enviando}
-            disabled={semCliente || semVersao || bloqueado}>
+            disabled={semCliente || semVersao || bloqueado || (via === 'link' && nadaVisivel)}>
             {via === 'link' ? 'Gerar link' : 'Registrar envio'}
           </Botao>
         </>
@@ -178,17 +185,19 @@ export default function EnviarAoCliente({ params, fechar }: PropsDialogo<'enviar
         {semVersao && <div className="cic-alerta" data-tom="perigo" role="alert"><AlertTriangle aria-hidden="true" /><span><strong>Entregue uma versão antes de enviar.</strong></span></div>}
         {versao && (
           <div className="cic-resumo-versao">
-            <span className="cic-rotulo">V{versao.numero}{versao.nota ? `: ${versao.nota}` : ''}</span>
-            <ul className="cic-itens" data-uma-coluna="" aria-label={`Itens da V${versao.numero}`}>{versao.itens.map((i) => <ItemVersao key={i.id} i={i} />)}</ul>
+            <span className="cic-rotulo">V{versao.numero} · {versao.itens.length} {versao.itens.length === 1 ? 'item' : 'itens'}{versao.nota ? ` · ${versao.nota}` : ''}</span>
+            <ul className="cic-itens" data-uma-coluna="" aria-label={`Itens da V${versao.numero}`}>{versao.itens.map((i) => <ItemVersao key={i.id} i={i} compacto />)}</ul>
           </div>
         )}
         <fieldset className="cic-campo">
           <legend className="cic-rotulo">Como enviar</legend>
           <div className="cic-escolhas" role="radiogroup" aria-label="Como enviar">
-            <button type="button" role="radio" aria-checked={via === 'link'} className="cic-escolha" onClick={() => setVia('link')} data-autofocus="">
-              Gerar link<span>O cliente aprova ou pede ajuste pelo celular, sem login.</span>
+            <button type="button" role="radio" aria-checked={via === 'link'} className="cic-escolha" onClick={() => setVia('link')}
+              disabled={soCaminhos} data-autofocus={soCaminhos ? undefined : ''}>
+              Gerar link<span>{soCaminhos ? 'O cliente não veria nada: esta versão só tem caminho de rede.' : 'O cliente aprova ou pede ajuste pelo celular, sem login.'}</span>
             </button>
-            <button type="button" role="radio" aria-checked={via === 'fora'} className="cic-escolha" onClick={() => setVia('fora')}>
+            <button type="button" role="radio" aria-checked={via === 'fora'} className="cic-escolha" onClick={() => setVia('fora')}
+              data-autofocus={soCaminhos ? '' : undefined}>
               Enviei por fora<span>Mandei por WhatsApp, e-mail ou reunião.</span>
             </button>
           </div>
@@ -212,18 +221,23 @@ export default function EnviarAoCliente({ params, fechar }: PropsDialogo<'enviar
                 {!versao?.enviadaClienteEm && (
                   <Botao tamanho="p" icone={Upload} carregando={subindo} onClick={() => arquivoRef.current?.click()}>Enviar arquivo (até 10 MB)</Botao>
                 )}
-                <input ref={arquivoRef} type="file" hidden multiple accept="image/*,application/pdf,application/zip"
-                  onChange={(e) => { const l = Array.from(e.target.files ?? []); e.target.value = ''; void subirArquivo(l) }} />
               </div>
             )}
           </div>
         )}
-        {via === 'link' && versao && !versao.itens.some((i) => i.tipo === 'arquivo' || (i.tipo === 'link' && i.driveStatus !== 'privado')) && (
-          <div className="cic-alerta" role="status">
+        {(soCaminhos || (via === 'link' && nadaVisivel && !bloqueado)) && (
+          <div className="cic-alerta" data-tom="info" role="status">
             <AlertTriangle aria-hidden="true" />
-            <span><strong>O cliente não vê caminhos de rede.</strong> Acrescente um link ou um arquivo à versão, ou mande por fora.</span>
+            <span><strong>O cliente não vê caminhos de rede.</strong> Para mandar o link de aprovação, acrescente o arquivo (ou o link do Drive) à versão. Ou registre o que mandou por fora.</span>
+            {!versao?.enviadaClienteEm && (
+              <div className="cic-alerta-acoes">
+                <Botao tamanho="p" icone={Upload} carregando={subindo} onClick={() => arquivoRef.current?.click()}>Enviar arquivo (até 10 MB)</Botao>
+              </div>
+            )}
           </div>
         )}
+        <input ref={arquivoRef} type="file" hidden multiple accept="image/*,application/pdf,application/zip"
+          onChange={(e) => { const l = Array.from(e.target.files ?? []); e.target.value = ''; void subirArquivo(l) }} />
         <div className="cic-grade">
           <Selecao rotulo="Para quem" value={contatoEscolhido} onChange={(e) => setContatoId(e.target.value)}
             opcoes={[...contatos.map((c) => ({ valor: c.id, rotulo: `${c.nome}${c.padrao ? ' (padrão)' : ''}` })),

@@ -8,7 +8,7 @@ import { QueryClient } from '@tanstack/query-core'
 import type {
   AgendaSaida, Apontamento, InicioSaida, ListarNotificacoesSaida, Notificacao,
 } from '../../shared/tipos/index.ts'
-import { tratarNotificacao } from '../../web/src/extensoes/eventos/paineis-notificacoes.ts'
+import { tratarNotificacao } from '../../web/src/funcionalidades/paineis/cache.ts'
 import {
   comMaisAntigas, comNotificacao, comPatchNotificacao, dataPorExtenso, diasDaSemanaDe, intervaloDaGrade, juntarAgenda,
   lancamentosDoDia, marcarNaLista, mesDe, partesDoResumo, quando, saudacao, totaisPorDia,

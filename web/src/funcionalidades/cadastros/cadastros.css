@@ -104,11 +104,17 @@
   /* fundos do quadro: amostras */
   .cad-fundos { display: flex; gap: var(--space-2); flex-wrap: wrap; }
   .cad-fundo {
-    width: 64px; height: 44px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--fundo);
-    display: grid; place-items: center; color: var(--text);
+    position: relative; width: 64px; height: 44px; padding: 0; border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+    background: var(--fundo); display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; color: var(--text);
   }
+  .cad-fundo-metade { background: var(--fundo); }
+  .cad-fundo-metade[data-tema="claro"] { color-scheme: light; }
+  .cad-fundo-metade[data-tema="escuro"] { color-scheme: dark; }
   .cad-fundo[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 4px var(--accent); }
-  .cad-fundo svg { width: 18px; height: 18px; }
+  .cad-fundo svg {
+    position: absolute; inset: 0; margin: auto; width: 22px; height: 22px; padding: 3px; border-radius: 50%;
+    background: var(--surface-raised); color: var(--text); box-shadow: var(--shadow-card);
+  }
   .cad-fundo-rotulo { font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); text-align: center; margin-top: 4px; }
   .cad-fundo-item { display: flex; flex-direction: column; align-items: center; }
 
@@ -146,6 +152,10 @@
   .cad-coluna-config > .cad-coluna-papel { grid-area: papel; }
   .cad-coluna-config > .cad-coluna-fim { grid-area: fim; }
   .cad-coluna-num { font: 500 var(--fs-meta) / 1 var(--font); color: var(--text-3); min-width: 1.5em; text-align: right; }
+  .cad-coluna-cabeca {
+    display: grid; grid-template-columns: 1.5em 32px minmax(0, 1fr) auto; gap: var(--space-2); padding: 0 var(--space-2);
+    font: 700 var(--fs-micro) / var(--lh-micro) var(--font); letter-spacing: var(--tracking-micro); text-transform: uppercase; color: var(--text-3);
+  }
 
   /* ─────────────── criar os quadros das equipes ─────────────── */
   .cad-equipes { display: flex; flex-direction: column; gap: var(--space-3); }

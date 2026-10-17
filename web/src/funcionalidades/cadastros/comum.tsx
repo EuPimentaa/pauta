@@ -117,6 +117,9 @@ export function SeletorFundo({ valor, aoMudar, rotulo = 'Fundo do quadro' }: { v
         <div key={f} className="cad-fundo-item">
           <button type="button" role="radio" aria-checked={f === valor} tabIndex={f === valor ? 0 : -1} aria-label={ROTULO_FUNDO[f]}
             className="cad-fundo" data-fundo={f} onClick={() => aoMudar(f)}>
+            {/* metade clara e metade escura: no tema escuro, as cinco eram quase pretas e Liso e Grafite ficavam iguais */}
+            <span className="cad-fundo-metade" data-fundo={f} data-tema="claro" aria-hidden="true" />
+            <span className="cad-fundo-metade" data-fundo={f} data-tema="escuro" aria-hidden="true" />
             {f === valor && <Check aria-hidden="true" />}
           </button>
           <span className="cad-fundo-rotulo" aria-hidden="true">{ROTULO_FUNDO[f]}</span>

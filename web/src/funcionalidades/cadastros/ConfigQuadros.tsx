@@ -36,7 +36,8 @@ import './dialogos.ts'
 import { RodapePendente, useRascunhoConfig } from './pendentes.tsx'
 
 const colacao = new Intl.Collator('pt-BR', { sensitivity: 'base' })
-const OPCOES_PAPEL = PAPEIS_COLUNA.map((p) => ({ valor: p, rotulo: ROTULO_PAPEL_COLUNA[p] }))
+/** Na linha da coluna o rótulo do campo é oculto: a opção diz o que é ("Papel: Normal"). */
+const OPCOES_PAPEL_LINHA = PAPEIS_COLUNA.map((p) => ({ valor: p, rotulo: `Papel: ${ROTULO_PAPEL_COLUNA[p]}` }))
 
 // ─────────────────────────────── dados do quadro (admin) ───────────────────────────────
 
@@ -166,6 +167,10 @@ function PainelColunas({ quadro }: { quadro: Quadro }) {
 
   return (
     <div className="cad-colunas">
+      <p className="cad-nota">Cada mudança nas colunas salva na hora (o nome e o limite, ao sair do campo). Diferente dos dados do quadro, aqui não há botão.</p>
+      {colunas.length > 0 && (
+        <div className="cad-coluna-cabeca" aria-hidden="true"><span /><span>Cor</span><span>Nome</span><span>Limite WIP · ordem</span></div>
+      )}
       {colunas.length === 0 && <p className="cad-nota">Este quadro ainda não tem colunas.</p>}
       {colunas.map((c, i) => {
         const pessoa = c.responsavelId ? usuarios.find((u) => u.id === c.responsavelId) : undefined
@@ -175,9 +180,9 @@ function PainelColunas({ quadro }: { quadro: Quadro }) {
             <BotaoCor valor={c.cor} rotulo={`Cor da coluna ${c.nome}`} permitirSemCor aoMudar={(cor) => void m.editar(c, { cor })} />
             <CampoAoSair rotulo={`Nome da coluna ${c.nome}`} valor={c.nome} maxLength={60} salvar={(nome) => { if (nome) void m.editar(c, { nome }) }} />
             <div className="cad-coluna-papel flex gap-2 min-w-0">
-              <Selecao classeGrupo="flex-1 min-w-0" rotulo={`Papel da coluna ${c.nome}`} rotuloOculto tamanho="p" opcoes={OPCOES_PAPEL} value={c.papel}
+              <Selecao classeGrupo="flex-1 min-w-0" rotulo={`Papel da coluna ${c.nome}`} rotuloOculto tamanho="p" opcoes={OPCOES_PAPEL_LINHA} value={c.papel}
                 onChange={(e) => void mudarPapel(c, e.target.value as PapelColuna)} />
-              <Selecao classeGrupo="flex-1 min-w-0" rotulo={`Pessoa da coluna ${c.nome}`} rotuloOculto tamanho="p" value={c.responsavelId ?? ''} vazia="Sem pessoa"
+              <Selecao classeGrupo="flex-1 min-w-0" rotulo={`Pessoa da coluna ${c.nome}`} rotuloOculto tamanho="p" value={c.responsavelId ?? ''} vazia="Sem pessoa na coluna"
                 disabled={c.papel !== 'normal'} title={c.papel !== 'normal' ? 'Só coluna de papel normal tem pessoa.' : undefined}
                 opcoes={(pessoa && !pessoa.ativo ? [pessoa, ...pessoas] : pessoas).map((u) => ({ valor: u.id, rotulo: `Coluna de ${nomeCurto(u)}` }))}
                 onChange={(e) => void m.editar(c, { responsavelId: e.target.value || null })} />

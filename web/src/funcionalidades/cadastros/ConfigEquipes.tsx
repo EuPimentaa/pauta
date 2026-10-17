@@ -6,7 +6,7 @@
 import { useId, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
-import { LayoutGrid, Pencil, Plus, Star, UserPlus, Users } from 'lucide-react'
+import { LayoutGrid, Pencil, Plus, UserPlus, Users } from 'lucide-react'
 import type { Bootstrap, Cor, Equipe, EquipeMembro, Id } from '@shared/tipos/index.ts'
 import { slugDe } from '@shared/logica/quadro.ts'
 import { useDoBootstrap, useEquipes, useQuadros, useUsuarios } from '../../api/seletores.ts'
@@ -176,6 +176,7 @@ export default function ConfigEquipes() {
   const [editando, setEditando] = useState<Equipe | null | 'nova'>(null)
   const [membrosDe, setMembrosDe] = useState<Equipe | null>(null)
   const lista = [...equipes].sort((a, b) => Number(b.ativa) - Number(a.ativa) || a.pos - b.pos)
+  const equipesDe = (uid: string) => equipes.filter((x) => x.membros.some((mm) => mm.usuarioId === uid)).length
 
   return (
     <div className="cad-secao">
@@ -216,7 +217,9 @@ export default function ConfigEquipes() {
                     <li key={u!.id} className="cad-pessoa">
                       <Avatar pessoa={u!} tamanho={24} />
                       <span>{nomeCurto(u!)}{m.funcao ? <span className="cad-texto-2"> · {m.funcao}</span> : null}</span>
-                      {m.principal && <Star className="text-fg-3" width={13} height={13} aria-label="principal" />}
+                      {m.principal && equipesDe(u!.id) > 1 && (
+                        <span className="cad-nota" title={`Equipe principal de ${nomeCurto(u!)}: é a coluna dela que nasce nos quadros por pessoa`}>principal</span>
+                      )}
                     </li>
                   ))}
                 </ul>

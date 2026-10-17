@@ -12,7 +12,7 @@ import { useEu } from '../../api/auth.ts'
 import { useEquipes, useUsuarios } from '../../api/seletores.ts'
 import { useAbrirDialogo } from '../../dialogos/index.ts'
 import { useListaClientes } from '../../funcionalidades/cadastros/api.ts'
-import { Faixa, nomeCurto, Painel, Pilula } from '../../funcionalidades/cadastros/comum.tsx'
+import { Faixa, LimparBusca, nomeCurto, Painel, Pilula, textoNadaEncontrado } from '../../funcionalidades/cadastros/comum.tsx'
 import { useTituloAba } from '../../lib/app.ts'
 import { Avatar, PilhaAvatares } from '../../ui/Avatar.tsx'
 import { Botao } from '../../ui/Botao.tsx'
@@ -89,7 +89,7 @@ export default function TelaClientes() {
       {todos.length > 0 && (
         <div className="cad-filtros">
           <Campo classeGrupo="cad-filtro-busca" rotulo="Buscar cliente" rotuloOculto icone={Search} type="search" placeholder="Sigla, nome ou apelido"
-            value={busca} onChange={(e) => setBusca(e.target.value)} />
+            value={busca} onChange={(e) => setBusca(e.target.value)} sufixo={<LimparBusca texto={busca} aoLimpar={() => setBusca('')} />} />
           <Selecao rotulo="Mostrar" rotuloOculto value={filtro} opcoes={opcoes} onChange={(e) => mudarFiltro(e.target.value)} />
         </div>
       )}
@@ -105,8 +105,13 @@ export default function TelaClientes() {
             texto="Comece pelos recorrentes. Também dá para criar na hora, ao abrir uma demanda."
             acoes={<Botao variante="secundario" icone={Plus} onClick={() => void cadastrar()}>Cadastrar cliente</Botao>} />
         ) : lista.length === 0 ? (
-          <EstadoVazio icone={Search} tamanho="p" titulo="Nenhum cliente com este filtro."
-            acoes={<Botao variante="secundario" onClick={() => { setBusca(''); mudarFiltro('ativos') }}>Limpar</Botao>} />
+          busca.trim() ? (
+            <EstadoVazio icone={Search} tamanho="p" titulo={textoNadaEncontrado(busca)}
+              acoes={<Botao variante="secundario" onClick={() => setBusca('')}>Limpar busca</Botao>} />
+          ) : (
+            <EstadoVazio icone={Search} tamanho="p" titulo="Nenhum cliente com este filtro."
+              acoes={<Botao variante="secundario" onClick={() => mudarFiltro('ativos')}>Limpar filtro</Botao>} />
+          )
         ) : (
           <div className="cad-tabela">
             <div className="cad-tabela-cabeca" aria-hidden="true">
@@ -124,8 +129,8 @@ export default function TelaClientes() {
                     <span className="cad-cliente-nomes">
                       <span className="cad-cliente-nome">{c.nome}</span>
                       <span className="cad-cliente-detalhe">
-                        <span>{c.sigla}</span>
-                        {c.status !== 'recorrente' && <span>· {ROTULO_STATUS[c.status]}</span>}
+                        {c.logoUrl && <span>{c.sigla} ·</span>}
+                        <span>{ROTULO_STATUS[c.status]}</span>
                         {c.nivel && <span>· nível {c.nivel}</span>}
                         {pendente && <Pilula tom="aviso">Completar cadastro</Pilula>}
                         {!pendente && c.pendencias.includes('sem_am') && <Pilula>Sem AM</Pilula>}

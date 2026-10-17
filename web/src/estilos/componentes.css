@@ -103,6 +103,8 @@
   .ui-entrada .ui-selecao-seta { position: absolute; right: 10px; pointer-events: none; color: var(--text-2); }
   .ui-entrada .ui-entrada-sufixo { margin-right: -6px; }
   .ui-entrada input[type="time"]::-webkit-calendar-picker-indicator { display: none; }
+  /* o X nativo do campo de busca (azul, 10 px, fora do Tab) sai: quem usa põe o "Limpar busca" no sufixo */
+  .ui-entrada input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
 
   /* ─────────────── checkbox e interruptor ─────────────── */
   .ui-check { display: inline-flex; align-items: flex-start; gap: 10px; cursor: pointer; font: 400 var(--fs-body) / var(--lh-body) var(--font); color: var(--text); }

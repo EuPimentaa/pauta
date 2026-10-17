@@ -3,7 +3,7 @@
  * quadro, o link de convite copiável e utilidades de erro e de permissão.
  */
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Check, Copy, MessageCircle } from 'lucide-react'
+import { Check, Copy, MessageCircle, X } from 'lucide-react'
 import { FUNDOS_QUADRO, type Cor, type FundoQuadro, type LinkAcesso, type UsuarioResumo } from '@shared/tipos/index.ts'
 import { pode, type AcaoPermissao, type AlvoPermissao } from '@shared/logica/permissoes.ts'
 import { useEu } from '../../api/auth.ts'
@@ -12,7 +12,7 @@ import type { Icone } from '../../extensoes/tipos.ts'
 import { cx } from '../../lib/classes.ts'
 import { ROTULO_COR } from '../../lib/cores.ts'
 import { avisar } from '../../ui/avisos.tsx'
-import { Botao } from '../../ui/Botao.tsx'
+import { Botao, BotaoIcone } from '../../ui/Botao.tsx'
 import { Popover } from '../../ui/Popover.tsx'
 import { SeletorCor } from '../../ui/SeletorCor.tsx'
 import { copiarParaAreaDeTransferencia } from '../../ui/Texto.tsx'
@@ -20,6 +20,15 @@ import { Tooltip } from '../../ui/Tooltip.tsx'
 import './cadastros.css'
 
 // ─────────────────────────────── molduras ───────────────────────────────
+
+/** Sufixo dos campos de busca das listas (Pessoas, Clientes, Arquivo): aparece com texto e limpa. */
+export function LimparBusca({ texto, aoLimpar }: { texto: string; aoLimpar(): void }) {
+  if (!texto) return null
+  return <BotaoIcone icone={X} rotulo="Limpar busca" tamanho="p" onClick={aoLimpar} />
+}
+
+/** "Nada encontrado para "termo"." (o mesmo molde nas três listas). */
+export const textoNadaEncontrado = (termo: string) => `Nada encontrado para “${termo.trim()}”.`
 
 export function Painel({ titulo, icone: I, acoes, children, className, id }: {
   titulo?: ReactNode; icone?: Icone; acoes?: ReactNode; children: ReactNode; className?: string; id?: string

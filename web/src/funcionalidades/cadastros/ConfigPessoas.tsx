@@ -24,7 +24,7 @@ import { EsqueletoLinhas, EstadoVazio } from '../../ui/Indicadores.tsx'
 import { Menu, type ItemMenuUi } from '../../ui/Menu.tsx'
 import { Modal } from '../../ui/Modal.tsx'
 import { editarPessoa, gerarLink, usePessoas } from './api.ts'
-import { LinkConvite, Painel, Pilula } from './comum.tsx'
+import { LimparBusca, LinkConvite, Painel, Pilula, textoNadaEncontrado } from './comum.tsx'
 import { DialogoPessoa, ROTULO_PAPEL } from './DialogoPessoa.tsx'
 
 const colacao = new Intl.Collator('pt-BR', { sensitivity: 'base' })
@@ -139,7 +139,8 @@ export default function ConfigPessoas() {
         ]} />
         {pessoas.length > 6 && (
           <Campo classeGrupo="cad-filtro-busca" rotulo="Buscar pessoa" rotuloOculto icone={Search} tamanho="p" type="search"
-            placeholder="Nome, apelido ou e-mail" value={busca} onChange={(e) => setBusca(e.target.value)} />
+            placeholder="Nome, apelido ou e-mail" value={busca} onChange={(e) => setBusca(e.target.value)}
+            sufixo={<LimparBusca texto={busca} aoLimpar={() => setBusca('')} />} />
         )}
       </div>
 
@@ -155,9 +156,10 @@ export default function ConfigPessoas() {
             acoes={<Botao variante="secundario" onClick={() => void consulta.refetch()}>Tentar de novo</Botao>} />
         ) : lista.length === 0 ? (
           <EstadoVazio icone={Users} tamanho="p"
-            titulo={termo ? 'Ninguém com esse nome.' : aba === 'ativas' ? 'Só você por enquanto.' : 'Ninguém desativado.'}
-            texto={!termo && aba === 'ativas' ? 'Convide a equipe: cada pessoa recebe um link para definir a senha.' : undefined}
-            acoes={!termo && aba === 'ativas' ? <Botao variante="secundario" icone={UserPlus} onClick={() => setEditando('nova')}>Convidar pessoa</Botao> : undefined} />
+            titulo={termo ? textoNadaEncontrado(busca) : aba === 'ativas' ? 'Só você por enquanto.' : 'Ninguém desativado.'}
+            texto={termo ? 'A busca olha o nome, o apelido e o e-mail.' : aba === 'ativas' ? 'Convide a equipe: cada pessoa recebe um link para definir a senha.' : undefined}
+            acoes={termo ? <Botao variante="secundario" onClick={() => setBusca('')}>Limpar busca</Botao>
+              : aba === 'ativas' ? <Botao variante="secundario" icone={UserPlus} onClick={() => setEditando('nova')}>Convidar pessoa</Botao> : undefined} />
         ) : (
           <ul className="cad-lista" aria-label={aba === 'ativas' ? 'Pessoas ativas' : 'Pessoas desativadas'}>
             {lista.map((u) => (

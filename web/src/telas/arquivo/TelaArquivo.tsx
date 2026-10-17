@@ -11,7 +11,7 @@ import type { Demanda, ListarArquivoConsulta, Quadro } from '@shared/tipos/index
 import { useAcoes } from '../../api/demandas.ts'
 import { useClientes, useColunas, useConfig, useQuadros } from '../../api/seletores.ts'
 import { useArquivo, useQuadrosArquivados } from '../../funcionalidades/cadastros/api.ts'
-import { Painel } from '../../funcionalidades/cadastros/comum.tsx'
+import { LimparBusca, Painel, textoNadaEncontrado } from '../../funcionalidades/cadastros/comum.tsx'
 import { useTituloAba } from '../../lib/app.ts'
 import { MESES } from '../../lib/datas.ts'
 import { useAbrirSobreposta } from '../../sessao/sobreposta.tsx'
@@ -113,7 +113,8 @@ export default function TelaArquivo() {
       </header>
       <form className="cad-filtros" role="search" onSubmit={(e) => { e.preventDefault(); mudar('q', texto.trim()) }}>
         <Campo classeGrupo="cad-filtro-busca" rotulo="Buscar no Arquivo" rotuloOculto icone={Search} type="search" value={texto}
-          placeholder='Título, número ou "he outubro"' onChange={(e) => setTexto(e.target.value)} />
+          placeholder='Título, número ou "he outubro"' onChange={(e) => setTexto(e.target.value)}
+          sufixo={<LimparBusca texto={texto} aoLimpar={() => { setTexto(''); mudar('q', '') }} />} />
         <Selecao rotulo="Cliente" rotuloOculto value={params.get('cliente') ?? ''} vazia="Todos os clientes" onChange={(e) => mudar('cliente', e.target.value)}
           opcoes={clientes.map((c) => ({ valor: c.id, rotulo: `${c.sigla} · ${c.nome}` }))} />
         <Selecao rotulo="Quadro" rotuloOculto value={params.get('quadro') ?? ''} vazia="Todos os quadros" onChange={(e) => mudar('quadro', e.target.value)}
@@ -128,8 +129,8 @@ export default function TelaArquivo() {
             acoes={<Botao variante="secundario" onClick={() => void arquivo.refetch()}>Tentar de novo</Botao>} />
         ) : itens.length === 0 ? (
           filtrando ? (
-            <EstadoVazio icone={Search} tamanho="p" titulo="Nada no Arquivo com estes filtros."
-              acoes={<Botao variante="secundario" onClick={() => { setTexto(''); setParams(new URLSearchParams(), { replace: true }) }}>Limpar filtros</Botao>} />
+            <EstadoVazio icone={Search} tamanho="p" titulo={params.get('q') ? textoNadaEncontrado(params.get('q')!) : 'Nada no Arquivo com estes filtros.'}
+              acoes={<Botao variante="secundario" onClick={() => { setTexto(''); setParams(new URLSearchParams(), { replace: true }) }}>{params.get('q') ? 'Limpar busca' : 'Limpar filtros'}</Botao>} />
           ) : (
             <EstadoVazio icone={Archive} como="h2" titulo="Nada no Arquivo ainda."
               texto={`As concluídas saem do quadro depois de ${config.quadroConcluidasDias} dias.`} />

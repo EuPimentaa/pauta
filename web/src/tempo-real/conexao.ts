@@ -222,6 +222,9 @@ export function conectarTempoReal(deps: DepsConexao, seqInicial: number): () => 
       }
       if (!fluxo || fluxo.readyState !== ABERTO) deps.definirEstado('online')
       esperaSync = r.resync || r.eventos.length ? ESPERA_SYNC.min : Math.min(ESPERA_SYNC.max, esperaSync * 1.5)
+      // o servidor respondeu: reabre o SSE já, sem esperar a espera crescente (depois de uma queda de uns 10 s, o
+      // próximo evento só chegava na consulta seguinte, uns 7 s depois; integração 3B)
+      reconectarJa()
     } catch {
       deps.definirEstado(semRede() ? 'offline' : 'reconectando')
       esperaSync = Math.min(ESPERA_SYNC.max, esperaSync * 1.5)

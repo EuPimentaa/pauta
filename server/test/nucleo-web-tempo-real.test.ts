@@ -424,4 +424,23 @@ describe('cliente SSE', () => {
     assert.equal(entregues.find((e) => e.id === 'd1')?.s, 120)
     assert.equal(estados.at(-1), 'online', 'o sync respondendo conta como conectado')
   })
+
+  test('o sync respondendo (servidor de volta) reabre o SSE na hora, sem esperar a espera crescente', async () => {
+    ligar()
+    ultimo().falhar(2)
+    mock.timers.tick(esperaDaTentativa(1, false) * 1.2)
+    ultimo().falhar(2)
+    mock.timers.tick(esperaDaTentativa(2, false) * 1.2)
+    ultimo().falhar(2)                              // terceira: o sync fica para daqui a 5 s
+    mock.timers.tick(esperaDaTentativa(2, false) * 1.2)
+    ultimo().falhar(2)                              // quarta: o SSE só tentaria de novo em ~4 s
+    const abertos = FluxoFalso.abertos.length
+    mock.timers.tick(5000 - esperaDaTentativa(2, false) * 1.2)
+    await new Promise((r) => setImmediate(r))
+    assert.deepEqual(syncs, [100], 'o sync rodou')
+    assert.equal(FluxoFalso.abertos.length, abertos + 1, 'reabriu o SSE junto com a resposta do sync')
+    assert.equal(ultimo().url, '/api/eventos?desde=100')
+    mock.timers.tick(10_000)
+    assert.equal(FluxoFalso.abertos.length, abertos + 1, 'e a espera crescente que estava marcada não abre outro')
+  })
 })

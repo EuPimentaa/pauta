@@ -32,9 +32,14 @@ export function AbaDemandas({ cliente }: { cliente: Cliente }) {
   const demandas = useDemandas()
   const quadros = useQuadros()
   const doCliente = useMemo(() => demandas.filter((d) => d.clienteId === cliente.id), [demandas, cliente.id])
+  // abertas por quadro (o número de cada grupo bate com "N abertas" e com o da aba); as concluídas que ainda estão nos
+  // quadros vêm num grupo próprio no fim
   const grupos = useMemo(() => quadros
-    .map((q) => ({ q, lista: doCliente.filter((d) => d.quadroId === q.id).sort((a, b) => Number(!!a.concluidaEm) - Number(!!b.concluidaEm) || (a.prazo ?? '9').localeCompare(b.prazo ?? '9') || a.numero - b.numero) }))
+    .map((q) => ({ q, lista: doCliente.filter((d) => d.quadroId === q.id && !d.concluidaEm)
+      .sort((a, b) => (a.prazo ?? '9').localeCompare(b.prazo ?? '9') || a.numero - b.numero) }))
     .filter((g) => g.lista.length > 0), [quadros, doCliente])
+  const concluidas = useMemo(() => doCliente.filter((d) => d.concluidaEm)
+    .sort((a, b) => b.concluidaEm!.localeCompare(a.concluidaEm!) || a.numero - b.numero), [doCliente])
   return (
     <div className="cad-secao">
       <p className="cad-texto-2">
@@ -42,7 +47,7 @@ export function AbaDemandas({ cliente }: { cliente: Cliente }) {
         {cliente.contadores.atrasadas === 1 ? '1 atrasada' : `${cliente.contadores.atrasadas} atrasadas`}.{' '}
         <Link to={`/arquivo?cliente=${encodeURIComponent(cliente.id)}`} className="underline underline-offset-2">Ver as do Arquivo</Link>
       </p>
-      {grupos.length === 0 ? (
+      {grupos.length === 0 && concluidas.length === 0 ? (
         <EstadoVazio icone={Archive} tamanho="p" titulo="Nenhuma demanda deste cliente nos quadros."
           texto="As concluídas há mais tempo e as arquivadas estão no Arquivo." />
       ) : grupos.map(({ q, lista }) => (
@@ -57,6 +62,18 @@ export function AbaDemandas({ cliente }: { cliente: Cliente }) {
           </div>
         </section>
       ))}
+      {concluidas.length > 0 && (
+        <section className="cad-grupo-quadro" aria-labelledby="cad-gq-concluidas">
+          <h3 id="cad-gq-concluidas" className="cad-grupo-quadro-titulo">
+            <Check aria-hidden="true" className="size-4" />
+            <span>Concluídas ainda nos quadros</span>
+            <span className="cad-nota">{concluidas.length}</span>
+          </h3>
+          <div className="cad-cards">
+            {concluidas.map((d: Demanda) => <CardDemanda key={d.id} demanda={d} mostrarQuadro />)}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

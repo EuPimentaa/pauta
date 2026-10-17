@@ -110,7 +110,7 @@ Papéis: `admin`, `atendimento`, `equipe` (`shared/tipos/nucleo.ts`). **Admin po
 | Editar e excluir apontamento (`apontamento.editar`) | sim | o próprio | o próprio |
 | Clientes: criar | sim | sim | só sigla e nome (`CAMPOS_CLIENTE_EQUIPE`; nasce com a pendência `sem_am`) |
 | Clientes: editar (dados, apelidos, responsáveis, contatos, links) | todos | os da carteira (`atendimentoId` = eu) e os sem AM | não |
-| Horas de outra pessoa | sim | não (só o total por cliente) | não |
+| Horas de outra pessoa | sim | não (só o total por cliente e mês, §4.20) | não |
 | Excluir (anonimizar) demanda | sim | não | não |
 
 Toda regra de papel fica em `server/src/servicos/permissoes.ts` (usa `shared/logica/permissoes.ts`, com a lista
@@ -992,8 +992,10 @@ Lançar e cronômetro ficam no modal (§4.15).
 #### `GET /api/apontamentos`
 - **Quem:** qualquer usuário. **Consulta:** `ListarApontamentosConsulta` (padrão: a semana atual; até 92 dias, senão
   `400`). **Resposta:** `ListarApontamentosSaida`.
-- Equipe: só os próprios. Atendimento: os próprios + `porCliente` (de todas as pessoas, só o total). Admin: os do
-  filtro (todos, sem `usuarioId`) + `porCliente` + `porPessoa`. `usuarioId` de outra pessoa sem ser admin: `403`.
+- Equipe: só os próprios. Atendimento: os próprios + `porCliente` (de todas as pessoas, só o total **por cliente e mês
+  inteiro**: o período vira os meses que ele toca e `demandaId` não vale para o total; com uma demanda e um dia, o
+  total menos os próprios dava as horas de outra pessoa; segurança da leva 2, achado 4). Admin: os do filtro (todos,
+  sem `usuarioId`) + `porCliente` + `porPessoa`, com o recorte pedido. `usuarioId` de outra pessoa sem ser admin: `403`.
   Excluídos (`excluido_em`) não entram; cronômetro ligado entra sem minutos (não soma). `extras` = demandas dos itens
   fora do bootstrap.
 

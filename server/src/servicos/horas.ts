@@ -6,7 +6,7 @@ import type {
   Apontamento, CriarApontamentoEntrada, Demanda, EditarApontamentoEntrada, Id, ListarApontamentosConsulta,
   ListarApontamentosSaida,
 } from '../../../shared/tipos/index.ts'
-import { diasEntre, segundaDaSemana, somarDias } from '../../../shared/logica/datas.ts'
+import { diasEntre, segundaDaSemana, somarDias, ultimoDiaDoMes } from '../../../shared/logica/datas.ts'
 import type { Ator } from '../auth.ts'
 import { agora, agoraData, marcadores, novoId, rodar, todos, um, type Db } from '../db.ts'
 import { conflito, naoEncontrado, validacao } from '../erros.ts'
@@ -110,10 +110,19 @@ export function excluirApontamento(db: Db, id: Id, ator: Ator): void {
   emitirContadores(db, antes.id, ator, antes)
 }
 
+/** Total de minutos por cliente (de todas as pessoas) com as condições dadas; cronômetro ligado não soma. */
+function totaisPorCliente(db: Db, condicoes: string[], params: unknown[]): { clienteId: Id | null; minutos: number }[] {
+  return todos<{ cliente_id: string | null; minutos: number }>(db, `
+    SELECT a.cliente_id, sum(a.minutos) AS minutos FROM apontamento a
+     WHERE ${condicoes.join(' AND ')} AND a.minutos IS NOT NULL GROUP BY a.cliente_id ORDER BY minutos DESC`, ...params)
+    .map((l) => ({ clienteId: l.cliente_id, minutos: Number(l.minutos) }))
+}
+
 /**
  * GET /api/apontamentos (API.md §4.20). Equipe: só os próprios; atendimento: os próprios + `porCliente` (de todas
- * as pessoas, só o total); admin: os do filtro (todos sem usuarioId) + porCliente + porPessoa. Excluídos não entram;
- * cronômetro ligado entra sem minutos (não soma).
+ * as pessoas, só o total por cliente e mês inteiro: ignora `demandaId` e o recorte por dia); admin: os do filtro (todos
+ * sem usuarioId) + porCliente + porPessoa com o recorte pedido. Excluídos não entram; cronômetro ligado entra sem
+ * minutos (não soma).
  */
 export function listarApontamentos(db: Db, c: ListarApontamentosConsulta, ator: Ator): ListarApontamentosSaida {
   const eu = ator.usuario!
@@ -138,11 +147,15 @@ export function listarApontamentos(db: Db, c: ListarApontamentosConsulta, ator: 
     totalMin: itens.reduce((s, a) => s + (a.minutos ?? 0), 0),
     extras: [],
   }
-  if (admin || ator.papel === 'atendimento') {
-    saida.porCliente = todos<{ cliente_id: string | null; minutos: number }>(db, `
-      SELECT a.cliente_id, sum(a.minutos) AS minutos FROM apontamento a
-       WHERE ${base.join(' AND ')} AND a.minutos IS NOT NULL GROUP BY a.cliente_id ORDER BY minutos DESC`, ...params)
-      .map((l) => ({ clienteId: l.cliente_id, minutos: Number(l.minutos) }))
+  if (admin) {
+    saida.porCliente = totaisPorCliente(db, base, params)
+  } else if (ator.papel === 'atendimento') {
+    // o atendimento não vê horas de outra pessoa (API.md §2): o total de todas as pessoas sai só por cliente e mês
+    // inteiro. Com o recorte por demanda ou por dia, o total menos os próprios dava as horas do dia de outra pessoa.
+    const [ano, mes] = ate.split('-').map(Number) as [number, number]
+    const meses = [`${de.slice(0, 7)}-01`, `${ate.slice(0, 7)}-${String(ultimoDiaDoMes(ano, mes)).padStart(2, '0')}`]
+    const porMes = ['a.excluido_em IS NULL', 'a.data >= ?', 'a.data <= ?', ...(c.clienteId ? ['a.cliente_id IS ?'] : [])]
+    saida.porCliente = totaisPorCliente(db, porMes, c.clienteId ? [...meses, c.clienteId] : meses)
   }
   if (admin) {
     saida.porPessoa = todos<{ usuario_id: string; minutos: number }>(db, `

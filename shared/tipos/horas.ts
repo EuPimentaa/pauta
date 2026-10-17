@@ -66,7 +66,11 @@ export interface ListarApontamentosSaida {
   itens: Apontamento[]
   /** Soma de `itens`. */
   totalMin: number
-  /** Atendimento e admin: total por cliente no período, de todas as pessoas (sem cliente: clienteId null). */
+  /**
+   * Atendimento e admin: total por cliente, de todas as pessoas (sem cliente: clienteId null). Admin: no período e com
+   * o recorte pedidos. Atendimento: só por cliente e mês inteiro (os meses que o período toca; `demandaId` e o recorte
+   * por dia não valem aqui), para não revelar as horas de outra pessoa.
+   */
   porCliente?: { clienteId: Id | null; minutos: number }[]
   /** Só admin: total por pessoa no período. */
   porPessoa?: { usuarioId: Id; minutos: number }[]

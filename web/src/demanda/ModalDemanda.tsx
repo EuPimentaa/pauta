@@ -2,9 +2,11 @@
  * Modal da demanda (PLANO §2, "Modal"; rota sobreposta /d/:numero por cima da tela atual).
  * - abre do cache; fora dele (arquivada, quadro arquivado, concluída antiga) espera o detalhe e monta o contexto com
  *   detalhe.quadro/detalhe.coluna, em `somenteLeitura` para arquivada ou de quadro arquivado;
- * - topo: capa, número, título editável, "na coluna Fazendo do quadro Criação" (abre o `mover-demanda` do F1),
- *   "Concluída" (POST /concluir, com o aviso da repetição), as ações (acoesDemanda(): um primário laranja, até 2
- *   secundários, o resto no ···) e o menu ··· (menuDemanda() com `onde` modal);
+ * - topo: capa, número, título editável em largura total, "na coluna Fazendo do quadro Criação" (abre o
+ *   `mover-demanda` do F1) e as seções `topo` (o estado do ciclo); no canto, ··· (menuDemanda() com `onde` modal) e
+ *   fechar; abaixo do título, a barra com "Concluída" (POST /concluir, com o aviso da repetição), o primário laranja e
+ *   até 2 secundárias (acoesDemanda(); o resto no ···), todos com 32 px. No celular, uma linha presa no topo:
+ *   [X] [Concluída] … [primário] [···], e as secundárias vão para o ···;
  * - colunas principal e lateral com secoesDemanda() (cada uma carrega sob demanda, com esqueleto);
  * - Esc fecha; ←/→ e J/K abrem a vizinha da mesma coluna (atalhos do escopo 'modal').
  */
@@ -25,6 +27,7 @@ import { useCamada } from '../lib/camadas.ts'
 import type { Ancora } from '../lib/posicao.ts'
 import { useAbrirSobreposta } from '../sessao/sobreposta.tsx'
 import { useRegistro, type ModuloRegistro } from '../sessao/registro.ts'
+import { useCelular } from '../lib/midia.ts'
 import { definirControleModal } from '../teclado/controles.ts'
 import { useEscopoAtalho } from '../teclado/escopos.ts'
 import { definirModal, lugarAtual } from '../teclado/foco.ts'
@@ -93,7 +96,7 @@ function Secao({ s, ctx, reg }: { s: ExtensaoSecaoDemanda; ctx: ContextoDemanda;
   const C = reg.componenteDe('demanda', s.id, s.carregar)
   return (
     <LimiteErro nome={`seção ${s.id}`}>
-      <Suspense fallback={<div className="modal-demanda-secao" aria-busy="true"><EsqueletoLinhas linhas={3} /></div>}>
+      <Suspense fallback={s.coluna === 'topo' ? null : <div className="modal-demanda-secao" aria-busy="true"><EsqueletoLinhas linhas={3} /></div>}>
         <C ctx={ctx} />
       </Suspense>
     </LimiteErro>
@@ -106,18 +109,19 @@ function visivel<T extends { id: string; visivel?(ctx: ContextoDemanda): boolean
 
 // ─────────────────────────────── ações ───────────────────────────────
 
-/** Um primário (o de menor ordem com `primaria`), até 2 secundários, o resto vai para o ···. */
-export function separarAcoes(acoes: readonly ExtensaoAcaoDemanda[], ctx: ContextoDemanda) {
+/** Um primário (o de menor ordem com `primaria`), até 2 secundários (nenhum no celular), o resto vai para o ···. */
+export function separarAcoes(acoes: readonly ExtensaoAcaoDemanda[], ctx: ContextoDemanda, maxSecundarias = 2) {
   const visiveis = acoes.filter((a) => { try { return a.visivel(ctx) } catch { return false } })
   const primaria = visiveis.find((a) => { try { return !!a.primaria?.(ctx) } catch { return false } }) ?? null
   const outras = visiveis.filter((a) => a !== primaria)
-  return { primaria, secundarias: outras.slice(0, 2), noMenu: outras.slice(2) }
+  return { primaria, secundarias: outras.slice(0, maxSecundarias), noMenu: outras.slice(maxSecundarias) }
 }
 
 function BotaoAcao({ a, ctx, util, primaria }: { a: ExtensaoAcaoDemanda; ctx: ContextoDemanda; util: UtilModal; primaria?: boolean }) {
   const [rodando, setRodando] = useState(false)
   return (
-    <Botao variante={primaria ? 'primario' : 'secundario'} tamanho="p" icone={a.icone} atalho={a.atalho} carregando={rodando}
+    <Botao variante={primaria ? 'primario' : 'secundario'} tamanho="p" className={primaria ? 'modal-demanda-primaria' : undefined}
+      icone={a.icone} atalho={a.atalho} carregando={rodando}
       onClick={async () => { setRodando(true); try { await a.executar(ctx, util) } finally { setRodando(false) } }}>
       {a.rotulo(ctx)}
     </Botao>
@@ -157,6 +161,7 @@ export function ConteudoModal({ demanda, detalhe, fechar }: PropsModalDemanda) {
   const colunas = useDoBootstrap(selColunas)
   const dias = useDoBootstrap(selDias) ?? 7
   const [menu, setMenu] = useState<{ ancora: Ancora; itens: ItemMenuUi[] } | null>(null)
+  const celular = useCelular()
   useEscopoAtalho('modal')
 
   // quadro e coluna do bootstrap (acompanham o mover); os do detalhe só para a demanda fora dele (arquivada, quadro
@@ -196,7 +201,8 @@ export function ConteudoModal({ demanda, detalhe, fechar }: PropsModalDemanda) {
   const secoes = reg.secoesDemanda().filter((s) => visivel(s, ctx))
   const principais = secoes.filter((s) => s.coluna === 'principal')
   const laterais = secoes.filter((s) => s.coluna === 'lateral')
-  const { primaria, secundarias, noMenu } = separarAcoes(reg.acoesDemanda(), ctx)
+  const topos = secoes.filter((s) => s.coluna === 'topo')
+  const { primaria, secundarias, noMenu } = separarAcoes(reg.acoesDemanda(), ctx, celular ? 0 : 2)
   const etiquetas = boot?.etiquetas.filter((e) => demanda.etiquetaIds.includes(e.id)).sort((a, b) => a.pos - b.pos) ?? []
 
   function abrirMenu(ancora: HTMLElement) {
@@ -209,18 +215,23 @@ export function ConteudoModal({ demanda, detalhe, fechar }: PropsModalDemanda) {
   return (
     // o foco entra no próprio modal (não no primeiro botão): Espaço, J/K e ←/→ valem de cara; Tab leva aos controles
     <div className="modal-demanda" data-modal-demanda="" tabIndex={-1} data-autofocus="">
-      {/* a barra vem primeiro: no celular ela fica presa no topo enquanto o conteúdo rola; no desktop o grid a põe
-          à direita do título */}
+      {/* a barra vem primeiro: no celular é uma linha presa no topo enquanto o conteúdo rola ([X] [Concluída] …
+          [primário] [···]); no desktop ela some (display: contents) e o grid põe as ações abaixo do título e ··· e
+          fechar no canto */}
       <div className="modal-demanda-barra">
-        <Checkbox tom="sucesso" className="modal-demanda-concluir" checked={!!demanda.concluidaEm} disabled={ctx.somenteLeitura}
-          onChange={(e) => void acoes.concluir(demanda, e.target.checked)}>
-          Concluída
-        </Checkbox>
-        {!ctx.somenteLeitura && secundarias.map((a) => <BotaoAcao key={a.id} a={a} ctx={ctx} util={util} />)}
-        {!ctx.somenteLeitura && primaria && <BotaoAcao a={primaria} ctx={ctx} util={util} primaria />}
-        <BotaoIcone icone={MoreHorizontal} rotulo="Mais ações da demanda" aria-haspopup="menu" aria-expanded={!!menu}
-          className="modal-demanda-mais" onClick={(e) => abrirMenu(e.currentTarget)} />
-        <BotaoIcone icone={X} rotulo="Fechar" atalho="esc" onClick={fechar} data-foco-por-ultimo="" />
+        <div className="modal-demanda-acoes">
+          <Checkbox tom="sucesso" className="modal-demanda-concluir" checked={!!demanda.concluidaEm} disabled={ctx.somenteLeitura}
+            onChange={(e) => void acoes.concluir(demanda, e.target.checked)}>
+            Concluída
+          </Checkbox>
+          {!ctx.somenteLeitura && primaria && <BotaoAcao a={primaria} ctx={ctx} util={util} primaria />}
+          {!ctx.somenteLeitura && secundarias.map((a) => <BotaoAcao key={a.id} a={a} ctx={ctx} util={util} />)}
+        </div>
+        <div className="modal-demanda-cantos">
+          <BotaoIcone icone={MoreHorizontal} rotulo="Mais ações da demanda" aria-haspopup="menu" aria-expanded={!!menu}
+            className="modal-demanda-mais" onClick={(e) => abrirMenu(e.currentTarget)} />
+          <BotaoIcone icone={X} rotulo="Fechar" atalho="esc" onClick={fechar} data-foco-por-ultimo="" className="modal-demanda-fechar" />
+        </div>
       </div>
       {demanda.capaUrl ? (
         <div className="modal-demanda-capa" data-imagem=""><img src={demanda.capaUrl} alt="" /></div>
@@ -244,6 +255,7 @@ export function ConteudoModal({ demanda, detalhe, fechar }: PropsModalDemanda) {
               {ctx.quadro.nome}
             </button>
           </p>
+          {topos.map((s) => <Secao key={s.id} s={s} ctx={ctx} reg={reg} />)}
         </div>
       </header>
       {ctx.somenteLeitura && (
@@ -272,7 +284,9 @@ export function EsqueletoModal({ fechar, mensagem }: { fechar(): void; mensagem?
   return (
     <div className="modal-demanda" data-modal-demanda="" tabIndex={-1} aria-busy={!mensagem}>
       <div className="modal-demanda-barra">
-        <BotaoIcone icone={X} rotulo="Fechar" atalho="esc" onClick={fechar} data-foco-por-ultimo="" className="modal-demanda-mais" />
+        <div className="modal-demanda-cantos">
+          <BotaoIcone icone={X} rotulo="Fechar" atalho="esc" onClick={fechar} data-foco-por-ultimo="" className="modal-demanda-fechar" />
+        </div>
       </div>
       <header className="modal-demanda-topo">
         <div className="modal-demanda-titulos">

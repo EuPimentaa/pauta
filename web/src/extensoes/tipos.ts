@@ -391,8 +391,11 @@ export interface UtilModal {
 export interface ExtensaoSecaoDemanda {
   id: string
   ordem: number
-  /** principal: descrição, checklists, versões, anexos, comentários; lateral: membros, etiquetas, datas, cliente... */
-  coluna: 'principal' | 'lateral'
+  /**
+   * principal: descrição, checklists, versões, anexos, comentários; lateral: membros, etiquetas, datas, cliente...;
+   * topo: uma linha curta logo abaixo de "na coluna … do quadro …" (o estado do ciclo; integração 3B).
+   */
+  coluna: 'principal' | 'lateral' | 'topo'
   visivel?(ctx: ContextoDemanda): boolean
   carregar: Carregar<{ ctx: ContextoDemanda }>
 }

@@ -1,7 +1,8 @@
 /*
- * Modal da demanda (/d/:numero). Grade com quatro faixas: barra de ações (Concluída, ações, ···, fechar), capa, topo
- * (número, etiquetas, título e o lugar) e o corpo em duas colunas (principal e um painel lateral) a partir de 900 px.
- * No celular é tela cheia (o Modal do DS cuida) e a barra fica presa no topo enquanto o conteúdo rola.
+ * Modal da demanda (/d/:numero). Grade: capa; topo (número, etiquetas, título em largura total, o lugar e a linha do
+ * estado do ciclo) com ··· e fechar no canto; a barra de ações abaixo do título (Concluída, o primário e até 2
+ * secundárias, todos com 32 px); e o corpo em duas colunas (principal e um painel lateral) a partir de 900 px.
+ * No celular é tela cheia (o Modal do DS cuida) e uma linha só fica presa no topo: [X] [Concluída] … [primário] [···].
  * A janela é sólida (texto longo para ler; o vidro das camadas deixava manchas dos cards atrás do texto) e o scrim é
  * um pouco mais escuro que o padrão, para o quadro colorido não competir com a leitura. Só tokens da marca.
  */
@@ -13,7 +14,7 @@
 
   .modal-demanda {
     display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: start; min-height: 100%; outline: none;
-    grid-template-areas: "capa capa" "topo barra" "faixa faixa" "corpo corpo";
+    grid-template-areas: "capa capa" "topo cantos" "barra barra" "faixa faixa" "corpo corpo";
   }
   .modal-demanda-capa {
     grid-area: capa; height: 56px; margin-bottom: var(--space-2); border-radius: var(--radius-xl) var(--radius-xl) 0 0;
@@ -23,14 +24,20 @@
   .modal-demanda-capa img { display: block; width: 100%; max-height: 200px; object-fit: cover; }
 
   /* ─────────────── barra de ações ─────────────── */
-  .modal-demanda-barra {
-    grid-area: barra; align-self: start; display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end;
-    gap: var(--space-2); padding: var(--space-5) var(--space-5) 0 var(--space-4);
+  /* no desktop a barra não tem caixa própria: as ações vão abaixo do título e ··· e fechar, para o canto */
+  .modal-demanda-barra { display: contents; }
+  .modal-demanda-acoes {
+    grid-area: barra; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: 0 var(--space-6) var(--space-4);
   }
-  /* "Concluída" como pílula (é o checkbox nativo por baixo: teclado e leitor de tela continuam iguais) */
+  .modal-demanda-cantos {
+    grid-area: cantos; align-self: start; display: flex; align-items: center; gap: var(--space-1); padding: var(--space-5) var(--space-5) 0 var(--space-3);
+  }
+  /* todas as ações com a mesma medida da "Concluída": 32 px e 13 px */
+  .modal-demanda-acoes .ui-botao { --altura: 32px; --pad: 12px; --icone: 15px; font-size: var(--fs-rotulo); }
+  /* "Concluída" com a forma das ações (é o checkbox nativo por baixo: teclado e leitor de tela continuam iguais) */
   .ui-check.modal-demanda-concluir {
-    align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 10px; border-radius: var(--radius-full);
-    box-shadow: inset 0 0 0 1px var(--border-strong); font: 500 var(--fs-body) / 1 var(--font); color: var(--text); white-space: nowrap;
+    align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 10px; border-radius: var(--radius-sm);
+    box-shadow: inset 0 0 0 1px var(--border-strong); font: 500 var(--fs-rotulo) / 1 var(--font); color: var(--text); white-space: nowrap;
     transition: background-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
   }
   .ui-check.modal-demanda-concluir:hover { background: var(--veu-1); }
@@ -41,7 +48,7 @@
   .ui-check.modal-demanda-concluir[data-desabilitado="true"] { color: var(--text-disabled); box-shadow: inset 0 0 0 1px var(--border); }
 
   /* ─────────────── topo ─────────────── */
-  .modal-demanda-topo { grid-area: topo; display: flex; min-width: 0; padding: var(--space-5) 0 var(--space-4) var(--space-6); }
+  .modal-demanda-topo { grid-area: topo; display: flex; min-width: 0; padding: var(--space-5) 0 var(--space-3) var(--space-6); }
   .modal-demanda-titulos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
   .modal-demanda-pre { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-height: 20px; }
   .modal-demanda-numero { color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); font-variant-numeric: lining-nums tabular-nums; }
@@ -102,22 +109,26 @@
   .modal-demanda-campo dd { min-width: 0; color: var(--text); font: 400 var(--fs-body) / var(--lh-body) var(--font); overflow-wrap: anywhere; }
 
   @media (max-width: 899.98px) {
-    .modal-demanda { grid-template-columns: minmax(0, 1fr); grid-template-areas: "capa" "barra" "topo" "faixa" "corpo"; }
-    .modal-demanda-barra { justify-content: flex-start; padding: var(--space-4) var(--space-5) 0 var(--space-6); }
-    /* ··· e fechar no canto direito; Concluída e as ações à esquerda */
-    .modal-demanda-mais { margin-left: auto; }
-    .modal-demanda-topo { padding-right: var(--space-6); padding-top: var(--space-3); }
     .modal-demanda-corpo { grid-template-columns: minmax(0, 1fr); }
     .modal-demanda-lateral { position: static; }
   }
   @media (max-width: 767.98px) {
     /* altura da tela: quem rola é o corpo do modal, e a barra (sticky) fica em cima enquanto o conteúdo passa */
     .ui-modal.modal-demanda-janela { height: 100dvh; }
-    .modal-demanda { grid-template-areas: "barra" "capa" "topo" "faixa" "corpo"; }
+    .modal-demanda { grid-template-columns: minmax(0, 1fr); grid-template-areas: "barra" "capa" "topo" "faixa" "corpo"; }
+    /* uma linha presa no topo: [X] [Concluída] … [primário] [···] (as secundárias foram para o ···) */
     .modal-demanda-barra {
-      position: sticky; top: 0; z-index: 2; padding: calc(var(--space-2) + env(safe-area-inset-top)) var(--space-3) var(--space-2) var(--space-4);
+      grid-area: barra; display: flex; align-items: center; gap: var(--space-2); position: sticky; top: 0; z-index: 2;
+      padding: calc(var(--space-2) + env(safe-area-inset-top)) var(--space-3) var(--space-2);
       background: var(--surface-raised); box-shadow: 0 1px 0 var(--border);
     }
+    .modal-demanda-acoes, .modal-demanda-cantos { display: contents; }
+    .modal-demanda-fechar { order: -2; }
+    .modal-demanda-concluir { order: -1; }
+    .modal-demanda-primaria { order: 1; margin-left: auto; min-width: 0; }
+    .modal-demanda-primaria > span { overflow: hidden; text-overflow: ellipsis; }
+    .modal-demanda-mais { order: 2; margin-left: auto; }
+    .modal-demanda-barra:has(.modal-demanda-primaria) .modal-demanda-mais { margin-left: 0; }
     .modal-demanda-capa { border-radius: 0; margin-bottom: 0; }
     .modal-demanda-topo { padding: var(--space-3) var(--space-4); }
     .modal-demanda-titulo, .modal-demanda-titulo-campo { font-size: var(--fs-h3); line-height: var(--lh-h3); }

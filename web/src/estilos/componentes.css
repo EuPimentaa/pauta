@@ -207,6 +207,7 @@
   .ui-progresso-rotulo { font: 500 var(--fs-meta) / 1 var(--font); color: var(--text-2); font-variant-numeric: lining-nums tabular-nums; }
 
   .ui-kbd { display: inline-flex; gap: 3px; align-items: center; }
+  .ui-kbd-seta { width: 12px; height: 12px; stroke-width: 2.25; vertical-align: -1px; }
   .ui-kbd kbd {
     display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 4px;
     font: 600 var(--fs-micro) / 1 var(--font); letter-spacing: .02em; color: var(--text-2); background: var(--surface);

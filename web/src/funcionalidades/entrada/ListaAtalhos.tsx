@@ -41,7 +41,9 @@ export default function ListaAtalhos(_props: PropsDialogo<'atalhos'>) {
                 <div key={i.chave} className="entrada-atalhos-item">
                   <dt>
                     {i.descricao}
-                    {i.escopo !== 'global' && i.escopo !== g.grupo && <span className="entrada-atalhos-onde"> · {ONDE[i.escopo]}</span>}
+                    {!i.escopos.includes('global') && !(i.escopos.length === 1 && i.escopo === g.grupo) && (
+                      <span className="entrada-atalhos-onde"> · {i.escopos.map((e) => ONDE[e]).join(' ou ')}</span>
+                    )}
                   </dt>
                   <dd>
                     {i.teclas.map((t, n) => (

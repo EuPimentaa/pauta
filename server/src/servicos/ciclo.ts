@@ -323,6 +323,7 @@ export function registrarRetorno(db: Db, p: ParametrosRetorno): RegistrarRetorno
   const itens = p.decisao === 'ajuste' ? linhasParaItens((p.linhas ?? []).join('\n')) : []
   if (p.decisao === 'ajuste' && itens.length === 0) throw validacao('Escreva pelo menos um ajuste, um por linha.', { linhas: 'vazio' })
   const quadroEnvio = quadroDoEnvio(db, versaoId)
+  const quem = nomeDoContato(db, contatoId) ?? nomeInformado ?? (p.via === 'manual' ? 'o cliente' : 'o cliente pelo link')
 
   // o print colado vira anexo de evidência (só pelas rotas do ciclo; não sai mais, gatilho anexo_evidencia_fixa)
   let evidenciaId: Id | null = null
@@ -342,7 +343,7 @@ export function registrarRetorno(db: Db, p: ParametrosRetorno): RegistrarRetorno
   const motivo = p.decisao === 'ajuste' ? (p.motivo ?? 'cliente_mudou') : null
   if (p.decisao === 'ajuste') {
     const r = abrirRodada(db, { demandaId: antes.id, origem: 'cliente', linhas: itens, motivo: motivo!, motivoTexto: p.motivoTexto,
-      prazo: p.prazo, prazoHora: p.prazoHora, ator: p.ator })
+      prazo: p.prazo, prazoHora: p.prazoHora, ator: p.ator, ...(p.via === 'link' ? { pedidoPor: quem } : {}) })
     rodada = r.rodada
     checklist = r.checklist
     sugerirExtra = r.sugerirExtra
@@ -359,7 +360,6 @@ export function registrarRetorno(db: Db, p: ParametrosRetorno): RegistrarRetorno
     rodada?.id ?? null, evidenciaId, antes.quadroId, antes.colunaId, p.idempotencia?.chave ?? null, p.idempotencia?.hash ?? null,
     p.ipHmac ?? null, p.userAgent?.slice(0, 300) || null, instante)
 
-  const quem = nomeDoContato(db, contatoId) ?? nomeInformado ?? (p.via === 'manual' ? 'o cliente' : 'o cliente pelo link')
   // a atividade vem antes da automação: anular sabe que movimento foi o da decisão (o primeiro depois dela)
   const atividadeId = registrarAtividade(db, { tipo: 'retorno.registrado', ator: p.ator, demandaId: antes.id,
     dados: { aprovacaoId, versaoNumero: versao.numero, decisao: p.decisao, via: p.via, quem } })

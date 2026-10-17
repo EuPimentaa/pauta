@@ -66,6 +66,12 @@ describe('frase do histórico', () => {
     assert.equal(fraseAtividade(a('demanda.membro_adicionado', { usuarioId: 'u1' }), nomes).texto, 'entrou na demanda')
     assert.equal(fraseAtividade(a('demanda.editada', { campos: ['prazo'] }, { antes: { prazo: '2026-10-16' } }), nomes).texto, 'mudou o prazo (era [2026-10-16])')
     assert.equal(fraseAtividade(a('demanda.editada', { campos: ['titulo', 'prioridade', 'capaCor'] }), nomes).texto, 'mudou o título, a prioridade e a capa')
+    // pelo link: sem o motivo padrão e sem repetir quem pediu como ator
+    assert.deepEqual(fraseAtividade(a('rodada.aberta', { rodadaId: 'r', numero: 2, origem: 'cliente', motivo: 'cliente_mudou', prazo: '2026-10-19', itens: 2,
+      extra: false, pedidoPor: 'Carla Menezes' }, { atorTipo: 'cliente', atorId: null }), nomes),
+    { ator: 'Rodada 2', texto: 'aberta com o pedido de Carla Menezes · prazo [2026-10-19]', grupo: 'ajuste' })
+    assert.equal(fraseAtividade(a('rodada.aberta', { rodadaId: 'r', numero: 3, origem: 'interna', motivo: 'erro_execucao', prazo: '2026-10-19', itens: 1,
+      extra: false }), nomes).texto, 'pediu ajuste interno e abriu a rodada 3 (erro de execução) · prazo [2026-10-19]')
     assert.deepEqual(fraseAtividade(a('demanda.editada', { campos: ['prazo'], aprovacaoId: 'ap', prazoNovo: null }, { antes: { prazo: '2026-10-19' } }), nomes),
       { ator: 'Automação', texto: 'tirou o prazo, cumprido na aprovação (era [2026-10-19])', grupo: 'edicao' })
     assert.equal(fraseAtividade(a('demanda.editada', { campos: ['prazo'], aprovacaoId: 'ap', prazoNovo: '2026-10-21' }, { antes: { prazo: '2026-10-19' } }), nomes).texto,
@@ -73,7 +79,7 @@ describe('frase do histórico', () => {
     assert.equal(fraseAtividade(a('tempo.lancado', { minutos: 90, origem: 'cronometro', apontamentoId: 'x' }, { atorId: 'u2' }), nomes).ator, 'Você')
     assert.equal(fraseAtividade(a('tempo.lancado', { minutos: 90, origem: 'cronometro', apontamentoId: 'x' }), nomes).texto, 'registrou 1h30 no cronômetro')
     assert.deepEqual(fraseAtividade(a('retorno.registrado', { decisao: 'ajuste', via: 'link', versaoNumero: 2, quem: 'Fulana', aprovacaoId: 'x' },
-      { atorTipo: 'cliente', atorId: null }), nomes), { ator: 'Fulana', texto: 'pediu ajuste na V2 pelo link', grupo: 'ciclo' })
+      { atorTipo: 'cliente', atorId: null }), nomes), { ator: 'Fulana', texto: 'pediu ajuste na V2 pelo link', grupo: 'ajuste' })
     assert.equal(juntar(['a', 'b', 'b', 'c']), 'a, b e c')
   })
 })

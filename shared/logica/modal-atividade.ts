@@ -22,9 +22,9 @@ export interface FraseAtividade {
   ator: string
   /** O resto da frase, minúsculo ("moveu de Fazendo para Revisão"). */
   texto: string
-  /** Grupo para o ícone. */
-  grupo: 'criacao' | 'edicao' | 'movimento' | 'conclusao' | 'pessoas' | 'etiquetas' | 'arquivo' | 'ciclo' | 'comentario'
-    | 'anexo' | 'checklist' | 'tempo'
+  /** Grupo para o ícone (o ciclo tem um por tipo de fato: entrega, envio, link aberto, aprovação, ajuste). */
+  grupo: 'criacao' | 'edicao' | 'movimento' | 'conclusao' | 'pessoas' | 'etiquetas' | 'arquivo' | 'ciclo' | 'entrega' | 'envio'
+    | 'visto' | 'aprovacao' | 'ajuste' | 'comentario' | 'anexo' | 'checklist' | 'tempo'
 }
 
 const CAMPOS: Record<string, string> = {
@@ -118,29 +118,34 @@ export function fraseAtividade(a: Atividade, n: NomesAtividade): FraseAtividade 
     }
     case 'rodada.aberta': {
       const x = d as MapaDadosAtividade['rodada.aberta']
+      // pelo link o motivo é o padrão (ninguém escolheu) e quem pediu já está na linha de cima: não repete nem presume
+      if (x.pedidoPor || a.atorTipo === 'cliente') {
+        return { ator: `Rodada ${x.numero}`, texto: `aberta com o pedido ${x.pedidoPor ? `de ${x.pedidoPor}` : 'do cliente'} · prazo ${n.data(x.prazo)}`, grupo: 'ajuste' }
+      }
       const motivo = ROTULO_MOTIVO_RODADA[x.motivo as MotivoRodada] ?? x.motivo
       const quem = x.origem === 'cliente' ? 'registrou o ajuste do cliente e abriu' : 'pediu ajuste interno e abriu'
-      return f(`${quem} a rodada ${x.numero} (${motivo.toLowerCase()}) · prazo ${n.data(x.prazo)}`, 'ciclo')
+      return f(`${quem} a rodada ${x.numero} (${motivo.toLowerCase()}) · prazo ${n.data(x.prazo)}`, 'ajuste')
     }
     case 'rodada.extra_marcada': return f(`marcou a rodada ${(d as MapaDadosAtividade['rodada.extra_marcada']).numero} como extra`, 'ciclo')
     case 'rodada.extra_desmarcada': return f(`desmarcou a rodada ${(d as MapaDadosAtividade['rodada.extra_desmarcada']).numero} como extra`, 'ciclo')
-    case 'versao.entregue': return f(`entregou a V${(d as MapaDadosAtividade['versao.entregue']).numero}`, 'ciclo')
+    case 'versao.entregue': return f(`entregou a V${(d as MapaDadosAtividade['versao.entregue']).numero}`, 'entrega')
     case 'versao.itens_adicionados': {
       const x = d as MapaDadosAtividade['versao.itens_adicionados']
-      return f(`acrescentou ${x.itens} ${x.itens === 1 ? 'item' : 'itens'} à V${x.numero}`, 'ciclo')
+      return f(`acrescentou ${x.itens} ${x.itens === 1 ? 'item' : 'itens'} à V${x.numero}`, 'entrega')
     }
     case 'versao.enviada': {
       const x = d as MapaDadosAtividade['versao.enviada']
-      return f(`enviou a V${x.numero} ao cliente ${x.via === 'link' ? 'por link' : 'por fora'}`, 'ciclo')
+      return f(`enviou a V${x.numero} ao cliente ${x.via === 'link' ? 'por link' : 'por fora'}`, 'envio')
     }
-    case 'link.gerado': return f('gerou um link de aprovação', 'ciclo')
+    case 'link.gerado': return f('gerou um link de aprovação', 'envio')
     case 'link.revogado': return f('revogou o link de aprovação', 'ciclo')
-    case 'link.visto': return { ator: 'O cliente', texto: 'abriu o link de aprovação', grupo: 'ciclo' }
+    case 'link.visto': return { ator: 'O cliente', texto: 'abriu o link de aprovação', grupo: 'visto' }
     case 'retorno.registrado': {
       const x = d as MapaDadosAtividade['retorno.registrado']
       const decisao = x.decisao === 'aprovado' ? `aprovou a V${x.versaoNumero}` : `pediu ajuste na V${x.versaoNumero}`
-      if (x.via === 'link') return { ator: x.quem || 'O cliente', texto: `${decisao} pelo link`, grupo: 'ciclo' }
-      return f(`registrou: ${x.quem} ${decisao}`, 'ciclo')
+      const grupo = x.decisao === 'aprovado' ? 'aprovacao' : 'ajuste'
+      if (x.via === 'link') return { ator: x.quem || 'O cliente', texto: `${decisao} pelo link`, grupo }
+      return f(`registrou: ${x.quem} ${decisao}`, grupo)
     }
     case 'aprovacao.anulada': return f(`anulou a aprovação da V${(d as MapaDadosAtividade['aprovacao.anulada']).versaoNumero}`, 'ciclo')
     case 'comentario.criado':

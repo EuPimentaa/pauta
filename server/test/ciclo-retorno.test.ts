@@ -63,6 +63,7 @@ describe('vaivém com as automações da Criação', () => {
     assert.equal(ap.via, 'link')
     assert.equal(ap.quadroAntesId, a.quadros.atendimento.quadro.id)
     assert.equal(um<{ ator_tipo: string }>(a.db, `SELECT ator_tipo FROM atividade WHERE tipo = 'retorno.registrado'`)!.ator_tipo, 'cliente')
+    assert.equal(JSON.parse(um<{ dados: string }>(a.db, `SELECT dados FROM atividade WHERE tipo = 'rodada.aberta'`)!.dados).pedidoPor, 'Fulana')
 
     // V2 entregue, enviada e aprovada: Social › Agendar com o social como único membro, sem `chegou`
     const v2 = await entregar(a, depoisAjuste.demanda)

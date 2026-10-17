@@ -6,8 +6,8 @@
  */
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ClipboardEvent } from 'react'
 import {
-  Archive, ArrowRightLeft, CircleCheck, Clock3, Eye, FileText, History, ListChecks, MessageSquare, Paperclip, Pencil,
-  Send, Sparkles, Tag, Users, X, type LucideIcon,
+  Archive, ArrowRightLeft, CheckCircle2, CircleCheck, Clock3, Eye, FileText, History, Layers, ListChecks, MessageSquare, Paperclip, Pencil,
+  Send, Sparkles, Tag, Upload, Users, Wrench, X, type LucideIcon,
 } from 'lucide-react'
 import type { Anexo, Bootstrap, Comentario, Id } from '@shared/tipos/index.ts'
 import { pode } from '@shared/logica/permissoes.ts'
@@ -35,7 +35,8 @@ const Markdown = lazy(() => import('../../../ui/Markdown.tsx').then((m) => ({ de
 
 const ICONES: Record<FraseAtividade['grupo'], LucideIcon> = {
   criacao: Sparkles, edicao: Pencil, movimento: ArrowRightLeft, conclusao: CircleCheck, pessoas: Users, etiquetas: Tag,
-  arquivo: Archive, ciclo: Send, comentario: MessageSquare, anexo: Paperclip, checklist: ListChecks, tempo: Clock3,
+  arquivo: Archive, ciclo: Layers, entrega: Upload, envio: Send, visto: Eye, aprovacao: CheckCircle2, ajuste: Wrench,
+  comentario: MessageSquare, anexo: Paperclip, checklist: ListChecks, tempo: Clock3,
 }
 
 // ─────────────────────────────── compositor ───────────────────────────────

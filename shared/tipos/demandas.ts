@@ -255,7 +255,11 @@ export interface MapaDadosAtividade {
   'demanda.excluida': Record<string, never>
   'demanda.copiada': { novaId: Id; novaNumero: number } | { origemId: Id; origemNumero: number }
   'demanda.repetida': { novaId: Id; novaNumero: number } | { origemId: Id; origemNumero: number }
-  'rodada.aberta': { rodadaId: Id; numero: number; origem: 'cliente' | 'interna'; motivo: string; prazo: DataLocal; itens: number; extra: boolean }
+  'rodada.aberta': {
+    rodadaId: Id; numero: number; origem: 'cliente' | 'interna'; motivo: string; prazo: DataLocal; itens: number; extra: boolean
+    /** Ajuste pedido pelo link: quem pediu. O motivo gravado é o padrão (ninguém escolheu), e a frase não o mostra. */
+    pedidoPor?: string
+  }
   'rodada.extra_marcada': { rodadaId: Id; numero: number }
   'rodada.extra_desmarcada': { rodadaId: Id; numero: number }
   'versao.entregue': { versaoId: Id; numero: number; itens: number }

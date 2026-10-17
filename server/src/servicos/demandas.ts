@@ -805,6 +805,8 @@ export function mandarParaLixoSeSemUso(db: Db, arquivoId: Id): boolean {
 export function abrirRodada(db: Db, p: {
   demandaId: Id; origem: 'cliente' | 'interna'; linhas: string[]; motivo: MotivoRodada; motivoTexto?: string | null
   prazo?: DataLocal; prazoHora?: HoraLocal | null; ator: Ator
+  /** Pelo link: quem pediu (vai na atividade). */
+  pedidoPor?: string
 }): { rodada: Rodada; checklist: ChecklistComItens; sugerirExtra: boolean } {
   const antes = demandaViva(db, p.demandaId)
   exigirData(p.prazo, 'prazo')
@@ -830,7 +832,7 @@ export function abrirRodada(db: Db, p: {
   const checklistId = inserirChecklist(db, p.demandaId, `Ajustes R${numero}`, itens, rodadaId, posMax + 1024, p.ator)
   const sugerirExtra = numero > antes.rodadasInclusas
   registrarAtividade(db, { tipo: 'rodada.aberta', ator: p.ator, demandaId: p.demandaId,
-    dados: { rodadaId, numero, origem: p.origem, motivo: p.motivo, prazo, itens: itens.length, extra: false } })
+    dados: { rodadaId, numero, origem: p.origem, motivo: p.motivo, prazo, itens: itens.length, extra: false, ...(p.pedidoPor ? { pedidoPor: p.pedidoPor } : {}) } })
   if (aberta) emitirObjeto(db, 'rodada', aberta.id, carregarRodada(db, aberta.id), p.ator, { demandaId: p.demandaId })
   const rodada = carregarRodada(db, rodadaId)
   emitirObjeto(db, 'rodada', rodadaId, rodada, p.ator, { demandaId: p.demandaId })

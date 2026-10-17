@@ -248,14 +248,17 @@ function CartaoVersao({ v, envios, decisoes, ctx, contatos, atual, anulavelId }:
 
 function CabecaRodada({ r, ctx, inclusas }: { r: Rodada; ctx: ContextoDemanda; inclusas: number }) {
   const qc = useQueryClient()
-  const origem = r.origem === 'inicial' ? 'primeira entrega' : r.origem === 'cliente' ? 'ajuste do cliente' : 'ajuste interno'
+  // ajuste pedido pelo link: o motivo gravado é o padrão (ninguém escolheu); a tela não o mostra como fato
+  const pedido = r.origem === 'cliente' ? ctx.detalhe?.aprovacoes.find((a) => a.rodadaAbertaId === r.id) : undefined
+  const peloLink = pedido?.via === 'link'
+  const origem = r.origem === 'inicial' ? 'primeira entrega' : r.origem === 'cliente' ? (peloLink ? 'ajuste pedido pelo link' : 'ajuste do cliente') : 'ajuste interno'
   const renegociado = r.prazo && r.prazoOriginal && r.prazo !== r.prazoOriginal
   const podeExtra = ctx.atendimento && !ctx.somenteLeitura && r.numero > 1
   return (
     <div className="cic-rodada-cabeca">
       <strong>Rodada {r.numero}</strong>
       <span>· {origem}</span>
-      {r.motivo && r.origem !== 'inicial' && <span>· {ROTULO_MOTIVO_RODADA[r.motivo]}{r.motivoTexto ? `: ${r.motivoTexto}` : ''}</span>}
+      {r.motivo && r.origem !== 'inicial' && !peloLink && <span>· {ROTULO_MOTIVO_RODADA[r.motivo]}{r.motivoTexto ? `: ${r.motivoTexto}` : ''}</span>}
       {r.prazo && (
         <span>
           · prazo {formatarPrazo(r.prazo, r.prazoHora ?? '18:00')}

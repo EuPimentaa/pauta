@@ -7,7 +7,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import type { EventoTempoReal, InicioSaida, ListarNotificacoesSaida, Notificacao } from '@shared/tipos/index.ts'
 import type { TratadorEventos } from '../tipos.ts'
 import { chaves } from '../../api/chaves.ts'
-import { marcarMencoes } from '../../funcionalidades/paineis/api.ts'
+import { marcarMencoes } from '../../funcionalidades/paineis/cache.ts'
 import { comNotificacao, comPatchNotificacao } from '../../funcionalidades/paineis/logica.ts'
 
 const MENCOES_NO_INICIO = 10

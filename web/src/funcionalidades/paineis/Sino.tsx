@@ -33,11 +33,23 @@ export function useRelerSinoNoResync(): void {
   }, [qc, seq])
 }
 
+/** Anuncia ao leitor de tela quando chega notificação nova (o número subiu). */
+function useAnuncio(n: number): string {
+  const anterior = useRef(n)
+  const [texto, setTexto] = useState('')
+  useEffect(() => {
+    if (n > anterior.current) setTexto(n - anterior.current === 1 ? 'Nova notificação.' : `${n - anterior.current} notificações novas.`)
+    anterior.current = n
+  }, [n])
+  return texto
+}
+
 export function SinoTopo() {
   const n = useNaoLidas()
   const abrir = useAbrirDialogo()
   const botao = useRef<HTMLButtonElement>(null)
   const [aberto, setAberto] = useState(false)
+  const anuncio = useAnuncio(n)
   useRelerSinoNoResync()
 
   async function alternar() {
@@ -53,6 +65,7 @@ export function SinoTopo() {
         data-novas={n > 0 || undefined} onClick={() => void alternar()}>
         <Bell aria-hidden="true" />
         {n > 0 && <span className="pnl-sino-num tabular" aria-hidden="true">{n > 99 ? '99+' : n}</span>}
+        <span className="sr-only" aria-live="polite">{anuncio}</span>
       </button>
     </Tooltip>
   )

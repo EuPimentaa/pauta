@@ -15,6 +15,7 @@ import { avisarErro } from '../../api/acoes.ts'
 import { chaves } from '../../api/chaves.ts'
 import { api, comConsulta, type ErroDaApi } from '../../api/cliente.ts'
 import { useDoBootstrap } from '../../api/seletores.ts'
+import { marcarMencoes } from './cache.ts'
 import { comMaisAntigas, LISTA_VAZIA, marcarNaLista } from './logica.ts'
 
 export const PAGINA_NOTIFICACOES = 30
@@ -64,14 +65,6 @@ export function useNaoLidas(): number {
 /** O seq do bootstrap muda quando ele é recarregado (resync): a lista do sino também precisa ser relida. */
 export function useSeqDoBootstrap(): number {
   return useDoBootstrap(selSeq) ?? 0
-}
-
-/** As menções do Início com o mesmo "lida" da lista do sino. */
-export function marcarMencoes(qc: QueryClient, lida: (m: Notificacao) => string | null): void {
-  qc.setQueryData<InicioSaida>(chaves.inicio, (ini) => (ini ? { ...ini, mencoes: ini.mencoes.map((m) => {
-    const lidaEm = lida(m)
-    return lidaEm === m.lidaEm ? m : { ...m, lidaEm }
-  }) } : ini))
 }
 
 /** Marca como lidas (otimista; no erro a lista volta como estava e avisa). */

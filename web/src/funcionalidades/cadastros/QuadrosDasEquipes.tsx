@@ -207,13 +207,15 @@ function LinhaEquipe({ l, modelos, modelo, usuarios, tentou, mudar, bloqueada }:
   )
 }
 
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
+
 function Estado({ l }: { l: Linha }) {
   if (l.estado === 'criando') return <span className="cad-equipe-estado" role="status"><Loader2 className="ui-giro" aria-hidden="true" />Criando…</span>
   if (l.estado === 'criado') {
     return (
       <span className="cad-equipe-estado" data-tom="sucesso" role="status">
         <Check aria-hidden="true" />
-        Criado: {l.quadro?.colunas.length ?? 0} colunas{l.quadro?.automacoes.length ? ` e ${l.quadro.automacoes.length} automações` : ''}
+        Criado: {plural(l.quadro?.colunas.length ?? 0, 'coluna', 'colunas')}{l.quadro?.automacoes.length ? ` e ${plural(l.quadro.automacoes.length, 'automação', 'automações')}` : ''}
       </span>
     )
   }

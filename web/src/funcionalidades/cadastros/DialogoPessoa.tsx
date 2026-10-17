@@ -111,12 +111,12 @@ export function DialogoPessoa({ pessoa, aoFechar }: { pessoa: Usuario | null; ao
       )}>
       <form id={idForm} className="cad-form" noValidate onSubmit={(e) => { e.preventDefault(); void salvar() }}>
         <div className="cad-grade-2">
-          <Campo rotulo="Nome" value={nome} maxLength={120} autoComplete="off" placeholder="Rafaela Souza" data-autofocus=""
+          <Campo rotulo="Nome" value={nome} maxLength={120} autoComplete="off" placeholder="Ex.: Rafaela Souza" data-autofocus=""
             erro={nomeVazio ? 'Escreva o nome.' : erroDoCampo(erro, 'nome')} onChange={(e) => setNome(e.target.value)} />
-          <Campo rotulo="Apelido" opcional value={apelido} maxLength={40} autoComplete="off" placeholder="Rafa" erro={erroApelido}
+          <Campo rotulo="Apelido" opcional value={apelido} maxLength={40} autoComplete="off" placeholder="Ex.: Rafa" erro={erroApelido}
             ajuda="Nome da coluna dela e das @menções." onChange={(e) => setApelido(e.target.value)} />
         </div>
-        <Campo rotulo="E-mail" type="email" value={email} maxLength={200} autoComplete="off" placeholder="rafa@meltcomunicacao.com.br"
+        <Campo rotulo="E-mail" type="email" value={email} maxLength={200} autoComplete="off" placeholder="Ex.: rafa@meltcomunicacao.com.br"
           erro={erroEmail} ajuda={pessoa ? 'Trocar o e-mail cancela os links pendentes.' : 'É o login dela.'} onChange={(e) => setEmail(e.target.value)} />
 
         <fieldset className="cad-secao">

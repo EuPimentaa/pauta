@@ -83,7 +83,7 @@ export function AbaAprovacoes({ cliente }: { cliente: Cliente }) {
             <span className="cad-trilha-icone" data-decisao={i.decisao} aria-hidden="true">{i.decisao === 'aprovado' ? <Check /> : <PencilLine />}</span>
             <div className="cad-trilha-corpo">
               <span className="cad-trilha-cabeca">
-                <span>{i.decisao === 'aprovado' ? 'Aprovou' : 'Pediu ajuste em'} a V{i.versaoNumero} de</span>
+                <span>{i.decisao === 'aprovado' ? 'Aprovou a' : 'Pediu ajuste na'} V{i.versaoNumero} de</span>
                 <Link to={`/d/${i.demanda.numero}`} className="underline underline-offset-2">#{i.demanda.numero} {i.demanda.titulo}</Link>
                 {i.anuladaEm && <Pilula tom="perigo">anulada</Pilula>}
               </span>
@@ -208,7 +208,7 @@ function Apelidos({ cliente, podeEditar }: { cliente: Cliente; podeEditar: boole
       </div>
       {podeEditar && (
         <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); if (novo.trim()) { void salvar([...manuais, novo.trim()]); setNovo('') } }}>
-          <Campo classeGrupo="flex-1" rotulo="Novo apelido" rotuloOculto tamanho="p" value={novo} maxLength={80} placeholder="hospital evangelico"
+          <Campo classeGrupo="flex-1" rotulo="Novo apelido" rotuloOculto tamanho="p" value={novo} maxLength={80} placeholder={`Ex.: ${normalizarAlias(cliente.nome).split(' ').slice(0, 2).join(' ') || sigla}`}
             onChange={(e) => setNovo(e.target.value)} />
           <Botao type="submit" tamanho="p" variante="secundario" icone={Plus} disabled={!novo.trim()}>Acrescentar</Botao>
         </form>

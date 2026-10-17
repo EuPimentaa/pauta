@@ -61,7 +61,7 @@ function NovoFeriado({ ano }: { ano: number }) {
           {(tentou && !data) || repetido || erroDoCampo(erro, 'data')
             ? <p className="ui-campo-erro">{tentou && !data ? 'Escolha a data.' : repetido ?? erroDoCampo(erro, 'data')}</p> : null}
         </div>
-        <Campo rotulo="Nome" value={nome} maxLength={80} placeholder="Aniversário da cidade" onChange={(e) => setNome(e.target.value)}
+        <Campo rotulo="Nome" value={nome} maxLength={80} placeholder="Ex.: Aniversário da cidade" onChange={(e) => setNome(e.target.value)}
           erro={tentou && !nome.trim() ? 'Escreva o nome.' : erroDoCampo(erro, 'nome')} />
         <Selecao rotulo="Tipo" value={tipo} onChange={(e) => setTipo(e.target.value as TipoFeriado)}
           opcoes={TIPOS_FERIADO.map((t) => ({ valor: t, rotulo: ROTULO_TIPO[t] }))} />

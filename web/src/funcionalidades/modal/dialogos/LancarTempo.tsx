@@ -46,7 +46,7 @@ export default function DialogoLancarTempo({ params, fechar }: PropsDialogo<'lan
       )}>
       <form id={idForm} className="mdl-formulario" onSubmit={(e) => { e.preventDefault(); void lancar() }}
         onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void lancar() } }}>
-        <Campo rotulo="Quanto tempo" value={texto} onChange={(e) => setTexto(e.target.value)} data-autofocus="" placeholder="1h30"
+        <Campo rotulo="Quanto tempo" value={texto} onChange={(e) => setTexto(e.target.value)} data-autofocus="" placeholder="Ex.: 1h30"
           erro={texto.trim() && !minutos ? 'Use minutos ou horas: 45, 1h30, 2h (até 24h).' : undefined}
           ajuda={minutos ? (formatarDuracao(minutos) === texto.trim() ? undefined : `= ${formatarDuracao(minutos)}`) : 'Minutos ou horas: 45, 1h30, 2h.'}
           inputMode="text" autoComplete="off" />

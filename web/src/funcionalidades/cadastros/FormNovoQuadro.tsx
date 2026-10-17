@@ -161,7 +161,7 @@ export default function FormNovoQuadro({ fechar, equipeInicial }: { fechar(): vo
       )}>
       <form id={idForm} className="cad-form" noValidate onSubmit={(e) => { e.preventDefault(); void criar() }}>
         <div className="cad-grade-2">
-          <Campo rotulo="Nome" value={nome} maxLength={80} placeholder="Criação" autoComplete="off" erro={erroNome} data-autofocus=""
+          <Campo rotulo="Nome" value={nome} maxLength={80} placeholder="Ex.: Vídeo" autoComplete="off" erro={erroNome} data-autofocus=""
             onChange={(e) => { setNome(e.target.value); setNomeTocado(true) }} />
           <Selecao rotulo="Equipe" value={equipeId ?? ''} vazia="Sem equipe"
             opcoes={equipes.map((e) => ({ valor: e.id, rotulo: e.nome }))}

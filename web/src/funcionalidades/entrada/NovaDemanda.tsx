@@ -581,7 +581,7 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
                 rotulo="Estimativa"
                 tamanho="p"
                 value={estado.estimativaTexto}
-                placeholder="1h30"
+                placeholder="Ex.: 1h30"
                 inputMode="text"
                 autoComplete="off"
                 erro={minutosDeTexto(estado.estimativaTexto) === undefined ? 'Use 45 min, 2h ou 1h30.' : undefined}

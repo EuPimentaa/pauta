@@ -39,7 +39,7 @@ function DialogoEquipe({ equipe, aoFechar }: { equipe: Equipe | null; aoFechar()
   const [erro, setErro] = useState<unknown>(null)
   const [enviando, setEnviando] = useState(false)
   const [tentou, setTentou] = useState(false)
-  const slugFinal = equipe ? equipe.slug : (slugTocado ? slug : slugDe(nome).replace(/^[^a-z]+/, '').slice(0, 40).replace(/-+$/, ''))
+  const slugFinal = equipe ? equipe.slug : (slugTocado ? slug : nome.trim() ? slugDe(nome).replace(/^[^a-z]+/, '').slice(0, 40).replace(/-+$/, '') : '')
 
   async function salvar() {
     setTentou(true)
@@ -68,7 +68,7 @@ function DialogoEquipe({ equipe, aoFechar }: { equipe: Equipe | null; aoFechar()
         </>
       )}>
       <form id={idForm} className="cad-form" noValidate onSubmit={(e) => { e.preventDefault(); void salvar() }}>
-        <Campo rotulo="Nome" value={nome} maxLength={60} placeholder="Vídeo" data-autofocus="" onChange={(e) => setNome(e.target.value)}
+        <Campo rotulo="Nome" value={nome} maxLength={60} placeholder="Ex.: Vídeo" data-autofocus="" onChange={(e) => setNome(e.target.value)}
           erro={tentou && !nome.trim() ? 'Escreva o nome.' : conflito ?? erroDoCampo(erro, 'nome')} />
         {!equipe && (
           <Campo rotulo="Identificador" value={slugFinal} maxLength={40} onChange={(e) => { setSlug(e.target.value); setSlugTocado(true) }}

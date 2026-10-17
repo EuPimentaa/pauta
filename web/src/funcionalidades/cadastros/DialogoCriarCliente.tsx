@@ -71,7 +71,7 @@ export default function DialogoCriarCliente({ params, fechar }: PropsDialogo<'cr
           autoComplete="off" spellCheck={false} autoCapitalize="characters" erro={erroSigla}
           ajuda="Até 12 letras ou números, como HE ou ICC. É o que aparece no card." data-autofocus={params.sigla ? undefined : ''} />
         <Campo rotulo="Nome" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={160} autoComplete="off"
-          placeholder="Hospital Evangélico" erro={erroNome} data-autofocus={params.sigla ? '' : undefined} />
+          placeholder={sigla ? `Ex.: nome completo de ${sigla}` : 'Ex.: Clínica Exemplo'} erro={erroNome} data-autofocus={params.sigla ? '' : undefined} />
         {existente && (
           <Faixa tom="info" icone={Building2} acoes={(
             <Botao tamanho="p" variante="secundario" onClick={() => fechar({ cliente: existente })}>Usar {existente.sigla}</Botao>

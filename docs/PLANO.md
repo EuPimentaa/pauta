@@ -994,6 +994,7 @@ DS = DESIGN-SYSTEM-WEB, NS = NÚCLEO-SERVIDOR, NW = NÚCLEO-WEB.
 
 | Ponto | Ordem |
 |---|---|
+| modal, topo (integração 3B: uma linha logo abaixo de "na coluna … do quadro …") | `ciclo-estado` 100 (o estado do ciclo, leva às versões) |
 | modal, coluna principal | `modal-descricao` 100 · `modal-checklists` 200 · `ciclo-versoes` 300 · `modal-anexos` 400 · `modal-atividade` 500 |
 | modal, coluna lateral | `modal-membros` 100 · `modal-etiquetas` 150 · `modal-cliente` 200 · `modal-datas` 300 · `modal-prioridade` 350 · `modal-estimativa` 400 · `modal-tempo` 500 · `modal-capa` 600 |
 | ações do modal | `ciclo` 100–199 (o primário sai daqui) · outras 200+ |
@@ -1035,10 +1036,11 @@ DS = DESIGN-SYSTEM-WEB, NS = NÚCLEO-SERVIDOR, NW = NÚCLEO-WEB.
 | Início vazio | "Nada com você agora. Veja os seus quadros favoritos." | F3 |
 | Agenda vazia | "Nenhuma demanda com prazo neste período." | F3 |
 | Sino vazio | "Nenhuma notificação." | F3 |
-| Horas vazia | "Nenhuma hora nesta semana. Ligue o cronômetro (T) num card ou [Lançar tempo]." | F3 |
+| Horas vazia | "Nenhuma hora nesta semana. Ligue o cronômetro (T) num card ou [Lançar tempo]." (no toque, sem o "(T)") | F3 |
 | Equipe sem membros em "Criar os quadros das equipes" | "Convide a equipe antes: quem entrar depois ganha a própria coluna." | F5 |
 | Busca vazia | "Nada encontrado para "termo". Tente a sigla do cliente ou o número." | F4 |
-| Demanda sem versão | "Nenhuma versão entregue. Cole o link do Drive ou o caminho da pasta de saída." | F2 |
+| Demanda sem versão | "Nenhuma versão entregue. Cole o link do Drive ou o caminho da pasta de saída." (quem pode entregar); da equipe e fora da demanda: "Nenhuma versão entregue. Entre na demanda para entregar a versão." [Entrar e entregar]; os outros: "Nenhuma versão entregue." | F2 |
+| Versão sem nada visível ao cliente (só caminho de rede), na página pública | "A peça desta versão foi enviada por outro meio." + "Se precisar, fale com o seu atendimento." (sem os botões) | F2 |
 | Drive privado | "O cliente verá uma tela de login." [Abrir compartilhamento] [Testar de novo] [Enviar arquivo (até 10 MB)] | F2 |
 | Link expirado ou revogado | "Este link de aprovação não está mais ativo. Peça um novo ao seu atendimento." | F2 |
 | Versão substituída (409) | "Chegou a V3. Veja a versão nova antes de decidir." | F2 |

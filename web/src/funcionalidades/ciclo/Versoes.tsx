@@ -203,14 +203,13 @@ function CartaoVersao({ v, envios, decisoes, ctx, contatos, atual, anulavelId }:
         <span className="cic-versao-quem">
           entregue por <strong>{nome(usuarios.find((u) => u.id === v.criadaPor))}</strong> · <span title={quando(v.criadaEm)}>{tempoRelativo(v.criadaEm)}</span>
         </span>
-        {podeEditar && !editandoNota && (
+        {/* o que foi enviado ao cliente não muda: nem a nota nem os itens (o servidor responde 409) */}
+        {podeEditar && !editandoNota && !v.enviadaClienteEm && (
           <span className="cic-secao-acoes">
             <Botao variante="ghost" tamanho="p" icone={Pencil} onClick={() => { setNota(v.nota ?? ''); setEditandoNota(true) }}>
               {v.nota ? 'Editar nota' : 'Nota'}
             </Botao>
-            {!v.enviadaClienteEm && (
-              <Botao variante="ghost" tamanho="p" icone={Plus} aria-expanded={acrescentando} onClick={() => setAcrescentando((x) => !x)}>Acrescentar</Botao>
-            )}
+            <Botao variante="ghost" tamanho="p" icone={Plus} aria-expanded={acrescentando} onClick={() => setAcrescentando((x) => !x)}>Acrescentar</Botao>
           </span>
         )}
       </div>

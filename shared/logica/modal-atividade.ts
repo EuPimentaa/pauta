@@ -133,6 +133,7 @@ export function fraseAtividade(a: Atividade, n: NomesAtividade): FraseAtividade 
       const x = d as MapaDadosAtividade['versao.itens_adicionados']
       return f(`acrescentou ${x.itens} ${x.itens === 1 ? 'item' : 'itens'} à V${x.numero}`, 'entrega')
     }
+    case 'versao.editada': return f(`editou a nota da V${(d as MapaDadosAtividade['versao.editada']).numero}`, 'entrega')
     case 'versao.enviada': {
       const x = d as MapaDadosAtividade['versao.enviada']
       return f(`enviou a V${x.numero} ao cliente ${x.via === 'link' ? 'por link' : 'por fora'}`, 'envio')

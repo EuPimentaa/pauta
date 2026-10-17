@@ -250,13 +250,20 @@ export function entregarVersao(db: Db, demandaId: Id, e: EntregarVersaoEntrada, 
   return { versao, demanda: carregarDemanda(db, demandaId) }
 }
 
-/** PATCH /api/versoes/:id: a nota (o autor, atendimento, admin). */
+/**
+ * PATCH /api/versoes/:id: a nota (o autor, atendimento, admin), só enquanto a versão não foi enviada ao cliente (409
+ * depois, como acrescentar itens: o que foi enviado não muda). A troca fica no histórico com a nota de antes.
+ */
 export function editarVersao(db: Db, versaoId: Id, e: EditarVersaoEntrada, ator: Ator): VersaoComItens {
   const v = carregarVersaoSemItens(db, versaoId)
   exigir(ator, 'versao.editar', { versao: v })
   const d = demandaViva(db, v.demandaId)
   if (d.arquivadoEm) throw estadoInvalido('Restaure a demanda antes de editar a versão.')
-  if (e.nota !== undefined) rodar(db, 'UPDATE versao SET nota = ? WHERE id = ?', e.nota?.trim() || null, versaoId)
+  if (v.enviadaClienteEm) throw conflito('Esta versão já foi enviada ao cliente. A nota não muda depois do envio.')
+  const nota = e.nota === undefined ? v.nota : (e.nota?.trim() || null)
+  if (nota === v.nota) return carregarVersao(db, versaoId)
+  rodar(db, 'UPDATE versao SET nota = ? WHERE id = ?', nota, versaoId)
+  registrarAtividade(db, { tipo: 'versao.editada', ator, demandaId: v.demandaId, dados: { versaoId, numero: v.numero }, antes: { nota: v.nota } })
   return emitirVersao(db, versaoId, ator)
 }
 

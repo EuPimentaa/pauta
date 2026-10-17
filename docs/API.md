@@ -741,7 +741,10 @@ gatilhos. "Com quem está a bola" e o "parado há": §5.4.
   sigla e nome), a todas as pessoas ativas do atendimento (sem nenhuma, aos admins), com "· sem atendimento" no resumo.
 
 #### `PATCH /api/versoes/:id`
-Autor da versão, atendimento, admin. **Corpo:** `EditarVersaoEntrada`. `200 VersaoComItens`. **SSE:** `versao`.
+- **Quem:** autor da versão, atendimento, admin. Só enquanto `enviadaClienteEm` for nulo: depois do envio, `409 conflito`
+  "Esta versão já foi enviada ao cliente." para todos (o que foi enviado não muda; a nota é recado interno e nunca vai
+  à página pública). **Corpo:** `EditarVersaoEntrada`. **Resposta:** `200 VersaoComItens` (a mesma nota: sem efeito).
+- **Atividade:** `versao.editada` (`antes.nota` = a nota de antes). **SSE:** `versao`. Segurança da leva 2, achado 1.
 
 #### `POST /api/versoes/:id/itens`
 - **Quem:** autor da versão, atendimento, admin. Só enquanto `enviadaClienteEm` for nulo (`409 conflito` depois).

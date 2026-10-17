@@ -200,7 +200,7 @@ export const TIPOS_ATIVIDADE = [
   'demanda.membro_adicionado', 'demanda.membro_removido', 'demanda.etiqueta_adicionada', 'demanda.etiqueta_removida',
   'demanda.arquivada', 'demanda.restaurada', 'demanda.excluida', 'demanda.copiada', 'demanda.repetida',
   'rodada.aberta', 'rodada.extra_marcada', 'rodada.extra_desmarcada',
-  'versao.entregue', 'versao.itens_adicionados', 'versao.enviada', 'link.gerado', 'link.revogado', 'link.visto',
+  'versao.entregue', 'versao.itens_adicionados', 'versao.editada', 'versao.enviada', 'link.gerado', 'link.revogado', 'link.visto',
   'retorno.registrado', 'aprovacao.anulada',
   'comentario.criado', 'comentario.editado', 'comentario.excluido',
   'anexo.adicionado', 'anexo.removido',
@@ -264,6 +264,8 @@ export interface MapaDadosAtividade {
   'rodada.extra_desmarcada': { rodadaId: Id; numero: number }
   'versao.entregue': { versaoId: Id; numero: number; itens: number }
   'versao.itens_adicionados': { versaoId: Id; numero: number; itens: number }
+  /** A nota trocada antes do envio (depois dele não muda: 409). `antes.nota` guarda a de antes. */
+  'versao.editada': { versaoId: Id; numero: number }
   'versao.enviada': { versaoId: Id; numero: number; via: 'link' | 'fora'; canal: string | null; contatoId: Id | null }
   'link.gerado': { linkId: Id }
   'link.revogado': { linkId: Id }

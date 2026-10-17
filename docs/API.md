@@ -630,10 +630,16 @@ pelo número). Arquivadas e de quadros arquivados só com `incluirArquivadas`. M
 - `bodyLimit` recusa pelo `Content-Length` antes do parse (§1). Confere tamanho (`uploadLimiteBytes`, no máximo 10 MB)
   e magic number (jpg, png, webp, gif, pdf, zip); grava em `DATA_DIR/uploads/<2>/<id>` e o sha256. **Resposta:** `201 ArquivoInfo`.
 - **Nome:** sem caminho nem caracteres de controle, até 200, e com a extensão do tipo detectado (`nomeParaTipo`): a que
-  casa fica (zip: `.zip`, `.docx`, `.xlsx`, `.pptx`, OpenDocument, `.idml`, `.xd`, `.sketch`, iWork; PDF: `.pdf`, `.ai`;
-  jpg: `.jpg`, `.jpeg`); a perigosa (`.html`, `.htm`, `.svg`, `.js`, `.jar`, `.apk`, `.exe`, `.bat`, `.cmd`, `.ps1`,
-  `.xlsm`, `.docm`, `.pptm`, `.hta`, `.vbs`) ou a de outro tipo é trocada ("boleto.html" num PDF → "boleto.pdf"); sem
-  extensão ou com outra qualquer, o nome ganha a do tipo ("Proposta v1.2.pdf"). Segurança da leva 2, achado 5.
+  casa fica (zip, os formatos sem macro que são zip por dentro: `.zip`, Office e os modelos sem macro (`.docx`, `.xlsx`,
+  `.pptx`, `.dotx`, `.xltx`, `.potx`, `.ppsx`, `.sldx`, `.thmx`), OpenDocument (`.odt`, `.ods`, `.odp`, `.odg` e os
+  modelos), Visio (`.vsdx`, `.vssx`, `.vstx`), CorelDRAW (`.cdr`, `.cdt`), `.idml`, `.xd`, `.sketch`, iWork, `.kra`,
+  `.ora`, `.procreate`, `.lottie`, `.mogrt`, `.3mf`, `.usdz`, `.xps`, `.kmz`, `.cbz`, `.epub`; PDF: `.pdf`, `.ai`,
+  `.ait`; jpg: `.jpg`, `.jpeg`); a perigosa (`.html`, `.htm`, `.svg`, `.js`, `.hta`, `.vbs`, `.exe`, `.bat`, `.cmd`,
+  `.ps1`; zip com macro do Office ou do Visio: `.xlsm`, `.docm`, `.pptm`, `.dotm`, `.xltm`, `.potm`, `.ppsm`, `.sldm`,
+  `.xlam`, `.ppam`, `.vsdm`, `.vssm`, `.vstm`; o que instala ou executa: `.jar`, `.war`, `.ear`, `.apk`, `.xpi`, `.vsix`,
+  `.appx`, `.msix` e os pacotes, `.xap`) ou a de outro tipo é trocada ("boleto.html" num PDF → "boleto.pdf"); sem
+  extensão ou com outra qualquer, o nome ganha a do tipo ("Proposta v1.2.pdf", "arquivo.xyz.zip"). Segurança da leva 2,
+  achado 5 (a lista de zip cresceu na verificação: "logo.cdr" virava "logo.cdr.zip", também no download dos antigos).
 - **Em uso** = referenciado por `versao_item.arquivo_id`, `cliente.logo_arquivo_id` ou `anexo.arquivo_id` sem
   `excluido_em` (inclusive o print de evidência e a capa). O gatilho `arquivo_em_uso` impede marcar `excluido_em`
   num arquivo em uso; o job de órfãos (24 h sem uso) e a exclusão de anexo usam a mesma lista. O caminho inverso

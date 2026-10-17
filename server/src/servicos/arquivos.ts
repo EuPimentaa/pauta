@@ -55,13 +55,27 @@ const EXTENSOES: Record<MimePermitido, readonly string[]> = {
   'image/png': ['png'],
   'image/webp': ['webp'],
   'image/gif': ['gif'],
-  // o .ai do Illustrator salvo com compatibilidade PDF começa com %PDF-
-  'application/pdf': ['pdf', 'ai'],
-  // formatos que são zip por dentro (Office, OpenDocument, InDesign, XD, Sketch, iWork)
-  'application/zip': ['zip', 'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'epub', 'idml', 'xd', 'sketch', 'key', 'pages', 'numbers'],
+  // o .ai (e o modelo .ait) do Illustrator salvo com compatibilidade PDF começa com %PDF-
+  'application/pdf': ['pdf', 'ai', 'ait'],
+  // formatos sem macro que são zip por dentro: Office (e os modelos e apresentações sem macro), OpenDocument, Visio,
+  // CorelDRAW (desde o X4), InDesign, XD, Sketch, iWork, Krita/OpenRaster, Procreate, Lottie, modelo do Premiere,
+  // 3D (3MF, USDZ), XPS e Google Earth. Fora da lista, o nome ganha ".zip" (não abre em outro programa sem querer).
+  'application/zip': [
+    'zip', 'docx', 'xlsx', 'pptx', 'dotx', 'xltx', 'potx', 'ppsx', 'sldx', 'thmx',
+    'odt', 'ods', 'odp', 'odg', 'odf', 'odc', 'odm', 'ott', 'ots', 'otp', 'otg', 'epub',
+    'vsdx', 'vssx', 'vstx', 'cdr', 'cdt', 'idml', 'xd', 'sketch', 'key', 'pages', 'numbers',
+    'kra', 'ora', 'procreate', 'lottie', 'mogrt', '3mf', 'usdz', 'xps', 'oxps', 'kmz', 'cbz',
+  ],
 }
-/** Abrem como página ou script no navegador, ou executam no sistema (zip com macro ou app): sempre trocadas. */
-const EXTENSOES_PERIGOSAS = new Set(['html', 'htm', 'svg', 'js', 'jar', 'apk', 'exe', 'bat', 'cmd', 'ps1', 'xlsm', 'docm', 'pptm', 'hta', 'vbs'])
+/**
+ * Abrem como página ou script no navegador, ou executam ou instalam algo no sistema (zip com macro do Office ou do
+ * Visio, pacote Java, extensão de navegador ou de editor, app): sempre trocadas.
+ */
+const EXTENSOES_PERIGOSAS = new Set([
+  'html', 'htm', 'svg', 'js', 'hta', 'vbs', 'exe', 'bat', 'cmd', 'ps1',
+  'xlsm', 'docm', 'pptm', 'dotm', 'xltm', 'potm', 'ppsm', 'sldm', 'xlam', 'ppam', 'vsdm', 'vssm', 'vstm',
+  'jar', 'war', 'ear', 'apk', 'xpi', 'vsix', 'appx', 'appxbundle', 'msix', 'msixbundle', 'xap',
+])
 const EXTENSOES_CONHECIDAS = new Set(Object.values(EXTENSOES).flat())
 
 /**

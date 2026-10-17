@@ -58,6 +58,35 @@ describe('nome do arquivo pelo tipo detectado', () => {
     }
   })
 
+  test('formatos sem macro que são zip por dentro ficam como estão, no upload e no download (CorelDRAW, Visio, modelos do Office…)', async () => {
+    const a = await ambiente()
+    const nomes = ['logo.cdr', 'modelo.cdt', 'planta.vsdx', 'formas.vssx', 'desenho.odg', 'modelo.ott', 'modelo.dotx', 'modelo.xltx',
+      'modelo.potx', 'apresentacao.ppsx', 'tema.thmx', 'pintura.kra', 'camadas.ora', 'peca.3mf', 'cena.usdz', 'arte.procreate',
+      'animacao.lottie', 'titulo.mogrt', 'documento.xps', 'mapa.kmz']
+    for (const nome of nomes) {
+      const info = await subir(a, ZIP, nome)
+      assert.equal(info.nome, nome, nome)
+      assert.equal(await nomeBaixado(a, info.id), nome, `download de ${nome}`)
+    }
+    // gravado antes desta lista (o download passava pelo nomeParaTipo e saía "Logo final.cdr.zip")
+    const antigo = await subir(a, ZIP, 'pacote.zip')
+    rodar(a.db, 'UPDATE arquivo SET nome = ? WHERE id = ?', 'Logo final.cdr', antigo.id)
+    assert.equal(await nomeBaixado(a, antigo.id), 'Logo final.cdr')
+    // modelo do Illustrator salvo com compatibilidade PDF
+    assert.equal((await subir(a, PDF, 'modelo.ait')).nome, 'modelo.ait')
+  })
+
+  test('zip com macro ou que instala algo (modelos e suplementos do Office com macro, Java, extensões) é trocado', async () => {
+    const a = await ambiente()
+    for (const [enviado, esperado] of [['modelo.dotm', 'modelo.zip'], ['modelo.xltm', 'modelo.zip'], ['suplemento.xlam', 'suplemento.zip'],
+      ['show.ppsm', 'show.zip'], ['planta.vsdm', 'planta.zip'], ['app.war', 'app.zip'], ['extensao.xpi', 'extensao.zip'],
+      ['extensao.vsix', 'extensao.zip'], ['pacote.msix', 'pacote.zip']] as const) {
+      assert.equal((await subir(a, ZIP, enviado)).nome, esperado, enviado)
+    }
+    // extensão que ninguém conhece continua ganhando .zip (não abre em outro programa sem querer)
+    assert.equal((await subir(a, ZIP, 'arquivo.xyz')).nome, 'arquivo.xyz.zip')
+  })
+
   test('arquivo gravado antes da correção (nome com .html) é baixado com a extensão do tipo', async () => {
     const a = await ambiente()
     const info = await subir(a, PDF, 'boleto.pdf')

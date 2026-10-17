@@ -178,6 +178,8 @@ function Barra({ editor }: { editor: Editor }) {
     return () => { editor.off('transaction', atualizar) }
   }, [editor])
   const [link, setLink] = useState<{ aberto: boolean; url: string }>({ aberto: false, url: '' })
+  // padrão ARIA de toolbar: uma parada só no Tab (o último usado) e as setas, Home e End andam entre os botões
+  const [atual, setAtual] = useState(0)
   const [ancoraLink, setAncoraLink] = useState<HTMLButtonElement | null>(null)
   const botoes = [
     { rotulo: 'Negrito', icone: Bold, atalho: 'mod+b', ativo: editor.isActive('bold'), acao: () => editor.chain().focus().toggleBold().run() },
@@ -196,12 +198,23 @@ function Barra({ editor }: { editor: Editor }) {
     setLink({ aberto: false, url: '' })
   }
   return (
-    <div className="ui-editor-barra" role="toolbar" aria-label="Formatação">
-      {botoes.map((b) => (
+    <div className="ui-editor-barra" role="toolbar" aria-label="Formatação" aria-orientation="horizontal"
+      onKeyDown={(e) => {
+        const n = botoes.length + 1
+        const alvo = e.key === 'ArrowRight' ? (atual + 1) % n : e.key === 'ArrowLeft' ? (atual - 1 + n) % n
+          : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1
+        if (alvo < 0) return
+        e.preventDefault()
+        setAtual(alvo)
+        e.currentTarget.querySelectorAll<HTMLButtonElement>('button')[alvo]?.focus()
+      }}>
+      {botoes.map((b, i) => (
         <BotaoIcone key={b.rotulo} icone={b.icone} rotulo={b.rotulo} atalho={b.atalho} tamanho="p" aria-pressed={b.ativo}
+          tabIndex={i === atual ? 0 : -1} onFocus={() => setAtual(i)}
           onMouseDown={(e) => e.preventDefault()} onClick={b.acao} />
       ))}
       <BotaoIcone ref={setAncoraLink} icone={Link2} rotulo={editor.isActive('link') ? 'Tirar link' : 'Link'} tamanho="p"
+        tabIndex={atual === botoes.length ? 0 : -1} onFocus={() => setAtual(botoes.length)}
         aria-pressed={editor.isActive('link')} onMouseDown={(e) => e.preventDefault()}
         onClick={() => {
           if (editor.isActive('link')) editor.chain().focus().unsetLink().run()

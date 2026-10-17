@@ -28,9 +28,11 @@ export interface PropsAbas<T extends string> {
   /** Prefixo dos ids (para ligar com painelAba). Padrão: gerado. */
   idBase?: string
   className?: string
+  /** Só os ícones à vista (o rótulo continua como nome acessível e dica): o seletor de visão do quadro no celular. */
+  soIcones?: boolean
 }
 
-export function Abas<const T extends string>({ abas, ativa, aoMudar, rotulo, variante = 'segmento', idBase, className }: PropsAbas<T>) {
+export function Abas<const T extends string>({ abas, ativa, aoMudar, rotulo, variante = 'segmento', idBase, className, soIcones }: PropsAbas<T>) {
   const gerado = useId()
   const base = idBase ?? gerado
   const lista = useRef<HTMLDivElement>(null)
@@ -50,7 +52,8 @@ export function Abas<const T extends string>({ abas, ativa, aoMudar, rotulo, var
   }
 
   return (
-    <div ref={lista} role="tablist" aria-label={rotulo} className={cx('ui-abas', className)} data-variante={variante} onKeyDown={aoTeclar}>
+    <div ref={lista} role="tablist" aria-label={rotulo} className={cx('ui-abas', className)} data-variante={variante}
+      data-so-icones={soIcones || undefined} onKeyDown={aoTeclar}>
       {abas.map((a) => {
         const I = a.icone
         const sel = a.id === ativa
@@ -65,10 +68,11 @@ export function Abas<const T extends string>({ abas, ativa, aoMudar, rotulo, var
             tabIndex={sel ? 0 : -1}
             disabled={a.desabilitada}
             className="ui-aba"
+            title={soIcones && I ? a.rotulo : undefined}
             onClick={() => aoMudar(a.id)}
           >
             {I && <I aria-hidden="true" />}
-            {a.rotulo}
+            <span className="ui-aba-rotulo">{a.rotulo}</span>
             {a.contador ? <Contador valor={a.contador} tom="suave" /> : null}
           </button>
         )

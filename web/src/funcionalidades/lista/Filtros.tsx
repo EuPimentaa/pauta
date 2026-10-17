@@ -1,8 +1,9 @@
 /**
  * Filtros do quadro no cabeçalho (extensoes/quadro-cabecalho/lista-filtros.tsx; PLANO §3, F6): o campo "Filtrar neste
- * quadro" (texto, número ou cliente; vai para a URL depois de uma pausa na digitação), o botão "Filtros" (F) com o
- * número de filtros ligados, que abre o painel (popover no desktop, folha no celular), e um chip por filtro ativo com
- * o × que o tira. "Só as minhas" (Q), o total e "Limpar" (X) são do cabeçalho do núcleo. Tudo vive em `?f=`.
+ * quadro" (texto, número ou cliente; vai para a URL depois de uma pausa na digitação) e o botão "Filtros" (F) com o
+ * número de filtros ligados, que abre o painel (popover no desktop, folha no celular). Um chip por filtro ativo, com o
+ * × que o tira, numa linha própria sob o cabeçalho (lista-filtros-chips, lado 'abaixo': a primeira linha não muda
+ * quando eles aparecem). "Só as minhas" (Q), o total e "Limpar" (X) são do cabeçalho do núcleo. Tudo vive em `?f=`.
  */
 import './lista.css'
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
@@ -20,13 +21,9 @@ const PainelFiltros = lazy(() => import('./PainelFiltros.tsx'))
 const CHIPS_DESKTOP: ReadonlySet<CampoChip> = new Set(['clientes', 'membros', 'etiquetas', 'prazo', 'prioridades', 'comCliente', 'concluidas'])
 const CHIPS_CELULAR: ReadonlySet<CampoChip> = new Set([...CHIPS_DESKTOP, 'texto'])
 
-export function FiltrosDoQuadro({ quadro, filtros, definirFiltros, total }: PropsCabecalhoQuadro) {
+/** Os chips dos filtros ativos (lado 'abaixo' do cabeçalho); no celular, numa linha que rola. */
+export function ChipsDosFiltros({ quadro, filtros, definirFiltros }: PropsCabecalhoQuadro) {
   const celular = useCelular()
-  const [aberto, setAberto] = useState(false)
-  const [botao, setBotao] = useState<HTMLButtonElement | null>(null)
-  const abrir = useCallback(() => setAberto(true), [])
-  usePedidoDeFiltros(abrir)
-
   const clientes = useClientes()
   const usuarios = useUsuarios()
   const etiquetas = useEtiquetas(quadro.id)
@@ -35,8 +32,29 @@ export function FiltrosDoQuadro({ quadro, filtros, definirFiltros, total }: Prop
     usuarios: new Map(usuarios.map((u) => [u.id, u])),
     etiquetas: new Map(etiquetas.map((e) => [e.id, e])),
   }, celular ? CHIPS_CELULAR : CHIPS_DESKTOP), [filtros, clientes, usuarios, etiquetas, celular])
-  const n = contarNoPainel(filtros) + (celular && filtros.texto?.trim() ? 1 : 0)
   const tirar = (campo: CampoChip) => definirFiltros(semCampo(filtros, campo))
+  if (chips.length === 0) return null
+  return (
+    <ul className="lista-chips" aria-label="Filtros ativos" data-celular={celular || undefined}>
+      {chips.map((c) => (
+        <li key={c.campo} className="lista-chip">
+          <span className="lista-chip-texto">{c.rotulo}</span>
+          <button type="button" className="lista-chip-tirar" aria-label={c.tirar} onClick={() => tirar(c.campo)}>
+            <X aria-hidden="true" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+export function FiltrosDoQuadro({ quadro, filtros, definirFiltros, total }: PropsCabecalhoQuadro) {
+  const celular = useCelular()
+  const [aberto, setAberto] = useState(false)
+  const [botao, setBotao] = useState<HTMLButtonElement | null>(null)
+  const abrir = useCallback(() => setAberto(true), [])
+  usePedidoDeFiltros(abrir)
+  const n = contarNoPainel(filtros) + (celular && filtros.texto?.trim() ? 1 : 0)
 
   return (
     <div className="lista-filtros" data-celular={celular || undefined}>
@@ -45,18 +63,6 @@ export function FiltrosDoQuadro({ quadro, filtros, definirFiltros, total }: Prop
         aria-haspopup="dialog" aria-expanded={aberto} atalho="f" dica="Filtros" onClick={() => setAberto((a) => !a)}>
         Filtros{n > 0 && <><span className="lista-filtros-n" aria-hidden="true">{n}</span><span className="sr-only">, {n} {n === 1 ? 'ativo' : 'ativos'}</span></>}
       </Botao>
-      {chips.length > 0 && (
-        <ul className="lista-chips" aria-label="Filtros ativos">
-          {chips.map((c) => (
-            <li key={c.campo} className="lista-chip">
-              <span className="lista-chip-texto">{c.rotulo}</span>
-              <button type="button" className="lista-chip-tirar" aria-label={c.tirar} onClick={() => tirar(c.campo)}>
-                <X aria-hidden="true" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
       {aberto && (
         <Suspense fallback={null}>
           <PainelFiltros ancora={botao} aoFechar={() => setAberto(false)} quadro={quadro} filtros={filtros}

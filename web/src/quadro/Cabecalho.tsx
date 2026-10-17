@@ -1,8 +1,10 @@
 /**
  * Cabeçalho da página do quadro (PLANO §2, "Página do quadro"): ponto na cor e nome (o admin edita clicando), estrela
- * (useFavoritar do DS), os slots cabecalhoQuadro() à esquerda e à direita, o total de demandas, "Só as minhas" (Q),
- * "Limpar filtros" (X), o seletor Quadro | Lista | Calendário (layouts(); some sem outro layout instalado) e o menu
- * ··· (menuQuadro(): Seguir, Copiar link e o que vier das funcionalidades); a descrição do quadro, quando há, embaixo.
+ * (useFavoritar do DS), o seletor Quadro | Lista | Calendário logo depois do nome (layouts(); some sem outro layout
+ * instalado; no celular vai, só com os ícones, para a linha do total), os slots cabecalhoQuadro() à esquerda, à
+ * direita e abaixo (uma linha inteira: os chips dos filtros), o total de demandas, "Só as minhas" (Q), "Limpar
+ * filtros" (X) e o menu ··· (menuQuadro(): Seguir, Copiar link e o que vier das funcionalidades); a descrição do
+ * quadro, quando há, embaixo. Pedidos 1, 2 e 3 do F6 (integração 3B).
  */
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -13,6 +15,7 @@ import { useFavoritar } from '../api/menu.ts'
 import { useEditarQuadro } from '../api/quadros.ts'
 import { contextoAcaoAgora } from '../dialogos/contexto.ts'
 import type { ContextoQuadro, ExtensaoLayout } from '../extensoes/tipos.ts'
+import { useCelular } from '../lib/midia.ts'
 import type { Ancora } from '../lib/posicao.ts'
 import type { ModuloRegistro } from '../sessao/registro.ts'
 import { Abas } from '../ui/Abas.tsx'
@@ -70,6 +73,7 @@ function NomeDoQuadro({ quadro, admin }: { quadro: Quadro; admin: boolean }) {
 export function CabecalhoQuadro(p: Props) {
   const { quadro, eu, reg, filtros } = p
   const qc = useQueryClient()
+  const celular = useCelular()
   const favoritar = useFavoritar()
   const [menu, setMenu] = useState<{ ancora: Ancora; itens: ItemMenuUi[] } | null>(null)
   const favorito = eu.favoritos.includes(quadro.id)
@@ -94,6 +98,14 @@ export function CabecalhoQuadro(p: Props) {
     setMenu({ ancora, itens })
   }
 
+  const visoes = p.layouts.length > 1 && (
+    <Abas rotulo="Visão do quadro" abas={p.layouts.map((l) => ({ id: l.id, rotulo: l.rotulo, icone: l.icone }))} ativa={p.visao}
+      aoMudar={(v) => p.mudarVisao(v as VisaoQuadro)} className="quadro-visoes" soIcones={celular} />
+  )
+  const slot = (s: (typeof slots)[number]) => (
+    <LimiteErro key={s.id} nome={`cabeçalho ${s.id}`} fallback={null}><s.Componente {...propsSlot} /></LimiteErro>
+  )
+
   const totalTexto = filtrando
     ? `${p.visiveis} de ${p.total} ${p.total === 1 ? 'demanda' : 'demandas'}`
     : `${p.total} ${p.total === 1 ? 'demanda' : 'demandas'}`
@@ -105,32 +117,27 @@ export function CabecalhoQuadro(p: Props) {
         <NomeDoQuadro quadro={quadro} admin={eu.usuario.papel === 'admin'} />
         <BotaoIcone icone={Star} className="quadro-estrela" rotulo={favorito ? 'Tirar a estrela' : 'Pôr estrela'} aria-pressed={favorito}
           onClick={() => void favoritar(quadro.id, !favorito)} />
+        {!celular && visoes}
       </div>
       <div className="quadro-cabeca-lado">
-        {slots.filter((s) => s.lado === 'esquerda').map((s) => (
-          <LimiteErro key={s.id} nome={`cabeçalho ${s.id}`} fallback={null}><s.Componente {...propsSlot} /></LimiteErro>
-        ))}
+        {slots.filter((s) => s.lado === 'esquerda').map(slot)}
       </div>
       <span className="quadro-cabeca-espaco" />
-      <div className="quadro-cabeca-lado">
-        {slots.filter((s) => s.lado === 'direita').map((s) => (
-          <LimiteErro key={s.id} nome={`cabeçalho ${s.id}`} fallback={null}><s.Componente {...propsSlot} /></LimiteErro>
-        ))}
+      <div className="quadro-cabeca-lado quadro-cabeca-direita">
+        {slots.filter((s) => s.lado === 'direita').map(slot)}
         <span className="quadro-total" aria-live="polite">{totalTexto}</span>
-        <Botao variante="ghost" tamanho="p" icone={UserRound} aria-pressed={!!filtros.soMinhas} atalho="q" dica="Só as minhas"
+        <Botao variante="ghost" tamanho="p" icone={UserRound} className="quadro-so-minhas" aria-pressed={!!filtros.soMinhas} atalho="q" dica="Só as minhas"
           onClick={() => p.definirFiltros({ ...filtros, soMinhas: !filtros.soMinhas })}>
           Só as minhas
         </Botao>
         {filtrando && (
           <Botao variante="ghost" tamanho="p" icone={X} atalho="x" dica="Limpar os filtros" onClick={() => p.definirFiltros({})}>Limpar</Botao>
         )}
-        {p.layouts.length > 1 && (
-          <Abas rotulo="Visão do quadro" abas={p.layouts.map((l) => ({ id: l.id, rotulo: l.rotulo, icone: l.icone }))} ativa={p.visao}
-            aoMudar={(v) => p.mudarVisao(v as VisaoQuadro)} />
-        )}
+        {celular && visoes}
         <BotaoIcone icone={MoreHorizontal} rotulo="Mais ações do quadro" aria-haspopup="menu" aria-expanded={!!menu}
           className="quadro-mais" onClick={(e) => abrirMenu(e.currentTarget)} />
       </div>
+      <div className="quadro-cabeca-abaixo">{slots.filter((s) => s.lado === 'abaixo').map(slot)}</div>
       {quadro.descricao.trim() && <p className="quadro-descricao">{quadro.descricao}</p>}
       {menu && <MenuFlutuante aberto aoFechar={() => setMenu(null)} ancora={menu.ancora} itens={menu.itens} rotulo={`Ações do quadro ${quadro.nome}`} alinhar="fim" />}
     </div>

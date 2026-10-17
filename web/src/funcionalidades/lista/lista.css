@@ -196,9 +196,9 @@
   .lista-chip-tirar svg { width: 13px; height: 13px; }
   @media (max-width: 767.98px) {
     /* no celular os chips rolam numa linha só, abaixo do título */
-    .lista-filtros[data-celular] .lista-chips { position: relative; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; order: 2; }
-    .lista-filtros[data-celular] .lista-chips::-webkit-scrollbar { display: none; }
-    .lista-filtros[data-celular] .lista-chip { flex: none; }
+    .lista-chips[data-celular] { position: relative; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .lista-chips[data-celular]::-webkit-scrollbar { display: none; }
+    .lista-chips[data-celular] .lista-chip { flex: none; }
   }
 
   /* ─────────────── painel de filtros ─────────────── */

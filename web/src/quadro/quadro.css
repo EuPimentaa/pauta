@@ -28,6 +28,10 @@
   .quadro-nome-campo { font: 600 var(--fs-h2) / var(--lh-h2) var(--font); width: min(420px, 70vw); }
   .quadro-cabeca-lado { display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex-wrap: wrap; }
   .quadro-cabeca-espaco { flex: 1; }
+  .quadro-titulo .quadro-visoes { margin-left: var(--space-2); }
+  /* linha inteira sob o cabeçalho (os chips dos filtros): a primeira linha não muda quando eles aparecem */
+  .quadro-cabeca-abaixo { flex: 1 1 100%; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+  .quadro-cabeca-abaixo:empty { display: none; }
   .quadro-total { color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; }
   .quadro-estrela[aria-pressed="true"] svg { fill: var(--warning); stroke: var(--warning-ink); }
   .quadro-aviso {
@@ -50,9 +54,14 @@
     .quadro-cabeca { padding: var(--space-3) 16px 0; }
     .quadro-nome { font-size: var(--fs-h3); line-height: var(--lh-h3); }
     .quadro-aviso { margin: var(--space-2) 16px 0; }
-    /* segunda linha: total e "Só as minhas" à esquerda, o ··· no canto direito */
+    /* linha do total: total, "Só as minhas" e as visões (só ícones), o ··· no canto direito; a linha de baixo (os
+       chips dos filtros) vem antes dela */
     .quadro-cabeca-espaco { display: none; }
-    .quadro-cabeca > .quadro-cabeca-lado:last-of-type { flex: 1 1 100%; }
+    .quadro-cabeca > .quadro-cabeca-direita { flex: 1 1 100%; order: 2; }
+    .quadro-cabeca-abaixo { order: 1; }
+    .quadro-descricao { order: 3; }
+    /* sem o ícone, "Só as minhas" deixa as visões e o ··· na linha do total (390 px) */
+    .quadro-so-minhas > svg { display: none; }
     .quadro-mais { margin-left: auto; }
   }
 

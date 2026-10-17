@@ -251,11 +251,14 @@ export interface PropsCabecalhoQuadro {
   total: number
 }
 
-/** Slots do cabeçalho do quadro (nome editável, estrela e seletor de visão são do núcleo). */
+/**
+ * Slots do cabeçalho do quadro (nome editável, estrela e seletor de visão são do núcleo). `abaixo`: uma linha inteira
+ * sob o cabeçalho (os chips dos filtros ativos), para a primeira linha não mudar quando eles aparecem; some sem nada.
+ */
 export interface ExtensaoCabecalhoQuadro {
   id: string
   ordem: number
-  lado: 'esquerda' | 'direita'
+  lado: 'esquerda' | 'direita' | 'abaixo'
   Componente: ComponentType<PropsCabecalhoQuadro>
 }
 

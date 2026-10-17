@@ -3,14 +3,18 @@
  * Calendário do quadro (F6). Mês e semana (começa na segunda), feriados marcados, concluídas riscadas.
  * - arrastar um item de prazo (ou um card da faixa "Sem prazo") para um dia muda o prazo mantendo a hora
  *   (useMudarPrazo: "Prazo: sex, 24/10 · Desfazer"); início e publicação só aparecem;
- * - no celular vira uma lista por dia (o mês inteiro não cabe numa grade de 390 px).
+ * - no celular vira uma lista por dia (o mês inteiro não cabe numa grade de 390 px);
+ * - cada item traz a sigla do cliente antes do título (o primeiro dado do card em todo o produto), o título inteiro
+ *   no `title` e, no prazo vencido, o destaque de atrasada (texto em --danger-ink e o triângulo), como no card.
  */
 import './calendario.css'
 import { useMemo } from 'react'
-import { CalendarClock, ChevronLeft, ChevronRight, Megaphone, PlayCircle } from 'lucide-react'
-import type { CampoAgenda, DataLocal, Demanda, Feriado, HoraLocal } from '@shared/tipos/index.ts'
+import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, Megaphone, PlayCircle } from 'lucide-react'
+import type { Bootstrap, CampoAgenda, DataLocal, Demanda, Feriado, HoraLocal, PapelColuna } from '@shared/tipos/index.ts'
+import { estadoPrazo } from '@shared/logica/prazo.ts'
 import { useMudarPrazo } from '../api/demandas.ts'
-import { useQuadros } from '../api/seletores.ts'
+import { useClientes, useDoBootstrap, useQuadros } from '../api/seletores.ts'
+import { useAgora } from '../quadro/estado.ts'
 import { DIAS_LONGOS, MESES, diaDaSemana, diasDaSemana, formatarHora, gradeDoMes, hojeLocal, inicioDaSemana, mesmoMes, somarDias, somarMeses } from '../lib/datas.ts'
 import { useCelular } from '../lib/midia.ts'
 import { Abas } from '../ui/Abas.tsx'
@@ -36,6 +40,27 @@ export interface PropsCalendarioDemandas {
   abrir(numero: number): void
   /** Celular, período sem nenhum item: o texto da lista por dia (padrão "Nada neste período."); null = nenhum (quem usa desenha o dele). */
   vazio?: string | null
+  /** Faixa "Sem prazo" vazia: o texto (padrão "Todas têm prazo."; com filtro, quem usa diz "Nenhuma sem prazo com estes filtros."). */
+  semPrazoVazio?: string
+}
+
+/** O que o item do calendário precisa saber além da demanda: a sigla do cliente e se o prazo venceu. */
+interface Marcas { sigla: (d: Demanda) => string | null; atrasada: (d: Demanda, campo: CampoAgenda) => boolean }
+
+const selPapeis = (b: Bootstrap) => b.colunas
+
+function useMarcas(): Marcas {
+  const clientes = useClientes()
+  const colunas = useDoBootstrap(selPapeis)
+  const agora = useAgora()
+  return useMemo(() => {
+    const siglas = new Map(clientes.map((c) => [c.id, c.sigla]))
+    const papeis = new Map<string, PapelColuna>((colunas ?? []).map((c) => [c.id, c.papel]))
+    return {
+      sigla: (d) => (d.clienteId ? siglas.get(d.clienteId) ?? null : null),
+      atrasada: (d, campo) => campo === 'prazo' && estadoPrazo(d, { papel: papeis.get(d.colunaId) ?? 'normal' }, agora) === 'atrasada',
+    }
+  }, [clientes, colunas, agora])
 }
 
 const ICONE_CAMPO = { prazo: CalendarClock, inicio: PlayCircle, publicacao: Megaphone } as const
@@ -44,15 +69,22 @@ const ROTULO_CAMPO = { prazo: 'Prazo', inicio: 'Início', publicacao: 'Publicaç
 const idDoItem = (i: ItemCalendarioDemanda) => `${i.campo}:${i.demanda.id}:${i.data}`
 const idSemPrazo = (d: Demanda) => `semprazo:${d.id}`
 
-function Chip({ demanda: d, campo, hora, corQuadro, abrir }: { demanda: Demanda; campo: CampoAgenda; hora: HoraLocal | null; corQuadro?: string; abrir(n: number): void }) {
+function Chip({ demanda: d, campo, hora, corQuadro, abrir, marcas }: {
+  demanda: Demanda; campo: CampoAgenda; hora: HoraLocal | null; corQuadro?: string; abrir(n: number): void; marcas: Marcas
+}) {
   const I = ICONE_CAMPO[campo]
+  const sigla = marcas.sigla(d)
+  const atrasada = marcas.atrasada(d, campo)
   return (
     <button type="button" className="cal-chip" data-concluida={d.concluidaEm ? 'true' : undefined} data-campo={campo}
-      data-cor={corQuadro} onClick={() => abrir(d.numero)}
-      aria-label={`${ROTULO_CAMPO[campo]}: #${d.numero} ${d.titulo}${hora ? `, ${formatarHora(hora)}` : ''}${d.concluidaEm ? ', concluída' : ''}`}>
+      data-atrasada={atrasada || undefined} data-cor={corQuadro} onClick={() => abrir(d.numero)}
+      title={`#${d.numero} ${sigla ? `${sigla} · ` : ''}${d.titulo}`}
+      aria-label={`${ROTULO_CAMPO[campo]}: #${d.numero} ${sigla ? `${sigla}, ` : ''}${d.titulo}${hora ? `, ${formatarHora(hora)}` : ''}${atrasada ? ', atrasada' : ''}${d.concluidaEm ? ', concluída' : ''}`}>
       {corQuadro && <span className="cal-chip-ponto" aria-hidden="true" />}
+      {atrasada && <AlertTriangle aria-hidden="true" className="cal-chip-alerta" />}
       {campo !== 'prazo' && <I aria-hidden="true" />}
       {hora && <span className="cal-chip-hora">{formatarHora(hora)}</span>}
+      {sigla && <span className="cal-chip-sigla">{sigla}</span>}
       <span className="cal-chip-titulo">{d.titulo}</span>
     </button>
   )
@@ -63,7 +95,7 @@ function ordenar(a: ItemCalendarioDemanda, b: ItemCalendarioDemanda) {
 }
 
 /** Lista por dia (celular): os dias do período que têm item, com o cabeçalho de período da grade. */
-function ListaPorDia(p: PropsCalendarioDemandas & { cores: Map<string, string>; porDia: Map<DataLocal, ItemCalendarioDemanda[]> }) {
+function ListaPorDia(p: PropsCalendarioDemandas & { cores: Map<string, string>; porDia: Map<DataLocal, ItemCalendarioDemanda[]>; marcas: Marcas }) {
   const dias = p.modo === 'mes' ? gradeDoMes(p.inicio).filter((d) => mesmoMes(d, p.inicio)) : diasDaSemana(p.inicio)
   const comItens = dias.filter((d) => p.porDia.has(d))
   const feriados = new Map(p.feriados.map((f) => [f.data, f.nome]))
@@ -91,7 +123,7 @@ function ListaPorDia(p: PropsCalendarioDemandas & { cores: Map<string, string>; 
           </h3>
           <div className="cal-lista-itens">
             {p.porDia.get(d)!.map((i) => (
-              <Chip key={idDoItem(i)} demanda={i.demanda} campo={i.campo} hora={i.hora} corQuadro={p.mostrarQuadro ? p.cores.get(i.demanda.quadroId) : undefined} abrir={p.abrir} />
+              <Chip key={idDoItem(i)} demanda={i.demanda} campo={i.campo} hora={i.hora} corQuadro={p.mostrarQuadro ? p.cores.get(i.demanda.quadroId) : undefined} abrir={p.abrir} marcas={p.marcas} />
             ))}
           </div>
         </div>
@@ -105,6 +137,7 @@ export function CalendarioDemandas(p: PropsCalendarioDemandas) {
   const mudarPrazo = useMudarPrazo()
   const quadros = useQuadros()
   const cores = useMemo(() => new Map<string, string>(quadros.map((q) => [q.id, q.cor])), [quadros])
+  const marcas = useMarcas()
   const porDia = useMemo(() => {
     const m = new Map<DataLocal, ItemCalendarioDemanda[]>()
     for (const i of p.itens) m.set(i.data, [...(m.get(i.data) ?? []), i])
@@ -118,7 +151,7 @@ export function CalendarioDemandas(p: PropsCalendarioDemandas) {
     return m
   }, [p.itens, p.semPrazo])
 
-  if (celular) return <ListaPorDia {...p} cores={cores} porDia={porDia} />
+  if (celular) return <ListaPorDia {...p} cores={cores} porDia={porDia} marcas={marcas} />
 
   const soltar = (idItem: string, dia: DataLocal) => {
     const d = porId.get(idItem)
@@ -128,7 +161,7 @@ export function CalendarioDemandas(p: PropsCalendarioDemandas) {
     id: idDoItem(i),
     arrastavel: i.campo === 'prazo' && !i.demanda.concluidaEm,
     rotulo: `#${i.demanda.numero} ${i.demanda.titulo}`,
-    conteudo: <Chip demanda={i.demanda} campo={i.campo} hora={i.hora} corQuadro={p.mostrarQuadro ? cores.get(i.demanda.quadroId) : undefined} abrir={p.abrir} />,
+    conteudo: <Chip demanda={i.demanda} campo={i.campo} hora={i.hora} corQuadro={p.mostrarQuadro ? cores.get(i.demanda.quadroId) : undefined} abrir={p.abrir} marcas={marcas} />,
   }))
 
   return (
@@ -137,11 +170,11 @@ export function CalendarioDemandas(p: PropsCalendarioDemandas) {
         {p.semPrazo && (
           <aside className="cal-sem-prazo" aria-label="Sem prazo">
             <h3 className="cal-sem-prazo-titulo">Sem prazo <span className="tabular">{p.semPrazo.length}</span></h3>
-            {p.semPrazo.length === 0 && <p className="cal-sem-prazo-vazio">Todas têm prazo.</p>}
+            {p.semPrazo.length === 0 && <p className="cal-sem-prazo-vazio">{p.semPrazoVazio ?? 'Todas têm prazo.'}</p>}
             <div className="cal-sem-prazo-itens">
               {p.semPrazo.map((d) => (
                 <ItemCalendario key={d.id} id={idSemPrazo(d)} rotulo={`#${d.numero} ${d.titulo}, sem prazo`}>
-                  <Chip demanda={d} campo="prazo" hora={null} corQuadro={p.mostrarQuadro ? cores.get(d.quadroId) : undefined} abrir={p.abrir} />
+                  <Chip demanda={d} campo="prazo" hora={null} corQuadro={p.mostrarQuadro ? cores.get(d.quadroId) : undefined} abrir={p.abrir} marcas={marcas} />
                 </ItemCalendario>
               ))}
             </div>

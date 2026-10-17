@@ -24,6 +24,10 @@
   .cal-chip-hora { flex: none; color: var(--text-2); font-variant-numeric: lining-nums tabular-nums; }
   .cal-chip-titulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cal-chip[data-concluida="true"] .cal-chip-titulo { text-decoration: line-through; color: var(--text-2); }
+  .cal-chip-sigla { flex: none; color: var(--text-2); font-weight: 600; }
+  /* prazo vencido, como o card: texto em vermelho escuro e o triângulo */
+  .cal-chip[data-atrasada] { color: var(--danger-ink); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--danger) 35%, var(--border)); }
+  .cal-chip[data-atrasada] .cal-chip-sigla, .cal-chip[data-atrasada] .cal-chip-hora, .cal-chip svg.cal-chip-alerta { color: var(--danger-ink); }
   .cal-chip[data-campo="inicio"], .cal-chip[data-campo="publicacao"] { background: var(--surface-sunken); }
 
   /* celular: lista por dia */

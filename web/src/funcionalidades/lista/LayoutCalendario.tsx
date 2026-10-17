@@ -87,7 +87,8 @@ export default function LayoutCalendario(p: PropsLayout) {
       <div className="lista-cal-corpo">
         <CalendarioDemandas modo={modo} inicio={inicio}
           mudarPeriodo={(d, m) => { setInicio(d); if (m !== modo) setModo(m) }}
-          itens={itens} feriados={feriados} semPrazo={celular ? undefined : sem} abrir={abrir} />
+          itens={itens} feriados={feriados} semPrazo={celular ? undefined : sem} abrir={abrir}
+          semPrazoVazio={temFiltros(filtros) ? 'Nenhuma sem prazo com estes filtros.' : undefined} />
         {celular && <SemPrazoCelular demandas={sem} />}
       </div>
     </div>

@@ -163,7 +163,7 @@ Checkbox · `3c01b8e` título e topo do modal · `7af4124` cronômetro sem conta
 # Integração 3A, segunda parte: as revisões da leva 1 e as correções
 
 Três revisões adversariais rodaram sobre `0f6c1d5` (funcional ponta a ponta em produção, segurança e visual/UX). Esta
-parte corrige o que elas acharam, direto na `master` (27 commits, `9c6885d`..`7664f9b`, sem push). Quando fazia sentido,
+parte corrige o que elas acharam, direto na `master` (`9c6885d`..`4fbb9b1` mais este registro, sem push). Quando fazia sentido,
 o teste novo falhou antes da correção (conferido tirando a correção e rodando de novo).
 
 Ambiente: API 7331 + Vite 5201 (`DATA_DIR=./data/integrador-3b`, `seed:demo`) para desenvolvimento e auditoria; build
@@ -259,12 +259,16 @@ no PLANO §4. Nenhuma migração nova.
 
 ## Verificação
 
-- Regra 8 na `master` em `7664f9b`: `npx tsc --noEmit -p server` e `-p web` sem erros; `npm test` **360/360** (eram
+- Regra 8 na `master` em `7664f9b` (e, depois do ajuste de regex em `4fbb9b1`, só servidor, de novo `tsc -p server` e
+  `npm test`): `npx tsc --noEmit -p server` e `-p web` sem erros; `npm test` **360/360** (eram
   347); `node server/scripts/verificar-migracoes.ts` 420 checagens, 0 falhas; `npm run build` sem aviso de chunk;
   `npm run contraste --workspace web` 276 pares, 0 abaixo; auditoria de navegador com login nas páginas `/inicio,
   /q/criacao, /d/25, /config/conta, /config/pessoas, /config/equipes, /config/quadros, /config/modelos,
   /config/feriados, /config/parametros, /config/aparencia, /clientes, /clientes/CHZ, /arquivo, /quadros/novo` (claro e
   escuro, 1440 e 390): **nenhum problema**.
+- `npm test` repetido: numa das primeiras seis rodadas, o teste novo "100 mil [ em menos de 50 ms" falhou com 53 ms (a
+  suíte roda os arquivos em paralelo). A regex do link ficou linear (sem `[` dentro do texto do link: 50 mil `[` em
+  0,4 ms) e as cinco rodadas seguidas depois disso deram 360/360.
 - **Roteiro de banco vazio em produção** (7332, `NODE_ENV=production`, CSP real), janelas isoladas para admin, Pri
   (atendimento), Bia, Léo e Duda (designers):
   - deslogado, `/` vai a `/entrar` sem nenhum erro no console (nem 401 nem aviso de fonte);

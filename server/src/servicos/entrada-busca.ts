@@ -46,7 +46,8 @@ export function markdownParaTexto(md: string): string {
   return md
     .replace(/\\([\\`*_[\]~<>|#+\-.!()])/g, (_, c: string) => String.fromCharCode(0xe000 + c.charCodeAt(0)))
     .replace(/@\[([^\]\n]{1,120})\]\(mencao:[A-Za-z0-9-]{1,64}\)/g, '@$1')
-    .replace(/\[([^\]\n]{0,200})\]\((?:[^)\s]{0,2000})\)/g, '$1')
+    // sem "[" dentro do texto do link: numa sequência de "[" cada tentativa para no "[" seguinte (linear)
+    .replace(/\[([^[\]\n]{0,200})\]\((?:[^)\s]{0,2000})\)/g, '$1')
     .replace(/^\s{0,3}(#{1,6}|>+|[-*+]|\d+[.)])\s+/gm, '')
     .replace(/(\*\*|__|~~|`+)/g, '')
     .replace(/(^|[\s(])[*_](\S)/g, '$1$2')

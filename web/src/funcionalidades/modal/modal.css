@@ -113,7 +113,8 @@
   .mdl-escondidos { margin-left: 44px; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
 
   /* ─────────────── anexos ─────────────── */
-  .mdl-anexos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 8px; }
+  /* duas colunas iguais (o caminho de rede também ocupa uma: antes, 310, 628 e 310 px na mesma lista) */
+  .mdl-anexos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .mdl-anexo {
     position: relative; display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 10px;
     min-height: 64px; padding: 6px 6px 6px 6px; border-radius: var(--radius-md); background: var(--surface);
@@ -146,7 +147,6 @@
   .mdl-anexo-marca[data-tom="evidencia"] { background: var(--info-bg); color: var(--info-ink); }
   .mdl-anexo .ui-copiar { padding: 2px 2px 2px 8px; }
   .mdl-anexo-caminho { grid-column: 2 / -1; }
-  .mdl-anexo[data-tipo="caminho"] { grid-column: 1 / -1; }
   .mdl-soltar {
     display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; padding: 10px; border-radius: var(--radius-md);
     border: 1px dashed var(--border-strong); color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); text-align: center;

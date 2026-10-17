@@ -249,7 +249,7 @@ function Checklist({ c, ctx, rodada, novoAberto, abrirNovo }: {
       {total > 0 && (
         <div className="mdl-progresso" data-completo={feitos === total || undefined}>
           <span className="mdl-progresso-pct" aria-hidden="true">{pct}%</span>
-          <BarraProgresso valor={feitos} max={total} rotulo={`Progresso de ${c.titulo}`} mostrarRotulo />
+          <BarraProgresso valor={feitos} max={total} rotulo={`Progresso de ${c.titulo}`} />
         </div>
       )}
       <DndContext sensors={sensores} collisionDetection={closestCenter} onDragEnd={aoSoltar}>

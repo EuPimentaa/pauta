@@ -56,7 +56,8 @@ export interface PropsChipCliente {
 export function ChipCliente({ cliente, tamanho = 'p', comNome, className }: PropsChipCliente) {
   const el = (
     <span className={cx('ui-chip-cliente', className)} data-cor={cliente.cor} data-tamanho={tamanho}
-      aria-label={comNome ? undefined : `Cliente ${cliente.nome} (${cliente.sigla})`} role={comNome ? undefined : 'img'}>
+      aria-label={comNome ? undefined : `Cliente ${cliente.nome} (${cliente.sigla})`} role={comNome ? undefined : 'img'}
+      title={comNome ? `${cliente.sigla} · ${cliente.nome}` : undefined}>
       {cliente.logoUrl && <img src={cliente.logoUrl} alt="" />}
       <span aria-hidden={comNome ? undefined : true}>{cliente.sigla}</span>
       {/* o nome se separa da sigla só pelo peso (400 x 600), na tinta cheia: com opacidade ficava abaixo de AA */}

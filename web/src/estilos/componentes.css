@@ -289,7 +289,7 @@
   }
   .ui-copiar code {
     flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text);
-    font: 500 12.5px / 1.4 ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, monospace;
+    font: 400 12px / 1.4 ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, monospace;
   }
   .ui-texto-puro { white-space: pre-wrap; overflow-wrap: anywhere; }
   .ui-texto-puro[data-linhas] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--linhas); overflow: hidden; }

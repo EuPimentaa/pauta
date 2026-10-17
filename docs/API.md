@@ -821,7 +821,8 @@ Qualquer usuário. **Corpo:** `TestarDriveEntrada`. **Resposta:** `200 TestarDri
 - **Erros:** `409 conflito` (ajuste, já anulada, não é a mais recente ou já há uma rodada nova aberta, como depois de
   um ajuste interno). Vale para a aprovação pelo link e pela equipe; o "Desfazer" do aviso só aparece na manual.
   **Atividade:** `aprovacao.anulada`
-  (+ `demanda.movida`). **SSE:** `aprovacao`, `demanda`, `rodada`.
+  (+ `demanda.movida`). **SSE:** `aprovacao`, `demanda`, `rodada`, `notificacao`: as `aprovada` da decisão anulada
+  ganham "· anulada por Pri" no resumo (integração 3B; aprovar de novo não deixa duas iguais sem explicação).
 
 #### `POST /api/demandas/:id/ajuste-interno` (Pedir ajuste interno)
 - **Quem:** atendimento, admin. Exige versão entregue na rodada atual (`422` "Nada entregue nesta rodada"); sem

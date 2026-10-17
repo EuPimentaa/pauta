@@ -28,7 +28,7 @@ import { testarLinkDrive } from './drive.ts'
 import { emitirMudancasDemanda, emitirObjeto } from './eventos.ts'
 import { COLUNAS_ARQUIVO, mapear } from './mapear.ts'
 import { mover } from './mover.ts'
-import { nomeDoAtor, notificar, rotuloDemanda } from './notificacoes.ts'
+import { marcarNotificacoesDoFato, nomeDoAtor, notificar, rotuloDemanda } from './notificacoes.ts'
 import { exigir } from './permissoes.ts'
 import { idsAtivos } from './pessoas.ts'
 
@@ -491,6 +491,8 @@ export function anularAprovacao(db: Db, aprovacaoId: Id, ator: Ator): AnularApro
   }
   const versao = carregarVersaoSemItens(db, a.versaoId)
   registrarAtividade(db, { tipo: 'aprovacao.anulada', ator, demandaId: a.demandaId, dados: { aprovacaoId: a.id, versaoNumero: versao.numero, voltou } })
+  // quem recebeu "aprovou a V1" fica sabendo que ela foi anulada (aprovar de novo não deixa duas notificações iguais)
+  if (registro) marcarNotificacoesDoFato(db, { atividadeId: registro.id, tipo: 'aprovada', sufixo: ` · anulada por ${nomeDoAtor(ator) ?? 'alguém'}`, ator })
   return { demanda: carregarDemanda(db, a.demandaId), voltou }
 }
 

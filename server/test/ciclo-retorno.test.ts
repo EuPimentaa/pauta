@@ -225,6 +225,10 @@ describe('Aprovado pelo WhatsApp e anular', () => {
     assert.equal(um<{ n: number }>(a.db, 'SELECT count(*) AS n FROM rodada WHERE demanda_id = ? AND fechada_em IS NULL', d.id)!.n, 1)
     // anular de novo → 409
     assert.equal((await am.post(`/api/aprovacoes/${ok.corpo.aprovacao.id}/anular`, {})).status, 409)
+    // quem recebeu "aprovou a V1" vê que foi anulada; aprovar de novo deixa uma anulada e uma nova
+    assert.deepEqual(notificacoesDe(a.db, a.pessoas.design.id).filter((n) => n.tipo === 'aprovada').map((n) => n.resumo.endsWith(' · anulada por Pri')), [true])
+    await am.post(`/api/demandas/${d.id}/aprovado-whatsapp`, {})
+    assert.deepEqual(notificacoesDe(a.db, a.pessoas.design.id).filter((n) => n.tipo === 'aprovada').map((n) => n.resumo.endsWith(' · anulada por Pri')).sort(), [false, true])
   })
 
   test('anular não devolve a demanda se alguém a moveu depois da decisão; o ajuste não se anula', async () => {

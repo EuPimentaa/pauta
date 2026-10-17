@@ -34,6 +34,24 @@ export function notificar(db: Db, n: {
   return enviados
 }
 
+/**
+ * Marca as notificações de um fato desfeito (ex.: a aprovação anulada): o resumo ganha o sufixo ("· anulada por Pri")
+ * e cada uma sai de novo pelo evento `notificacao` (objeto inteiro: o sino troca a linha). Não muda o lido.
+ */
+export function marcarNotificacoesDoFato(db: Db, p: { atividadeId: number; tipo: TipoNotificacao; sufixo: string; ator: Ator }): number {
+  const linhas = todos<{ id: number; usuario_id: string; resumo: string; demanda_id: string | null }>(db,
+    'SELECT id, usuario_id, resumo, demanda_id FROM notificacao WHERE atividade_id = ? AND tipo = ?', p.atividadeId, p.tipo)
+  for (const l of linhas) {
+    if (l.resumo.endsWith(p.sufixo)) continue
+    const resumo = `${l.resumo.slice(0, 300 - p.sufixo.length)}${p.sufixo}`
+    rodar(db, 'UPDATE notificacao SET resumo = ? WHERE id = ?', resumo, l.id)
+    const linha = um<Record<string, unknown>>(db, `
+      SELECT n.*, d.numero AS demanda_numero FROM notificacao n LEFT JOIN demanda d ON d.id = n.demanda_id WHERE n.id = ?`, l.id)!
+    emitirObjeto(db, 'notificacao', String(l.id), mapear.notificacao(linha), p.ator, { publico: 'usuario', usuarioId: l.usuario_id, demandaId: l.demanda_id })
+  }
+  return linhas.length
+}
+
 /** Pessoas ativas que seguem o quadro. */
 export function seguidoresDoQuadro(db: Db, quadroId: Id): Id[] {
   return todos<{ usuario_id: string }>(db, `

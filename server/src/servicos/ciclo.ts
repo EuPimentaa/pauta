@@ -20,6 +20,7 @@ import { agora, depoisDoCommit, novoId, rodar, todos, tx, um, type Db } from '..
 import { ErroHttp, conflito, estadoInvalido, naoEncontrado, validacao } from '../erros.ts'
 import { registrarAtividade } from './atividade.ts'
 import { executarAutomacao, quadroDoEnvio } from './automacoes.ts'
+import { hoje } from './config-app.ts'
 import {
   abrirRodada, atualizarLinhaDemanda, carregarDemanda, carregarRodada, demandaViva, detectarProvedor, exigirHttps, inserirAnexo,
 } from './demandas.ts'
@@ -379,6 +380,7 @@ export function registrarRetorno(db: Db, p: ParametrosRetorno): RegistrarRetorno
   emitirObjeto(db, 'aprovacao', aprovacaoId, carregarAprovacao(db, aprovacaoId), p.ator, { demandaId: antes.id })
 
   const automacao = executarAutomacao(db, antes.id, p.decisao === 'aprovado' ? 'aprovado' : 'ajuste_pedido', p.ator, quadroEnvio)
+  if (p.decisao === 'aprovado' && automacao) prazoAoPassarAdiante(db, antes.id, quadroEnvio, aprovacaoId, p.ator)
   const posAutomacao = carregarDemanda(db, antes.id)
   const retornoEm = instante > posAutomacao.statusDesde ? instante : posAutomacao.statusDesde
   atualizarLinhaDemanda(db, antes.id, { retorno_em: retornoEm }, p.ator)
@@ -396,6 +398,39 @@ export function registrarRetorno(db: Db, p: ParametrosRetorno): RegistrarRetorno
       : `${Quem} pediu ${plural(itens.length, 'ajuste', 'ajustes')} na V${versao.numero} de ${rotulo}`,
   })
   return { aprovacao: carregarAprovacao(db, aprovacaoId), demanda: carregarDemanda(db, antes.id), rodada, checklist, sugerirExtra, automacao }
+}
+
+/**
+ * A aprovação levou a peça para outro quadro (ex.: Criação → Social › Fila): o prazo era o da rodada que acabou de ser
+ * cumprida e não diz nada a quem recebe (ficaria atrasado lá e dispararia o aviso das 8h). Vira a publicação, se houver
+ * (com a hora dela), senão nenhum. Com repetição o prazo fica (a próxima nasce dele). Não mexe na rodada (o prazo dela
+ * é histórico). A atividade guarda o de antes, que anular devolve.
+ */
+function prazoAoPassarAdiante(db: Db, demandaId: Id, quadroEnvio: Id, aprovacaoId: Id, ator: Ator): void {
+  const d = carregarDemanda(db, demandaId)
+  if (d.quadroId === quadroEnvio || !d.prazo) return
+  let prazo: DataLocal | null = d.publicacaoData && d.publicacaoData >= hoje() ? d.publicacaoData : null
+  if (prazo && d.inicio && d.inicio > prazo) prazo = null
+  if (!prazo && d.repetir !== 'nenhuma') return
+  const prazoHora = prazo ? d.publicacaoHora : null
+  if (prazo === d.prazo && prazoHora === d.prazoHora) return
+  atualizarLinhaDemanda(db, demandaId, { prazo, prazo_hora: prazoHora }, ator)
+  const campos = ['prazo', ...(prazoHora !== d.prazoHora ? ['prazoHora'] : [])]
+  registrarAtividade(db, { tipo: 'demanda.editada', ator, demandaId, dados: { campos, aprovacaoId, prazoNovo: prazo },
+    antes: { prazo: d.prazo, prazoHora: d.prazoHora } })
+}
+
+/** Anular devolve o prazo que a aprovação tirou, se ninguém mexeu nele depois. */
+function devolverPrazoDaAprovacao(db: Db, demandaId: Id, aprovacaoId: Id, ator: Ator): void {
+  const l = um<{ dados: string; antes: string | null }>(db, `SELECT dados, antes FROM atividade WHERE demanda_id = ? AND tipo = 'demanda.editada'
+    AND json_extract(dados, '$.aprovacaoId') = ? ORDER BY id DESC LIMIT 1`, demandaId, aprovacaoId)
+  if (!l?.antes) return
+  const dados = JSON.parse(l.dados) as MapaDadosAtividade['demanda.editada']
+  const era = JSON.parse(l.antes) as { prazo: DataLocal | null; prazoHora: HoraLocal | null }
+  const d = carregarDemanda(db, demandaId)
+  if (d.prazo !== (dados.prazoNovo ?? null)) return
+  atualizarLinhaDemanda(db, demandaId, { prazo: era.prazo, prazo_hora: era.prazoHora }, ator)
+  registrarAtividade(db, { tipo: 'demanda.editada', ator, demandaId, dados: { campos: ['prazo'] }, antes: { prazo: d.prazo, prazoHora: d.prazoHora } })
 }
 
 // ─────────────────────────────── anular a aprovação ───────────────────────────────
@@ -449,6 +484,9 @@ export function anularAprovacao(db: Db, aprovacaoId: Id, ator: Ator): AnularApro
         : undefined
       mover(db, { demandaId: a.demandaId, ator, colunaId: a.colunaAntesId, via: 'manual', membroIds })
       voltou = true
+      const movida = carregarDemanda(db, a.demandaId)
+      devolverPrazoDaAprovacao(db, a.demandaId, a.id, ator)
+      emitirMudancasDemanda(db, movida, ator)
     }
   }
   const versao = carregarVersaoSemItens(db, a.versaoId)

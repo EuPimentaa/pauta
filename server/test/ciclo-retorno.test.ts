@@ -319,3 +319,48 @@ describe('cliente sem AM (criado pela equipe, só com sigla e nome)', () => {
     assert.ok(notificacoesDe(a.db, a.pessoas.am2.id).some((n) => n.tipo === 'ajuste_pedido'), 'quem enviou')
   })
 })
+
+describe('prazo da peça aprovada que a automação leva a outro quadro', () => {
+  test('sem publicação fica sem prazo (a rodada guarda o dela); anular devolve o prazo de antes', async () => {
+    const a = await ambiente()
+    const d = await a.criarDemanda({ colunaId: a.coluna('criacao', 'Design').id, prazo: '2026-10-16', prazoHora: '15:00' })
+    const v1 = await entregar(a, d)
+    await enviarAoCliente(a, v1.demanda, { via: 'fora' })
+    const am = a.como(a.pessoas.am)
+    const ok = await am.post(`/api/demandas/${d.id}/aprovado-whatsapp`, {})
+    assert.equal(ok.status, 200, ok.texto)
+    const s = ok.corpo.demanda as Demanda
+    assert.equal(s.colunaId, a.coluna('social', 'Agendar').id)
+    assert.equal(s.prazo, null)
+    assert.equal(s.prazoHora, null)
+    // no Social ela não vira atrasada depois do prazo da rodada já cumprida
+    assert.equal(estadoPrazo(s, { papel: 'normal' }, new Date('2026-10-19T22:00:00.000Z')), 'sem_prazo')
+    assert.equal(um<{ prazo: string }>(a.db, 'SELECT prazo FROM rodada WHERE demanda_id = ? AND numero = 1', d.id)!.prazo, '2026-10-16')
+
+    const anular = await am.post(`/api/aprovacoes/${ok.corpo.aprovacao.id}/anular`, {})
+    assert.equal(anular.corpo.voltou, true)
+    assert.equal(anular.corpo.demanda.prazo, '2026-10-16')
+    assert.equal(anular.corpo.demanda.prazoHora, '15:00')
+  })
+
+  test('com publicação o prazo vira a publicação; automação para o próprio quadro do envio não mexe no prazo', async () => {
+    const a = await ambiente()
+    const d = await a.criarDemanda({ colunaId: a.coluna('criacao', 'Design').id, prazo: '2026-10-16', publicacaoData: '2026-10-21',
+      publicacaoHora: '10:00' })
+    const v1 = await entregar(a, d)
+    await enviarAoCliente(a, v1.demanda, { via: 'fora' })
+    const ok = await a.como(a.pessoas.am).post(`/api/demandas/${d.id}/aprovado-whatsapp`, {})
+    assert.equal(ok.corpo.demanda.prazo, '2026-10-21')
+    assert.equal(ok.corpo.demanda.prazoHora, '10:00')
+
+    const criacao = a.quadros.criacao.quadro.id
+    const put = await a.como(a.pessoas.admin).put(`/api/quadros/${criacao}/automacoes/aprovado`, { destinoColunaId: a.coluna('criacao', 'Pronto').id })
+    assert.equal(put.status, 200, put.texto)
+    const d2 = await a.criarDemanda({ colunaId: a.coluna('criacao', 'Design').id, prazo: '2026-10-16' })
+    const v = await entregar(a, d2)
+    await enviarAoCliente(a, v.demanda, { via: 'fora' })
+    const ok2 = await a.como(a.pessoas.am).post(`/api/demandas/${d2.id}/aprovado-whatsapp`, {})
+    assert.equal(ok2.corpo.demanda.colunaId, a.coluna('criacao', 'Pronto').id)
+    assert.equal(ok2.corpo.demanda.prazo, '2026-10-16')
+  })
+})

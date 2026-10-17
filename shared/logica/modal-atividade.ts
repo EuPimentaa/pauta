@@ -68,6 +68,11 @@ export function fraseAtividade(a: Atividade, n: NomesAtividade): FraseAtividade 
       const x = d as MapaDadosAtividade['demanda.editada']
       const partes = x.campos.map((c) => CAMPOS[c]).filter((c): c is string => !!c)
       const prazoAntes = a.antes && typeof a.antes.prazo === 'string' ? ` (era ${n.data(a.antes.prazo)})` : ''
+      // a aprovação levou a peça a outro quadro: o prazo da rodada foi cumprido (API.md §4.16)
+      if (x.aprovacaoId) {
+        return { ator: 'Automação', grupo: 'edicao',
+          texto: x.prazoNovo ? `trocou o prazo pela publicação, ${n.data(x.prazoNovo)}${prazoAntes}` : `tirou o prazo, cumprido na aprovação${prazoAntes}` }
+      }
       return f(partes.length ? `mudou ${juntar(partes)}${x.campos.length === 1 && x.campos[0] === 'prazo' ? prazoAntes : ''}` : 'editou a demanda',
         'edicao')
     }

@@ -66,6 +66,10 @@ describe('frase do histórico', () => {
     assert.equal(fraseAtividade(a('demanda.membro_adicionado', { usuarioId: 'u1' }), nomes).texto, 'entrou na demanda')
     assert.equal(fraseAtividade(a('demanda.editada', { campos: ['prazo'] }, { antes: { prazo: '2026-10-16' } }), nomes).texto, 'mudou o prazo (era [2026-10-16])')
     assert.equal(fraseAtividade(a('demanda.editada', { campos: ['titulo', 'prioridade', 'capaCor'] }), nomes).texto, 'mudou o título, a prioridade e a capa')
+    assert.deepEqual(fraseAtividade(a('demanda.editada', { campos: ['prazo'], aprovacaoId: 'ap', prazoNovo: null }, { antes: { prazo: '2026-10-19' } }), nomes),
+      { ator: 'Automação', texto: 'tirou o prazo, cumprido na aprovação (era [2026-10-19])', grupo: 'edicao' })
+    assert.equal(fraseAtividade(a('demanda.editada', { campos: ['prazo'], aprovacaoId: 'ap', prazoNovo: '2026-10-21' }, { antes: { prazo: '2026-10-19' } }), nomes).texto,
+      'trocou o prazo pela publicação, [2026-10-21] (era [2026-10-19])')
     assert.equal(fraseAtividade(a('tempo.lancado', { minutos: 90, origem: 'cronometro', apontamentoId: 'x' }, { atorId: 'u2' }), nomes).ator, 'Você')
     assert.equal(fraseAtividade(a('tempo.lancado', { minutos: 90, origem: 'cronometro', apontamentoId: 'x' }), nomes).texto, 'registrou 1h30 no cronômetro')
     assert.deepEqual(fraseAtividade(a('retorno.registrado', { decisao: 'ajuste', via: 'link', versaoNumero: 2, quem: 'Fulana', aprovacaoId: 'x' },

@@ -791,7 +791,9 @@ Qualquer usuário. **Corpo:** `TestarDriveEntrada`. **Resposta:** `200 TestarDri
   `aprovacao` grava `quadroAntesId`/`colunaAntesId` = onde a demanda está agora.
   - **aprovado:** `aprovadaEm`/`aprovadaVersaoId`, fecha a rodada, limpa `envioPendenteEm` e roda a automação
     `aprovado` **do quadro do envio** (`envio.quadro_id` do último envio desta versão; pode levar a outro quadro,
-    ex.: Social › Agendar);
+    ex.: Social › Agendar). Levada a um quadro que não é o do envio, o prazo (o da rodada, já cumprido) vira a
+    publicação com a hora dela, ou nenhum (com repetição, fica); a rodada guarda o dela (`demanda.editada` com
+    `aprovacaoId` e `prazoNovo`; anular, quando a demanda volta, devolve o prazo de antes se ninguém mexeu nele);
   - **ajuste:** `comentario` = linhas, abre a rodada N+1 (§5.7) com checklist "Ajustes R{N+1}", limpa
     `envioPendenteEm` e roda a automação `ajuste_pedido` do quadro do envio (ex.: volta da Atendimento › Com o
     cliente para a Criação › Fila); `sugerirExtra` se N+1 passou das inclusas.

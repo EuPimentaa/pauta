@@ -226,7 +226,15 @@ export interface LugarDemanda {
 /** Formato de `dados` por tipo (o que o histórico precisa para escrever a frase). `antes` guarda os valores anteriores. */
 export interface MapaDadosAtividade {
   'demanda.criada': { origem: OrigemDemanda; quadroId: Id; colunaId: Id; modeloId: Id | null }
-  'demanda.editada': { campos: string[] }
+  'demanda.editada': {
+    campos: string[]
+    /**
+     * Prazo trocado pela aprovação que levou a peça a outro quadro (API.md §4.16): o da rodada já foi cumprido; o novo
+     * é a publicação ou nenhum. Anular a aprovação devolve o de antes.
+     */
+    aprovacaoId?: Id
+    prazoNovo?: DataLocal | null
+  }
   'demanda.movida': {
     de: LugarDemanda; para: LugarDemanda; via: ViaMovimento; gatilho?: GatilhoAutomacao
     /** Nomes das etiquetas que ficaram guardadas no quadro de origem. */

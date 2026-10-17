@@ -260,11 +260,30 @@ export function TabelaLista(p: PropsTabela) {
   // ─────────── foco itinerante ───────────
   const [foco, setFoco] = useState<string | null>(null)
   const pendente = useRef<string | null>(null)
-  const chaveFoco = foco && indicePorChave.has(foco) ? foco : linhas.find(focavel)?.chave ?? null
+  /** A demanda da linha focada: se ela muda de grupo (`,` e `.`, Desfazer, outra pessoa), o foco vai junto. */
+  const focoDemanda = useRef<Id | null>(null)
+  const seguida = foco && !indicePorChave.has(foco) && focoDemanda.current
+    ? linhas.find((l) => l.tipo === 'demanda' && l.demanda.id === focoDemanda.current)?.chave ?? null
+    : null
+  const chaveFoco = foco && indicePorChave.has(foco) ? foco : seguida ?? linhas.find(focavel)?.chave ?? null
   const indiceFoco = chaveFoco ? indicePorChave.get(chaveFoco) ?? -1 : -1
+  useLayoutEffect(() => {
+    if (!seguida) return
+    setFoco(seguida)
+    // a linha focada saiu do DOM (mudou de grupo): o foco tinha caído no corpo e volta para ela, à vista
+    if (document.activeElement === document.body || !document.activeElement) {
+      pendente.current = seguida
+      const i = indicePorChave.get(seguida)
+      const el = rolagem.current
+      if (el && i !== undefined && (topos[i] < el.scrollTop || topos[i] + ALTURAS.demanda > el.scrollTop + el.clientHeight - ALTURA_CABECA)) {
+        el.scrollTop = Math.max(0, topos[i] - el.clientHeight / 2)
+        setVista((v) => ({ ...v, topo: el.scrollTop }))
+      }
+    }
+  }, [seguida, indicePorChave, topos])
 
-  const aoFocarDemanda = useCallback((chave: string, d: Demanda) => { setFoco(chave); focar(d) }, [focar])
-  const aoFocarGrupo = useCallback((chave: string) => { setFoco(chave); focar(null) }, [focar])
+  const aoFocarDemanda = useCallback((chave: string, d: Demanda) => { setFoco(chave); focoDemanda.current = d.id; focar(d) }, [focar])
+  const aoFocarGrupo = useCallback((chave: string) => { setFoco(chave); focoDemanda.current = null; focar(null) }, [focar])
   const aoDesfocar = useCallback(() => focar(null), [focar])
   useEffect(() => () => focar(null), [focar])
 

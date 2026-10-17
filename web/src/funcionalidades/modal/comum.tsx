@@ -97,6 +97,15 @@ export function useUsuarios(): UsuarioResumo[] {
 /** Apelido ou primeiro nome. */
 export const nomeCurto = (u: Pick<UsuarioResumo, 'nome' | 'apelido'>) => u.apelido || u.nome.split(' ')[0] || u.nome
 
+/** Para o <Markdown nomeDaPessoa>: o chip da menção mostra o nome atual da pessoa do id (o rótulo do texto é do autor). */
+export function useNomeDaPessoa(): (id: string) => string | null {
+  const usuarios = useUsuarios()
+  return useMemo(() => {
+    const porId = new Map(usuarios.map((u) => [u.id, nomeCurto(u)]))
+    return (id: string) => porId.get(id) ?? null
+  }, [usuarios])
+}
+
 /** Quem aparece no "@" do editor: pessoas ativas que casam o termo (nome ou apelido, sem acento), até 8. */
 export function useBuscarPessoas(): (termo: string) => PessoaMencao[] {
   const usuarios = useUsuarios()

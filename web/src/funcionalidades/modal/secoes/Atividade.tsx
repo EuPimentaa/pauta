@@ -29,7 +29,7 @@ import { EditorMarkdown } from '../../../ui/EditorMarkdown.tsx'
 import { EsqueletoLinhas } from '../../../ui/Indicadores.tsx'
 import { Kbd } from '../../../ui/Kbd.tsx'
 import { useAcoesModal, useComentarios, useHistorico } from '../api.ts'
-import { Secao, nomeCurto, quandoPorExtenso, tempoRelativo, useBuscarPessoas, useEscLocal, useUsuarios } from '../comum.tsx'
+import { Secao, nomeCurto, quandoPorExtenso, tempoRelativo, useBuscarPessoas, useEscLocal, useNomeDaPessoa, useUsuarios } from '../comum.tsx'
 
 const Markdown = lazy(() => import('../../../ui/Markdown.tsx').then((m) => ({ default: m.Markdown })))
 
@@ -146,6 +146,7 @@ function UmComentario({ c, ctx, responder }: { c: Comentario; ctx: ContextoDeman
   const acoes = useAcoesModal()
   const usuarios = useUsuarios()
   const buscarPessoas = useBuscarPessoas()
+  const nomeDaPessoa = useNomeDaPessoa()
   const [editando, setEditando] = useState<string | null>(null)
   useEscLocal(editando !== null, () => setEditando(null))
   const autor = c.autorId ? usuarios.find((u) => u.id === c.autorId) : undefined
@@ -190,7 +191,7 @@ function UmComentario({ c, ctx, responder }: { c: Comentario; ctx: ContextoDeman
           </div>
         ) : (
           <div className="mdl-comentario-balao">
-            <Suspense fallback={<EsqueletoLinhas linhas={1} />}><Markdown texto={c.corpoMd} euId={eu.id} /></Suspense>
+            <Suspense fallback={<EsqueletoLinhas linhas={1} />}><Markdown texto={c.corpoMd} euId={eu.id} nomeDaPessoa={nomeDaPessoa} nivelBase={4} /></Suspense>
             {c.anexos.length > 0 && (
               <div className="mdl-comentario-anexos">
                 {c.anexos.map((a) => (a.arquivo?.imagem ? (

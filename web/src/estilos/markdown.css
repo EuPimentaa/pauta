@@ -8,6 +8,12 @@
   .ui-md h1 { font-size: var(--fs-h3); }
   .ui-md h2 { font-size: 16px; }
   .ui-md h3 { font-size: var(--fs-body); }
+  /* com nivelBase, o nível do texto vem em data-nivel e o tamanho continua o de antes */
+  .ui-md [data-nivel] { font-weight: 600; letter-spacing: var(--tracking-titulo); line-height: 1.3; margin-top: 1.2em; }
+  .ui-md > [data-nivel]:first-child { margin-top: 0; }
+  .ui-md [data-nivel="1"] { font-size: var(--fs-h3); }
+  .ui-md [data-nivel="2"] { font-size: 16px; }
+  .ui-md [data-nivel="3"] { font-size: var(--fs-body); }
   .ui-md strong { font-weight: 600; }
   .ui-md s { color: var(--text-2); }
   .ui-md a { color: var(--accent-ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; border-radius: 2px; }
@@ -28,8 +34,9 @@
   .ui-md[data-compacto="true"] { font-size: var(--fs-meta); line-height: 1.5; }
   .ui-md[data-compacto="true"] > * + * { margin-top: .5em; }
 
+  /* respiro de 3 px e -1 px à direita: "@Pri." não se lê "@Pri ." */
   .ui-mencao {
-    display: inline; padding: 0 4px; border-radius: 5px; white-space: nowrap;
+    display: inline; padding: 0 3px; margin-right: -1px; border-radius: 5px; white-space: nowrap;
     background: var(--accent-soft); color: var(--accent-ink); font-weight: 500;
   }
   .ui-mencao[data-eu="true"] { background: var(--accent); color: var(--on-accent); }

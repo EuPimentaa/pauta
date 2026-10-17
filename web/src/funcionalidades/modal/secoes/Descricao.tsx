@@ -15,7 +15,7 @@ import { EditorMarkdown } from '../../../ui/EditorMarkdown.tsx'
 import { EsqueletoLinhas } from '../../../ui/Indicadores.tsx'
 import { Kbd } from '../../../ui/Kbd.tsx'
 import { TextoPuro } from '../../../ui/Texto.tsx'
-import { Secao, useBuscarPessoas, useEscLocal } from '../comum.tsx'
+import { Secao, useBuscarPessoas, useEscLocal, useNomeDaPessoa } from '../comum.tsx'
 
 const Markdown = lazy(() => import('../../../ui/Markdown.tsx').then((m) => ({ default: m.Markdown })))
 
@@ -29,6 +29,7 @@ function saiuDe(bloco: HTMLElement | null, alvo: EventTarget | null): boolean {
 export default function Descricao({ ctx }: { ctx: ContextoDemanda }) {
   const acoes = useAcoes()
   const buscarPessoas = useBuscarPessoas()
+  const nomeDaPessoa = useNomeDaPessoa()
   const [editando, setEditando] = useState<{ base: Demanda; texto: string } | null>(null)
   const bloco = useRef<HTMLDivElement>(null)
   const salvando = useRef(false)
@@ -84,12 +85,12 @@ export default function Descricao({ ctx }: { ctx: ContextoDemanda }) {
         </div>
       ) : texto.trim() ? (
         ctx.somenteLeitura ? (
-          <Suspense fallback={<EsqueletoLinhas linhas={3} />}><Markdown texto={texto} euId={ctx.eu.usuario.id} /></Suspense>
+          <Suspense fallback={<EsqueletoLinhas linhas={3} />}><Markdown texto={texto} euId={ctx.eu.usuario.id} nomeDaPessoa={nomeDaPessoa} nivelBase={3} /></Suspense>
         ) : (
           // clique no texto edita (como no Trello); os links do texto continuam abrindo. No teclado: o "Editar" do topo
           <div className="mdl-descricao-ler" title="Clique para editar"
             onClick={(e) => { if (!(e.target as Element).closest('a') && !window.getSelection()?.toString()) comecar() }}>
-            <Suspense fallback={<EsqueletoLinhas linhas={3} />}><Markdown texto={texto} euId={ctx.eu.usuario.id} /></Suspense>
+            <Suspense fallback={<EsqueletoLinhas linhas={3} />}><Markdown texto={texto} euId={ctx.eu.usuario.id} nomeDaPessoa={nomeDaPessoa} nivelBase={3} /></Suspense>
           </div>
         )
       ) : ctx.somenteLeitura ? (

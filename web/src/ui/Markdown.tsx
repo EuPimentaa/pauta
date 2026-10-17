@@ -7,6 +7,9 @@
  *   atributos só href e data-mencao; URI só https: e mailto:; links com rel="noopener noreferrer nofollow ugc" e
  *   target="_blank".
  * O resultado (um DocumentFragment saneado) vira elementos React: nada de dangerouslySetInnerHTML.
+ * Com `nomeDaPessoa`, o chip da menção mostra o nome atual da pessoa do id (o rótulo escrito no texto não vale: "@[Diretoria
+ * Financeira](mencao:<id da Bia>)" aparece como "@Bia"); id que não é de ninguém vira o texto como foi escrito, sem chip.
+ * Com `nivelBase`, os títulos do texto descem de nível (h1 → h{nivelBase}), para não competir com o título da tela.
  *
  *   <Markdown texto={demanda.descricaoMd} />
  *   <Markdown texto={comentario.textoMd} compacto euId={eu.usuario.id} />
@@ -107,12 +110,18 @@ export function markdownParaHtmlSeguro(texto: string): string {
 
 // ─────────────────────────────── DOM saneado → React ───────────────────────────────
 
-function paraReact(no: Node, chave: string, euId: string | undefined): ReactNode {
+interface OpcoesReact {
+  euId?: string
+  nomeDaPessoa?(id: string): string | null
+  nivelBase?: number
+}
+
+function paraReact(no: Node, chave: string, o: OpcoesReact): ReactNode {
   if (no.nodeType === Node.TEXT_NODE) return no.textContent
   if (no.nodeType !== Node.ELEMENT_NODE) return null
   const el = no as Element
   const tag = el.tagName.toLowerCase()
-  const filhos = Array.from(el.childNodes, (f, i) => paraReact(f, `${chave}.${i}`, euId))
+  const filhos = Array.from(el.childNodes, (f, i) => paraReact(f, `${chave}.${i}`, o))
   if (!(TAGS as readonly string[]).includes(tag)) return createElement(Fragment, { key: chave }, ...filhos)
   if (tag === 'a') {
     const href = el.getAttribute('href') ?? ''
@@ -122,7 +131,16 @@ function paraReact(no: Node, chave: string, euId: string | undefined): ReactNode
   if (tag === 'span') {
     const id = el.getAttribute('data-mencao') ?? ''
     if (!RE_ID_MENCAO.test(id)) return createElement(Fragment, { key: chave }, ...filhos)
-    return createElement('span', { key: chave, className: 'ui-mencao', 'data-mencao': id, 'data-eu': id === euId || undefined }, ...filhos)
+    if (o.nomeDaPessoa) {
+      const nome = o.nomeDaPessoa(id)
+      if (nome === null) return createElement(Fragment, { key: chave }, ...filhos)
+      return createElement('span', { key: chave, className: 'ui-mencao', 'data-mencao': id, 'data-eu': id === o.euId || undefined }, `@${nome}`)
+    }
+    return createElement('span', { key: chave, className: 'ui-mencao', 'data-mencao': id, 'data-eu': id === o.euId || undefined }, ...filhos)
+  }
+  if (o.nivelBase && /^h[1-3]$/.test(tag)) {
+    const nivel = Number(tag[1])
+    return createElement(`h${Math.min(6, nivel - 1 + o.nivelBase)}`, { key: chave, 'data-nivel': nivel }, ...filhos)
   }
   if (tag === 'br' || tag === 'hr') return createElement(tag, { key: chave })
   return createElement(tag, { key: chave }, ...filhos)
@@ -134,13 +152,17 @@ export interface PropsMarkdown {
   compacto?: boolean
   /** Destaca as menções a mim. */
   euId?: string
+  /** O nome atual da pessoa do id da menção (diretório do bootstrap); null = id de ninguém (vira texto). */
+  nomeDaPessoa?(id: string): string | null
+  /** Os títulos do texto começam neste nível (3: h1 e h2 do texto viram h3 e h4). */
+  nivelBase?: number
   className?: string
 }
 
-export function Markdown({ texto, compacto, euId, className }: PropsMarkdown) {
+export function Markdown({ texto, compacto, euId, nomeDaPessoa, nivelBase, className }: PropsMarkdown) {
   const conteudo = useMemo(() => {
     const frag = sanear(md.render(texto ?? ''))
-    return Array.from(frag.childNodes, (n, i) => paraReact(n, String(i), euId))
-  }, [texto, euId])
+    return Array.from(frag.childNodes, (n, i) => paraReact(n, String(i), { euId, nomeDaPessoa, nivelBase }))
+  }, [texto, euId, nomeDaPessoa, nivelBase])
   return <div className={cx('ui-md', className)} data-compacto={compacto || undefined}>{conteudo}</div>
 }

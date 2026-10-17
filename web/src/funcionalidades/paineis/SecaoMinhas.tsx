@@ -71,8 +71,11 @@ function Vazio() {
   const quadros = useDoBootstrap(selFavoritos) ?? []
   const eu = useEu()
   const favoritos = eu.favoritos.length > 0
-  const texto = favoritos || quadros.length === 0 ? 'Veja os seus quadros favoritos.'
-    : eu.usuario.equipeIds.length > 0 ? 'Veja os quadros da sua equipe.' : 'Veja os quadros da agência.'
+  // sem nenhum quadro (começo do zero): o caminho é criar os quadros, não ver os favoritos
+  const texto = quadros.length === 0
+    ? (eu.usuario.papel === 'admin' ? 'Comece pelos Primeiros passos: os quadros das equipes saem num clique.' : 'Peça ao admin para criar os quadros.')
+    : favoritos ? 'Veja os seus quadros favoritos.'
+      : eu.usuario.equipeIds.length > 0 ? 'Veja os quadros da sua equipe.' : 'Veja os quadros da agência.'
   return (
     <div className="pnl-vazio">
       <EstadoVazio icone={Coffee} titulo="Nada com você agora." texto={texto} />

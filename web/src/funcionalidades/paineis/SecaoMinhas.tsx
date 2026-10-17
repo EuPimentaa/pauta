@@ -1,11 +1,11 @@
 /**
  * Início · Minhas demandas (F3, ordem 100): as abertas em que sou membro ou o AM, por prazo: Atrasadas, Hoje, Esta
- * semana, Depois e Sem prazo, com o card de cada uma (e o quadro dela). Grupos longos mostram os primeiros e
+ * semana, Com o cliente (as enviadas há mais tempo primeiro), Depois e Sem prazo, com o card de cada uma (e o quadro dela). Grupos longos mostram os primeiros e
  * "Mostrar mais". Nada comigo: "Nada com você agora. Veja os seus quadros favoritos." com os favoritos.
  */
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { AlarmClock, CalendarClock, CalendarDays, CalendarRange, ChevronDown, ChevronUp, Coffee, Inbox, Star } from 'lucide-react'
+import { AlarmClock, CalendarClock, CalendarDays, CalendarRange, ChevronDown, ChevronUp, Coffee, Hourglass, Inbox, Star } from 'lucide-react'
 import type { Bootstrap, Demanda, Id, MinhasPorPrazo, Quadro } from '@shared/tipos/index.ts'
 import type { Icone } from '../../extensoes/tipos.ts'
 import { useEu } from '../../api/auth.ts'
@@ -20,6 +20,7 @@ const GRUPOS: { id: keyof MinhasPorPrazo; ancora: string; titulo: string; icone:
   { id: 'atrasadas', ancora: 'pnl-atrasadas', titulo: 'Atrasadas', icone: AlarmClock, mostrar: 12 },
   { id: 'hoje', ancora: 'pnl-hoje', titulo: 'Hoje', icone: CalendarClock, mostrar: 12 },
   { id: 'semana', ancora: 'pnl-semana', titulo: 'Esta semana', icone: CalendarDays, mostrar: 8 },
+  { id: 'comCliente', ancora: 'pnl-cliente', titulo: 'Com o cliente', icone: Hourglass, mostrar: 4 },
   { id: 'depois', ancora: 'pnl-depois', titulo: 'Depois', icone: CalendarRange, mostrar: 4 },
   { id: 'semPrazo', ancora: 'pnl-sem-prazo', titulo: 'Sem prazo', icone: Inbox, mostrar: 4 },
 ]

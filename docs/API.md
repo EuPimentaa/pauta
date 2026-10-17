@@ -906,8 +906,9 @@ Mesmos headers de `GET /api/arquivos/:id`; `&inline=1` (só imagem, como na rota
 
 #### `GET /api/inicio`
 - Qualquer usuário. `200 InicioSaida`: minhas abertas por prazo (`estadoPrazo` §5.2: atrasadas, hoje, esta semana
-  de amanhã até domingo (no domingo ela é vazia), depois, sem prazo; as com o cliente ficam em "depois"/"sem prazo"
-  pelo prazo, nunca em atrasadas); `comClienteParado` para o atendimento e também para o **admin**, só nas demandas em
+  de amanhã até domingo (no domingo ela é vazia), com o cliente, depois, sem prazo; as com o cliente (`pausado`) têm o
+  grupo `comCliente`, nunca atrasadas, as enviadas há mais tempo primeiro (`envioPendenteEm`, senão `statusDesde`);
+  integração 3B); `comClienteParado` para o atendimento e também para o **admin**, só nas demandas em
   que a pessoa é o AM (`atendimentoId` = eu; a equipe nunca recebe o bloco): as com o cliente há mais de
   `clienteParadoDiasUteis` (§5.4), mais antigas primeiro (dias úteis desde o envio, senão desde a entrada na coluna
   `aguardando_cliente`); "Registrar retorno" só aparece com `envioPendenteEm`, senão o bloco mostra "Abrir". Na
@@ -917,7 +918,7 @@ Mesmos headers de `GET /api/arquivos/:id`; `&inline=1` (só imagem, como na rota
 - As listas são as de `shared/logica/paineis.ts` (`minhasPorPrazo`, `comClienteParado`, `resumoInicio`), as mesmas
   que o front calcula do bootstrap (o card entra e sai do Início na hora; `GET /api/inicio` serve as menções). Ordem
   dentro de cada grupo: prazo, hora (sem hora = 18h), prioridade (urgente primeiro) e número; "sem prazo" por
-  prioridade e número; a com o cliente sem prazo vai para "sem prazo".
+  prioridade e número; "com o cliente" pelo envio.
 - `primeirosPassos` só para admin, nulo quando concluído. Na ordem de `PASSOS_INICIAIS`, com o critério de `feito` (e
   o `caminho` de cada item):
   - `convidar_equipe` (`/config/pessoas`): pelo menos 2 usuários ativos. Vem primeiro para o modelo "Por pessoa" já

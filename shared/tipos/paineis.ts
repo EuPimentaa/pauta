@@ -15,6 +15,8 @@ export interface MinhasPorPrazo {
   hoje: Id[]
   /** Do dia seguinte até domingo desta semana. */
   semana: Id[]
+  /** Com o cliente (estado `pausado`), tenham prazo ou não: as enviadas há mais tempo primeiro (integração 3B). */
+  comCliente: Id[]
   depois: Id[]
   semPrazo: Id[]
 }

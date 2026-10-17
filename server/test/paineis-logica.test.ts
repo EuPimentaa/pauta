@@ -55,12 +55,12 @@ describe('Início e Agenda', () => {
     assert.deepEqual([a, b, c, d, e].sort(porPrazo).map((x) => x.id), [d.id, c.id, b.id, a.id, e.id])
   })
 
-  test('minhasPorPrazo usa o papel da coluna: aguardando_cliente pausa (vai para "depois")', () => {
+  test('minhasPorPrazo usa o papel da coluna: aguardando_cliente pausa (vai para "com o cliente")', () => {
     const agora = new Date('2026-10-14T13:00:00.000Z')
     const vencida = demanda({ prazo: '2026-10-13', colunaId: 'cliente' })
     const deOutro = demanda({ prazo: '2026-10-13', membroIds: ['outro'] })
     const minhas = minhasPorPrazo([vencida, deOutro], (id) => (id === 'cliente' ? 'aguardando_cliente' : 'normal'), 'eu', agora)
-    assert.deepEqual(minhas, { atrasadas: [], hoje: [], semana: [], depois: [vencida.id], semPrazo: [] })
+    assert.deepEqual(minhas, { atrasadas: [], hoje: [], semana: [], comCliente: [vencida.id], depois: [], semPrazo: [] })
     // a decisão do cliente depois de entrar na coluna devolve a bola
     const decidida = { ...vencida, retornoEm: '2026-10-13T12:00:00.000Z' }
     assert.deepEqual(minhasPorPrazo([decidida], () => 'aguardando_cliente', 'eu', agora).atrasadas, [vencida.id])

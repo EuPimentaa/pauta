@@ -66,9 +66,7 @@ export default function TelaInicio() {
             {partes.length === 0 ? 'Nada atrasado nem para hoje.' : partes.map((p, i) => (
               <span key={p.id}>
                 {i > 0 && <span className="pnl-inicio-sep" aria-hidden="true"> · </span>}
-                {p.id === 'cliente'
-                  ? <span className="pnl-inicio-parte" data-tom={p.id}>{p.texto}</span>
-                  : <a href={`#pnl-${p.id}`} className="pnl-inicio-parte" data-tom={p.id} onClick={(e) => irPara(e, `pnl-${p.id}`)}>{p.texto}</a>}
+                <a href={`#pnl-${p.id}`} className="pnl-inicio-parte" data-tom={p.id} onClick={(e) => irPara(e, `pnl-${p.id}`)}>{p.texto}</a>
               </span>
             ))}
           </p>

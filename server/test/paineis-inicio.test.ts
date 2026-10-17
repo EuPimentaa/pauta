@@ -65,7 +65,7 @@ describe('GET /api/inicio · minhas', () => {
     assert.deepEqual(noDomingo.minhas.depois, [segunda.id])
   })
 
-  test('com o cliente nunca entra em Atrasadas: vai para "depois" (ou "sem prazo") e conta em comCliente', async () => {
+  test('com o cliente nunca entra em Atrasadas: tem o grupo dele (as enviadas há mais tempo primeiro) e conta em comCliente', async () => {
     const a = await ambiente()
     const { am } = a.pessoas
     const enviadaVencida = await a.criarDemanda({ titulo: 'Enviada vencida', prazo: '2026-10-09', ate: 'enviada' })
@@ -76,8 +76,9 @@ describe('GET /api/inicio · minhas', () => {
 
     const { minhas, resumo } = await inicioDe(a, am)
     assert.deepEqual(minhas.atrasadas, [atrasadaDeVerdade.id])
-    assert.deepEqual(minhas.depois, [enviadaVencida.id, naColuna.id])
-    assert.deepEqual(minhas.semPrazo, [enviadaSemPrazo.id])
+    assert.deepEqual(minhas.comCliente, [enviadaVencida.id, enviadaSemPrazo.id, naColuna.id])
+    assert.deepEqual(minhas.depois, [])
+    assert.deepEqual(minhas.semPrazo, [])
     assert.deepEqual(resumo, { atrasadas: 1, hoje: 0, comCliente: 3 })
   })
 })

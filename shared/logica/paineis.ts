@@ -34,11 +34,12 @@ export function domingoDaSemana(hoje: DataLocal): DataLocal {
 }
 
 /**
- * Minhas abertas por prazo (estadoPrazo, API.md §5.2): atrasadas, hoje, esta semana (de amanhã até domingo), depois e
- * sem prazo. As com o cliente (estado `pausado`) nunca são atrasadas: vão para "depois" (com prazo) ou "sem prazo".
+ * Minhas abertas por prazo (estadoPrazo, API.md §5.2): atrasadas, hoje, esta semana (de amanhã até domingo), com o
+ * cliente, depois e sem prazo. As com o cliente (estado `pausado`) nunca são atrasadas e têm o grupo delas, as
+ * enviadas há mais tempo primeiro (antes iam para "Depois" e, ordenadas pelo prazo vencido, abriam o grupo).
  */
 export function minhasPorPrazo(demandas: readonly Demanda[], papelDe: PapelDe, euId: Id, agora: Date): MinhasPorPrazo {
-  const grupos: Record<keyof MinhasPorPrazo, Demanda[]> = { atrasadas: [], hoje: [], semana: [], depois: [], semPrazo: [] }
+  const grupos: Record<keyof MinhasPorPrazo, Demanda[]> = { atrasadas: [], hoje: [], semana: [], comCliente: [], depois: [], semPrazo: [] }
   const domingo = domingoDaSemana(hojeSP(agora))
   for (const d of demandas) {
     if (d.concluidaEm || d.arquivadoEm || !ehMinha(d, euId)) continue
@@ -46,13 +47,16 @@ export function minhasPorPrazo(demandas: readonly Demanda[], papelDe: PapelDe, e
       case 'atrasada': grupos.atrasadas.push(d); break
       case 'hoje': grupos.hoje.push(d); break
       case 'em_dia': (d.prazo! <= domingo ? grupos.semana : grupos.depois).push(d); break
-      case 'pausado': (d.prazo ? grupos.depois : grupos.semPrazo).push(d); break
+      case 'pausado': grupos.comCliente.push(d); break
       case 'sem_prazo': grupos.semPrazo.push(d); break
       case 'concluida': break
     }
   }
   const ids = (l: Demanda[]) => l.sort(porPrazo).map((d) => d.id)
-  return { atrasadas: ids(grupos.atrasadas), hoje: ids(grupos.hoje), semana: ids(grupos.semana), depois: ids(grupos.depois), semPrazo: ids(grupos.semPrazo) }
+  const desde = (d: Demanda) => d.envioPendenteEm ?? d.statusDesde
+  const comCliente = grupos.comCliente.sort((a, b) => desde(a).localeCompare(desde(b)) || a.numero - b.numero).map((d) => d.id)
+  return { atrasadas: ids(grupos.atrasadas), hoje: ids(grupos.hoje), semana: ids(grupos.semana), comCliente, depois: ids(grupos.depois),
+    semPrazo: ids(grupos.semPrazo) }
 }
 
 /** "3 atrasadas · 2 para hoje · 4 com o cliente" (das minhas abertas). */

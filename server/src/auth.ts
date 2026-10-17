@@ -240,35 +240,74 @@ export async function corpoJson(c: Context): Promise<unknown> {
 
 // ─────────────────────────────── limite em memória ───────────────────────────────
 
-const janelas = new Map<string, number[]>()
+/** Marcas (instantes em ms) de cada chave, com a janela dela (a poda respeita a janela de cada limite). */
+const janelas = new Map<string, { ms: number; marcas: number[] }>()
 
 /** Zera os limites em memória (testes). */
 export function zerarLimites(): void {
   janelas.clear()
 }
 
+function marcasVivas(id: string, janelaMs: number, agoraMs: number): number[] {
+  return (janelas.get(id)?.marcas ?? []).filter((t) => t > agoraMs - janelaMs)
+}
+
+function gravarMarcas(id: string, janelaMs: number, marcas: number[], agoraMs: number): void {
+  janelas.set(id, { ms: janelaMs, marcas })
+  if (janelas.size > 20_000) {
+    for (const [k, j] of janelas) if (j.marcas.every((t) => t <= agoraMs - j.ms)) janelas.delete(k)
+  }
+}
+
+function muitasTentativas(marcas: number[], janelaMs: number, agoraMs: number): ErroHttp {
+  const espera = Math.max(1, Math.ceil((marcas[0]! + janelaMs - agoraMs) / 1000))
+  return new ErroHttp(429, 'muitas_tentativas', 'Muitas tentativas. Espere um pouco e tente de novo.', { tenteEmSegundos: espera })
+}
+
 /**
  * 429 muitas_tentativas com `detalhes.tenteEmSegundos` quando passa de `max` requisições em `janelaSeg` (janela
- * deslizante, em memória: um processo só). A chave é `chave` + IP real + os parâmetros da rota (ex.: o token do
- * link público em `/api/publico/a/:token`).
+ * deslizante, em memória: um processo só). A chave é `chave` + IP real e, com `porParametro`, o valor desse parâmetro
+ * da rota (ex.: o token em `/api/publico/a/:token`); sem ele, só o IP (ex.: os arquivos públicos, de ids diferentes).
  */
-export function limite(chave: string, max: number, janelaSeg: number): MiddlewareHandler<Ambiente> {
+export function limite(chave: string, max: number, janelaSeg: number, opcoes: { porParametro?: string } = {}): MiddlewareHandler<Ambiente> {
   return async (c, next) => {
     const agoraMs = Date.parse(agora())
-    const id = [chave, c.get('ator').ip, ...Object.values(c.req.param() as Record<string, string>)].join('|')
-    const inicio = agoraMs - janelaSeg * 1000
-    const lista = (janelas.get(id) ?? []).filter((t) => t > inicio)
-    if (lista.length >= max) {
-      const espera = Math.max(1, Math.ceil((lista[0]! + janelaSeg * 1000 - agoraMs) / 1000))
-      janelas.set(id, lista)
-      throw new ErroHttp(429, 'muitas_tentativas', 'Muitas tentativas. Espere um pouco e tente de novo.',
-        { tenteEmSegundos: espera })
+    const janelaMs = janelaSeg * 1000
+    const id = [chave, c.get('ator').ip, ...(opcoes.porParametro ? [c.req.param(opcoes.porParametro) ?? ''] : [])].join('|')
+    const marcas = marcasVivas(id, janelaMs, agoraMs)
+    if (marcas.length >= max) {
+      gravarMarcas(id, janelaMs, marcas, agoraMs)
+      throw muitasTentativas(marcas, janelaMs, agoraMs)
     }
-    lista.push(agoraMs)
-    janelas.set(id, lista)
-    if (janelas.size > 20_000) {
-      for (const [k, v] of janelas) if (v.every((t) => t <= inicio)) janelas.delete(k)
-    }
+    marcas.push(agoraMs)
+    gravarMarcas(id, janelaMs, marcas, agoraMs)
     await next()
+  }
+}
+
+/**
+ * Limite de respostas com `status` por IP (o 404 de token desconhecido na página pública): passou de `max` em
+ * `janelaSeg`, o IP leva 429 em toda rota com este limite até a janela andar, inclusive com o token certo (senão o
+ * 429 só nos desconhecidos viraria oráculo). A requisição reserva a marca antes de seguir (uma rajada em paralelo também
+ * para no limite) e a devolve se a resposta não teve o status.
+ */
+export function limiteDeFalhas(chave: string, max: number, janelaSeg: number, status: number): MiddlewareHandler<Ambiente> {
+  return async (c, next) => {
+    const agoraMs = Date.parse(agora())
+    const janelaMs = janelaSeg * 1000
+    const id = `${chave}|${c.get('ator').ip}`
+    const marcas = marcasVivas(id, janelaMs, agoraMs)
+    if (marcas.length >= max) {
+      gravarMarcas(id, janelaMs, marcas, agoraMs)
+      throw muitasTentativas(marcas, janelaMs, agoraMs)
+    }
+    marcas.push(agoraMs)
+    gravarMarcas(id, janelaMs, marcas, agoraMs)
+    await next()
+    if (c.res.status !== status) {
+      const j = janelas.get(id)
+      const i = j ? j.marcas.lastIndexOf(agoraMs) : -1
+      if (i >= 0) j!.marcas.splice(i, 1)
+    }
   }
 }

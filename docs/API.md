@@ -864,7 +864,10 @@ Todas: sem sessão; `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex`, `Ca
 HTML de `/a/:token`); `/a/*` e `/api/publico/*` mascarados nos logs. Token: `randomBytes(32)` em base64url (sha256 no banco).
 
 - **Limites** (em memória, janela deslizante; um processo só): 30 por minuto por **IP+token** em
-  `/api/publico/a/:token*`; 300 por minuto por IP em `/api/publico/arquivos/*`. Estouro: `429`.
+  `/api/publico/a/:token*`; além disso, 20 tokens desconhecidos (`404`) em 10 min por **IP**: estourado, esse IP leva
+  `429` em `/api/publico/a/*` com qualquer token, inclusive o certo (senão o 429 só nos desconhecidos seria um oráculo),
+  até a janela andar; 300 por minuto por **IP** em `/api/publico/arquivos/*`, somando ids diferentes. Estouro: `429`
+  com `detalhes.tenteEmSegundos`. Segurança da leva 2, achado 7 (antes a chave juntava o IP e todos os parâmetros da rota).
 - **Prévia interna** (segurança da leva 2, achado 2): quem tem sessão interna válida no cookie (o atendimento no "Ver
   como o cliente", o link copiado de `GET /api/demandas/:id/links`) vê a página, mas não é o cliente: `/visto` responde
   `204` sem contar e a decisão responde `403 previa_interna` "Você está vendo como o cliente: só ele pode decidir por

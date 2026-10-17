@@ -1,10 +1,11 @@
 /**
  * Página pública de aprovação (API.md §4.17, F2): sem sessão. Cabeçalhos no-store, noindex e no-referrer e o log
  * mascarado vêm do middleware global (app.ts) para todo /api/publico/*. Limites em memória: 30 por minuto por IP+token
- * em /api/publico/a/:token*, 300 por minuto por IP nos arquivos.
+ * em /api/publico/a/:token*, mais 20 tokens desconhecidos (404) em 10 min por IP (estourado, o IP espera em qualquer
+ * token), e 300 por minuto por IP nos arquivos (ids diferentes somam).
  */
 import { HEADER_IDEMPOTENCIA } from '../../../shared/tipos/index.ts'
-import { corpoJson, limite, sessaoDaRequisicao, validar, type App } from '../auth.ts'
+import { corpoJson, limite, limiteDeFalhas, sessaoDaRequisicao, validar, type App } from '../auth.ts'
 import { tx } from '../db.ts'
 import { ErroHttp, validacao } from '../erros.ts'
 import { assinaturaValida, lerArquivo, respostaArquivo } from '../servicos/arquivos.ts'
@@ -14,20 +15,22 @@ import {
 } from '../servicos/ciclo-publico.ts'
 
 export function registrar(app: App): void {
-  const porToken = limite('publico-a', 30, 60)
+  // 20 tokens desconhecidos (404) em 10 min por IP: depois, 429 em qualquer token desse IP; e 30 por minuto por IP+token
+  const desconhecidos = limiteDeFalhas('publico-a-404', 20, 600, 404)
+  const porToken = limite('publico-a', 30, 60, { porParametro: 'token' })
 
-  app.get('/api/publico/a/:token', porToken, (c) => c.json(paginaAprovacao(c.get('db'), c.req.param('token'))))
+  app.get('/api/publico/a/:token', desconhecidos, porToken, (c) => c.json(paginaAprovacao(c.get('db'), c.req.param('token'))))
 
   // sessão interna válida no cookie (atendimento no "Ver como o cliente", o link copiado): a visita não conta e a decisão
   // responde 403 previa_interna; a página mostra a faixa "Prévia" pela dica de sessão
-  app.post('/api/publico/a/:token/visto', porToken, (c) => {
+  app.post('/api/publico/a/:token/visto', desconhecidos, porToken, (c) => {
     const db = c.get('db')
     const previaInterna = !!sessaoDaRequisicao(c)
     tx(db, () => registrarVisto(db, c.req.param('token'), c.get('ator'), { previaInterna }))
     return c.body(null, 204)
   })
 
-  app.post('/api/publico/a/:token/decisao', porToken, async (c) => {
+  app.post('/api/publico/a/:token/decisao', desconhecidos, porToken, async (c) => {
     const bruta = c.req.header(HEADER_IDEMPOTENCIA)
     if (!bruta) throw validacao('Falta o Idempotency-Key.', { [HEADER_IDEMPOTENCIA]: 'obrigatório' })
     const chave = validar(esquema.chaveIdempotencia, bruta)

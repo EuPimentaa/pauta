@@ -54,7 +54,7 @@ describe('análise da criação rápida (puro)', () => {
   test('a pessoa da coluna entra na prévia; o cliente do contexto e a sigla nova', () => {
     const a = analisarRapida('Post', ctx, { clienteIdContexto: 'c-cla', coluna: { nome: 'Rafa', responsavelId: 'u-rafa' } })
     assert.deepEqual(a.membroIds, ['u-rafa'])
-    assert.equal(a.previa, 'CLA · Rafa · Rafa')
+    assert.equal(a.previa, 'CLA · Rafa', 'a pessoa da coluna não se repete como coluna')
     const nova = analisarRapida('[XYZ] Banner', ctx)
     assert.equal(nova.siglaNova, 'XYZ')
     assert.equal(nova.titulo, '[XYZ] Banner')

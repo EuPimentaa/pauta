@@ -187,7 +187,8 @@ export function analisarRapida(texto: string, ctx: ContextoRapida, opcoes: {
     const n = ctx.nomeDe(id)
     if (n) partes.push(n)
   }
-  if (opcoes.coluna?.nome) partes.push(opcoes.coluna.nome)
+  // na coluna de uma pessoa, o nome dela já está como membro: "ICC · Caio", não "ICC · Caio · Caio"
+  if (opcoes.coluna?.nome && !partes.some((p) => normalizarAlias(p) === normalizarAlias(opcoes.coluna!.nome))) partes.push(opcoes.coluna.nome)
 
   return { titulo, clienteId: cliente, membroIds: todos, marcadores, siglaNova, previa: partes.join(' · ') }
 }

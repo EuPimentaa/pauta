@@ -109,7 +109,7 @@ describe('POST /api/demandas/rapida', () => {
     const eu = a.como(a.pessoas.am)
     const p = await eu.post('/api/demandas/rapida/previa', { texto: 'HE: Post', colunaId: col.id })
     assert.deepEqual(p.corpo.membroIds, [a.pessoas.design.id])
-    assert.equal(p.corpo.previa, 'HE · Design · Design')
+    assert.equal(p.corpo.previa, 'HE · Design', 'a pessoa da coluna não se repete como coluna')
     const r1 = await eu.post('/api/demandas/rapida', { texto: 'Um', colunaId: col.id })
     const r2 = await eu.post('/api/demandas/rapida', { texto: 'Dois', colunaId: col.id })
     assert.deepEqual(r1.corpo.demanda.membroIds, [a.pessoas.design.id])

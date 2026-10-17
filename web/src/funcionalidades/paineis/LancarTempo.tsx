@@ -37,18 +37,20 @@ export function LancarTempo({ ancora, fechar }: { ancora: HTMLElement | null; fe
 
   return (
     <Popover aberto aoFechar={fechar} ancora={ancora} titulo="Lançar tempo" mostrarTitulo largura={380} alinhar="fim">
-      <GrupoCampo rotulo="Em qual demanda?" ajuda="As suas aparecem primeiro. Busque pelo número, título ou sigla do cliente.">
-        {(aria) => (
-          <Combobox {...aria} opcoes={opcoes} valor={escolhida} aoMudar={(d) => void escolher(d)} idDe={(d) => d.id}
-            rotuloDe={(d) => `#${d.numero} ${d.titulo}`} limite={30}
-            detalheDe={(d) => [d.clienteId ? porCliente.get(d.clienteId)?.sigla : null, porQuadro.get(d.quadroId)?.nome].filter(Boolean).join(' · ')}
-            filtrar={(d, t) => {
-              const sigla = d.clienteId ? porCliente.get(d.clienteId)?.sigla ?? '' : ''
-              return normalizarBusca(`#${d.numero} ${d.numero} ${d.titulo} ${sigla}`).includes(t)
-            }}
-            placeholder="#12, título ou sigla" vazio="Nenhuma demanda aberta com isso." />
-        )}
-      </GrupoCampo>
+      <div className="ui-popover-corpo">
+        <GrupoCampo rotulo="Em qual demanda?" ajuda="As suas aparecem primeiro. Busque pelo número, título ou sigla do cliente.">
+          {(aria) => (
+            <Combobox {...aria} opcoes={opcoes} valor={escolhida} aoMudar={(d) => void escolher(d)} idDe={(d) => d.id}
+              rotuloDe={(d) => `#${d.numero} ${d.titulo}`} limite={30}
+              detalheDe={(d) => [d.clienteId ? porCliente.get(d.clienteId)?.sigla : null, porQuadro.get(d.quadroId)?.nome].filter(Boolean).join(' · ')}
+              filtrar={(d, t) => {
+                const sigla = d.clienteId ? porCliente.get(d.clienteId)?.sigla ?? '' : ''
+                return normalizarBusca(`#${d.numero} ${d.numero} ${d.titulo} ${sigla}`).includes(t)
+              }}
+              placeholder="#12, título ou sigla" vazio="Nenhuma demanda aberta com isso." />
+          )}
+        </GrupoCampo>
+      </div>
     </Popover>
   )
 }

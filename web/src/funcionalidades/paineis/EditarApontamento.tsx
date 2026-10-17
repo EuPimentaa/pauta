@@ -33,7 +33,7 @@ export function EditarApontamento({ a, ancora, fechar }: { a: Apontamento; ancor
 
   return (
     <Popover aberto aoFechar={fechar} ancora={ancora} titulo="Editar tempo" mostrarTitulo largura={320} alinhar="fim">
-      <form className="pnl-editar" onSubmit={(e) => void salvar(e)}>
+      <form className="pnl-editar ui-popover-corpo" onSubmit={(e) => void salvar(e)}>
         <GrupoCampo rotulo="Dia">
           {(aria) => <SeletorData {...aria} rotulo="Dia" valor={data} permitirLimpar={false} feriados={feriados}
             aoMudar={(d) => { if (d) setData(d) }} tamanho="p" />}

@@ -17,7 +17,7 @@ import { linhasParaItens } from '../../../shared/logica/texto.ts'
 import { primeiroNome } from '../../../shared/logica/texto-whatsapp.ts'
 import type { Ator } from '../auth.ts'
 import { config } from '../config.ts'
-import { agora, rodar, todos, um, type Db } from '../db.ts'
+import { agora, marcadores, rodar, todos, um, type Db } from '../db.ts'
 import { ErroHttp, naoEncontrado, validacao } from '../erros.ts'
 import { lerArquivo, urlAssinada } from './arquivos.ts'
 import { registrarAtividade } from './atividade.ts'
@@ -55,11 +55,38 @@ const naoAguarda = () => new ErroHttp(409, 'conflito', TEXTO_NAO_AGUARDA)
  */
 function linkAtivoPeloToken(db: Db, token: string): LinkLinha {
   if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) throw naoEncontrado('Link não encontrado.')
-  const l = um<LinkLinha>(db, `SELECT l.id, l.cliente_id, l.contato_id, l.expira_em, l.revogado_em, c.ativo AS contato_ativo
-    FROM link_publico l LEFT JOIN cliente_contato c ON c.id = l.contato_id WHERE l.token_hash = ?`, hashToken(token))
+  const l = um<LinkLinha>(db, `${SQL_LINK} WHERE l.token_hash = ?`, hashToken(token))
   if (!l) throw naoEncontrado('Link não encontrado.')
+  return exigirAtivo(l)
+}
+
+const SQL_LINK = `SELECT l.id, l.cliente_id, l.contato_id, l.expira_em, l.revogado_em, c.ativo AS contato_ativo
+  FROM link_publico l LEFT JOIN cliente_contato c ON c.id = l.contato_id`
+
+function exigirAtivo(l: LinkLinha): LinkLinha {
   if (l.revogado_em || l.expira_em <= agora() || (l.contato_id && l.contato_ativo !== 1)) throw linkInativo()
   return l
+}
+
+/** Arquivo público que não vale mais para o link (ou assinatura errada ou vencida): 403, a página recarrega. */
+export const TEXTO_ARQUIVO_VENCIDO = 'Este endereço de arquivo venceu. Recarregue a página.'
+
+/**
+ * GET /api/publico/arquivos/:id, com a assinatura (link, arquivo, exp) já conferida pela rota: o link segue ativo e com
+ * itens (senão 410, como a página) e contém o arquivo — item de uma versão enviada por ele numa demanda que o cliente
+ * ainda vê, ou o logo atual do cliente do link (senão 403). Revogar o link, desativar o contato, arquivar a demanda ou
+ * trocar o logo cortam as URLs já emitidas.
+ */
+export function conferirArquivoDoLink(db: Db, linkId: Id, arquivoId: Id): void {
+  const l = um<LinkLinha>(db, `${SQL_LINK} WHERE l.id = ?`, linkId)
+  if (!l) throw new ErroHttp(403, 'sem_permissao', TEXTO_ARQUIVO_VENCIDO)
+  const link = exigirAtivo(l)
+  const demandas = demandasDoLink(db, link)
+  if (demandas.length === 0) throw linkInativo()
+  const ehLogo = !!um(db, 'SELECT 1 FROM cliente WHERE id = ? AND logo_arquivo_id = ?', link.cliente_id, arquivoId)
+  const ehItem = !!um(db, `SELECT 1 FROM versao_item vi WHERE vi.arquivo_id = ? AND vi.demanda_id IN (${marcadores(demandas.length)})
+    AND EXISTS (SELECT 1 FROM envio e WHERE e.versao_id = vi.versao_id AND e.link_id = ?)`, arquivoId, ...demandas, link.id)
+  if (!ehLogo && !ehItem) throw new ErroHttp(403, 'sem_permissao', TEXTO_ARQUIVO_VENCIDO)
 }
 
 /** Demandas do link que o cliente ainda vê: vivas, não arquivadas, do cliente do link. */
@@ -83,7 +110,7 @@ function enviadaPorEsteLink(db: Db, linkId: Id, versaoId: Id): boolean {
 }
 
 /** Arquivo, link (com prévia e embutir) — caminho de rede nunca vai ao cliente. */
-function versaoPublica(db: Db, versaoId: Id, enviadaEm: string): VersaoPublica {
+function versaoPublica(db: Db, linkId: Id, versaoId: Id, enviadaEm: string): VersaoPublica {
   const v = carregarVersao(db, versaoId)
   const minutos = lerConfig(db).linkPublicoArquivoMinutos
   const itens: ItemVersaoPublico[] = []
@@ -100,7 +127,7 @@ function versaoPublica(db: Db, versaoId: Id, enviadaEm: string): VersaoPublica {
         mime: null, bytes: null,
       })
     } else if (i.tipo === 'arquivo' && i.arquivo) {
-      const url = urlAssinada(i.arquivo.id, minutos)
+      const url = urlAssinada(linkId, i.arquivo.id, minutos)
       itens.push({ tipo: 'arquivo', nome: i.nome, url, previaUrl: i.arquivo.imagem ? `${url}&inline=1` : null, imagem: i.arquivo.imagem, embutivel: false,
         mime: i.arquivo.mime, bytes: i.arquivo.bytes })
     }
@@ -125,7 +152,7 @@ function itemPublico(db: Db, link: LinkLinha, demandaId: Id): ItemAprovacaoPubli
   const versoes = versoesDoLink(db, link.id, demandaId)
   const atual = versoes[0]
   const modeloNome = d.modeloId ? um<{ nome: string }>(db, 'SELECT nome FROM modelo_demanda WHERE id = ?', d.modeloId)?.nome ?? null : null
-  const versao = atual ? versaoPublica(db, atual.id, atual.enviado_em) : null
+  const versao = atual ? versaoPublica(db, link.id, atual.id, atual.enviado_em) : null
   let decisao: DecisaoPublica | null = null
   let proximoPasso: string | null = null
   if (atual) {
@@ -179,7 +206,7 @@ export function paginaAprovacao(db: Db, token: string): PaginaAprovacao {
   if (c.logo_arquivo_id) {
     try {
       lerArquivo(db, c.logo_arquivo_id)
-      logoUrl = `${urlAssinada(c.logo_arquivo_id, lerConfig(db).linkPublicoArquivoMinutos)}&inline=1`
+      logoUrl = `${urlAssinada(link.id, c.logo_arquivo_id, lerConfig(db).linkPublicoArquivoMinutos)}&inline=1`
     } catch {
       logoUrl = null
     }
@@ -263,10 +290,10 @@ export function decidir(db: Db, token: string, chave: string, e: DecisaoPublicaE
   if (e.versaoId !== d.versaoEnviadaId) {
     const atual = versoesDoLink(db, link.id, d.id)[0]!
     throw new ErroHttp(409, 'versao_desatualizada', `Chegou a V${atual.numero}. Veja a versão nova antes de decidir.`,
-      { versaoAtual: versaoPublica(db, atual.id, atual.enviado_em) })
+      { versaoAtual: versaoPublica(db, link.id, atual.id, atual.enviado_em) })
   }
   if (decisaoValida(db, e.versaoId)) throw new ErroHttp(409, 'ja_decidida', 'Esta peça já recebeu uma decisão.')
-  if (versaoPublica(db, e.versaoId, '').itens.length === 0) throw new ErroHttp(409, 'conflito', `${TEXTO_SEM_PECA} Fale com o seu atendimento.`)
+  if (versaoPublica(db, link.id, e.versaoId, '').itens.length === 0) throw new ErroHttp(409, 'conflito', `${TEXTO_SEM_PECA} Fale com o seu atendimento.`)
   if (e.contatoId != null && e.contatoId !== link.contato_id) {
     throw validacao('Confirme quem está decidindo.', { contatoId: 'não é o contato deste link' })
   }

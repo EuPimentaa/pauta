@@ -207,8 +207,8 @@ export function posicaoEntre(db: Db, alvo: { tabela: string; coluna: 'posicao' |
   rel: PosicaoRelativa | undefined): number
 // src/servicos/arquivos.ts
 export function lerArquivo(db: Db, id: Id): { info: ArquivoInfo; caminho: string }
-export function urlAssinada(id: Id, minutos: number): string
-export function assinaturaValida(id: Id, exp: number, sig: string): boolean
+export function urlAssinada(linkId: Id, id: Id, minutos: number): string   // a assinatura inclui o link (segurança leva 2, achado 6)
+export function assinaturaValida(linkId: Id, id: Id, exp: number, sig: string): boolean
 // src/tarefas.ts  (jobs diários; funcionalidades criam src/tarefas/<prefixo>-*.ts exportando `tarefa`)
 export interface Tarefa { nome: string; horario: HoraLocal; executar(db: Db): void | Promise<void> }
 // test/ajuda.ts  (as funcionalidades podem criar test/<prefixo>-ajuda.ts com o que for só delas)

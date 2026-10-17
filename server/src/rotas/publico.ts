@@ -9,7 +9,9 @@ import { tx } from '../db.ts'
 import { ErroHttp, validacao } from '../erros.ts'
 import { assinaturaValida, lerArquivo, respostaArquivo } from '../servicos/arquivos.ts'
 import * as esquema from '../servicos/ciclo-esquemas.ts'
-import { decidir, paginaAprovacao, registrarVisto } from '../servicos/ciclo-publico.ts'
+import {
+  TEXTO_ARQUIVO_VENCIDO, conferirArquivoDoLink, decidir, paginaAprovacao, registrarVisto,
+} from '../servicos/ciclo-publico.ts'
 
 export function registrar(app: App): void {
   const porToken = limite('publico-a', 30, 60)
@@ -36,12 +38,16 @@ export function registrar(app: App): void {
     return c.json(tx(db, () => decidir(db, c.req.param('token'), chave, e, c.get('ator'), userAgent, { previaInterna })))
   })
 
+  // a assinatura cobre o link, o arquivo e a validade; o link precisa seguir ativo e conter o arquivo
   app.get('/api/publico/arquivos/:id', limite('publico-arquivos', 300, 60), (c) => {
     const id = c.req.param('id')
+    const linkId = c.req.query('l') ?? ''
     const exp = Number(c.req.query('exp'))
     const sig = c.req.query('sig') ?? ''
-    if (!assinaturaValida(id, exp, sig)) throw new ErroHttp(403, 'sem_permissao', 'Este endereço de arquivo venceu. Recarregue a página.')
-    const { info, caminho } = lerArquivo(c.get('db'), id)
+    if (!assinaturaValida(linkId, id, exp, sig)) throw new ErroHttp(403, 'sem_permissao', TEXTO_ARQUIVO_VENCIDO)
+    const db = c.get('db')
+    conferirArquivoDoLink(db, linkId, id)
+    const { info, caminho } = lerArquivo(db, id)
     return respostaArquivo(info, caminho, { inline: c.req.query('inline') === '1' })
   })
 }

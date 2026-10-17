@@ -120,7 +120,8 @@ Backup: `VACUUM INTO` diário em `DATA_DIR/backups` (mantém 14) feito pelo pró
 - Upload multipart pelo Node, até 10 MB, conferindo magic number (jpg, png, webp, gif, pdf, zip).
 - Download interno: `GET /api/arquivos/:id` autenticado, `X-Content-Type-Options: nosniff`, `Content-Disposition:
   attachment` exceto imagens.
-- Página pública de aprovação: URL assinada com HMAC e validade de 10 min (`/api/publico/arquivos/:id?exp=&sig=`).
+- Página pública de aprovação: URL assinada com HMAC do link, do arquivo e da validade de 10 min
+  (`/api/publico/arquivos/:id?l=&exp=&sig=`); a rota confere que o link segue ativo e contém o arquivo.
 - Logo do cliente só por upload (vai à página pública por URL assinada); não há logo por URL externa.
 - Exclusão: marca `excluido_em`; o job diário apaga do disco depois de 30 dias.
 - O teste de "Drive público" (SPEC §5.3) é feito pelo servidor com `fetch` sem credenciais.

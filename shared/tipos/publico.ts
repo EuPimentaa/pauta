@@ -12,7 +12,7 @@ export interface ItemVersaoPublico {
   /** Caminho de rede nunca aparece para o cliente. */
   tipo: 'link' | 'arquivo'
   nome: string
-  /** Link https externo ou URL assinada de 10 min (/api/publico/arquivos/:id?exp=&sig=). */
+  /** Link https externo ou URL assinada de 10 min ligada ao link (/api/publico/arquivos/:id?l=&exp=&sig=). */
   url: string
   /** Prévia estática; o iframe (Drive /preview, YouTube nocookie, Figma) só abre no toque. */
   previaUrl: string | null
@@ -74,7 +74,7 @@ export interface ItemAprovacaoPublico {
 /** GET /api/publico/a/:token: sem efeito colateral (o robô de prévia do WhatsApp abre o link). */
 export interface PaginaAprovacao {
   app: { nome: string }
-  /** logoUrl = urlAssinada(logoArquivoId, linkPublicoArquivoMinutos) (a rota interna exige sessão). */
+  /** logoUrl = urlAssinada(linkId, logoArquivoId, linkPublicoArquivoMinutos) (a rota interna exige sessão). */
   cliente: { nome: string; sigla: string; cor: Cor; logoUrl: string | null }
   /** Link gerado para um contato: "Você é Fulana?". */
   contato: { id: Id; nome: string } | null

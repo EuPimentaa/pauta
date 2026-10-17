@@ -884,7 +884,7 @@ HTML de `/a/:token`); `/a/*` e `/api/publico/*` mascarados nos logs. Token: `ran
   link não tem decisão mas a peça não espera mais por ela (outra versão enviada por fora, envio pendente tratado de
   outro jeito), ou "A peça desta versão foi enviada por outro meio." quando a versão não tem nada que o cliente veja
   (só caminho de rede, envio de antes da trava): a página esconde os botões; `modeloNome` = nome do modelo da demanda. Arquivos e o logo do
-  cliente por URL assinada (`urlAssinada(id, linkPublicoArquivoMinutos)`).
+  cliente por URL assinada (`urlAssinada(linkId, id, linkPublicoArquivoMinutos)`).
 - **Erros:** `404` token desconhecido; `410 link_inativo` expirado, revogado, de contato desativado ou sem itens (vale
   para `/visto` e para a decisão).
 
@@ -918,9 +918,13 @@ Com sessão interna no cookie (prévia interna): `204` sem efeito. **SSE:** `lin
      inclusive a automação do quadro do envio (§5.5) e o `retornoEm`.
 - **Atividade:** `retorno.registrado` (ator_tipo `cliente`). **SSE/Notifica:** como `POST /retorno`.
 
-#### `GET /api/publico/arquivos/:id?exp=&sig=`
-`sig` = HMAC-SHA256(`SEGREDO`, `${id}.${exp}`) em base64url; `exp` em segundos Unix. Inválida ou vencida: `403`.
-Mesmos headers de `GET /api/arquivos/:id`; `&inline=1` (só imagem, como na rota interna) serve a prévia da página.
+#### `GET /api/publico/arquivos/:id?l=&exp=&sig=`
+`l` = o id do link que emitiu a URL; `sig` = HMAC-SHA256(`SEGREDO`, `arquivo-publico|${l}|${id}|${exp}`) em base64url;
+`exp` em segundos Unix. Inválida, vencida ou de outro link: `403`. Depois da assinatura, a rota confere o link
+(`conferirArquivoDoLink`): expirado, revogado, de contato desativado ou sem itens → `410 link_inativo`; o arquivo
+precisa ser item de uma versão enviada por este link numa demanda que o cliente ainda vê, ou o logo atual do cliente do
+link (senão `403`). Revogar o link corta as URLs já emitidas (segurança da leva 2, achado 6). Mesmos headers de
+`GET /api/arquivos/:id`; `&inline=1` (só imagem, como na rota interna) serve a prévia da página.
 
 ### 4.18 Início, Agenda e notificações · painéis
 

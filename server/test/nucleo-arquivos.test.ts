@@ -258,22 +258,25 @@ describe('GET /api/arquivos/:id', () => {
 })
 
 describe('URL assinada (página pública)', () => {
-  test('vale até expirar; assinatura de outro arquivo ou adulterada não vale', async () => {
+  test('vale até expirar; assinatura de outro arquivo, de outro link ou adulterada não vale', async () => {
     const a = await ambiente()
     const id = await subir(a)
-    const url = new URL(urlAssinada(id, 10), 'http://x')
+    const url = new URL(urlAssinada('link-1', id, 10), 'http://x')
     assert.equal(url.pathname, `/api/publico/arquivos/${id}`)
+    assert.equal(url.searchParams.get('l'), 'link-1')
     const exp = Number(url.searchParams.get('exp'))
     const sig = url.searchParams.get('sig')!
     assert.equal(exp, Date.parse('2026-10-14T13:10:00.000Z') / 1000)
-    assert.equal(assinaturaValida(id, exp, sig), true)
-    assert.equal(assinaturaValida('outro-id', exp, sig), false)
-    assert.equal(assinaturaValida(id, exp + 60, sig), false)
+    assert.equal(assinaturaValida('link-1', id, exp, sig), true)
+    assert.equal(assinaturaValida('link-1', 'outro-id', exp, sig), false)
+    assert.equal(assinaturaValida('link-2', id, exp, sig), false)
+    assert.equal(assinaturaValida('', id, exp, sig), false)
+    assert.equal(assinaturaValida('link-1', id, exp + 60, sig), false)
     // troca o último caractere por OUTRO (com "A" fixo, 1 vez em 64 a assinatura já terminava em "A" e o teste falhava)
-    assert.equal(assinaturaValida(id, exp, `${sig.slice(0, -1)}${sig.at(-1) === 'A' ? 'B' : 'A'}`), false)
-    assert.equal(assinaturaValida(id, Number.NaN, sig), false)
+    assert.equal(assinaturaValida('link-1', id, exp, `${sig.slice(0, -1)}${sig.at(-1) === 'A' ? 'B' : 'A'}`), false)
+    assert.equal(assinaturaValida('link-1', id, Number.NaN, sig), false)
     a.relogio('2026-10-14T13:11:00.000Z')
-    assert.equal(assinaturaValida(id, exp, sig), false)
+    assert.equal(assinaturaValida('link-1', id, exp, sig), false)
   })
 })
 

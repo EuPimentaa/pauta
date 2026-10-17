@@ -48,7 +48,7 @@ describe('GET /api/publico/a/:token', () => {
     assert.deepEqual(item.versao!.itens.map((i) => i.tipo), ['link', 'arquivo'])
     assert.equal(item.versao!.itens[0]!.embutivel, true)
     assert.match(item.versao!.itens[0]!.previaUrl!, /drive\.google\.com\/thumbnail/)
-    assert.match(item.versao!.itens[1]!.url, /^\/api\/publico\/arquivos\/[^?]+\?exp=\d+&sig=/)
+    assert.match(item.versao!.itens[1]!.url, /^\/api\/publico\/arquivos\/[^?]+\?l=[^&]+&exp=\d+&sig=/)
     assert.equal(item.versao!.itens[1]!.imagem, true)
     // tipo e tamanho do arquivo para a página dizer "PNG · 1 KB"; link sem eles
     assert.equal(item.versao!.itens[1]!.mime, 'image/png')

@@ -123,16 +123,23 @@ export function lerArquivo(db: Db, id: Id): { info: ArquivoInfo; caminho: string
   return { info: mapear.arquivo(l), caminho: caminhoDoArquivo(id) }
 }
 
-/** URL assinada para a página pública: /api/publico/arquivos/:id?exp=&sig= (sig = HMAC de `${id}.${exp}`). */
-export function urlAssinada(id: Id, minutos: number): string {
+/** O texto assinado: o link, o arquivo e a validade (o prefixo separa esta assinatura das outras HMAC com SEGREDO). */
+const textoAssinado = (linkId: Id, id: Id, exp: number) => `arquivo-publico|${linkId}|${id}|${exp}`
+
+/**
+ * URL assinada para a página pública de um link: /api/publico/arquivos/:id?l=<link>&exp=&sig= (sig = HMAC do link, do
+ * arquivo e de exp). A rota confere também que o link segue ativo e contém o arquivo (`arquivoDoLink`, ciclo-publico.ts):
+ * revogar o link corta as URLs já emitidas.
+ */
+export function urlAssinada(linkId: Id, id: Id, minutos: number): string {
   const exp = Math.floor(agoraData().getTime() / 1000) + Math.round(minutos * 60)
-  return `/api/publico/arquivos/${encodeURIComponent(id)}?exp=${exp}&sig=${hmac(`${id}.${exp}`)}`
+  return `/api/publico/arquivos/${encodeURIComponent(id)}?l=${encodeURIComponent(linkId)}&exp=${exp}&sig=${hmac(textoAssinado(linkId, id, exp))}`
 }
 
-/** Assinatura certa e ainda no prazo (exp em segundos Unix). */
-export function assinaturaValida(id: Id, exp: number, sig: string): boolean {
-  if (!Number.isFinite(exp) || exp * 1000 < agoraData().getTime()) return false
-  return iguaisSeguro(hmac(`${id}.${exp}`), sig)
+/** Assinatura certa para o link e o arquivo, e ainda no prazo (exp em segundos Unix). */
+export function assinaturaValida(linkId: Id, id: Id, exp: number, sig: string): boolean {
+  if (!linkId || !Number.isFinite(exp) || exp * 1000 < agoraData().getTime()) return false
+  return iguaisSeguro(hmac(textoAssinado(linkId, id, exp)), sig)
 }
 
 /**

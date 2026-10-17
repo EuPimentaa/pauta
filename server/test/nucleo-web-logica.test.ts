@@ -188,7 +188,7 @@ describe('sinal do card', () => {
     const s = sinal({ prazo: '2026-10-09', envioPendenteEm: '2026-10-09T15:00:00.000Z' })
     // 9/10 (sex) → 14/10 (qua): seg 12 é feriado; conta ter 13 e qua 14
     assert.deepEqual(s, { tipo: 'cliente', dias: 2 })
-    assert.equal(textoSinal(s!), 'com o cliente há 2 dias úteis')
+    assert.equal(textoSinal(s!), 'Com o cliente há 2 dias úteis')
     assert.equal(sinal({ envioPendenteEm: '2026-10-14T12:00:00.000Z' }), null)
   })
 
@@ -196,7 +196,7 @@ describe('sinal do card', () => {
     assert.equal(sinal({ statusDesde: '2026-10-09T12:00:00.000Z' }), null)          // 2 dias úteis: no limite
     const s = sinal({ statusDesde: '2026-10-08T12:00:00.000Z' })                     // 3 dias úteis
     assert.deepEqual(s, { tipo: 'parado', dias: 3 })
-    assert.equal(textoSinal(s!), 'parado há 3 dias úteis')
+    assert.equal(textoSinal(s!), 'Parado há 3 dias úteis')
   })
 
   test('rodada extra por último; concluída não tem sinal', () => {

@@ -134,7 +134,7 @@ const COLUNAS: PropsColuna[] = [
     { numero: 1199, titulo: 'Banner da campanha de verão', cliente: 'AUR', capa: 'ambar', prazo: { estado: 'hoje', texto: 'Hoje, 18h' }, checklist: [3, 5], anexos: 2, membros: ['Rafa'] },
   ] },
   { nome: 'Fazendo', cor: 'ambar', limite: 5, cartoes: [
-    { numero: 1175, titulo: 'Landing page da campanha Outubro Rosa', cliente: 'ICC', etiquetas: ['Site', 'Urgente do cliente'], prazo: { estado: 'hoje', texto: 'Hoje, 14h' }, sinal: { tom: 'parado', texto: 'parado há 4 dias úteis' }, membros: ['Bruno', 'Cami', 'Diego', 'Igor'], prioridade: 'alta' },
+    { numero: 1175, titulo: 'Landing page da campanha Outubro Rosa', cliente: 'ICC', etiquetas: ['Site', 'Urgente do cliente'], prazo: { estado: 'hoje', texto: 'Hoje, 14h' }, sinal: { tom: 'parado', texto: 'Parado há 4 dias úteis' }, membros: ['Bruno', 'Cami', 'Diego', 'Igor'], prioridade: 'alta' },
     { numero: 1190, titulo: 'Folder institucional, versão para impressão', cliente: 'VTX', etiquetas: ['Impresso'], selecionado: true, checklist: [2, 6], membros: ['Cami'] },
   ] },
   { nome: 'Revisão interna', cor: 'roxo', cartoes: [

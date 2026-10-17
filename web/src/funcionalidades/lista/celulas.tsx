@@ -7,13 +7,12 @@ import type { Coluna, DataLocal, Demanda, EstadoPrazo, Etiqueta, HoraLocal, Prio
 import { ROTULO_PRIORIDADE } from '@shared/tipos/index.ts'
 import { estadoPrazo } from '@shared/logica/prazo.ts'
 import { hojeSP } from '@shared/logica/datas.ts'
-import { DIAS_CURTOS, diaDaSemana, formatarDiaMes, formatarHora } from '../../lib/datas.ts'
+import { formatarData, formatarDiaBarraMes, formatarHora } from '../../lib/datas.ts'
 import { ChipEtiqueta } from '../../ui/Chips.tsx'
 
-/** "sex, 24 out" (+ ", 14h"). */
+/** "sex, 24/10" (+ ", 14h"). */
 export function dataCurta(data: DataLocal, hora?: HoraLocal | null): string {
-  const base = `${DIAS_CURTOS[diaDaSemana(data)]}, ${formatarDiaMes(data)}`
-  return hora ? `${base}, ${formatarHora(hora)}` : base
+  return formatarData(data, hora)
 }
 
 export function BandeiraPrioridade({ p, compacta }: { p: Prioridade; compacta?: boolean }) {
@@ -47,10 +46,10 @@ export function PrazoCelula({ d, coluna, agora }: { d: Demanda; coluna: Pick<Col
   )
 }
 
-/** "14 out" (+ ", 9h"): a coluna é estreita; o dia da semana fica para o prazo. */
+/** "14/10" (+ ", 9h"): a coluna é estreita; o dia da semana fica para o prazo. */
 export function DataCelula({ data, hora }: { data: DataLocal | null; hora?: HoraLocal | null }) {
   if (!data) return null
-  return <span className="lista-data" title={dataCurta(data, hora)}>{formatarDiaMes(data)}{hora ? `, ${formatarHora(hora)}` : ''}</span>
+  return <span className="lista-data" title={dataCurta(data, hora)}>{formatarDiaBarraMes(data)}{hora ? `, ${formatarHora(hora)}` : ''}</span>
 }
 
 export function ConcluidaCelula({ d }: { d: Demanda }) {
@@ -58,7 +57,7 @@ export function ConcluidaCelula({ d }: { d: Demanda }) {
   return (
     <span className="lista-concluida">
       <Check aria-hidden="true" />
-      <span className="sr-only">Concluída em </span>{formatarDiaMes(hojeSP(new Date(d.concluidaEm)))}
+      <span className="sr-only">Concluída em </span>{formatarDiaBarraMes(hojeSP(new Date(d.concluidaEm)))}
     </span>
   )
 }

@@ -94,7 +94,12 @@ export function formatarData(s: DataLocal, hora?: HoraLocal | null): string {
   return hora ? `${base}, ${formatarHora(hora)}` : base
 }
 
-/** "16 out" */
+/** "16/10" (o dia e o mês do formato do contrato, sem o dia da semana: colunas estreitas, "Entregue em 16/10"). */
+export function formatarDiaBarraMes(s: DataLocal): string {
+  return `${s.slice(8, 10)}/${s.slice(5, 7)}`
+}
+
+/** "16 out" (títulos de período, como a semana do calendário). */
 export function formatarDiaMes(s: DataLocal): string {
   return `${Number(s.slice(8, 10))} ${MESES_CURTOS[Number(s.slice(5, 7)) - 1]}`
 }

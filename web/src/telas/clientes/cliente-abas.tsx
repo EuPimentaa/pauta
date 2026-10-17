@@ -8,6 +8,7 @@ import { Link, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Archive, Check, ChevronLeft, ChevronRight, Clock3, PencilLine, Plus, X } from 'lucide-react'
 import { CANAIS, CORES, STATUS_CLIENTE, type Cliente, type Cor, type Demanda, type StatusCliente } from '@shared/tipos/index.ts'
+import { dataLocalDe, formatarPrazo, horaLocalDe } from '@shared/logica/datas.ts'
 import { normalizarAlias } from '@shared/logica/texto.ts'
 import { avisarErro } from '../../api/acoes.ts'
 import { useApontamentos } from '../../api/horas.ts'
@@ -63,7 +64,13 @@ export function AbaDemandas({ cliente }: { cliente: Cliente }) {
 // ─────────────────────────────── Aprovações ───────────────────────────────
 
 const ROTULO_CANAL: Record<(typeof CANAIS)[number], string> = { whatsapp: 'WhatsApp', email: 'e-mail', reuniao: 'reunião', outro: 'outro canal' }
-const dataHora = (i: string) => new Date(i).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
+/** "sáb, 17/10 às 00:17" (o formato do resto do produto); de outro ano, com o ano: "17/10/2025 às 00:17". */
+const dataHora = (i: string) => {
+  const d = dataLocalDe(i)
+  return d.slice(0, 4) === hojeLocal().slice(0, 4)
+    ? `${formatarPrazo(d, null)} às ${horaLocalDe(i)}`
+    : `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)} às ${horaLocalDe(i)}`
+}
 
 export function AbaAprovacoes({ cliente }: { cliente: Cliente }) {
   const trilha = useTrilha(cliente.id)

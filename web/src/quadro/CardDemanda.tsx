@@ -24,7 +24,7 @@ import { conjuntoFeriados, useDoBootstrap } from '../api/seletores.ts'
 import { itensDoMenuDemanda, montarContextoDemanda, montarUtilModal } from '../demanda/contexto.ts'
 import type { ExtensaoSeloCard } from '../extensoes/tipos.ts'
 import { cx } from '../lib/classes.ts'
-import { DIAS_CURTOS, diaDaSemana, formatarDiaMes, formatarHora } from '../lib/datas.ts'
+import { formatarData, formatarDiaBarraMes, formatarHora } from '../lib/datas.ts'
 import type { Ancora } from '../lib/posicao.ts'
 import { useAbrirSobreposta } from '../sessao/sobreposta.tsx'
 import { useRegistro } from '../sessao/registro.ts'
@@ -73,16 +73,15 @@ export function useDadosCard(d: Demanda): DadosCard | undefined {
 // em 13 px o CalendarClock embolava (calendário e relógio juntos): o prazo em dia é só o calendário
 const ICONE_PRAZO = { atrasada: TriangleAlert, hoje: Clock3, em_dia: Calendar, pausado: Clock3, concluida: Check } as const
 
-/** "sex, 24 out" (+ ", 14h" com hora). */
+/** "sex, 24/10" (+ ", 14h" com hora): o mesmo formato do modal e do resto do produto. */
 function dataCurta(data: string, hora: string | null): string {
-  const base = `${DIAS_CURTOS[diaDaSemana(data)]}, ${formatarDiaMes(data)}`
-  return hora ? `${base}, ${formatarHora(hora)}` : base
+  return formatarData(data, hora)
 }
 
 /** O texto do chip de prazo para cada estado ("Hoje, 18h", "Entregue em 12 out", "Atrasada há 2 dias"). */
 export function textoPrazo(d: Demanda, estado: EstadoPrazo, sinal: SinalCard | null): string | null {
   switch (estado) {
-    case 'concluida': return d.concluidaEm ? `Entregue em ${formatarDiaMes(hojeSP(new Date(d.concluidaEm)))}` : 'Entregue'
+    case 'concluida': return d.concluidaEm ? `Entregue em ${formatarDiaBarraMes(hojeSP(new Date(d.concluidaEm)))}` : 'Entregue'
     case 'atrasada': return sinal?.tipo === 'atrasada' ? textoSinal(sinal) : 'Atrasada'
     case 'hoje': return `Hoje, ${formatarHora(d.prazoHora ?? '18:00')}`
     case 'em_dia': case 'pausado': return d.prazo ? dataCurta(d.prazo, d.prazoHora) : null

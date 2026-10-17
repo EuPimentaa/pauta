@@ -43,12 +43,12 @@ export function sinalDoCard(
 
 const diasUteis = (n: number) => `${n} ${n === 1 ? 'dia útil' : 'dias úteis'}`
 
-/** Texto curto do sinal: "Atrasada há 2 dias", "com o cliente há 3 dias úteis", "parado há 4 dias úteis", "R3/2 · extra". */
+/** Texto curto do sinal, sempre com maiúscula: "Atrasada há 2 dias", "Com o cliente há 3 dias úteis", "Parado há 4 dias úteis", "R3/2 · extra". */
 export function textoSinal(s: SinalCard): string {
   switch (s.tipo) {
     case 'atrasada': return s.dias === 0 ? 'Venceu hoje' : `Atrasada há ${s.dias} ${s.dias === 1 ? 'dia' : 'dias'}`
-    case 'cliente': return `com o cliente há ${diasUteis(s.dias)}`
-    case 'parado': return `parado há ${diasUteis(s.dias)}`
+    case 'cliente': return `Com o cliente há ${diasUteis(s.dias)}`
+    case 'parado': return `Parado há ${diasUteis(s.dias)}`
     case 'extra': return `R${s.rodada}/${s.inclusas} · extra`
   }
 }

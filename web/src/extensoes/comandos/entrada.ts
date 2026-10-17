@@ -7,26 +7,26 @@ import type { Comando } from '../tipos.ts'
 
 export const comandos: Comando[] = [
   {
-    id: 'entrada-nova', rotulo: 'Nova demanda', secao: 'acoes', icone: Plus, atalho: 'shift+n',
+    id: 'entrada-nova', rotulo: 'Nova demanda', secao: 'acoes', ordem: 10, icone: Plus, atalho: 'shift+n',
     palavras: ['criar', 'card', 'tarefa', 'pedido', 'job'], visivel: (ctx) => !ctx.quadroAtual,
     executar: (ctx) => { void ctx.abrirDialogo('nova-demanda', {}) },
   },
   {
-    id: 'entrada-nova-quadro', rotulo: 'Nova demanda neste quadro', secao: 'acoes', icone: SquarePlus, atalho: 'shift+n',
+    id: 'entrada-nova-quadro', rotulo: 'Nova demanda neste quadro', secao: 'acoes', ordem: 10, icone: SquarePlus, atalho: 'shift+n',
     palavras: ['criar', 'card', 'tarefa', 'pedido', 'job'], visivel: (ctx) => !!ctx.quadroAtual,
     executar: (ctx) => { void ctx.abrirDialogo('nova-demanda', { quadroId: ctx.quadroAtual?.id }) },
   },
   {
-    id: 'entrada-colar', rotulo: 'Colar do WhatsApp', secao: 'acoes', icone: ClipboardPaste,
+    id: 'entrada-colar', rotulo: 'Colar do WhatsApp', secao: 'acoes', ordem: 20, icone: ClipboardPaste,
     palavras: ['whatsapp', 'conversa', 'mensagem', 'zap', 'nova demanda'],
     executar: (ctx) => { void ctx.abrirDialogo('nova-demanda', { quadroId: ctx.quadroAtual?.id, focoColar: true }) },
   },
   {
-    id: 'entrada-atalhos', rotulo: 'Atalhos do teclado', secao: 'acoes', icone: Keyboard, atalho: '?',
+    id: 'entrada-atalhos', rotulo: 'Atalhos do teclado', secao: 'acoes', ordem: 900, icone: Keyboard, atalho: '?',
     palavras: ['teclas', 'teclado', 'ajuda'], executar: (ctx) => { void ctx.abrirDialogo('atalhos', {}) },
   },
   {
-    id: 'entrada-modelos', rotulo: 'Modelos de demanda', secao: 'ir_para', icone: LayoutTemplate,
+    id: 'entrada-modelos', rotulo: 'Modelos de demanda', secao: 'ir_para', ordem: 120, icone: LayoutTemplate,
     palavras: ['briefing', 'checklist', 'configuracoes', 'modelo'],
     executar: (ctx) => ctx.navegar(ctx.quadroAtual ? `/config/modelos?quadro=${encodeURIComponent(ctx.quadroAtual.id)}` : '/config/modelos'),
   },

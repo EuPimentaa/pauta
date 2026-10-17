@@ -10,6 +10,7 @@
  */
 import './modal.css'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lembrarDemandaAberta } from '../paleta/estado.ts'
 import { useQueryClient } from '@tanstack/react-query'
 import { Archive, MoreHorizontal, X } from 'lucide-react'
 import type { Bootstrap, Demanda, DemandaDetalhe } from '@shared/tipos/index.ts'
@@ -168,6 +169,8 @@ export function ConteudoModal({ demanda, detalhe, fechar }: PropsModalDemanda) {
     definirModal(demanda.id, demanda.quadroId)
     return () => definirModal(null)
   }, [demanda.id, demanda.quadroId])
+  // a demanda aberta entra nos Recentes da paleta (Cmd+K com a busca vazia)
+  useEffect(() => { lembrarDemandaAberta(demanda) }, [demanda.id, demanda.titulo])
   useEffect(() => {
     const id = demanda.id
     return () => { requestAnimationFrame(() => focarCardAoFechar(id)) }

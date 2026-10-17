@@ -521,6 +521,11 @@ export interface Comando {
   id: string
   rotulo: string
   secao: 'acoes' | 'ir_para'
+  /**
+   * Ordem dentro da seção (menor primeiro; PLANO §4): Nova demanda 10, Colar do WhatsApp 20, ações do quadro 30–90,
+   * cadastros 500+, tema 800+, Atalhos 900. Sem ordem = 1000 (depois dos combinados).
+   */
+  ordem?: number
   palavras?: string[]
   atalho?: string
   icone?: Icone

@@ -1001,6 +1001,7 @@ DS = DESIGN-SYSTEM-WEB, NS = NÚCLEO-SERVIDOR, NW = NÚCLEO-WEB.
 | avatar | `cadastros-conta` 100 ("Sua conta", integração 3A) · `nucleo-tema` 200 · `nucleo-sair` 900 |
 | Início | `cadastros-primeiros-passos` 50 (veio com o F5; o F3 não repete) · `paineis-minhas` 100 · `paineis-cliente-parado` 200 · `paineis-mencoes` 300 |
 | Configurações | `cadastros-conta` 50 (Sua conta: nome, apelido, cor e senha; integração 3A) · `cadastros-pessoas` 100 · `cadastros-equipes` 200 · `cadastros-quadros` 300 · `entrada-modelos` 400 · `cadastros-feriados` 500 · `cadastros-parametros` 550 (Prazos e limites) · `cadastros-aparencia` 600 |
+| paleta (comandos; integração 3A) | Ações: `entrada-nova` 10 · `entrada-colar` 20 · `nucleo-so-minhas` 30 · `nucleo-link-quadro` 40 · `cadastros` 500–530 · `nucleo-tema-*` 800 · `entrada-atalhos` 900; Ir para: `nucleo-ir-inicio` 10 · `cadastros` 100–140 (Clientes, Arquivo, Configurações, Sua conta) · `entrada-modelos` 120. Sem ordem: depois (1000). A busca vazia começa pelos Recentes (as demandas abertas no modal entram sozinhas) |
 | globais | `nucleo-tempo-real` 100 · `nucleo-dialogos` 200 · `nucleo-teclado` 300 · `nucleo-paleta` 400 |
 
 ### 4.1 Estados vazios, carregamento e erro: texto e dono

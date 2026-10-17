@@ -11,29 +11,18 @@ import { Clock, CornerDownLeft, Loader2, Search } from 'lucide-react'
 import type { Comando, ContextoAcao, FontePaleta, ResultadoPaleta } from '../extensoes/tipos.ts'
 import { useDemanda } from '../api/seletores.ts'
 import { useContextoAcao } from '../dialogos/contexto.ts'
-import { lerLocal, gravarLocal } from '../lib/armazenamento.ts'
 import { EH_MAC } from '../lib/teclas.ts'
 import { useRegistro } from '../sessao/registro.ts'
 import { Kbd } from '../ui/Kbd.tsx'
 import { Modal } from '../ui/Modal.tsx'
 import { casaTermo } from './casar.ts'
-import { demandaNaAberturaPaleta, fecharPaleta, termoInicialPaleta, usePaletaAberta } from './estado.ts'
+import {
+  demandaNaAberturaPaleta, fecharPaleta, guardarRecentePaleta as guardarRecente, lerRecentesPaleta as lerRecentes, termoInicialPaleta,
+  usePaletaAberta,
+} from './estado.ts'
 
-const MAX_RECENTES = 8
 const ESPERA_MS = 110
 const SECAO_COMANDO = { acoes: 'Ações', ir_para: 'Ir para' } as const
-
-type Recente = { tipo: 'comando'; id: string } | { tipo: 'resultado'; id: string; secao: string; rotulo: string; detalhe?: string; caminho: string }
-
-function lerRecentes(): Recente[] {
-  const v = lerLocal<Recente[]>('paleta-recentes', [])
-  return Array.isArray(v) ? v : []
-}
-
-function guardarRecente(r: Recente) {
-  const chave = (x: Recente) => `${x.tipo}:${x.id}`
-  gravarLocal('paleta-recentes', [r, ...lerRecentes().filter((x) => chave(x) !== chave(r))].slice(0, MAX_RECENTES))
-}
 
 interface Estado { carregando: boolean; itens: ResultadoPaleta[] }
 
@@ -78,7 +67,9 @@ function Busca() {
   const [selecionado, setSelecionado] = useState('')
   const fontes = useMemo(() => reg.fontesBusca(), [reg])
   const resultados = useResultados(fontes, termo)
+  // na ordem combinada (Comando.ordem; sem ordem, depois), e não na de chegada dos arquivos
   const comandos = reg.comandos().filter((c) => visivel(c, ctx) && casaTermo(termo, c.rotulo, ...(c.palavras ?? [])))
+    .sort((a, b) => (a.ordem ?? 1000) - (b.ordem ?? 1000))
   const vazio = !termo.trim()
   const recentes = vazio ? lerRecentes() : []
   const ctxRef = useRef(ctx)

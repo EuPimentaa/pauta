@@ -45,6 +45,7 @@ function novaChave(): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
 }
 
+const hostDe = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url } }
 const primeiroNome = (n: string) => n.trim().split(/\s+/)[0] ?? n
 
 // ─────────────────────────────── botão e folha (sem o design system em JS: a página fica leve) ───────────────────────────────
@@ -138,12 +139,16 @@ function Previa({ i, ampliar }: { i: ItemVersaoPublico; ampliar(url: string, nom
           aria-label={embutido ? `Ver ${i.nome} aqui` : `Ampliar ${i.nome}`}>
           <img src={i.previaUrl} alt={i.nome} decoding="async" referrerPolicy="no-referrer" />
         </button>
+      ) : embutido ? (
+        <button type="button" className="pub-previa-vazia" onClick={() => setEmbutir(true)}>
+          <Eye aria-hidden="true" /><strong>Ver a peça aqui</strong><span>{hostDe(i.url)}</span>
+        </button>
       ) : null}
       <div className="pub-previa-rodape">
         <span className="pub-previa-icone" aria-hidden="true"><Icone /></span>
         <span className="pub-previa-nome" title={i.nome}>{i.nome}</span>
         <span className="pub-previa-acoes">
-          {embutido && !embutir && <Botao tamanho="p" icone={Eye} onClick={() => setEmbutir(true)}>Ver aqui</Botao>}
+          {embutido && !embutir && !!i.previaUrl && <Botao tamanho="p" icone={Eye} onClick={() => setEmbutir(true)}>Ver aqui</Botao>}
           {embutir && <Botao tamanho="p" icone={X} onClick={() => setEmbutir(false)}>Fechar</Botao>}
           {i.tipo === 'arquivo' && !i.imagem
             ? <a className="ui-botao" data-variante="secundario" data-tamanho="p" href={i.url} download><Download aria-hidden="true" /><span>Baixar</span></a>
@@ -420,12 +425,14 @@ export default function TelaAprovacao() {
   return (
     <div className="pub">
       <header className="pub-topo">
-        {pagina?.cliente.logoUrl
-          ? <img className="pub-cliente-logo" src={pagina.cliente.logoUrl} alt={`Logo de ${pagina.cliente.nome}`} />
-          : pagina ? <span className="pub-cliente-sigla bg-cor-bg text-cor-ink" data-cor={pagina.cliente.cor} aria-hidden="true">{pagina.cliente.sigla.slice(0, 3)}</span> : null}
-        <div className="pub-cliente">
-          <span className="pub-cliente-nome">{pagina?.cliente.nome ?? 'Aprovação'}</span>
-          <span className="pub-por">por <Logo altura={13} rotulo="Melt" /></span>
+        <div className="pub-topo-dentro">
+          {pagina?.cliente.logoUrl
+            ? <img className="pub-cliente-logo" src={pagina.cliente.logoUrl} alt={`Logo de ${pagina.cliente.nome}`} />
+            : pagina ? <span className="pub-cliente-sigla bg-cor-bg text-cor-ink" data-cor={pagina.cliente.cor} aria-hidden="true">{pagina.cliente.sigla.slice(0, 3)}</span> : null}
+          <div className="pub-cliente">
+            <span className="pub-cliente-nome">{pagina?.cliente.nome ?? 'Aprovação'}</span>
+            <span className="pub-por">por <Logo altura={13} rotulo="Melt" /></span>
+          </div>
         </div>
       </header>
       {estado.tipo === 'carregando' && (

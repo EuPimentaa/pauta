@@ -87,6 +87,7 @@
 
   /* itens da versão */
   .cic-itens { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 8px; list-style: none; margin: 0; padding: 0; }
+  .cic-itens[data-uma-coluna] { grid-template-columns: minmax(0, 1fr); }
   .cic-item {
     display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 56px; padding: 6px;
     border-radius: var(--radius-sm); background: var(--surface-sunken); min-width: 0;
@@ -195,7 +196,8 @@
 }
 
 @layer foco {
-  .cic-escolha:focus-visible, .cic-item-previa:focus-visible, .cic-texto-whatsapp:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .cic-escolha:focus-visible, .cic-texto-whatsapp:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .cic-item-previa:focus-visible { outline: none; box-shadow: inset 0 0 0 3px var(--accent); }
   .cic-soltar:has(input:focus-visible) { box-shadow: var(--focus-ring); }
   .cic-automacao-membros input:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 50%; }
 }

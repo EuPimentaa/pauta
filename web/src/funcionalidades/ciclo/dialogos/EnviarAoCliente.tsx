@@ -53,7 +53,7 @@ export default function EnviarAoCliente({ params, fechar }: PropsDialogo<'enviar
   const [erro, setErro] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [subindo, setSubindo] = useState(false)
-  const [feito, setFeito] = useState<EnviarAoClienteSaida | null>(null)
+  const [feito, setFeito] = useState<{ saida: EnviarAoClienteSaida; quadroAntes: string } | null>(null)
   const [texto, setTexto] = useState('')
 
   const versao: VersaoComItens | undefined = det?.versoes.find((v) => v.id === d?.versaoAtualId)
@@ -94,7 +94,7 @@ export default function EnviarAoCliente({ params, fechar }: PropsDialogo<'enviar
         contatoId: contatoEscolhido === '' ? null : contatoEscolhido,
         ...(prazo ? { prazoRetorno: prazo.data, prazoRetornoHora: prazo.data ? prazo.hora : null } : {}),
       })
-      setFeito(s)
+      setFeito({ saida: s, quadroAntes: d.quadroId })
       setTexto(s.textoWhatsapp)
     } catch (e) {
       if (ehErroDaApi(e) && e.codigo === 'drive_privado') void testar()
@@ -123,34 +123,35 @@ export default function EnviarAoCliente({ params, fechar }: PropsDialogo<'enviar
 
   // ─────────── depois de enviar ───────────
   if (feito) {
-    const onde = feito.automacao ? lugarDe(qc, feito.demanda, d.quadroId) : null
-    const para = contatos.find((c) => c.id === feito.envio.contatoId)?.nome
+    const { saida, quadroAntes } = feito
+    const onde = saida.automacao ? lugarDe(qc, saida.demanda, quadroAntes) : null
+    const para = contatos.find((c) => c.id === saida.envio.contatoId)?.nome
     return (
       <MolduraDialogo titulo={`V${versao?.numero ?? ''} enviada`} tamanho="m"
-        rodape={<Botao variante="primario" onClick={() => fechar({ demanda: feito.demanda })}>Concluir</Botao>}>
+        rodape={<Botao onClick={() => fechar({ demanda: saida.demanda })}>Concluir</Botao>}>
         <div className="cic-feito">
           <div className="cic-alerta" data-tom="sucesso" role="status">
             <CheckCircle2 aria-hidden="true" />
             <span>
-              <strong>{feito.envio.via === 'link' ? 'Link gerado' : 'Envio registrado'}{para ? ` para ${para}` : ''}.</strong>
+              <strong>{saida.envio.via === 'link' ? 'Link gerado' : 'Envio registrado'}{para ? ` para ${para}` : ''}.</strong>
               {onde ? ` Movida para ${onde}.` : ''}
             </span>
           </div>
-          {feito.link && (
+          {saida.link && (
             <div className="cic-campo">
               <span className="cic-rotulo">Link de aprovação</span>
-              <CopiarTexto texto={feito.link.url} rotulo="Copiar link" avisoCopiado="Link copiado." />
+              <CopiarTexto texto={saida.link.url} rotulo="Copiar link" avisoCopiado="Link copiado." />
             </div>
           )}
           <div className="cic-campo">
             <label className="cic-rotulo" htmlFor={`${idForm}-texto`}>Texto para o WhatsApp</label>
             <textarea id={`${idForm}-texto`} className="cic-texto-whatsapp" value={texto} onChange={(e) => setTexto(e.target.value)} />
             <div className="cic-linha">
-              <Botao icone={Copy} onClick={async () => {
+              <Botao variante="primario" icone={Copy} data-autofocus="" onClick={async () => {
                 const ok = await copiarParaAreaDeTransferencia(texto)
                 avisar(ok ? 'Texto copiado. Cole no WhatsApp.' : 'Não foi possível copiar.', { tipo: ok ? 'sucesso' : 'erro', duracao: 2500 })
               }}>Copiar para WhatsApp</Botao>
-              {feito.link && <Botao variante="ghost" icone={ExternalLink} onClick={() => window.open(feito.link!.url, '_blank', 'noopener,noreferrer')}>Ver como o cliente</Botao>}
+              {saida.link && <Botao variante="ghost" icone={ExternalLink} onClick={() => window.open(saida.link!.url, '_blank', 'noopener,noreferrer')}>Ver como o cliente</Botao>}
             </div>
           </div>
         </div>
@@ -178,13 +179,13 @@ export default function EnviarAoCliente({ params, fechar }: PropsDialogo<'enviar
         {versao && (
           <div className="cic-resumo-versao">
             <span className="cic-rotulo">V{versao.numero}{versao.nota ? `: ${versao.nota}` : ''}</span>
-            <ul className="cic-itens" aria-label={`Itens da V${versao.numero}`}>{versao.itens.map((i) => <ItemVersao key={i.id} i={i} />)}</ul>
+            <ul className="cic-itens" data-uma-coluna="" aria-label={`Itens da V${versao.numero}`}>{versao.itens.map((i) => <ItemVersao key={i.id} i={i} />)}</ul>
           </div>
         )}
         <fieldset className="cic-campo">
           <legend className="cic-rotulo">Como enviar</legend>
           <div className="cic-escolhas" role="radiogroup" aria-label="Como enviar">
-            <button type="button" role="radio" aria-checked={via === 'link'} className="cic-escolha" onClick={() => setVia('link')}>
+            <button type="button" role="radio" aria-checked={via === 'link'} className="cic-escolha" onClick={() => setVia('link')} data-autofocus="">
               Gerar link<span>O cliente aprova ou pede ajuste pelo celular, sem login.</span>
             </button>
             <button type="button" role="radio" aria-checked={via === 'fora'} className="cic-escolha" onClick={() => setVia('fora')}>
@@ -215,6 +216,12 @@ export default function EnviarAoCliente({ params, fechar }: PropsDialogo<'enviar
                   onChange={(e) => { const l = Array.from(e.target.files ?? []); e.target.value = ''; void subirArquivo(l) }} />
               </div>
             )}
+          </div>
+        )}
+        {via === 'link' && versao && !versao.itens.some((i) => i.tipo === 'arquivo' || (i.tipo === 'link' && i.driveStatus !== 'privado')) && (
+          <div className="cic-alerta" role="status">
+            <AlertTriangle aria-hidden="true" />
+            <span><strong>O cliente não vê caminhos de rede.</strong> Acrescente um link ou um arquivo à versão, ou mande por fora.</span>
           </div>
         )}
         <div className="cic-grade">

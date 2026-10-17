@@ -44,8 +44,8 @@ export default function EnviarAoSoltar({ params, fechar }: PropsDialogo<'enviar-
         </>
       )}>
       <p className="cic-vazio">
-        A V{d.nVersoes} de #{d.numero} {d.titulo} ainda não foi enviada. {coluna ? `"${coluna.nome}"` : 'Esta coluna'} é de quem aguarda o
-        cliente: envie agora para a bola ficar com ele, ou só mova o card.
+        A V{d.nVersoes} de #{d.numero} {d.titulo} ainda não foi enviada. Enviar agora deixa a bola com o cliente; "Só mover" leva o
+        card para {coluna ? coluna.nome : 'a coluna'} sem enviar.
       </p>
     </MolduraDialogo>
   )

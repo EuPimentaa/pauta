@@ -79,8 +79,12 @@ describe('vaivém com as automações da Criação', () => {
     assert.equal(final.quadroId, a.quadros.social.quadro.id)
     assert.equal(final.colunaId, a.coluna('social', 'Agendar').id)
     assert.deepEqual(final.membroIds, [a.pessoas.social.id])
-    // aprovada estando no Atendimento (sem etiquetas): as da Criação continuam guardadas lá
-    assert.deepEqual(nomesEtiquetas(a, final), [])
+    // aprovada estando no Atendimento (sem etiquetas): as guardadas na Criação (o quadro do envio) casam por nome com
+    // o Social ("Alteração"); "Urgente" não tem par lá e continua guardada na Criação
+    assert.deepEqual(nomesEtiquetas(a, final), ['Alteração'])
+    const urgenteGuardada = um<{ n: number }>(a.db, 'SELECT count(*) AS n FROM demanda_etiqueta WHERE demanda_id = ? AND etiqueta_id = ?',
+      d0.id, urgente.id)!.n
+    assert.equal(urgenteGuardada, 1)
     assert.ok(final.aprovadaEm)
     assert.equal(final.aprovadaVersaoId, v2.versao.id)
     assert.ok(notificacoesDe(a.db, a.pessoas.social.id).some((n) => n.tipo === 'membro'))

@@ -75,9 +75,12 @@ export function executarAutomacao(db: Db, demandaId: Id, gatilho: GatilhoAutomac
       JOIN coluna c ON c.id = a.destino_coluna_id JOIN quadro q ON q.id = a.destino_quadro_id
      WHERE a.quadro_id = ? AND a.gatilho = ? AND a.ativa = 1`, quadroId ?? d.quadro_id, gatilho)
   if (!a || a.arquivada_em || a.quadro_arquivado || a.destino_coluna_id === d.coluna_id) return false
+  // a demanda espera o cliente em outro quadro (ex.: Atendimento › Com o cliente): as etiquetas que ficaram guardadas
+  // no quadro do envio (as da Criação) também casam por nome com o destino (pedido 1 do F2, integração 3B)
   mover(db, {
     demandaId, ator, colunaId: String(a.destino_coluna_id), posicao: { depoisDeId: null }, via: 'automacao', gatilho,
     etiquetasSemPar: 'deixar', membros: a.membros as MembrosAoMover,
+    ...(quadroId && quadroId !== d.quadro_id ? { etiquetasTambemDe: quadroId } : {}),
   })
   return true
 }

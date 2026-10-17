@@ -36,6 +36,11 @@ export interface MoverParametros {
   membros?: MembrosAoMover
   membroIds?: Id[]
   rev?: number
+  /**
+   * Mudando de quadro, as etiquetas guardadas neste quadro também casam por nome com o destino, além das atuais (as
+   * sem par continuam guardadas nele, sem aviso). A automação do quadro do envio (§5.5) passa o quadro do envio.
+   */
+  etiquetasTambemDe?: Id
 }
 
 /** Responsável ativo do cliente na equipe do quadro (cliente_responsavel), ou null. */
@@ -115,6 +120,12 @@ export function mover(db: Db, p: MoverParametros): MoverSaida {
     const guardadas = etiquetasGuardadas(db, antes.id, destino.quadroId).map((e) => e.id)
     const { ids, semPar } = mapearEtiquetas(atuais, doDestino, guardadas)
     const finais = [...ids]
+    const tambemDe = p.etiquetasTambemDe
+    if (tambemDe && tambemDe !== antes.quadroId && tambemDe !== destino.quadroId) {
+      for (const id of mapearEtiquetas(etiquetasGuardadas(db, antes.id, tambemDe), doDestino, []).ids) {
+        if (!finais.includes(id)) finais.push(id)
+      }
+    }
     if ((p.etiquetasSemPar ?? 'deixar') === 'criar') {
       for (const et of semPar) {
         const id = novoId()

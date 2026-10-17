@@ -129,6 +129,8 @@ describe('cadastros (front): Primeiros passos e nomes', () => {
     assert.deepEqual(fim.itens.map((i) => i.feito), [true, true, true, true], 'sem contato padrão não segura; ex-cliente sem AM não conta')
     assert.equal(fim.concluido, true)
     assert.equal(calcularPassos({ ...vazio, clientes: [{ status: 'ex', pendencias: [] }] }).itens[2]!.feito, false, 'só ex-clientes não conta')
+    assert.equal(calcularPassos({ ...vazio, clientes: [{ status: 'recorrente', pendencias: [] }, { status: 'pontual', pendencias: ['sem_am'] }] }).itens[2]!.feito,
+      true, 'o cliente que a equipe criou depois (sem AM) não reabre o passo')
   })
 
   test('resumo de cada passo', () => {

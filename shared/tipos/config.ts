@@ -129,7 +129,8 @@ export type PassoInicial = (typeof PASSOS_INICIAIS)[number]
  * - convidar_equipe: pelo menos 2 usuários ativos (o admin e mais alguém);
  * - criar_quadros: pelo menos 1 quadro ativo (o atalho cria os das equipes de uma vez a partir do modelo sugerido;
  *   a tela avisa quando a equipe ainda não tem membros);
- * - cadastrar_clientes: pelo menos 1 cliente fora de 'ex' e nenhum deles com a pendência sem_am;
+ * - cadastrar_clientes: pelo menos 1 cliente fora de 'ex' com AM (o que a equipe cria depois, sem AM, não reabre o
+ *   bloco: a pendência fica em Clientes; integração 3B);
  * - revisar_modelos: ConfigApp.modelosRevisadosEm preenchido (botão "Revisei os modelos").
  * `concluido` = todos feitos; aí o Início devolve primeirosPassos = null.
  */

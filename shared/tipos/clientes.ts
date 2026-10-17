@@ -11,7 +11,7 @@ export type TipoLinkCliente = (typeof TIPOS_LINK_CLIENTE)[number]
 export const PENDENCIAS_CLIENTE = ['sem_am', 'sem_contato_padrao'] as const
 /**
  * Cadastro incompleto ("Criar cliente HE" na hora e completar depois). Calculado na leitura; a lista de clientes e o
- * cabeçalho do cliente mostram "Completar cadastro". `sem_am` também conta nos Primeiros passos do admin.
+ * cabeçalho do cliente mostram "Completar cadastro". Os Primeiros passos do admin pedem só 1 cliente com AM.
  */
 export type PendenciaCliente = (typeof PENDENCIAS_CLIENTE)[number]
 

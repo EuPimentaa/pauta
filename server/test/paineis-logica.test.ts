@@ -83,5 +83,7 @@ describe('Início e Agenda', () => {
     const tudo = { usuariosAtivos: 2, quadrosAtivos: 1, clientesAtivos: 1, clientesSemAm: 0, modelosRevisadosEm: '2026-10-14T13:00:00.000Z' }
     assert.equal(primeirosPassos(tudo), null)
     assert.deepEqual(primeirosPassos({ ...tudo, clientesSemAm: 1 })!.itens.map((i) => i.feito), [true, true, false, true])
+    // um cliente criado depois pela equipe (sem AM) não reabre o bloco quando já há um com AM
+    assert.equal(primeirosPassos({ ...tudo, clientesAtivos: 3, clientesSemAm: 1 }), null)
   })
 })

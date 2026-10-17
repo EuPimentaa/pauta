@@ -926,7 +926,8 @@ Mesmos headers de `GET /api/arquivos/:id`; `&inline=1` (só imagem, como na rota
     mostra uma linha por equipe ativa sem quadro, com o modelo sugerido e as colunas para desmarcar ou renomear (as
     das pessoas já expandidas; equipe sem membros: aviso "Convide a equipe antes: quem entrar depois ganha a própria
     coluna"); cada linha é um `POST /api/quadros`;
-  - `cadastrar_clientes` (`/clientes`): pelo menos 1 cliente fora de `ex` e nenhum deles com a pendência `sem_am`;
+  - `cadastrar_clientes` (`/clientes`): pelo menos 1 cliente fora de `ex` com AM (integração 3B: o cliente que a
+    equipe cria depois, só com sigla e nome, não reabre o bloco; a pendência `sem_am` fica em Clientes);
   - `revisar_modelos` (`/config/modelos`): `config.modelosRevisadosEm` preenchido (botão "Revisei os modelos",
     `POST /api/modelos-demanda/revisados`).
 

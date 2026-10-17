@@ -174,14 +174,15 @@ const CAMINHO_PASSO: Record<PassoInicial, string> = {
 
 /**
  * Primeiros passos do admin (API.md §4.18), na ordem de PASSOS_INICIAIS: 2+ pessoas ativas; 1+ quadro ativo; 1+
- * cliente fora de 'ex' e nenhum deles sem AM; "Revisei os modelos" apertado. Tudo feito: null (o bloco some).
+ * cliente fora de 'ex' com AM; "Revisei os modelos" apertado. Tudo feito: null (o bloco some). O cliente que a equipe
+ * cria depois (só sigla e nome, sem AM) não reabre o bloco: a pendência fica em Clientes ("Completar cadastro").
  */
 export function primeirosPassos(d: { usuariosAtivos: number; quadrosAtivos: number; clientesAtivos: number;
   clientesSemAm: number; modelosRevisadosEm: string | null }): PrimeirosPassos | null {
   const feito: Record<PassoInicial, boolean> = {
     convidar_equipe: d.usuariosAtivos >= 2,
     criar_quadros: d.quadrosAtivos >= 1,
-    cadastrar_clientes: d.clientesAtivos >= 1 && d.clientesSemAm === 0,
+    cadastrar_clientes: d.clientesAtivos - d.clientesSemAm >= 1,
     revisar_modelos: d.modelosRevisadosEm !== null,
   }
   const itens = PASSOS_INICIAIS.map((id) => ({ id, rotulo: ROTULO_PASSO[id], caminho: CAMINHO_PASSO[id], feito: feito[id] }))

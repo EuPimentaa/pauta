@@ -170,14 +170,14 @@ const CAMINHO_PASSO: Record<PassoInicial, string> = {
 
 /**
  * Na ordem de PASSOS_INICIAIS, com o critério de `feito`: 2+ usuários ativos; 1+ quadro ativo; 1+ cliente fora de
- * 'ex' e nenhum deles sem AM; "Revisei os modelos" apertado.
+ * 'ex' com AM (o criado depois pela equipe, sem AM, não reabre o bloco); "Revisei os modelos" apertado.
  */
 export function calcularPassos(d: DadosPassos): { itens: PassoCalculado[]; concluido: boolean } {
   const ativos = d.clientes.filter((c) => c.status !== 'ex')
   const feito: Record<PassoInicial, boolean> = {
     convidar_equipe: d.usuarios.filter((u) => u.ativo).length >= 2,
     criar_quadros: d.quadros.some((q) => q.arquivadoEm === null),
-    cadastrar_clientes: ativos.length > 0 && ativos.every((c) => !c.pendencias.includes('sem_am')),
+    cadastrar_clientes: ativos.some((c) => !c.pendencias.includes('sem_am')),
     revisar_modelos: d.modelosRevisadosEm !== null,
   }
   const ordem: PassoInicial[] = ['convidar_equipe', 'criar_quadros', 'cadastrar_clientes', 'revisar_modelos']

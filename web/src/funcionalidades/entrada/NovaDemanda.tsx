@@ -20,6 +20,7 @@ import {
 import { dataLocalDe, hojeSP, horaLocalDe } from '@shared/logica/datas.ts'
 import { lerConversa, prazoDaConversa, trechoDaConversa } from '@shared/logica/colar-whatsapp.ts'
 import { normalizarAlias } from '@shared/logica/texto.ts'
+import { detectarSenha } from '@shared/logica/senha.ts'
 import { useBootstrap } from '../../api/bootstrap.ts'
 import { mensagemDeErro } from '../../api/cliente.ts'
 import { useCriarDemanda } from '../../api/demandas.ts'
@@ -127,6 +128,7 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
   function estadoNovo(): Estado {
     const quadro = quadroInicial(b.quadros, {
       pedido: params.quadroId, aberto: ctx.quadroAtual?.id, ultimo: lerLocal<string | null>(CHAVE_ULTIMO_QUADRO, null), favoritos: eu.favoritos,
+      seguindo: eu.seguindo, equipeIds: eu.usuario.equipeIds,
     })
     const coluna = quadro ? colunaInicial(b.colunas, quadro.id, params.colunaId) : null
     const modelo = params.modeloId && modelosDoQuadro(b.modelosDemanda, quadro?.id ?? null).some((m) => m.id === params.modeloId) ? params.modeloId : null
@@ -178,8 +180,11 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
   const guardar = () => {
     if (criada.current) return
     const a = atual.current
-    if (a.sujo) gravarRascunho(eu.usuario.id, paraGuardar(a.estado, a.textoColar, new Date()))
-    else if (rascunho) gravarRascunho(eu.usuario.id, null)
+    // senha no texto (a conversa colada, a descrição): não vai para o localStorage do aparelho; o que havia sai
+    const comSenha = a.estado.senhaNoTexto
+      || detectarSenha([a.textoColar, a.estado.titulo, a.estado.descricaoMd, a.estado.origemTexto ?? ''].join('\n'))
+    if (a.sujo && !comSenha) gravarRascunho(eu.usuario.id, paraGuardar(a.estado, a.textoColar, new Date()))
+    else if (rascunho || comSenha) gravarRascunho(eu.usuario.id, null)
   }
   // guarda um pouco depois de cada mudança (outra aba ou o Shift+N logo depois do Esc já acham) e ao fechar
   useEffect(() => {
@@ -411,6 +416,7 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
           {estado.senhaNoTexto && (
             <p className="entrada-alerta" role="alert">
               <AlertTriangle aria-hidden="true" /> Parece que a conversa traz uma senha. Guarde no cofre (Acessos do cliente) e apague daqui.
+              Com a senha no texto, o rascunho não fica guardado no aparelho.
             </p>
           )}
         </section>

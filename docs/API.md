@@ -629,6 +629,11 @@ pelo número). Arquivadas e de quadros arquivados só com `incluirArquivadas`. M
 - **Quem:** qualquer usuário. **Corpo:** `multipart/form-data` com o campo `arquivo` (um por chamada).
 - `bodyLimit` recusa pelo `Content-Length` antes do parse (§1). Confere tamanho (`uploadLimiteBytes`, no máximo 10 MB)
   e magic number (jpg, png, webp, gif, pdf, zip); grava em `DATA_DIR/uploads/<2>/<id>` e o sha256. **Resposta:** `201 ArquivoInfo`.
+- **Nome:** sem caminho nem caracteres de controle, até 200, e com a extensão do tipo detectado (`nomeParaTipo`): a que
+  casa fica (zip: `.zip`, `.docx`, `.xlsx`, `.pptx`, OpenDocument, `.idml`, `.xd`, `.sketch`, iWork; PDF: `.pdf`, `.ai`;
+  jpg: `.jpg`, `.jpeg`); a perigosa (`.html`, `.htm`, `.svg`, `.js`, `.jar`, `.apk`, `.exe`, `.bat`, `.cmd`, `.ps1`,
+  `.xlsm`, `.docm`, `.pptm`, `.hta`, `.vbs`) ou a de outro tipo é trocada ("boleto.html" num PDF → "boleto.pdf"); sem
+  extensão ou com outra qualquer, o nome ganha a do tipo ("Proposta v1.2.pdf"). Segurança da leva 2, achado 5.
 - **Em uso** = referenciado por `versao_item.arquivo_id`, `cliente.logo_arquivo_id` ou `anexo.arquivo_id` sem
   `excluido_em` (inclusive o print de evidência e a capa). O gatilho `arquivo_em_uso` impede marcar `excluido_em`
   num arquivo em uso; o job de órfãos (24 h sem uso) e a exclusão de anexo usam a mesma lista. O caminho inverso
@@ -638,7 +643,8 @@ pelo número). Arquivadas e de quadros arquivados só com `incluirArquivadas`. M
 
 #### `GET /api/arquivos/:id`
 - **Quem:** qualquer usuário. `?inline=1` só vale para imagens. Headers: `X-Content-Type-Options: nosniff`,
-  `Content-Disposition: attachment; filename*=` (exceto imagem inline), `Cache-Control: private, max-age=3600`.
+  `Content-Disposition: attachment; filename*=` (exceto imagem inline), `Cache-Control: private, max-age=3600`. O nome
+  baixado passa pela mesma regra de extensão do upload (vale para os gravados antes dela).
 - **Erros:** `404` inexistente ou excluído.
 
 ### 4.15 Modal da demanda · modal

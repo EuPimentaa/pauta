@@ -49,6 +49,41 @@ export function nomeSeguro(nome: string): string {
   return limpo.slice(0, 200 - ext.length) + ext
 }
 
+/** Extensões que casam com cada tipo detectado; a primeira é a que o nome ganha quando não casa. */
+const EXTENSOES: Record<MimePermitido, readonly string[]> = {
+  'image/jpeg': ['jpg', 'jpeg', 'jpe', 'jfif'],
+  'image/png': ['png'],
+  'image/webp': ['webp'],
+  'image/gif': ['gif'],
+  // o .ai do Illustrator salvo com compatibilidade PDF começa com %PDF-
+  'application/pdf': ['pdf', 'ai'],
+  // formatos que são zip por dentro (Office, OpenDocument, InDesign, XD, Sketch, iWork)
+  'application/zip': ['zip', 'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'epub', 'idml', 'xd', 'sketch', 'key', 'pages', 'numbers'],
+}
+/** Abrem como página ou script no navegador, ou executam no sistema (zip com macro ou app): sempre trocadas. */
+const EXTENSOES_PERIGOSAS = new Set(['html', 'htm', 'svg', 'js', 'jar', 'apk', 'exe', 'bat', 'cmd', 'ps1', 'xlsm', 'docm', 'pptm', 'hta', 'vbs'])
+const EXTENSOES_CONHECIDAS = new Set(Object.values(EXTENSOES).flat())
+
+/**
+ * O nome com a extensão do tipo detectado pelo magic number (API.md §4.14): a que casa fica ("Contrato.docx" num zip);
+ * a perigosa ou a de outro tipo é trocada ("boleto.html" num PDF → "boleto.pdf"; "foto.jpg" num PNG → "foto.png"); sem
+ * extensão, ou com uma que não diz nada ("Proposta v1.2"), o nome ganha a do tipo ("Proposta v1.2.pdf"). Pontos e
+ * espaços no fim saem (o Windows os tira e "boleto.html." viraria .html). Até 200 caracteres. Vale no upload e no
+ * download (nomes gravados antes desta regra).
+ */
+export function nomeParaTipo(nome: string, mime: string): string {
+  const permitidas = EXTENSOES[mime as MimePermitido]
+  if (!permitidas) return nome
+  const limpo = nome.replace(/[.\s]+$/, '')
+  const ponto = limpo.lastIndexOf('.')
+  const ext = ponto >= 0 ? limpo.slice(ponto + 1).toLowerCase() : ''
+  if (ext && permitidas.includes(ext)) return limpo
+  const trocar = ext !== '' && (EXTENSOES_PERIGOSAS.has(ext) || EXTENSOES_CONHECIDAS.has(ext))
+  const base = (trocar ? limpo.slice(0, ponto) : limpo).trim() || 'arquivo'
+  const nova = `.${permitidas[0]}`
+  return base.slice(0, 200 - nova.length) + nova
+}
+
 /** "10 MB", "1,5 MB", "200 KB" (para a mensagem do limite). */
 export function tamanhoLegivel(bytes: number): string {
   if (bytes < 1_048_576) return `${Math.max(1, Math.round(bytes / 1024))} KB`
@@ -77,7 +112,7 @@ export function salvarUpload(db: Db, conteudo: Uint8Array, nomeOriginal: string,
   seDesfeita(db, () => rmSync(destino, { force: true }))
   const sha256 = createHash('sha256').update(conteudo).digest('hex')
   rodar(db, 'INSERT INTO arquivo (id, nome, mime, bytes, sha256, enviado_por, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    id, nomeSeguro(nomeOriginal), mime, conteudo.byteLength, sha256, ator.usuario!.id, agora())
+    id, nomeParaTipo(nomeSeguro(nomeOriginal), mime), mime, conteudo.byteLength, sha256, ator.usuario!.id, agora())
   return lerArquivo(db, id).info
 }
 
@@ -111,8 +146,10 @@ export function respostaArquivo(info: ArquivoInfo, caminho: string, opcoes: { in
     throw naoEncontrado('Arquivo não encontrado.')
   }
   const inline = opcoes.inline === true && info.imagem
-  const nome = encodeURIComponent(info.nome).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
-  const ascii = info.nome.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_')
+  // o nome baixado tem a extensão do tipo de verdade (também os gravados antes da regra do upload)
+  const nomeFinal = nomeParaTipo(info.nome, info.mime)
+  const nome = encodeURIComponent(nomeFinal).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+  const ascii = nomeFinal.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_')
   const corpo = Readable.toWeb(createReadStream(caminho)) as ReadableStream<Uint8Array>
   return new Response(corpo, {
     status: 200,

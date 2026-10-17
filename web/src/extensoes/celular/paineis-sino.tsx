@@ -14,7 +14,7 @@ function useContador(): number {
 }
 
 export const aba: ExtensaoAbaCelular = {
-  id: 'paineis-sino', ordem: 500, rotulo: 'Notificações', icone: Bell, useContador,
+  id: 'paineis-sino', ordem: 500, rotulo: 'Avisos', icone: Bell, useContador,
   executar: (ctx) => {
     if (sinoAberto()) { fecharSinoAberto(); return }
     const ativo = document.activeElement

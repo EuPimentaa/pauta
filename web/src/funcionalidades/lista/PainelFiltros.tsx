@@ -224,7 +224,7 @@ export default function PainelFiltros({ ancora, aoFechar, quadro, filtros, defin
           {quantos === 0 ? 'Nenhum filtro' : `${quantos} ${quantos === 1 ? 'filtro' : 'filtros'}`} · {total} {total === 1 ? 'demanda' : 'demandas'}
         </span>
         <Botao variante="ghost" tamanho="p" disabled={!temFiltros(filtros)} onClick={() => definirFiltros({})}>Limpar filtros</Botao>
-        {celular && <Botao variante="secundario" tamanho="p" onClick={aoFechar}>Ver {total} {total === 1 ? 'demanda' : 'demandas'}</Botao>}
+        {celular && <Botao variante="primario" larguraTotal onClick={aoFechar}>Ver {total} {total === 1 ? 'demanda' : 'demandas'}</Botao>}
       </div>
     </Popover>
   )

@@ -21,6 +21,7 @@ import { LancarTempo } from '../../funcionalidades/paineis/LancarTempo.tsx'
 import { diasDaSemanaDe, lancamentosDoDia, mesDe, totaisPorDia } from '../../funcionalidades/paineis/logica.ts'
 import { useTituloAba } from '../../lib/app.ts'
 import { DIAS_CURTOS, DIAS_LONGOS, MESES, diaDaSemana, ehDataLocal, hojeLocal, somarDias, somarMeses } from '../../lib/datas.ts'
+import { usePonteiroGrosso } from '../../lib/midia.ts'
 import { useAgora } from '../../quadro/estado.ts'
 import { useAbrirSobreposta } from '../../sessao/sobreposta.tsx'
 import { Avatar } from '../../ui/Avatar.tsx'
@@ -167,8 +168,12 @@ export default function TelaHoras() {
     for (const d of semana.data?.extras ?? []) m.set(d.id, d)
     return m
   }, [demandas, semana.data])
-  const totais = totaisPorDia(itens)
-  const totalSemana = itens.reduce((s, a) => s + (a.minutos ?? 0), 0)
+  // o cronômetro ligado entra nos totais do dia e da semana com o tempo que já correu (o item mostra o mesmo)
+  const contados = useMemo(() => itens.map((a) => (a.minutos === null && a.iniciadoEm
+    ? { ...a, minutos: Math.max(1, Math.round((agora.getTime() - Date.parse(a.iniciadoEm)) / 60_000)) } : a)), [itens, agora])
+  const totais = totaisPorDia(contados)
+  const totalSemana = contados.reduce((s, a) => s + (a.minutos ?? 0), 0)
+  const toque = usePonteiroGrosso()
   const diasComItens = dias.filter((d) => itens.some((a) => a.data === d)).reverse()
   const nomeMes = `${MESES[Number(mes.de.slice(5, 7)) - 1]} de ${mes.de.slice(0, 4)}`
 
@@ -226,7 +231,7 @@ export default function TelaHoras() {
           ) : itens.length === 0 ? (
             <div className="pnl-vazio">
               <EstadoVazio icone={Clock3} tamanho="p" titulo="Nenhuma hora nesta semana."
-                texto={minhas ? <>Ligue o cronômetro (<kbd className="pnl-kbd">T</kbd>) num card ou</> : undefined}
+                texto={minhas ? (toque ? <>Ligue o cronômetro num card ou</> : <>Ligue o cronômetro (<kbd className="pnl-kbd">T</kbd>) num card ou</>) : undefined}
                 acoes={minhas ? <Botao tamanho="p" icone={Plus} onClick={() => setLancando(true)}>Lançar tempo</Botao> : undefined} />
             </div>
           ) : (

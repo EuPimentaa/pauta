@@ -50,6 +50,10 @@ describe('GET /api/publico/a/:token', () => {
     assert.match(item.versao!.itens[0]!.previaUrl!, /drive\.google\.com\/thumbnail/)
     assert.match(item.versao!.itens[1]!.url, /^\/api\/publico\/arquivos\/[^?]+\?exp=\d+&sig=/)
     assert.equal(item.versao!.itens[1]!.imagem, true)
+    // tipo e tamanho do arquivo para a página dizer "PNG · 1 KB"; link sem eles
+    assert.equal(item.versao!.itens[1]!.mime, 'image/png')
+    assert.ok(item.versao!.itens[1]!.bytes! > 0)
+    assert.equal(item.versao!.itens[0]!.mime, null)
     assert.ok(!JSON.stringify(p).includes('M:\\\\'))
     // o arquivo abre pela URL assinada (imagem inline) e não pela rota interna
     const arq = await publico(a).get(item.versao!.itens[1]!.previaUrl!)

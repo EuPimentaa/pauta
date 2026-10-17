@@ -71,6 +71,8 @@ describe('vaivém com as automações da Criação', () => {
     const pag2 = (await publico(a).pagina(token)).corpo as PaginaAprovacao
     assert.equal(pag2.itens[0]!.versao!.numero, 2)
     assert.deepEqual(pag2.itens[0]!.anteriores.map((x) => [x.numero, x.decisao]), [[1, 'ajuste']])
+    // o cliente confere a V2 contra o que pediu na V1
+    assert.deepEqual(pag2.itens[0]!.anteriores[0]!.linhas, ['Trocar a foto', 'Aumentar o logo', 'Corrigir a data'])
     const seq = ultimoSeq(a.db)
     const ok = await publico(a).decidir(token, { demandaId: d0.id, versaoId: pag2.itens[0]!.versao!.id, decisao: 'aprovado', contatoId: pag.contato!.id })
     assert.equal(ok.status, 200, ok.texto)

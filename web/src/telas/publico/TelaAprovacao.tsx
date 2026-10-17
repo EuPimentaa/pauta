@@ -1,16 +1,21 @@
 /**
  * Página pública de aprovação (/a/:token; F2; SPEC §5.4): sem login, celular primeiro. Mostra o logo do cliente e
  * "por Melt", a última versão enviada por este link (prévia estática; o Drive, o YouTube e o Figma só abrem embutidos
- * no toque), a conversa visível ao cliente e as versões anteriores. [Aprovar] abre uma folha de confirmação;
- * [Pedir ajuste] pede "um ajuste por linha". A identidade é pedida na hora da decisão ("Você é Fulana?" ou o nome,
- * lembrado no aparelho). 409 de versão nova recarrega a prévia ("Chegou a V3"); a decisão vai com Idempotency-Key.
+ * no toque), a conversa visível ao cliente e as versões anteriores (com o ajuste que o próprio cliente pediu).
+ * O estado da decisão vem logo abaixo do título (quem volta ao link vê primeiro); a versão diz quantos itens tem e cada
+ * prévia é numerada ("1 de 3"). [Aprovar] abre uma folha de confirmação com as miniaturas; [Pedir ajuste] pede "um ajuste
+ * por linha"; a barra de decisão fica presa ao rodapé (no desktop, dentro da coluna). Depois de decidir, a tela volta ao
+ * item e o foco vai para o selo. A identidade é pedida na hora da decisão ("Você é Fulana?" ou o nome, lembrado no
+ * aparelho). 409 de versão nova recarrega a prévia ("Chegou a V3"); a decisão vai com Idempotency-Key.
  * Leve: nada de bootstrap, SSE, registro de extensões nem Markdown (o texto do cliente e da agência é texto puro).
  */
 import './publico.css'
 import { useCallback, useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { useParams } from 'react-router'
 import {
-  AlertTriangle, CalendarClock, CheckCircle2, Download, ExternalLink, Eye, FileText, Link2, Loader2, Lock, Wrench, X, type LucideIcon,
+  AlertTriangle, CalendarClock, CheckCircle2, ChevronDown, Download, ExternalLink, Eye, FileText, Image as IconeImagem, ImageOff, Link2, Loader2, Lock,
+  Video, Wrench, X,
+  type LucideIcon,
 } from 'lucide-react'
 import type {
   DecisaoPublicaSaida, DetalhesVersaoDesatualizada, ItemAprovacaoPublico, ItemVersaoPublico, PaginaAprovacao,
@@ -18,6 +23,7 @@ import type {
 import { HORA_PADRAO_PRAZO } from '@shared/tipos/index.ts'
 import { dataLocalDe, formatarPrazo } from '@shared/logica/datas.ts'
 import { linhasParaItens } from '@shared/logica/texto.ts'
+import { primeiroNome } from '@shared/logica/texto-whatsapp.ts'
 import { api, ehErroDaApi, mensagemDeErro } from '../../api/cliente.ts'
 import { useNomeApp, useTituloAba } from '../../lib/app.ts'
 import { Logo } from '../../ui/Marca.tsx'
@@ -46,7 +52,31 @@ function novaChave(): string {
 }
 
 const hostDe = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url } }
-const primeiroNome = (n: string) => n.trim().split(/\s+/)[0] ?? n
+const reduzMovimento = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const ehVideo = (i: ItemVersaoPublico) => i.tipo === 'link' && /(^|\.)(youtube\.com|youtu\.be|vimeo\.com)$/i.test(hostDe(i.url))
+const ehPdf = (i: ItemVersaoPublico) => i.mime === 'application/pdf'
+
+/** "PDF · 12 KB" do arquivo enviado pelo app (link: o host). */
+function detalheDoItem(i: ItemVersaoPublico): string {
+  if (i.tipo === 'link') return hostDe(i.url)
+  const tipo = ehPdf(i) ? 'PDF' : i.mime === 'application/zip' ? 'ZIP' : i.mime?.startsWith('image/') ? i.mime.slice(6).toUpperCase().replace('JPEG', 'JPG') : 'Arquivo'
+  if (i.bytes == null) return tipo
+  const tam = i.bytes < 1_048_576 ? `${Math.max(1, Math.round(i.bytes / 1024))} KB` : `${String(Math.round((i.bytes / 1_048_576) * 10) / 10).replace('.', ',')} MB`
+  return `${tipo} · ${tam}`
+}
+
+/** "2 imagens e 1 link" (o que a versão traz). */
+export function resumoDosItens(itens: readonly ItemVersaoPublico[]): string {
+  const contar = (n: number, um: string, varios: string) => (n ? `${n} ${n === 1 ? um : varios}` : null)
+  const imagens = itens.filter((i) => i.imagem).length
+  const videos = itens.filter(ehVideo).length
+  const pdfs = itens.filter((i) => !i.imagem && ehPdf(i)).length
+  const arquivos = itens.filter((i) => i.tipo === 'arquivo' && !i.imagem && !ehPdf(i)).length
+  const links = itens.length - imagens - videos - pdfs - arquivos
+  const partes = [contar(imagens, 'imagem', 'imagens'), contar(videos, 'vídeo', 'vídeos'), contar(pdfs, 'PDF', 'PDFs'),
+    contar(arquivos, 'arquivo', 'arquivos'), contar(links, 'link', 'links')].filter((p): p is string => !!p)
+  return partes.length <= 1 ? (partes[0] ?? '') : `${partes.slice(0, -1).join(', ')} e ${partes.at(-1)}`
+}
 
 // ─────────────────────────────── botão e folha (sem o design system em JS: a página fica leve) ───────────────────────────────
 
@@ -93,7 +123,8 @@ function FolhaPublica({ aberta, titulo, aoFechar, children }: { aberta: boolean;
     return () => {
       document.removeEventListener('keydown', tecla)
       document.body.style.overflow = rolagem
-      antes?.focus?.()
+      // depois de decidir, o botão que abriu sumiu: o foco fica com quem a tela escolheu (o selo)
+      if (antes?.isConnected) antes.focus()
     }
   }, [aberta])
   if (!aberta) return null
@@ -121,42 +152,68 @@ function dataHora(instante: string): string {
 
 // ─────────────────────────────── prévias ───────────────────────────────
 
-function Previa({ i, ampliar }: { i: ItemVersaoPublico; ampliar(url: string, nome: string): void }) {
+function IconeDoItem({ i }: { i: ItemVersaoPublico }) {
+  const I = i.imagem ? IconeImagem : ehVideo(i) ? Video : i.tipo === 'arquivo' ? FileText : Link2
+  return <I aria-hidden="true" />
+}
+
+function Previa({ i, n, total, ampliar }: { i: ItemVersaoPublico; n: number; total: number; ampliar(url: string, nome: string): void }) {
   const [embutir, setEmbutir] = useState(false)
+  // miniatura que não carrega (arquivo do Drive que deixou de ser público, Drive fora do ar): cai no cartão
+  const [falhou, setFalhou] = useState(false)
   const embutido = i.embutivel ? enderecoEmbutido(i.url) : null
-  const Icone = i.tipo === 'arquivo' ? FileText : Link2
+  const previa = i.previaUrl && !falhou ? i.previaUrl : null
   return (
     <li className="pub-previa">
-      {i.imagem && i.previaUrl ? (
-        <button type="button" className="pub-previa-imagem" onClick={() => ampliar(i.previaUrl!, i.nome)} aria-label={`Ampliar ${i.nome}`}>
-          <img src={i.previaUrl} alt={i.nome} decoding="async" />
+      {i.imagem && previa ? (
+        <button type="button" className="pub-previa-imagem" onClick={() => ampliar(previa, i.nome)} aria-label={`Ampliar ${i.nome}`}>
+          <img src={previa} alt={i.nome} decoding="async" onError={() => setFalhou(true)} />
         </button>
       ) : embutir && embutido ? (
         <iframe src={embutido} title={i.nome} referrerPolicy="no-referrer" allow="fullscreen"
           sandbox="allow-scripts allow-same-origin allow-popups allow-presentation" />
-      ) : i.previaUrl ? (
-        <button type="button" className="pub-previa-imagem" onClick={() => (embutido ? setEmbutir(true) : ampliar(i.previaUrl!, i.nome))}
+      ) : previa ? (
+        <button type="button" className="pub-previa-imagem" onClick={() => (embutido ? setEmbutir(true) : ampliar(previa, i.nome))}
           aria-label={embutido ? `Ver ${i.nome} aqui` : `Ampliar ${i.nome}`}>
-          <img src={i.previaUrl} alt={i.nome} decoding="async" referrerPolicy="no-referrer" />
+          <img src={previa} alt={i.nome} decoding="async" referrerPolicy="no-referrer" onError={() => setFalhou(true)} />
         </button>
       ) : embutido ? (
         <button type="button" className="pub-previa-vazia" onClick={() => setEmbutir(true)}>
           <Eye aria-hidden="true" /><strong>Ver a peça aqui</strong><span>{hostDe(i.url)}</span>
         </button>
+      ) : falhou ? (
+        <a className="pub-previa-vazia" href={i.url} target="_blank" rel="noopener noreferrer">
+          <ImageOff aria-hidden="true" /><strong>Prévia indisponível</strong><span>Abrir {i.tipo === 'link' ? `em ${hostDe(i.url)}` : 'o arquivo'}</span>
+        </a>
       ) : null}
       <div className="pub-previa-rodape">
-        <span className="pub-previa-icone" aria-hidden="true"><Icone /></span>
-        <span className="pub-previa-nome" title={i.nome}>{i.nome}</span>
+        <span className="pub-previa-icone" aria-hidden="true"><IconeDoItem i={i} /></span>
+        <span className="pub-previa-info">
+          <span className="pub-previa-nome" title={i.nome}>{i.nome}</span>
+          <span className="pub-previa-detalhe">{total > 1 ? `${n} de ${total} · ` : ''}{detalheDoItem(i)}</span>
+        </span>
         <span className="pub-previa-acoes">
-          {embutido && !embutir && !!i.previaUrl && <Botao tamanho="p" icone={Eye} onClick={() => setEmbutir(true)}>Ver aqui</Botao>}
+          {embutido && !embutir && !!previa && <Botao tamanho="p" icone={Eye} onClick={() => setEmbutir(true)}>Ver aqui</Botao>}
           {embutir && <Botao tamanho="p" icone={X} onClick={() => setEmbutir(false)}>Fechar</Botao>}
           {i.tipo === 'arquivo' && !i.imagem
-            ? <a className="ui-botao" data-variante="secundario" data-tamanho="p" href={i.url} download><Download aria-hidden="true" /><span>Baixar</span></a>
+            ? <a className="ui-botao" data-variante="secundario" data-tamanho="p" href={i.url} download aria-label={`Baixar ${i.nome}`}><Download aria-hidden="true" /><span>Baixar</span></a>
             : <a className="ui-botao" data-variante="ghost" data-tamanho="p" href={i.url} target="_blank" rel="noopener noreferrer"
               aria-label={`Abrir ${i.nome} em outra aba`}><ExternalLink aria-hidden="true" /><span>Abrir</span></a>}
         </span>
       </div>
     </li>
+  )
+}
+
+/** Miniaturas da versão na folha de aprovação ("Você vai aprovar os 3 itens"). */
+function Miniaturas({ itens }: { itens: readonly ItemVersaoPublico[] }) {
+  return (
+    <ul className="pub-miniaturas" aria-hidden="true">
+      {itens.slice(0, 6).map((i, k) => (
+        <li key={k}>{i.previaUrl ? <img src={i.previaUrl} alt="" decoding="async" referrerPolicy="no-referrer" /> : <IconeDoItem i={i} />}</li>
+      ))}
+      {itens.length > 6 && <li className="pub-miniaturas-mais">+{itens.length - 6}</li>}
+    </ul>
   )
 }
 
@@ -171,7 +228,7 @@ function Quem({ pagina, valor, mudar, erro }: { pagina: PaginaAprovacao; valor: 
   const contato = pagina.contato
   return (
     <fieldset className="pub-quem">
-      <legend>{contato ? `Você é ${primeiroNome(contato.nome)}?` : 'Quem está decidindo?'}</legend>
+      <legend>{contato ? `Você é ${primeiroNome(contato.nome) ?? contato.nome}?` : 'Quem está decidindo?'}</legend>
       {contato && (
         <>
           <label className="pub-opcao"><input type="radio" name="pub-quem" checked={valor.sou} onChange={() => mudar({ ...valor, sou: true })} />Sim, sou {contato.nome}</label>
@@ -205,6 +262,7 @@ function Decidir({ pagina, item, token, depois }: {
   // a mesma chave enquanto o pedido for o mesmo (repetir depois de uma queda de rede não decide duas vezes)
   const chave = useRef<{ corpo: string; chave: string } | null>(null)
   const versao = item.versao!
+  const n = versao.itens.length
 
   async function enviar(decisao: 'aprovado' | 'ajuste') {
     if (enviando) return
@@ -254,15 +312,26 @@ function Decidir({ pagina, item, token, depois }: {
   }
 
   const fechar = () => { setAberta(null); setErro(null); setErroNome(null) }
+  const nAjustes = linhasParaItens(linhas).length
   return (
     <>
       <div className="pub-decidir">
+        <p className="pub-decidir-resumo">
+          V{versao.numero}{n > 1 ? ` · ${n} itens` : ''}
+          {item.prazoRetorno ? ` · retorno até ${formatarPrazo(item.prazoRetorno, null)}` : ''}
+        </p>
         <Botao tamanho="g" icone={Wrench} onClick={() => setAberta('ajuste')}>Pedir ajuste</Botao>
         <Botao tamanho="g" variante="primario" icone={CheckCircle2} onClick={() => setAberta('aprovar')}>Aprovar</Botao>
       </div>
-      <FolhaPublica aberta={aberta === 'aprovar'} aoFechar={fechar} titulo={`Aprovar a V${versao.numero}?`}>
+      <FolhaPublica aberta={aberta === 'aprovar'} aoFechar={fechar} titulo={`Aprovar a V${versao.numero} de “${item.titulo}”?`}>
         <form className="pub-form" onSubmit={(e) => { e.preventDefault(); void enviar('aprovado') }}>
-          <p className="pub-ajuda">A agência segue com esta versão como está. {item.titulo}.</p>
+          {n > 1 && (
+            <div className="pub-aprovar-itens">
+              <Miniaturas itens={versao.itens} />
+              <p className="pub-ajuda">Você vai aprovar os {n} itens desta versão.</p>
+            </div>
+          )}
+          <p className="pub-ajuda">A agência segue com esta versão como está.</p>
           <Quem pagina={pagina} valor={quem} mudar={setQuem} erro={erroNome} />
           {erro && <p className="pub-erro" role="alert">{erro}</p>}
           <div className="pub-acoes-folha">
@@ -279,14 +348,14 @@ function Decidir({ pagina, item, token, depois }: {
               <textarea id="pub-linhas" rows={6} value={linhas} onChange={(e) => setLinhas(e.target.value)} aria-describedby="pub-linhas-ajuda"
                 placeholder={'Ex.:\nTrocar a foto principal\nAumentar o logo'} />
             </div>
-            <p id="pub-linhas-ajuda" className="pub-ajuda">Cada linha vira um item para a equipe.</p>
+            <p id="pub-linhas-ajuda" className="pub-ajuda">Cada linha vira um item para a equipe.{n > 1 ? ' Diga qual item (1 de 3…) quando precisar.' : ''}</p>
           </div>
           <Quem pagina={pagina} valor={quem} mudar={setQuem} erro={erroNome} />
           {erro && <p className="pub-erro" role="alert">{erro}</p>}
           <div className="pub-acoes-folha">
             <Botao tamanho="g" onClick={fechar}>Voltar</Botao>
             <Botao tamanho="g" type="submit" variante="primario" carregando={enviando}>
-              Enviar {linhasParaItens(linhas).length > 1 ? `${linhasParaItens(linhas).length} ajustes` : 'ajuste'}
+              Enviar {nAjustes > 1 ? `${nAjustes} ajustes` : 'ajuste'}
             </Botao>
           </div>
         </form>
@@ -297,14 +366,16 @@ function Decidir({ pagina, item, token, depois }: {
 
 // ─────────────────────────────── item ───────────────────────────────
 
+const idDoSelo = (demandaId: string) => `pub-selo-${demandaId}`
+
 function SeloDecisao({ item, mensagem }: { item: ItemAprovacaoPublico; mensagem: string | null }) {
   const d = item.decisao
   if (d) {
     const aprovado = d.decisao === 'aprovado'
     return (
-      <div className="pub-selo" data-tom={aprovado ? 'aprovado' : 'ajuste'} role="status">
+      <div id={idDoSelo(item.demandaId)} tabIndex={-1} className="pub-selo" data-tom={aprovado ? 'aprovado' : 'ajuste'} role="status">
         {aprovado ? <CheckCircle2 aria-hidden="true" /> : <Wrench aria-hidden="true" />}
-        <span className="pub-selo-titulo">{aprovado ? `Aprovado V${d.versaoNumero} por ${d.nome} em ${dataHora(d.em)}` : `Ajustes enviados por ${d.nome} em ${dataHora(d.em)}`}</span>
+        <span className="pub-selo-titulo">{aprovado ? `V${d.versaoNumero} aprovada por ${d.nome} em ${dataHora(d.em)}.` : `Ajustes enviados por ${d.nome} em ${dataHora(d.em)}.`}</span>
         {!aprovado && item.proximoPasso && <span className="pub-selo-texto">{item.proximoPasso}.</span>}
         {mensagem && aprovado && <span className="pub-selo-texto">{mensagem}</span>}
         {d.linhas.length > 0 && <ul>{d.linhas.map((l, i) => <li key={i}>{l}</li>)}</ul>}
@@ -313,7 +384,7 @@ function SeloDecisao({ item, mensagem }: { item: ItemAprovacaoPublico; mensagem:
   }
   if (item.proximoPasso) {
     return (
-      <div className="pub-selo" data-tom="aviso" role="status">
+      <div id={idDoSelo(item.demandaId)} tabIndex={-1} className="pub-selo" data-tom="aviso" role="status">
         <Lock aria-hidden="true" />
         <span className="pub-selo-titulo">{item.proximoPasso}</span>
         <span className="pub-selo-texto">Se precisar, fale com o seu atendimento.</span>
@@ -323,24 +394,54 @@ function SeloDecisao({ item, mensagem }: { item: ItemAprovacaoPublico; mensagem:
   return null
 }
 
+function Anteriores({ item }: { item: ItemAprovacaoPublico }) {
+  return (
+    <details className="pub-anteriores">
+      <summary><span>Versões anteriores ({item.anteriores.length})</span><ChevronDown aria-hidden="true" /></summary>
+      <ul>
+        {item.anteriores.map((a) => (
+          <li key={a.numero} className="pub-anterior">
+            <p className="pub-anterior-linha">
+              <span className="pub-chip">V{a.numero}</span>
+              <span className="pub-anterior-data">enviada em {dataHora(a.enviadaEm)}</span>
+              {a.decisao && <span className="pub-chip" data-tom={a.decisao === 'aprovado' ? 'aprovado' : 'ajuste'}>{a.decisao === 'aprovado' ? 'aprovada' : 'ajuste pedido'}</span>}
+            </p>
+            {a.linhas.length > 0 && <ul className="pub-anterior-ajustes" aria-label={`Ajustes pedidos na V${a.numero}`}>{a.linhas.map((l, i) => <li key={i}>{l}</li>)}</ul>}
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
 function Item({ pagina, item, token, ampliar, mensagem, depois }: {
   pagina: PaginaAprovacao; item: ItemAprovacaoPublico; token: string; ampliar(url: string, nome: string): void; mensagem: string | null
   depois: Parameters<typeof Decidir>[0]['depois']
 }) {
   const v = item.versao
   const aguarda = !!v && !item.decisao && !item.proximoPasso
+  const total = v?.itens.length ?? 0
   return (
-    <article className="pub-item" aria-labelledby={`pub-titulo-${item.demandaId}`}>
-      <div className="flex flex-col gap-1.5">
-        <p className="pub-eyebrow">{item.modeloNome ?? 'Peça'}{v ? ` · V${v.numero}` : ''}</p>
+    <article id={`pub-item-${item.demandaId}`} className="pub-item" aria-labelledby={`pub-titulo-${item.demandaId}`}>
+      <div className="pub-cabeca">
+        <p className="pub-eyebrow">{v ? (item.modeloNome ? `${item.modeloNome} · V${v.numero}` : `Versão ${v.numero}`) : (item.modeloNome ?? '')}</p>
         <h1 id={`pub-titulo-${item.demandaId}`} className="pub-titulo">{item.titulo}</h1>
-        {aguarda && item.prazoRetorno && (
-          <p className="pub-linha"><span className="pub-chip" data-tom="prazo"><CalendarClock aria-hidden="true" />
-            Retorno até {formatarPrazo(item.prazoRetorno, item.prazoRetornoHora ?? HORA_PADRAO_PRAZO)}</span></p>
+        {(total > 0 || (aguarda && item.prazoRetorno)) && (
+          <p className="pub-linha">
+            {total > 0 && <span className="pub-resumo">{resumoDosItens(v!.itens)}</span>}
+            {aguarda && item.prazoRetorno && (
+              <span className="pub-chip" data-tom="prazo"><CalendarClock aria-hidden="true" />
+                Retorno até {formatarPrazo(item.prazoRetorno, item.prazoRetornoHora ?? HORA_PADRAO_PRAZO)}</span>
+            )}
+          </p>
         )}
       </div>
-      {v && v.itens.length > 0 && <ul className="pub-previas" aria-label={`O que foi enviado na V${v.numero}`}>{v.itens.map((i, k) => <Previa key={k} i={i} ampliar={ampliar} />)}</ul>}
       <SeloDecisao item={item} mensagem={mensagem} />
+      {v && total > 0 && (
+        <ul className="pub-previas" aria-label={`O que foi enviado na V${v.numero}`}>
+          {v.itens.map((i, k) => <Previa key={k} i={i} n={k + 1} total={total} ampliar={ampliar} />)}
+        </ul>
+      )}
       {aguarda && <Decidir pagina={pagina} item={item} token={token} depois={depois} />}
       {item.comentarios.length > 0 && (
         <section className="pub-secao" aria-label="Conversa">
@@ -355,16 +456,7 @@ function Item({ pagina, item, token, ampliar, mensagem, depois }: {
           </ul>
         </section>
       )}
-      {item.anteriores.length > 0 && (
-        <details className="pub-anteriores">
-          <summary>Versões anteriores ({item.anteriores.length})</summary>
-          <ul>
-            {item.anteriores.map((a) => (
-              <li key={a.numero}>V{a.numero} · enviada em {dataHora(a.enviadaEm)}{a.decisao === 'aprovado' ? ' · aprovada' : a.decisao === 'ajuste' ? ' · ajuste pedido' : ''}</li>
-            ))}
-          </ul>
-        </details>
-      )}
+      {item.anteriores.length > 0 && <Anteriores item={item} />}
     </article>
   )
 }
@@ -376,6 +468,16 @@ const INATIVO = {
   texto: 'Peça um novo ao seu atendimento.',
 }
 
+/** Rola até o item (abaixo do topo preso) e põe o foco no selo da decisão, que o leitor de tela também anuncia. */
+function mostrarSelo(demandaId: string): void {
+  const item = document.getElementById(`pub-item-${demandaId}`)
+  const selo = document.getElementById(idDoSelo(demandaId))
+  const topo = document.querySelector<HTMLElement>('.pub-topo')?.offsetHeight ?? 0
+  const y = item ? Math.max(0, item.getBoundingClientRect().top + window.scrollY - topo - 16) : 0
+  window.scrollTo({ top: y < 120 ? 0 : y, behavior: reduzMovimento() ? 'auto' : 'smooth' })
+  selo?.focus({ preventScroll: true })
+}
+
 export default function TelaAprovacao() {
   const { token = '' } = useParams()
   const nomeApp = useNomeApp()
@@ -383,6 +485,7 @@ export default function TelaAprovacao() {
   const [aviso, setAviso] = useState<string | null>(null)
   const [mensagens, setMensagens] = useState<Record<string, string>>({})
   const [zoom, setZoom] = useState<{ url: string; nome: string } | null>(null)
+  const [decidido, setDecidido] = useState<{ demandaId: string; vez: number } | null>(null)
   const visto = useRef(false)
   const pagina = estado.tipo === 'ok' ? estado.pagina : null
   useTituloAba(pagina ? `${pagina.itens[0]?.titulo ?? 'Aprovação'} · ${pagina.cliente.nome}` : 'Aprovação')
@@ -411,14 +514,22 @@ export default function TelaAprovacao() {
     return () => window.removeEventListener('keydown', esc)
   }, [zoom])
 
+  // depois de decidir, o selo já está na tela (logo abaixo do título): rola até ele e põe o foco nele
+  useEffect(() => {
+    if (!decidido) return
+    const r = requestAnimationFrame(() => mostrarSelo(decidido.demandaId))
+    return () => cancelAnimationFrame(r)
+  }, [decidido])
+
   const depois: Parameters<typeof Decidir>[0]['depois'] = (r) => {
     if (r.tipo === 'inativo') { setEstado({ tipo: 'inativo', ...INATIVO }); return }
-    if (r.tipo === 'recarregar') { setAviso(r.aviso); void carregar(); window.scrollTo({ top: 0, behavior: 'smooth' }); return }
+    if (r.tipo === 'recarregar') { setAviso(r.aviso); void carregar(); window.scrollTo({ top: 0, behavior: reduzMovimento() ? 'auto' : 'smooth' }); return }
     setAviso(null)
     setMensagens((m) => ({ ...m, [r.saida.item.demandaId]: r.saida.mensagem }))
     setEstado((s) => (s.tipo === 'ok'
       ? { tipo: 'ok', pagina: { ...s.pagina, itens: s.pagina.itens.map((i) => (i.demandaId === r.saida.item.demandaId ? r.saida.item : i)) } }
       : s))
+    setDecidido((x) => ({ demandaId: r.saida.item.demandaId, vez: (x?.vez ?? 0) + 1 }))
   }
 
   return (

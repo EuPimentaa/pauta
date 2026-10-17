@@ -19,6 +19,9 @@ export interface ItemVersaoPublico {
   imagem: boolean
   /** Host conhecido que pode ser embutido com sandbox. */
   embutivel: boolean
+  /** Arquivo enviado pelo app: tipo e tamanho ("PDF · 12 KB"); link: null. (Integração 3B.) */
+  mime: string | null
+  bytes: number | null
 }
 
 export interface VersaoPublica {
@@ -58,7 +61,8 @@ export interface ItemAprovacaoPublico {
   versao: VersaoPublica | null
   /** Decisão válida sobre `versao` (o link fica só leitura com o selo). */
   decisao: DecisaoPublica | null
-  anteriores: { numero: number; enviadaEm: Instante; decisao: 'aprovado' | 'ajuste' | null }[]
+  /** Versões anteriores enviadas por este link, com a decisão e as linhas do ajuste pedido (o cliente confere a V2). */
+  anteriores: { numero: number; enviadaEm: Instante; decisao: 'aprovado' | 'ajuste' | null; linhas: string[] }[]
   comentarios: ComentarioPublico[]
   /**
    * "A equipe prepara a V3 até sex, 17/10", "V2 aprovada por Fulana em 14/10 às 14:03.", "Esta peça não aguarda mais

@@ -90,10 +90,12 @@ function versaoPublica(db: Db, versaoId: Id, enviadaEm: string): VersaoPublica {
         previaUrl: i.provedor === 'drive' && i.driveStatus === 'publico' ? i.previaUrl : null,
         imagem: false,
         embutivel: drive?.tipo === 'arquivo' || i.provedor === 'youtube' || i.provedor === 'figma',
+        mime: null, bytes: null,
       })
     } else if (i.tipo === 'arquivo' && i.arquivo) {
       const url = urlAssinada(i.arquivo.id, minutos)
-      itens.push({ tipo: 'arquivo', nome: i.nome, url, previaUrl: i.arquivo.imagem ? `${url}&inline=1` : null, imagem: i.arquivo.imagem, embutivel: false })
+      itens.push({ tipo: 'arquivo', nome: i.nome, url, previaUrl: i.arquivo.imagem ? `${url}&inline=1` : null, imagem: i.arquivo.imagem, embutivel: false,
+        mime: i.arquivo.mime, bytes: i.arquivo.bytes })
     }
   }
   // A nota da versão é recado interno da equipe para o atendimento: nunca vai ao cliente.
@@ -140,9 +142,10 @@ function itemPublico(db: Db, link: LinkLinha, demandaId: Id): ItemAprovacaoPubli
       proximoPasso = TEXTO_SEM_PECA
     }
   }
-  const anteriores = versoes.slice(1).map((v) => ({
-    numero: v.numero, enviadaEm: v.enviado_em, decisao: decisaoValida(db, v.id)?.decisao ?? null,
-  }))
+  const anteriores = versoes.slice(1).map((v) => {
+    const a = decisaoValida(db, v.id)
+    return { numero: v.numero, enviadaEm: v.enviado_em, decisao: a?.decisao ?? null, linhas: a?.comentario ? a.comentario.split('\n') : [] }
+  })
   const comentarios: ComentarioPublico[] = todos<Linha>(db, `
     SELECT c.corpo_md, c.criado_em, c.autor_externo, u.apelido, u.nome FROM comentario c LEFT JOIN usuario u ON u.id = c.autor_id
      WHERE c.demanda_id = ? AND c.visivel_cliente = 1 AND c.excluido_em IS NULL ORDER BY c.criado_em, c.rowid`, demandaId).map((l) => ({

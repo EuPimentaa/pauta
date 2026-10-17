@@ -60,13 +60,15 @@ export function SinoTopo() {
 
   const rotulo = `Notificações: ${textoNaoLidas(n)}`
   return (
+    <>
     <Tooltip texto={n > 0 ? `Notificações (${n})` : 'Notificações'}>
       <button ref={botao} type="button" className="pnl-sino-botao" aria-label={rotulo} aria-haspopup="dialog" aria-expanded={aberto}
         data-novas={n > 0 || undefined} onClick={() => void alternar()}>
         <Bell aria-hidden="true" />
         {n > 0 && <span className="pnl-sino-num tabular" aria-hidden="true">{n > 99 ? '99+' : n}</span>}
-        <span className="sr-only" aria-live="polite">{anuncio}</span>
       </button>
     </Tooltip>
+    <span className="sr-only" aria-live="polite">{anuncio}</span>
+    </>
   )
 }

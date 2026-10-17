@@ -8,11 +8,12 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  CheckCircle2, Clock3, Copy, ExternalLink, Layers, Link2, Pencil, Plus, Send, ShieldOff, Sparkles, Undo2, Wrench,
+  CheckCircle2, Clock3, Copy, ExternalLink, Layers, Link2, Pencil, Plus, Send, ShieldAlert, ShieldOff, Sparkles, Undo2, Wrench,
 } from 'lucide-react'
 import type { Aprovacao, ClienteContato, Envio, Rodada, UsuarioResumo, VersaoComItens } from '@shared/tipos/index.ts'
 import { ROTULO_MOTIVO_RODADA } from '@shared/tipos/index.ts'
 import { formatarPrazo } from '@shared/logica/datas.ts'
+import { juntar } from '@shared/logica/modal-atividade.ts'
 import { pode } from '@shared/logica/permissoes.ts'
 import type { ContextoDemanda } from '../../extensoes/tipos.ts'
 import { useClienteDetalhe } from '../../api/clientes.ts'
@@ -31,6 +32,10 @@ import { linhaDoTempo, passoCiclo, podeEntregar, rodadaExtra, ultimaDecisao } fr
 const CANAL: Record<string, string> = { whatsapp: 'pelo WhatsApp', email: 'por e-mail', reuniao: 'em reunião', outro: 'por outro canal' }
 
 const nome = (u: UsuarioResumo | undefined) => (u ? (u.apelido ?? u.nome.split(' ')[0]!) : 'alguém')
+
+/** Por que a decisão pelo link está marcada (API.md §4.17). */
+const EXPLICA_REDE_INTERNA = 'A decisão veio da mesma conexão de internet que esta pessoa usou no app nas últimas 24 horas: '
+  + 'pode ser alguém da agência decidindo pelo link no lugar do cliente, ou o cliente na rede da agência.'
 
 async function copiar(texto: string, aviso: string) {
   const ok = await copiarParaAreaDeTransferencia(texto)
@@ -131,6 +136,8 @@ function LinhaDecisao({ a, ctx, contatos, anulavel }: { a: Aprovacao; ctx: Conte
   const por = a.via === 'link' ? 'pelo link' : `${CANAL[a.canal ?? 'outro']} · registrado por ${nome(usuarios.find((u) => u.id === a.registradoPor))}`
   const print = a.evidenciaAnexoId ? det.anexos.find((x) => x.id === a.evidenciaAnexoId) : undefined
   const linhas = a.comentario ? a.comentario.split('\n').filter(Boolean) : []
+  // pelo link, da mesma rede de uma sessão interna recente (API.md §4.17): a decisão vale, mas fica marcada
+  const rede = a.redeInterna.map((id) => (id === ctx.eu.usuario.id ? 'você' : nome(usuarios.find((u) => u.id === id))))
   return (
     <div className="cic-evento" data-tom={a.decisao === 'aprovado' ? 'sucesso' : 'ajuste'} data-anulada={a.anuladaEm ? '' : undefined}>
       {a.decisao === 'aprovado' ? <CheckCircle2 aria-hidden="true" /> : <Wrench aria-hidden="true" />}
@@ -140,6 +147,11 @@ function LinhaDecisao({ a, ctx, contatos, anulavel }: { a: Aprovacao; ctx: Conte
           {print?.arquivo && <> · <a href={print.arquivo.url} target="_blank" rel="noopener noreferrer">print</a></>}
           {a.anuladaEm && ` · anulada por ${nome(usuarios.find((u) => u.id === a.anuladaPor))} ${tempoRelativo(a.anuladaEm)}`}
         </span>
+        {rede.length > 0 && (
+          <span className="cic-selo cic-selo-rede" data-tom="aviso" title={EXPLICA_REDE_INTERNA}>
+            <ShieldAlert aria-hidden="true" />Da mesma rede que {juntar(rede)}
+          </span>
+        )}
         {linhas.length > 0 && <ul className="cic-evento-linhas">{linhas.map((l, i) => <li key={i}>{l}</li>)}</ul>}
       </span>
       {anulavel && (

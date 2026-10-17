@@ -6,11 +6,13 @@
 import { useId, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { Archive, Check, ChevronLeft, ChevronRight, Clock3, PencilLine, Plus, X } from 'lucide-react'
+import { Archive, Check, ChevronLeft, ChevronRight, Clock3, PencilLine, Plus, ShieldAlert, X } from 'lucide-react'
 import { CANAIS, CORES, STATUS_CLIENTE, type Cliente, type Cor, type Demanda, type StatusCliente } from '@shared/tipos/index.ts'
 import { dataLocalDe, formatarPrazo, horaLocalDe } from '@shared/logica/datas.ts'
+import { juntar } from '@shared/logica/modal-atividade.ts'
 import { normalizarAlias } from '@shared/logica/texto.ts'
 import { avisarErro } from '../../api/acoes.ts'
+import { useEu } from '../../api/auth.ts'
 import { useApontamentos } from '../../api/horas.ts'
 import { useClientes, useDemandas, useQuadros, useUsuarios } from '../../api/seletores.ts'
 import { definirApelidos, editarCliente, useTrilha } from '../../funcionalidades/cadastros/api.ts'
@@ -89,8 +91,19 @@ const dataHora = (i: string) => {
     : `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)} às ${horaLocalDe(i)}`
 }
 
+/** Por que a decisão pelo link está marcada (API.md §4.17). */
+const EXPLICA_REDE_INTERNA = 'A decisão veio da mesma conexão de internet que esta pessoa usou no app nas últimas 24 horas: '
+  + 'pode ser alguém da agência decidindo pelo link no lugar do cliente, ou o cliente na rede da agência.'
+
 export function AbaAprovacoes({ cliente }: { cliente: Cliente }) {
   const trilha = useTrilha(cliente.id)
+  const usuarios = useUsuarios()
+  const eu = useEu().usuario.id
+  const nomeDe = (id: string) => {
+    if (id === eu) return 'você'
+    const u = usuarios.find((x) => x.id === id)
+    return u ? nomeCurto(u) : 'alguém'
+  }
   if (trilha.isPending) return <EsqueletoLinhas linhas={4} />
   if (trilha.isError) {
     return <EstadoVazio titulo="Não foi possível carregar a trilha." texto={trilha.error.mensagem}
@@ -110,10 +123,14 @@ export function AbaAprovacoes({ cliente }: { cliente: Cliente }) {
                 <span>{i.decisao === 'aprovado' ? 'Aprovou a' : 'Pediu ajuste na'} V{i.versaoNumero} de</span>
                 <Link to={`/d/${i.demanda.numero}`} className="underline underline-offset-2">#{i.demanda.numero} {i.demanda.titulo}</Link>
                 {i.anuladaEm && <Pilula tom="perigo">anulada</Pilula>}
+                {i.redeInterna.length > 0 && (
+                  <Pilula tom="aviso" icone={ShieldAlert} titulo={EXPLICA_REDE_INTERNA}>da mesma rede que {juntar(i.redeInterna.map(nomeDe))}</Pilula>
+                )}
               </span>
               <span className="cad-linha-meta">
                 <span>{i.quem}</span>
                 <span>{i.via === 'link' ? 'pelo link' : `por ${i.canal ? ROTULO_CANAL[i.canal] : 'fora'}`}</span>
+                {i.dispositivo && <span>{i.dispositivo}</span>}
                 <span>{dataHora(i.criadoEm)}</span>
               </span>
               {i.comentario && <TextoPuro texto={i.comentario} linhas={4} />}

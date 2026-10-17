@@ -28,12 +28,12 @@ async function outroLink(a: Awaited<ReturnType<typeof ambiente>>, titulo: string
 describe('URL assinada ligada ao link', () => {
   test('a URL leva o id do link; revogar o link corta as URLs já emitidas (410)', async () => {
     const { a, linkId, url } = await comLink()
-    assert.match(url, new RegExp(`^/api/publico/arquivos/[^?]+\\?l=${linkId}&exp=\\d+&sig=`))
     assert.equal((await publico(a).get(url)).status, 200)
     assert.equal((await a.como(a.pessoas.am).post(`/api/links-publicos/${linkId}/revogar`, {})).status, 200)
     const r = await publico(a).get(url)
     assert.equal(r.status, 410, r.texto)
     assert.equal(r.corpo.erro.codigo, 'link_inativo')
+    assert.match(url, new RegExp(`^/api/publico/arquivos/[^?]+\\?l=${linkId}&exp=\\d+&sig=`))
   })
 
   test('a assinatura de um link não vale com o id de outro, e o link não serve arquivo que não é dele', async () => {

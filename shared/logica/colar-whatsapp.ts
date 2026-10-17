@@ -97,20 +97,26 @@ function maiuscula(s: string): string {
   return s ? s.charAt(0).toLocaleUpperCase('pt-BR') + s.slice(1) : s
 }
 
-/** Uma linha que diz o pedido, sem saudação nem "precisamos de um", cortada na primeira frase e em até 80 caracteres. */
+/** "Aqui é da Clínica…", "Sou a Fulana da…": a apresentação de quem escreve, não o pedido. */
+const APRESENTACAO = /^(aqui (e|eh) (a|o|da|do|de)\b|sou (a|o|da|do|de)\b|somos (a|o|da|do|de)\b|falo (da|do|de)\b|meu nome e\b)/
+
+/**
+ * Uma linha que diz o pedido, sem saudação nem "precisamos de um", cortada na primeira frase e em até 80 caracteres.
+ * Prefere a primeira linha que pede ("precisamos", "gostaria", "pode fazer"…); senão, a primeira que não é saudação nem
+ * apresentação ("Aqui é da Clínica Sorriso Real").
+ */
 export function tituloDaConversa(msgs: readonly MensagemConversa[]): string {
   const linhas = msgs.flatMap((m) => m.texto.split('\n')).map((l) => l.trim()).filter(Boolean)
-  let escolhida = ''
+  const candidatas: string[] = []
   for (const l of linhas) {
     // tira a saudação do começo ("Oi Pri, tudo bem? Precisamos...") antes de decidir
     const semSaudacao = l.replace(/^((oi+|ol[aá]|opa|bom dia|boa tarde|boa noite)(?=[\s,!.?]|$)[^.!?\n]{0,25}[,!.?]\s*)+/i, '')
       .replace(/^(tudo bem|tudo bom|td bem)(?=[\s,!.?]|$)\s*\??\s*/i, '').trim()
-    const n = normalizarAlias(semSaudacao)
-    if (!n || (SAUDACAO.test(n) && n.length < 40) || n.split(' ').length < 2) continue
-    escolhida = semSaudacao
-    break
+    const n = normalizarAlias(semSaudacao.slice(0, 300))
+    if (!n || (SAUDACAO.test(n) && n.length < 40) || n.split(' ').length < 2 || APRESENTACAO.test(n)) continue
+    candidatas.push(semSaudacao)
   }
-  if (!escolhida) escolhida = linhas[0] ?? ''
+  const escolhida = candidatas.find((c) => PEDIDO.test(c.slice(0, 300))) ?? candidatas[0] ?? linhas[0] ?? ''
   // "HE: precisamos…", "[XYZ] preciso…": a sigla (o cliente vai no campo Cliente) e o pedido saem do título
   let t = escolhida.replace(/^\[?[A-Z][A-Z0-9]{1,11}\]?\s*(?::|\s[-–—])\s+/, '').replace(PEDIDO, '').replace(/^[\s:,;–—-]+/, '')
   const fimFrase = /[.!?;](\s|$)/.exec(t)

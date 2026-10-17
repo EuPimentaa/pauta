@@ -167,5 +167,10 @@ describe('colar-whatsapp (puro)', () => {
       assert.ok(x.tituloSugerido.length <= 80)
     }
     assert.equal(tituloDaConversa(lerConversa('Banner para a feira, até sexta', '2026-10-16')), 'Banner para a feira', 'o prazo no fim continua saindo')
+    // a apresentação de quem escreve não vira título; a linha que pede vence
+    assert.equal(tituloDaConversa(lerConversa('Bom dia! Aqui é da Clínica Sorriso Real\nPrecisamos de 3 stories para o feriado de Finados, até quarta', '2026-10-16')),
+      '3 stories para o feriado de Finados')
+    assert.equal(tituloDaConversa(lerConversa('Oi, sou a Marta do marketing\nTudo certo com o evento de sábado?\nGostaria de um banner para a fachada', '2026-10-16')),
+      'Banner para a fachada')
   })
 })

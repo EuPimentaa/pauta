@@ -2,7 +2,8 @@
  * Anexos (seção principal 400): links (https, o provedor pelo host), caminhos de rede (M:\…, texto com [Copiar
  * caminho], nunca link) e arquivos até 10 MB (imagem, PDF, ZIP). Um campo só reconhece link ou caminho; arquivos por
  * "Enviar arquivo", arrastando para a seção ou com Ctrl+V em qualquer lugar do modal (um print do WhatsApp, por
- * exemplo). Imagens podem virar a capa do card. O print de evidência de uma aprovação não sai.
+ * exemplo). Imagens podem virar a capa do card. O print de evidência de uma aprovação não sai. PDF e ZIP o servidor
+ * entrega sempre como download (Content-Disposition: attachment, decisão de segurança): o nome e o menu dizem "Baixar".
  */
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import {
@@ -22,6 +23,7 @@ import { Campo } from '../../../ui/Campo.tsx'
 import { EsqueletoLinhas } from '../../../ui/Indicadores.tsx'
 import { Menu, type ItemMenuUi } from '../../../ui/Menu.tsx'
 import { CopiarTexto, copiarParaAreaDeTransferencia } from '../../../ui/Texto.tsx'
+import { usePonteiroGrosso } from '../../../lib/midia.ts'
 import { useAcoesModal } from '../api.ts'
 import { Secao, nomeCurto, quandoPorExtenso, tamanho, tempoRelativo, useEscLocal, useUsuarios } from '../comum.tsx'
 
@@ -30,6 +32,16 @@ const PROVEDOR: Record<Provedor, { rotulo: string; icone: typeof Link2 }> = {
   canva: { rotulo: 'Canva', icone: PenTool }, wetransfer: { rotulo: 'WeTransfer', icone: Cloud }, youtube: { rotulo: 'YouTube', icone: Video },
   vimeo: { rotulo: 'Vimeo', icone: Video }, dropbox: { rotulo: 'Dropbox', icone: Cloud }, rede: { rotulo: 'Pasta de rede', icone: FolderOpen },
   arquivo: { rotulo: 'Arquivo', icone: FileText }, outro: { rotulo: 'Link', icone: Link2 },
+}
+
+/** Baixa o arquivo sem abrir aba (o servidor responde com attachment). */
+function baixar(url: string, nome: string): void {
+  const el = document.createElement('a')
+  el.href = url
+  el.download = nome
+  document.body.appendChild(el)
+  el.click()
+  el.remove()
 }
 
 /** Link https ou caminho de rede (M:\…, \\servidor\…); null = nenhum dos dois. */
@@ -69,6 +81,8 @@ function CartaoAnexo({ a, ctx }: { a: Anexo; ctx: ContextoDemanda }) {
   const p = PROVEDOR[a.provedor ?? 'outro']
   const Icone = a.tipo === 'arquivo' ? (imagem ? IconeImagem : a.arquivo?.mime === 'application/zip' ? FileArchive : FileText) : p.icone
   const href = a.tipo === 'link' ? a.url : a.arquivo ? a.arquivo.url : null
+  // PDF e ZIP: o servidor manda baixar (attachment); a imagem abre no navegador
+  const soBaixa = a.tipo === 'arquivo' && !!a.arquivo && !imagem
 
   async function tornarCapa(sim: boolean) {
     if (sim && a.arquivo) aplicarPatchDemanda(qc, d.id, { capaUrl: a.arquivo.url })
@@ -76,7 +90,8 @@ function CartaoAnexo({ a, ctx }: { a: Anexo; ctx: ContextoDemanda }) {
   }
 
   const itens: ItemMenuUi[] = [
-    ...(href ? [{ id: 'abrir', rotulo: a.tipo === 'link' ? 'Abrir o link' : 'Abrir', icone: ExternalLink, executar: () => { window.open(href, '_blank', 'noopener,noreferrer') } }] : []),
+    ...(href && !soBaixa ? [{ id: 'abrir', rotulo: a.tipo === 'link' ? 'Abrir o link' : 'Abrir', icone: ExternalLink, executar: () => { window.open(href, '_blank', 'noopener,noreferrer') } }] : []),
+    ...(soBaixa ? [{ id: 'baixar', rotulo: 'Baixar', icone: Download, executar: () => baixar(href!, a.nome) }] : []),
     // a imagem abre no navegador; "Baixar" pede o arquivo como anexo (sem o ?inline=1)
     ...(imagem && a.arquivo ? [{
       id: 'baixar', rotulo: 'Baixar', icone: Download,
@@ -117,6 +132,8 @@ function CartaoAnexo({ a, ctx }: { a: Anexo; ctx: ContextoDemanda }) {
               onFocus={(e) => e.currentTarget.select()} onChange={(e) => setNome(e.target.value)}
               onBlur={() => { if (!renomeando) return; setRenomeando(false); if (nome.trim() && nome.trim() !== a.nome) void acoes.renomearAnexo(a, nome.trim()) }} />
           </form>
+        ) : href && soBaixa ? (
+          <a className="mdl-anexo-nome" href={href} download={a.nome} title={`Baixar ${a.nome}`}>{a.nome}</a>
         ) : href ? (
           <a className="mdl-anexo-nome" href={href} target="_blank" rel="noopener noreferrer" title={a.nome}>{a.nome}</a>
         ) : (
@@ -127,7 +144,7 @@ function CartaoAnexo({ a, ctx }: { a: Anexo; ctx: ContextoDemanda }) {
           {evidencia && <span className="mdl-anexo-marca" data-tom="evidencia">Print do retorno</span>}
           {a.comentarioId && <span>no comentário</span>}
           <span>{a.tipo === 'link' && a.url ? (a.provedor === 'outro' ? hostDe(a.url) : p.rotulo) : a.tipo === 'caminho' ? 'Pasta de rede'
-            : a.arquivo ? tamanho(a.arquivo.bytes) : 'Arquivo'}</span>
+            : a.arquivo ? `${a.arquivo.mime === 'application/pdf' ? 'PDF · ' : a.arquivo.mime === 'application/zip' ? 'ZIP · ' : ''}${tamanho(a.arquivo.bytes)}` : 'Arquivo'}</span>
           <span title={quandoPorExtenso(a.criadoEm)}>{quem ? `${nomeCurto(quem)}, ` : ''}{tempoRelativo(a.criadoEm)}</span>
         </span>
       </div>
@@ -188,6 +205,7 @@ export default function Anexos({ ctx }: { ctx: ContextoDemanda }) {
   const [adicionando, setAdicionando] = useState(false)
   const [sobre, setSobre] = useState(false)
   const [todos, setTodos] = useState(false)
+  const toque = usePonteiroGrosso()
   const arquivo = useRef<HTMLInputElement>(null)
   const d = ctx.demanda
   const so = ctx.somenteLeitura
@@ -257,7 +275,7 @@ export default function Anexos({ ctx }: { ctx: ContextoDemanda }) {
         {so ? (anexos.length === 0 && <p className="mdl-vazio">Sem anexos.</p>) : (
           <div className="mdl-soltar" data-ativo={sobre || undefined}>
             <Upload aria-hidden="true" />
-            {sobre ? 'Solte para anexar.' : 'Arraste arquivos para cá ou cole um print com Ctrl+V. Imagem, PDF ou ZIP até 10 MB.'}
+            {sobre ? 'Solte para anexar.' : toque ? 'Imagem, PDF ou ZIP até 10 MB: use "Arquivo".' : 'Arraste arquivos para cá ou cole um print com Ctrl+V. Imagem, PDF ou ZIP até 10 MB.'}
           </div>
         )}
       </Secao>

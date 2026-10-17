@@ -109,7 +109,9 @@ export default function LayoutLista(p: PropsLayout) {
           </Botao>
         ))}
         {!celular && agrupar === 'coluna' && !semResultado && (
-          <p className="lista-barra-dica">Arraste uma linha para o grupo de outra coluna para mover a demanda.</p>
+          <p className="lista-barra-dica">
+            {ordemPropria ? 'Arraste uma linha para o grupo de outra coluna: ela entra no topo.' : 'Arraste uma linha para outro lugar ou para o grupo de outra coluna.'}
+          </p>
         )}
       </div>
       {semResultado ? (

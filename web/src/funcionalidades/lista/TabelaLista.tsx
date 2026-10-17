@@ -42,14 +42,14 @@ const COLUNAS_TABELA: ColunaTabela[] = [
   { campo: 'titulo', rotulo: 'Título', largura: 'titulo' },
   { campo: 'cliente', rotulo: 'Cliente', largura: 88 },
   { campo: 'coluna', rotulo: 'Coluna', largura: 128 },
-  { campo: 'membros', rotulo: 'Membros', largura: 96 },
-  { campo: 'etiquetas', rotulo: 'Etiquetas', largura: 132 },
+  { campo: 'membros', rotulo: 'Membros', largura: 88 },
+  { campo: 'etiquetas', rotulo: 'Etiquetas', largura: 120 },
   { campo: 'prioridade', rotulo: 'Prioridade', largura: 108 },
   { campo: 'inicio', rotulo: 'Início', largura: 84 },
-  { campo: 'prazo', rotulo: 'Prazo', largura: 140 },
+  { campo: 'prazo', rotulo: 'Prazo', largura: 136 },
   { campo: 'concluida', rotulo: 'Concluída', largura: 96 },
 ]
-const TITULO_MIN = 200
+const TITULO_MIN = 190
 
 /** A coluna do agrupamento escolhido repete o grupo em cada linha: some. */
 const ESCONDE: Partial<Record<Agrupamento, CampoOrdem>> = { coluna: 'coluna', cliente: 'cliente', prioridade: 'prioridade' }
@@ -231,7 +231,7 @@ export function TabelaLista(p: PropsTabela) {
   const fixas = visiveis.reduce((s, c) => s + (c.largura === 'titulo' ? 0 : c.largura), 0)
   const estiloTabela = {
     ['--lista-colunas' as string]: visiveis.map((c) => (c.largura === 'titulo' ? `minmax(${TITULO_MIN}px, 1fr)` : `${c.largura}px`)).join(' '),
-    ['--lista-min' as string]: `${fixas + TITULO_MIN + 16}px`,
+    ['--lista-min' as string]: `${fixas + TITULO_MIN + 12}px`,
   } as CSSProperties
 
   // ─────────── rolagem e janela ───────────

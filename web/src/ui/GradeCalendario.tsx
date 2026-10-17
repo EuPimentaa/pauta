@@ -9,9 +9,12 @@
  * Arrastar por mouse, toque ou teclado (Espaço pega; setas andam de dia em dia; Espaço solta; Esc cancela).
  * Uma faixa de fora (ex.: "Sem prazo") que também arrasta para os dias: envolva os dois em <CalendarioArrastar> e use
  * <ItemCalendario> nela; a grade dentro do provedor não precisa de `aoSoltar`.
+ *
+ * Teclado: a grade é uma parada só do Tab (o dia em foco; as setas andam de dia em dia) e só os itens desse dia entram
+ * no Tab (o mês de todos os quadros eram mais de 120 paradas; pedido 3 do F3, integração 3B).
  */
 import '../estilos/calendario.css'
-import { createContext, useContext, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { createContext, useContext, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDraggable, useDroppable, useSensor, useSensors,
@@ -100,18 +103,40 @@ export function CalendarioArrastar({ aoSoltar, children }: { aoSoltar(idItem: st
   )
 }
 
-/** Item que pode ser arrastado para um dia (dentro de <CalendarioArrastar> ou de uma grade com aoSoltar). */
-export function ItemCalendario({ id, arrastavel = true, rotulo, children }: { id: string; arrastavel?: boolean; rotulo?: string; children: ReactNode }) {
+const FOCAVEIS_DO_ITEM = 'a[href], button, input, select, textarea, [tabindex]'
+
+/**
+ * Item que pode ser arrastado para um dia (dentro de <CalendarioArrastar> ou de uma grade com aoSoltar). Com
+ * `tabavel={false}` (itens de um dia que não é o dia em foco da grade) ele e o que tiver dentro saem do Tab, mas
+ * continuam clicáveis.
+ */
+export function ItemCalendario({ id, arrastavel = true, rotulo, tabavel = true, children }: {
+  id: string; arrastavel?: boolean; rotulo?: string; tabavel?: boolean; children: ReactNode
+}) {
   const ctx = useContext(ContextoArrastar)
   ctx?.conteudos.set(id, children)
   const { setNodeRef, attributes, listeners, isDragging } = useDraggable({ id, disabled: !arrastavel || !ctx })
+  const raiz = useRef<HTMLDivElement | null>(null)
+  // o conteúdo é de quem usa (ex.: o chip do CalendarioDemandas): tira e devolve o lugar no Tab de tudo o que for focável
+  useLayoutEffect(() => {
+    for (const el of raiz.current?.querySelectorAll<HTMLElement>(FOCAVEIS_DO_ITEM) ?? []) {
+      if (!tabavel) {
+        if (!el.hasAttribute('data-tab-antes')) el.setAttribute('data-tab-antes', el.getAttribute('tabindex') ?? '')
+        el.tabIndex = -1
+      } else if (el.hasAttribute('data-tab-antes')) {
+        const antes = el.getAttribute('data-tab-antes')!
+        if (antes === '') el.removeAttribute('tabindex'); else el.setAttribute('tabindex', antes)
+        el.removeAttribute('data-tab-antes')
+      }
+    }
+  })
   return (
     <div
-      ref={setNodeRef}
+      ref={(el) => { raiz.current = el; setNodeRef(el) }}
       className="ui-cal-item"
       data-arrastavel={(arrastavel && !!ctx) || undefined}
       data-arrastando={isDragging || undefined}
-      {...(arrastavel && ctx ? { ...attributes, ...listeners, 'aria-roledescription': 'item arrastável', 'aria-label': rotulo } : {})}
+      {...(arrastavel && ctx ? { ...attributes, ...listeners, tabIndex: tabavel ? 0 : -1, 'aria-roledescription': 'item arrastável', 'aria-label': rotulo } : {})}
     >
       {children}
     </div>
@@ -251,7 +276,7 @@ function Dia({ dia, hoje, foco, fora, feriado, itens, limite, aoVerMais, aoFocar
       data-feriado={feriado ? true : undefined}
       data-sobre={isOver || undefined}
       title={feriado}
-      onFocus={(e) => { if (e.target === e.currentTarget) aoFocar() }}
+      onFocus={() => aoFocar()}
       onDoubleClick={(e) => { if (aoAtivar && !(e.target as HTMLElement).closest('.ui-cal-item')) aoAtivar(dia) }}
     >
       <div className="ui-cal-cabeca">
@@ -260,11 +285,11 @@ function Dia({ dia, hoje, foco, fora, feriado, itens, limite, aoVerMais, aoFocar
       </div>
       {visiveis.length > 0 && (
         <div className="ui-cal-itens">
-          {visiveis.map((i) => <ItemCalendario key={i.id} id={i.id} arrastavel={i.arrastavel} rotulo={i.rotulo}>{i.conteudo}</ItemCalendario>)}
+          {visiveis.map((i) => <ItemCalendario key={i.id} id={i.id} arrastavel={i.arrastavel} rotulo={i.rotulo} tabavel={foco}>{i.conteudo}</ItemCalendario>)}
         </div>
       )}
       {resto > 0 && (
-        <button type="button" className="ui-cal-mais" aria-label={`+${resto} ${resto === 1 ? 'outro' : 'outros'}`}
+        <button type="button" className="ui-cal-mais" tabIndex={foco ? 0 : -1} aria-label={`+${resto} ${resto === 1 ? 'outro' : 'outros'}`}
           onClick={() => (aoVerMais ? aoVerMais(dia) : setExpandido(true))}>
           +{resto}<span className="ui-cal-mais-texto"> {resto === 1 ? 'outro' : 'outros'}</span>
         </button>

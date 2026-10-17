@@ -127,19 +127,38 @@ function casaPrazo(d: Demanda, filtro: FiltroPrazo, coluna: Pick<Coluna, 'papel'
   }
 }
 
-/** Palavras do texto (sem acento, sem caixa); "#12" e "12" casam o número. */
-function palavras(texto: string): string[] {
-  return normalizarAlias(texto).split(' ').filter(Boolean)
+/** Pontuação que junta as partes de uma palavra ("e-mail", "d'água", "v1.2"). */
+const JUNTA = /['’.\-]/g
+/** O resto da pontuação separa ("HE: post", "post/stories"). */
+const SEPARA = /[^\p{L}\p{N}#]+/u
+
+/**
+ * Termos digitados (sem acento, sem caixa): "#12" e "12" casam o número; "e-mail" vira "email"; pontuação separa
+ * ("HE: carrossel" = "he" e "carrossel"). Um "#" sozinho (meio da digitação de "#12") não filtra.
+ */
+function termosDe(texto: string): string[] {
+  return normalizarAlias(texto).replace(JUNTA, '').split(SEPARA).filter((t) => t && t !== '#')
 }
 
+/**
+ * As palavras de onde os termos podem começar: o título, a sigla e o nome do cliente, com as partes de uma palavra
+ * composta juntas e separadas ("pós-venda" casa "posvenda", "pos" e "venda"; "e-mail" casa "email" e "mail").
+ */
+function palavrasDoAlvo(texto: string): string[] {
+  const base = normalizarAlias(texto)
+  return [...new Set([...base.split(/[^\p{L}\p{N}]+/u), ...base.replace(JUNTA, '').split(/[^\p{L}\p{N}]+/u)].filter(Boolean))]
+}
+
+/** Cada termo começa alguma palavra (o número da demanda conta como palavra); todos os termos precisam casar. */
 function casaTexto(d: Demanda, termos: string[], ctx: ContextoFiltros): boolean {
   const cliente = d.clienteId ? ctx.clientes?.get(d.clienteId) : undefined
-  const alvo = normalizarAlias(`${d.titulo} ${cliente ? `${cliente.sigla} ${cliente.nome}` : ''}`)
+  const palavras = palavrasDoAlvo(`${d.titulo} ${cliente ? `${cliente.sigla} ${cliente.nome}` : ''}`)
   const numero = String(d.numero)
   return termos.every((t) => {
-    const n = t.startsWith('#') ? t.slice(1) : t
+    const n = t.startsWith('#') ? t.slice(1).replace(/#/g, '') : t.replace(/#/g, '')
+    if (!n) return true
     if (/^\d+$/.test(n) && numero.startsWith(n)) return true
-    return t.startsWith('#') ? false : alvo.includes(t)
+    return t.startsWith('#') && /^\d+$/.test(n) ? false : palavras.some((p) => p.startsWith(n))
   })
 }
 
@@ -153,7 +172,7 @@ export function aplicarFiltros(demandas: readonly Demanda[], filtros: FiltrosQua
   const f = normalizarFiltros(filtros)
   if (Object.keys(f).length === 0) return [...demandas]
   const hoje = hojeSP(ctx.agora)
-  const termos = f.texto ? palavras(f.texto) : []
+  const termos = f.texto ? termosDe(f.texto) : []
   const prioridades = f.prioridades ? new Set<Prioridade>(f.prioridades) : null
   const clientes = f.clientes ? new Set(f.clientes) : null
   const concluidas: FiltroConcluidas = f.concluidas ?? 'mostrar'

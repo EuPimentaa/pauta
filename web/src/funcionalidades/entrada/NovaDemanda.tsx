@@ -553,7 +553,7 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
             <div className="entrada-datas">
               <div className="ui-campo-grupo">
                 <span className="ui-rotulo">Prazo</span>
-                <SeletorData rotulo="Prazo" valor={estado.prazo} hora={estado.prazoHora} comHora feriados={feriadosLista}
+                <SeletorData rotulo="Prazo" tamanho="p" valor={estado.prazo} hora={estado.prazoHora} comHora feriados={feriadosLista}
                   aoMudar={(d, h) => setEstado((e) => ({ ...e, prazo: d, prazoHora: d ? h : null, repetir: d ? e.repetir : 'nenhuma', mexidos: mexer(e, 'prazo') }))} />
                 {!estado.mexidos.has('prazo') && estado.prazo && (estado.prazoConversa ? (
                   <p className="ui-campo-ajuda">Pela conversa: "{estado.prazoConversa.casou}".</p>
@@ -563,12 +563,12 @@ export default function NovaDemanda({ params, fechar }: PropsDialogo<'nova-deman
               </div>
               <div className="ui-campo-grupo">
                 <span className="ui-rotulo">Início</span>
-                <SeletorData rotulo="Início" valor={estado.inicio} feriados={feriadosLista}
+                <SeletorData rotulo="Início" tamanho="p" valor={estado.inicio} feriados={feriadosLista}
                   aoMudar={(d) => setEstado((e) => ({ ...e, inicio: d }))} />
               </div>
               <div className="ui-campo-grupo">
                 <span className="ui-rotulo">Publicação</span>
-                <SeletorData rotulo="Publicação" valor={estado.publicacaoData} hora={estado.publicacaoHora} comHora feriados={feriadosLista}
+                <SeletorData rotulo="Publicação" tamanho="p" valor={estado.publicacaoData} hora={estado.publicacaoHora} comHora feriados={feriadosLista}
                   aoMudar={(d, h) => setEstado((e) => ({ ...e, publicacaoData: d, publicacaoHora: d ? h : null }))} />
               </div>
             </div>

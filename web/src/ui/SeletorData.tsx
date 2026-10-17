@@ -137,13 +137,15 @@ export interface PropsSeletorData {
   placeholder?: string
   permitirLimpar?: boolean
   desabilitado?: boolean
+  /** A mesma altura do Campo e da Seleção ao lado: 'm' (40 px, padrão) ou 'p' (32 px, painéis laterais). */
+  tamanho?: 'p' | 'm'
   id?: string
   'aria-describedby'?: string
   className?: string
 }
 
 export function SeletorData({
-  valor, hora = null, comHora, aoMudar, feriados, rotulo, placeholder = 'Sem data', permitirLimpar = true, desabilitado, id,
+  valor, hora = null, comHora, aoMudar, feriados, rotulo, placeholder = 'Sem data', permitirLimpar = true, desabilitado, tamanho = 'm', id,
   className, ...aria
 }: PropsSeletorData) {
   const [aberto, setAbertoEstado] = useState(false)
@@ -167,6 +169,8 @@ export function SeletorData({
         variante="secundario"
         icone={CalendarDays}
         className={cx('ui-data-gatilho', className)}
+        tamanho={tamanho === 'p' ? 'p' : 'm'}
+        data-campo={tamanho}
         data-vazio={!valor || undefined}
         aria-haspopup="dialog"
         aria-expanded={aberto}

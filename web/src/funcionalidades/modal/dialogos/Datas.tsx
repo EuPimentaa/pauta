@@ -57,17 +57,17 @@ export default function DialogoDatas({ params, fechar }: PropsDialogo<'datas'>) 
       <form className="mdl-datas" onSubmit={(e) => { e.preventDefault(); void salvar() }}>
         <div className="mdl-data-linha">
           <span id="mdl-data-prazo">Prazo</span>
-          <SeletorData rotulo="Prazo" valor={v.prazo} hora={v.prazoHora} comHora feriados={feriados} placeholder="Sem prazo"
+          <SeletorData rotulo="Prazo" tamanho="p" valor={v.prazo} hora={v.prazoHora} comHora feriados={feriados} placeholder="Sem prazo"
             aoMudar={(data, hora) => mudar({ prazo: data, prazoHora: data ? hora : null, ...(data ? {} : { repetir: 'nenhuma' as Repeticao }) })} />
         </div>
         <div className="mdl-data-linha">
           <span>Início</span>
-          <SeletorData rotulo="Início" valor={v.inicio} hora={v.inicioHora} comHora feriados={feriados}
+          <SeletorData rotulo="Início" tamanho="p" valor={v.inicio} hora={v.inicioHora} comHora feriados={feriados}
             aoMudar={(data, hora) => mudar({ inicio: data, inicioHora: data ? hora : null })} />
         </div>
         <div className="mdl-data-linha">
           <span>Publicação</span>
-          <SeletorData rotulo="Publicação" valor={v.publicacaoData} hora={v.publicacaoHora} comHora feriados={feriados}
+          <SeletorData rotulo="Publicação" tamanho="p" valor={v.publicacaoData} hora={v.publicacaoHora} comHora feriados={feriados}
             aoMudar={(data, hora) => mudar({ publicacaoData: data, publicacaoHora: data ? hora : null })} />
         </div>
         <div className="mdl-data-linha">

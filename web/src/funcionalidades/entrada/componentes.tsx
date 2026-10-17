@@ -3,11 +3,11 @@
  * marcado, as setas andam e marcam, como o rádio nativo, mas com o anel no próprio cartão), as pessoas (chips +
  * adicionar) e as etiquetas do quadro (botões que ligam e desligam).
  */
-import { useRef, type KeyboardEvent, type ReactNode } from 'react'
-import { Check, X } from 'lucide-react'
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Check, Plus, Repeat2, X } from 'lucide-react'
 import type { Etiqueta, Id, ModeloDemanda, UsuarioResumo } from '@shared/tipos/index.ts'
 import { Avatar } from '../../ui/Avatar.tsx'
-import { ChipEtiqueta } from '../../ui/Chips.tsx'
+import { Botao } from '../../ui/Botao.tsx'
 import { Combobox, normalizarBusca } from '../../ui/Combobox.tsx'
 import { cx } from '../../lib/classes.ts'
 import { iconeDoModelo } from './icones.ts'
@@ -67,10 +67,40 @@ export interface PropsGradeModelos {
 
 const SEM = '__sem__'
 
+/**
+ * Com um modelo escolhido (clique, Enter ou o foco saindo da grade), a grade recolhe numa linha "Carrossel · Trocar"
+ * e devolve o espaço à descrição; as setas andam entre os cartões sem recolher.
+ */
 export function GradeModelos({ modelos, valor, aoMudar, sugerido, idRotulo }: PropsGradeModelos) {
   const grade = useRef<HTMLDivElement>(null)
+  const trocar = useRef<HTMLButtonElement>(null)
+  const [expandida, setExpandida] = useState(valor === null)
   const ids = [SEM, ...modelos.map((m) => m.id)]
   const atual = valor ?? SEM
+  const escolhido = valor ? modelos.find((m) => m.id === valor) ?? null : null
+  if (escolhido && !expandida) {
+    const I = iconeDoModelo(escolhido.icone)
+    return (
+      <div className="entrada-modelo-escolhido" role="group" aria-labelledby={idRotulo}>
+        <span className="entrada-modelo-icone" aria-hidden="true"><I /></span>
+        <span className="entrada-modelo-textos">
+          <span className="entrada-modelo-nome">
+            {escolhido.nome}
+            {sugerido === escolhido.id && <span className="entrada-selo">sugerido</span>}
+          </span>
+          {escolhido.descricao && <span className="entrada-modelo-descricao">{escolhido.descricao}</span>}
+        </span>
+        <Botao ref={trocar} variante="ghost" tamanho="p" icone={Repeat2} onClick={() => {
+          setExpandida(true)
+          requestAnimationFrame(() => grade.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus())
+        }}>Trocar</Botao>
+      </div>
+    )
+  }
+  const recolher = () => requestAnimationFrame(() => {
+    setExpandida(false)
+    requestAnimationFrame(() => trocar.current?.focus())
+  })
   const colunas = () => {
     const el = grade.current
     if (!el) return 1
@@ -78,7 +108,7 @@ export function GradeModelos({ modelos, valor, aoMudar, sugerido, idRotulo }: Pr
   }
   const cartao = (id: string, nome: string, descricao: string, icone: ReactNode, quadro: boolean) => (
     <button key={id} type="button" role="radio" aria-checked={atual === id} tabIndex={atual === id ? 0 : -1} data-valor={id}
-      className="entrada-modelo" onClick={() => aoMudar(id === SEM ? null : id)} title={descricao || undefined}>
+      className="entrada-modelo" onClick={() => { aoMudar(id === SEM ? null : id); if (id !== SEM) recolher() }} title={descricao || undefined}>
       <span className="entrada-modelo-icone" aria-hidden="true">{icone}</span>
       <span className="entrada-modelo-textos">
         <span className="entrada-modelo-nome">
@@ -92,7 +122,8 @@ export function GradeModelos({ modelos, valor, aoMudar, sugerido, idRotulo }: Pr
   )
   return (
     <div ref={grade} role="radiogroup" aria-labelledby={idRotulo} className="entrada-modelos"
-      onKeyDown={(e) => teclasDoGrupo(e, ids, atual, (id) => aoMudar(id === SEM ? null : id), colunas())}>
+      onKeyDown={(e) => teclasDoGrupo(e, ids, atual, (id) => aoMudar(id === SEM ? null : id), colunas())}
+      onBlur={(e) => { if (valor && !e.currentTarget.contains(e.relatedTarget as Node | null)) setExpandida(false) }}>
       {cartao(SEM, 'Sem modelo', 'Só o título e o que você escrever.', <span className="entrada-modelo-traco">—</span>, false)}
       {modelos.map((m) => {
         const I = iconeDoModelo(m.icone)
@@ -178,18 +209,23 @@ export function SeletorEtiquetas({ etiquetas, valor, aoMudar, novas = [], idRotu
     <div role="group" aria-labelledby={idRotulo} className="entrada-etiquetas">
       {etiquetas.map((e) => {
         const ligada = valor.includes(e.id)
+        // marcada: cheia na cor da etiqueta, com ✓; não marcada: só o contorno e o +, para não parecer já aplicada
         return (
-          <button key={e.id} type="button" className="entrada-etiqueta" aria-pressed={ligada}
+          <button key={e.id} type="button" className="entrada-etiqueta" data-cor={e.cor} aria-pressed={ligada}
             aria-label={e.nome ? undefined : `Etiqueta sem nome (${e.cor})`}
             onClick={() => aoMudar(ligada ? valor.filter((x) => x !== e.id) : [...valor, e.id])}>
-            {ligada && <Check aria-hidden="true" />}
-            <ChipEtiqueta etiqueta={e} tabIndex={-1} />
+            {ligada ? <Check aria-hidden="true" /> : <Plus aria-hidden="true" />}
+            <span className="entrada-etiqueta-ponto" aria-hidden="true" />
+            {e.nome && <span className="entrada-etiqueta-nome">{e.nome}</span>}
           </button>
         )
       })}
       {novas.map((e) => (
-        <span key={e.nome} className="entrada-etiqueta" data-nova="" title="Nasce no quadro com a demanda (etiqueta do modelo)">
-          <ChipEtiqueta etiqueta={{ nome: e.nome, cor: e.cor }} />
+        <span key={e.nome} className="entrada-etiqueta" data-cor={e.cor} data-nova="" data-marcada=""
+          title="Nasce no quadro com a demanda (etiqueta do modelo)">
+          <Check aria-hidden="true" />
+          <span className="entrada-etiqueta-ponto" aria-hidden="true" />
+          <span className="entrada-etiqueta-nome">{e.nome}</span>
           <span className="sr-only"> (nova, do modelo)</span>
         </span>
       ))}

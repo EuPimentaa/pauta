@@ -175,7 +175,7 @@
   .cic-alerta strong { font: 600 var(--fs-body) / var(--lh-body) var(--font); }
   .cic-alerta-acoes { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   .cic-texto-whatsapp {
-    width: 100%; min-height: 120px; padding: 12px 14px; border-radius: var(--radius-md); resize: vertical;
+    width: 100%; min-height: 120px; max-height: 50vh; field-sizing: content; padding: 12px 14px; border-radius: var(--radius-md); resize: vertical;
     background: var(--surface-sunken); color: var(--text); border: 1px solid var(--border-control);
     font: 400 var(--fs-body) / var(--lh-body) var(--font);
   }

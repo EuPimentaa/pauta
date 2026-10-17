@@ -180,7 +180,7 @@ function gravarEnvio(db: Db, demandaId: Id, e: EnviarAoClienteEntrada, ator: Ato
 
   const automacao = executarAutomacao(db, d.id, 'enviado_ao_cliente', ator)
   const texto = textoWhatsapp('envio', {
-    contatoNome: nomeDoContato(db, contatoId), modeloNome: nomeDoModelo(db, d.modeloId), titulo: d.titulo, versao: versao.numero,
+    contatoNome: nomeDoContato(db, contatoId), titulo: d.titulo, versao: versao.numero,
     url: link?.url ?? null, prazoRetorno, prazoRetornoHora,
   })
   return { envio, demanda: carregarDemanda(db, d.id), link, textoWhatsapp: texto, automacao }
@@ -190,10 +190,6 @@ export function carregarEnvio(db: Db, id: Id): Envio {
   const l = um<Linha>(db, 'SELECT * FROM envio WHERE id = ?', id)
   if (!l) throw naoEncontrado('Envio não encontrado.')
   return mapear.envio(l)
-}
-
-function nomeDoModelo(db: Db, modeloId: Id | null): string | null {
-  return modeloId ? um<{ nome: string }>(db, 'SELECT nome FROM modelo_demanda WHERE id = ?', modeloId)?.nome ?? null : null
 }
 
 // ─────────────────────────────── texto para WhatsApp ───────────────────────────────
@@ -206,7 +202,6 @@ function nomeDoModelo(db: Db, modeloId: Id | null): string | null {
 export function textoParaWhatsapp(db: Db, demandaId: Id, modelo: ModeloWhatsapp, ator: Ator): TextoWhatsappSaida {
   exigir(ator, 'ciclo.cliente')
   const d = demandaViva(db, demandaId)
-  const modeloNome = nomeDoModelo(db, d.modeloId)
   if (modelo === 'envio' || modelo === 'lembrete') {
     const l = um<Linha>(db, 'SELECT * FROM envio WHERE demanda_id = ? ORDER BY enviado_em DESC, rowid DESC LIMIT 1', demandaId)
     if (!l) throw conflito('Esta demanda ainda não foi enviada ao cliente.')
@@ -223,7 +218,7 @@ export function textoParaWhatsapp(db: Db, demandaId: Id, modelo: ModeloWhatsapp,
     }
     if (modelo === 'envio' && envio.via === 'fora') url = null
     const texto = textoWhatsapp(modelo, {
-      contatoNome: nomeDoContato(db, envio.contatoId), modeloNome, titulo: d.titulo, versao: versao.numero, url,
+      contatoNome: nomeDoContato(db, envio.contatoId), titulo: d.titulo, versao: versao.numero, url,
       prazoRetorno: envio.prazoRetorno, prazoRetornoHora: envio.prazoRetornoHora,
     })
     return { modelo, texto, linkUrl: url }
@@ -236,7 +231,7 @@ export function textoParaWhatsapp(db: Db, demandaId: Id, modelo: ModeloWhatsapp,
   const rodada = a.rodadaAbertaId ? um<{ prazo: string | null; prazo_hora: string | null }>(db,
     'SELECT prazo, prazo_hora FROM rodada WHERE id = ?', a.rodadaAbertaId) : undefined
   const texto = textoWhatsapp(modelo, {
-    contatoNome: nomeDoContato(db, a.contatoId) ?? a.nomeInformado, modeloNome, titulo: d.titulo, versao: versao.numero,
+    contatoNome: nomeDoContato(db, a.contatoId) ?? a.nomeInformado, titulo: d.titulo, versao: versao.numero,
     prazoAjuste: rodada?.prazo ?? null, prazoAjusteHora: rodada?.prazo_hora ?? null,
   })
   return { modelo, texto, linkUrl: null }

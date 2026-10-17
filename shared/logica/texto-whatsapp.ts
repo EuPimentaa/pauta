@@ -1,22 +1,20 @@
 /**
  * Textos para colar no WhatsApp (API.md §6), puros: o servidor monta em GET /api/demandas/:id/whatsapp e no envio, e
  * o front pode pré-visualizar com os mesmos dados. Tom da marca: direto, sem exclamação, data "qui, 16/10, 18h".
+ * Uma ideia por linha, o link sozinho na linha dele e o título em negrito do WhatsApp (*título*):
  *
- *   textoWhatsapp('envio', { contatoNome: 'Fulana de Tal', modeloNome: 'Carrossel', titulo: 'Outubro Rosa', versao: 2,
+ *   textoWhatsapp('envio', { contatoNome: 'Fulana de Tal', titulo: 'Outubro Rosa', versao: 2,
  *     url: 'https://…/a/…', prazoRetorno: '2026-10-16', prazoRetornoHora: null })
- *   // "Olá, Fulana. Segue Carrossel Outubro Rosa (V2) para aprovação: https://…/a/… Prazo para retorno: sex, 16/10, 18h."
+ *   // "Olá, Fulana.\nSegue a V2 de *Outubro Rosa* para aprovação:\nhttps://…/a/…\n\nRetorno até sex, 16/10, 18h."
  */
 import type { ModeloWhatsapp } from '../tipos/ciclo.ts'
 import type { DataLocal, HoraLocal } from '../tipos/nucleo.ts'
 import { HORA_PADRAO_PRAZO } from '../tipos/nucleo.ts'
 import { formatarPrazo } from './datas.ts'
-import { normalizarAlias } from './texto.ts'
 
 export interface DadosWhatsapp {
-  /** Nome do contato (o texto usa o primeiro nome). Nulo = sem contato. */
+  /** Nome do contato (o texto usa o primeiro nome, com o tratamento: "Dona Maria"). Nulo = sem contato. */
   contatoNome: string | null
-  /** Nome do modelo da demanda ("Carrossel"), se houver. */
-  modeloNome: string | null
   titulo: string
   /** Número da versão enviada ou decidida. */
   versao: number
@@ -29,22 +27,25 @@ export interface DadosWhatsapp {
   prazoAjusteHora?: HoraLocal | null
 }
 
-/** Primeiro nome do contato ("Fulana de Tal" → "Fulana"); vazio → null. */
-export function primeiroNome(nome: string | null | undefined): string | null {
-  const p = (nome ?? '').trim().split(/\s+/)[0]
-  return p ? p : null
-}
+/** Pronomes de tratamento que não são o nome ("Seu Joaquim", "Dona Maria", "Dr. Paulo"). */
+const TRATAMENTOS = new Set(['seu', 'sr', 'sr.', 'senhor', 'dona', 'd.', 'sra', 'sra.', 'senhora', 'srta', 'srta.', 'dr', 'dr.',
+  'dra', 'dra.', 'doutor', 'doutora', 'prof', 'prof.', 'profa', 'profa.', 'professor', 'professora'])
 
 /**
- * "{modelo} {título}" sem repetir o modelo quando o título já começa com ele ("Carrossel de outubro" com o modelo
- * Carrossel continua "Carrossel de outubro").
+ * Como chamar a pessoa: o primeiro nome ("Fulana de Tal" → "Fulana"), com o tratamento quando o nome começa por um
+ * ("Seu Joaquim da Silva" → "Seu Joaquim"; "Dona Maria" → "Dona Maria"). Vazio → null.
  */
-export function nomeDaPeca(modeloNome: string | null, titulo: string): string {
-  const t = titulo.trim()
-  const m = (modeloNome ?? '').trim()
-  if (!m) return t
-  if (normalizarAlias(t).startsWith(normalizarAlias(m))) return t
-  return `${m} ${t}`
+export function primeiroNome(nome: string | null | undefined): string | null {
+  const partes = (nome ?? '').trim().split(/\s+/).filter(Boolean)
+  if (partes.length === 0) return null
+  if (partes.length > 1 && TRATAMENTOS.has(partes[0]!.toLowerCase())) return `${partes[0]} ${partes[1]}`
+  return partes[0]!
+}
+
+/** O título em negrito do WhatsApp (sem asteriscos dentro, que quebrariam o negrito). */
+function negrito(titulo: string): string {
+  const t = titulo.replace(/\*/g, '').replace(/\s+/g, ' ').trim()
+  return t ? `*${t}*` : 'a peça'
 }
 
 /** "qui, 16/10, 18h" (sem hora: a hora padrão do prazo). */
@@ -52,33 +53,31 @@ function quando(d: DataLocal, h: HoraLocal | null | undefined): string {
   return formatarPrazo(d, h ?? HORA_PADRAO_PRAZO)
 }
 
+/** As linhas que existem, uma por linha (nulo some; '' vira linha em branco). */
+const linhas = (...l: (string | null)[]) => l.filter((x): x is string => x !== null).join('\n')
+
 /**
- * O texto do modelo (API.md §6). Sem contato, a saudação vira "Olá, tudo bem." e o agradecimento "Obrigado." (o nome
+ * O texto do modelo (API.md §6). Sem contato, a saudação vira "Olá, tudo bem?" e o agradecimento "Obrigado." (o nome
  * some). Lembrete sem link (envio por fora) termina sem o endereço.
  */
 export function textoWhatsapp(modelo: ModeloWhatsapp, dados: DadosWhatsapp): string {
   const nome = primeiroNome(dados.contatoNome)
-  const ola = `Olá, ${nome ?? 'tudo bem'}.`
+  const ola = nome ? `Olá, ${nome}.` : 'Olá, tudo bem?'
   const obrigado = nome ? `Obrigado, ${nome}.` : 'Obrigado.'
-  const peca = nomeDaPeca(dados.modeloNome, dados.titulo)
   const v = dados.versao
+  const peca = `V${v} de ${negrito(dados.titulo)}`
   const url = dados.url?.trim() || null
   switch (modelo) {
     case 'envio': {
-      const prazo = dados.prazoRetorno ? ` Prazo para retorno: ${quando(dados.prazoRetorno, dados.prazoRetornoHora)}.` : ''
-      return url
-        ? `${ola} Segue ${peca} (V${v}) para aprovação: ${url}${prazo}`
-        : `${ola} Segue ${peca} (V${v}) para aprovação.${prazo}`
+      const prazo = dados.prazoRetorno ? `Retorno até ${quando(dados.prazoRetorno, dados.prazoRetornoHora)}.` : null
+      return linhas(ola, `Segue a ${peca} para aprovação${url ? ':' : '.'}`, url, prazo && '', prazo)
     }
     case 'lembrete':
-      return url
-        ? `${ola} Passando para lembrar de ${peca} (V${v}), que aguarda o seu retorno: ${url}`
-        : `${ola} Passando para lembrar de ${peca} (V${v}), que aguarda o seu retorno.`
+      return linhas(ola, `Passando para lembrar da ${peca}, que aguarda o seu retorno${url ? ':' : '.'}`, url)
     case 'aprovado':
-      return `${obrigado} Registramos a aprovação de ${peca} (V${v}).`
-    case 'ajuste': {
-      const prazo = dados.prazoAjuste ? ` A V${v + 1} fica pronta até ${quando(dados.prazoAjuste, dados.prazoAjusteHora)}.` : ''
-      return `${obrigado} Recebemos os ajustes de ${peca}.${prazo}`
-    }
+      return linhas(obrigado, `Registramos a aprovação da ${peca}.`)
+    case 'ajuste':
+      return linhas(obrigado, `Recebemos os ajustes da ${peca}.`,
+        dados.prazoAjuste ? `A V${v + 1} fica pronta até ${quando(dados.prazoAjuste, dados.prazoAjusteHora)}.` : null)
   }
 }

@@ -1151,15 +1151,18 @@ na Agenda ou no Calendário (PATCH), aprovação manual (anular). Gerar link e e
 
 ## 6. Textos para WhatsApp
 
-Tom da marca: direto, sem exclamação, com data no formato "qui, 16/10, 18h". `{contato}` = primeiro nome do contato
-(sem contato: "Olá, tudo bem." no envio e no lembrete, "Obrigado." sem nome no aprovado e no ajuste), `{peca}` = nome
-do modelo (se houver; não se repete quando o título já começa com ele, "Carrossel de outubro") + título, `{v}` =
-número da versão. Lembrete sem link (envio por fora sem link ativo do contato) termina sem o endereço.
+Tom da marca: direto, sem exclamação, com data no formato "qui, 16/10, 18h". Uma ideia por linha, o link sozinho na
+linha dele (o WhatsApp mostra a prévia) e o título em negrito do WhatsApp (`*título*`, sem asteriscos de dentro; o
+modelo da demanda não entra: "Segue Post E-mail…" soava errado). `{contato}` = primeiro nome do contato, com o
+tratamento quando o nome começa por um ("Seu Joaquim", "Dona Maria"; `primeiroNome`); sem contato: "Olá, tudo bem?"
+no envio e no lembrete (pergunta, não exclamação), "Obrigado." sem nome no aprovado e no ajuste. `{v}` = número da
+versão. Lembrete sem link (envio por fora sem link ativo do contato) termina sem o endereço; sem prazo, a linha do
+prazo some. `↵` = quebra de linha.
 
 | Modelo | Texto |
 |---|---|
-| envio (link) | Olá, {contato}. Segue {peca} (V{v}) para aprovação: {url} Prazo para retorno: {prazoRetorno}. |
-| envio (por fora) | Olá, {contato}. Segue {peca} (V{v}) para aprovação. Prazo para retorno: {prazoRetorno}. |
-| lembrete | Olá, {contato}. Passando para lembrar de {peca} (V{v}), que aguarda o seu retorno: {url} |
-| aprovado | Obrigado, {contato}. Registramos a aprovação de {peca} (V{v}). |
-| ajuste | Obrigado, {contato}. Recebemos os ajustes de {peca}. A V{v+1} fica pronta até {prazo}. |
+| envio (link) | Olá, {contato}.↵Segue a V{v} de \*{titulo}\* para aprovação:↵{url}↵↵Retorno até {prazoRetorno}. |
+| envio (por fora) | Olá, {contato}.↵Segue a V{v} de \*{titulo}\* para aprovação.↵↵Retorno até {prazoRetorno}. |
+| lembrete | Olá, {contato}.↵Passando para lembrar da V{v} de \*{titulo}\*, que aguarda o seu retorno:↵{url} |
+| aprovado | Obrigado, {contato}.↵Registramos a aprovação da V{v} de \*{titulo}\*. |
+| ajuste | Obrigado, {contato}.↵Recebemos os ajustes da V{v} de \*{titulo}\*.↵A V{v+1} fica pronta até {prazo}. |

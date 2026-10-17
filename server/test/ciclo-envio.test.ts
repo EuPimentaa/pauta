@@ -37,7 +37,7 @@ describe('POST /api/demandas/:id/enviar', () => {
     assert.equal(s.link, null)
     assert.equal(s.demanda.colunaId, d.colunaId)
     assert.equal(s.demanda.versaoEnviadaId, d.versaoAtualId)
-    assert.match(s.textoWhatsapp, /^Olá, Fulana\. Segue Post de outubro \(V1\) para aprovação\. Prazo para retorno: sex, 16\/10, 18h\.$/)
+    assert.equal(s.textoWhatsapp, 'Olá, Fulana.\nSegue a V1 de *Post de outubro* para aprovação.\n\nRetorno até sex, 16/10, 18h.')
     const v = um<{ enviada_cliente_em: string; enviada_via: string }>(a.db, 'SELECT enviada_cliente_em, enviada_via FROM versao WHERE id = ?', d.versaoAtualId)!
     assert.equal(v.enviada_via, 'fora')
     const evs = eventos(a.db, seq)
@@ -114,12 +114,12 @@ describe('texto para WhatsApp e links', () => {
     const s = await enviarAoCliente(a, d)
     const lembrete = (await am.get(`/api/demandas/${d.id}/whatsapp?modelo=lembrete`)).corpo
     assert.equal(lembrete.linkUrl, s.link!.url)
-    assert.equal(lembrete.texto, `Olá, Fulana. Passando para lembrar de Post de outubro (V1), que aguarda o seu retorno: ${s.link!.url}`)
+    assert.equal(lembrete.texto, `Olá, Fulana.\nPassando para lembrar da V1 de *Post de outubro*, que aguarda o seu retorno:\n${s.link!.url}`)
     assert.equal((await am.get(`/api/demandas/${d.id}/whatsapp?modelo=envio`)).corpo.texto, s.textoWhatsapp)
     assert.equal((await am.get(`/api/demandas/${d.id}/whatsapp?modelo=aprovado`)).status, 409)
     await am.post(`/api/demandas/${d.id}/retorno`, { decisao: 'ajuste', linhas: ['x'] })
     assert.equal((await am.get(`/api/demandas/${d.id}/whatsapp?modelo=ajuste`)).corpo.texto,
-      'Obrigado, Fulana. Recebemos os ajustes de Post de outubro. A V2 fica pronta até qui, 15/10, 18h.')
+      'Obrigado, Fulana.\nRecebemos os ajustes da V1 de *Post de outubro*.\nA V2 fica pronta até qui, 15/10, 18h.')
     assert.equal((await am.get(`/api/demandas/${d.id}/whatsapp?modelo=xpto`)).status, 400)
     assert.equal((await a.como(a.pessoas.design).get(`/api/demandas/${d.id}/whatsapp?modelo=envio`)).status, 403)
   })

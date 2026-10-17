@@ -14,6 +14,7 @@ import type {
 } from '../../../shared/tipos/index.ts'
 import { dataLocalDe, formatarPrazo, horaLocalDe } from '../../../shared/logica/datas.ts'
 import { linhasParaItens } from '../../../shared/logica/texto.ts'
+import { primeiroNome } from '../../../shared/logica/texto-whatsapp.ts'
 import type { Ator } from '../auth.ts'
 import { config } from '../config.ts'
 import { agora, rodar, todos, um, type Db } from '../db.ts'
@@ -124,7 +125,7 @@ function itemPublico(db: Db, link: LinkLinha, demandaId: Id): ItemAprovacaoPubli
       const nome = nomeDoContato(db, a.contatoId) ?? a.nomeInformado ?? 'a agência'
       decisao = { decisao: a.decisao, versaoNumero: atual.numero, nome, em: a.criadoEm, linhas: a.comentario ? a.comentario.split('\n') : [] }
       if (a.decisao === 'aprovado') {
-        proximoPasso = `Aprovado V${atual.numero} por ${nome} em ${quandoCurto(a.criadoEm)}`
+        proximoPasso = `V${atual.numero} aprovada por ${nome} em ${quandoCurto(a.criadoEm)}.`
       } else {
         const r = a.rodadaAbertaId ? um<{ prazo: string | null; prazo_hora: string | null }>(db, 'SELECT prazo, prazo_hora FROM rodada WHERE id = ?', a.rodadaAbertaId) : undefined
         proximoPasso = r?.prazo
@@ -209,7 +210,8 @@ export function hashDecisao(e: DecisaoPublicaEntrada): string {
 }
 
 function mensagemDaDecisao(item: ItemAprovacaoPublico): string {
-  if (item.decisao?.decisao === 'aprovado') return `Aprovação registrada. Obrigado, ${item.decisao.nome.split(' ')[0]}.`
+  // "Seu Joaquim" fica "Seu Joaquim" (não "Seu"): o primeiro nome com o tratamento
+  if (item.decisao?.decisao === 'aprovado') return `Aprovação registrada. Obrigado, ${primeiroNome(item.decisao.nome) ?? item.decisao.nome}.`
   return `Ajustes enviados. ${item.proximoPasso ?? 'A equipe já recebeu'}.`
 }
 

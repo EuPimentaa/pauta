@@ -37,7 +37,7 @@ describe('vaivém com as automações da Criação', () => {
     assert.equal(env.demanda.quadroId, a.quadros.atendimento.quadro.id)
     assert.ok(env.demanda.envioPendenteEm)
     assert.equal(comQuemEsta(env.demanda, { papel: 'aguardando_cliente' }), 'cliente')
-    assert.match(env.textoWhatsapp, /^Olá, Fulana\. Segue Post de outubro \(V1\) para aprovação: http.+\/a\/.+ Prazo para retorno: sex, 16\/10, 18h\.$/)
+    assert.match(env.textoWhatsapp, /^Olá, Fulana\.\nSegue a V1 de \*Post de outubro\* para aprovação:\nhttp\S+\/a\/\S+\n\nRetorno até sex, 16\/10, 18h\.$/)
     // "Urgente" não tem par no Atendimento: fica guardada na Criação
     assert.deepEqual(env.demanda.etiquetaIds, [])
 
@@ -263,7 +263,7 @@ describe('página pública e o retorno manual se enxergam', () => {
     const pag = (await publico(a).pagina(tokenDe(env.link!.url))).corpo as PaginaAprovacao
     assert.equal(pag.itens[0]!.decisao!.decisao, 'aprovado')
     assert.equal(pag.itens[0]!.decisao!.nome, 'Fulana')
-    assert.match(pag.itens[0]!.proximoPasso!, /^Aprovado V1 por Fulana em 14\/10 às 10:00$/)
+    assert.match(pag.itens[0]!.proximoPasso!, /^V1 aprovada por Fulana em 14\/10 às 10:00\.$/)
   })
 })
 
@@ -295,6 +295,7 @@ describe('cliente sem AM (criado pela equipe, só com sigla e nome)', () => {
     const pag = (await publico(a).pagina(token)).corpo as PaginaAprovacao
     const r = await publico(a).decidir(token, { demandaId: d0.id, versaoId: pag.itens[0]!.versao!.id, decisao: 'aprovado', nomeInformado: 'Seu Joaquim' })
     assert.equal(r.status, 200, r.texto)
+    assert.equal(r.corpo.mensagem, 'Aprovação registrada. Obrigado, Seu Joaquim.')
     assert.ok(notificacoesDe(a.db, a.pessoas.am.id).some((n) => n.tipo === 'aprovada' && n.demanda_id === d0.id))
   })
 

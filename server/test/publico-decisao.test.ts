@@ -135,6 +135,6 @@ describe('corrida entre versões e decisões', () => {
     // a página fica só leitura, com o selo
     const depois = (await publico(a).pagina(token)).corpo as PaginaAprovacao
     assert.equal(depois.itens[0]!.decisao!.decisao, 'aprovado')
-    assert.match(depois.itens[0]!.proximoPasso!, /^Aprovado V1 por Fulana em 14\/10 às 10:00$/)
+    assert.match(depois.itens[0]!.proximoPasso!, /^V1 aprovada por Fulana em 14\/10 às 10:00\.$/)
   })
 })

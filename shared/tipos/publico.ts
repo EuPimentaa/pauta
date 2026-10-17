@@ -60,7 +60,10 @@ export interface ItemAprovacaoPublico {
   decisao: DecisaoPublica | null
   anteriores: { numero: number; enviadaEm: Instante; decisao: 'aprovado' | 'ajuste' | null }[]
   comentarios: ComentarioPublico[]
-  /** "A equipe prepara a V3 até sex, 17/10" ou "Aprovado V2 por Fulana em 14/10 às 14:03". */
+  /**
+   * "A equipe prepara a V3 até sex, 17/10", "V2 aprovada por Fulana em 14/10 às 14:03.", "Esta peça não aguarda mais
+   * sua decisão." ou "A peça desta versão foi enviada por outro meio." (os dois últimos escondem os botões).
+   */
   proximoPasso: string | null
 }
 

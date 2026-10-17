@@ -121,7 +121,8 @@ const LinhaDemanda = memo(function LinhaDemanda(p: PropsLinhaDemanda) {
       case 'coluna': return <ColunaCelula coluna={p.coluna} />
       case 'membros': return membros.length ? <PilhaAvatares pessoas={membros} tamanho={22} /> : null
       case 'etiquetas': return <EtiquetasCelula etiquetas={etiquetas} />
-      case 'prioridade': return <BandeiraPrioridade p={d.prioridade} />
+      // como no card: a média (o padrão) não aparece; só o que destoa
+      case 'prioridade': return d.prioridade === 'media' ? null : <BandeiraPrioridade p={d.prioridade} />
       case 'inicio': return <DataCelula data={d.inicio} hora={d.inicioHora} />
       case 'prazo': return <PrazoCelula d={d} coluna={p.coluna ?? { papel: 'normal' }} agora={p.agora} />
       case 'concluida': return <ConcluidaCelula d={d} />
@@ -226,7 +227,13 @@ export function TabelaLista(p: PropsTabela) {
   const { topos, total } = useMemo(() => deslocamentos(linhas, ALTURAS), [linhas])
   const indicePorChave = useMemo(() => new Map(linhas.map((l, i) => [l.chave, i])), [linhas])
 
-  const visiveis = useMemo(() => COLUNAS_TABELA.filter((c) => c.campo !== ESCONDE[p.agrupar]), [p.agrupar])
+  // Início e Concluída só quando alguma linha tem o dado (vazias, ocupavam ~230 px em toda tabela)
+  const visiveis = useMemo(() => {
+    const todas = p.grupos.flatMap((g) => g.demandas)
+    const temInicio = todas.some((d) => d.inicio)
+    const temConcluida = todas.some((d) => d.concluidaEm)
+    return COLUNAS_TABELA.filter((c) => c.campo !== ESCONDE[p.agrupar] && (c.campo !== 'inicio' || temInicio) && (c.campo !== 'concluida' || temConcluida))
+  }, [p.agrupar, p.grupos])
   const fixas = visiveis.reduce((s, c) => s + (c.largura === 'titulo' ? 0 : c.largura), 0)
   const estiloTabela = {
     ['--lista-colunas' as string]: visiveis.map((c) => (c.largura === 'titulo' ? `minmax(${TITULO_MIN}px, 1fr)` : `${c.largura}px`)).join(' '),

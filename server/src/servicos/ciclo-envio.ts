@@ -66,6 +66,11 @@ function linkAtivo(db: Db, d: Demanda, contatoId: Id | null): Linha | undefined 
 
 // ─────────────────────────────── enviar ───────────────────────────────
 
+/** O que a página pública mostra de um item (ciclo-publico.ts): link que não é Drive privado, ou arquivo. */
+export function visivelAoCliente(i: VersaoComItens['itens'][number]): boolean {
+  return (i.tipo === 'link' && !!i.url && i.driveStatus !== 'privado') || (i.tipo === 'arquivo' && !!i.arquivo)
+}
+
 interface Preparado {
   d: Demanda
   versao: VersaoComItens
@@ -115,6 +120,11 @@ function gravarEnvio(db: Db, demandaId: Id, e: EnviarAoClienteEntrada, ator: Ato
     if (privados.length > 0 && !versao.itens.some((i) => i.tipo === 'arquivo')) {
       throw new ErroHttp(422, 'drive_privado', 'O cliente verá uma tela de login: abra o compartilhamento do Drive, envie o arquivo pelo app ou mande por fora.',
         { itens: privados.map((i) => ({ itemId: i.id, nome: i.nome, url: i.url })) })
+    }
+    // caminho de rede nunca vai ao cliente: sem nenhum link ou arquivo, ele aprovaria sem ver a peça
+    if (!versao.itens.some(visivelAoCliente)) {
+      throw new ErroHttp(422, 'estado_invalido', 'Pelo link o cliente não veria nada: esta versão só tem caminhos de rede. Acrescente o link do Drive ou o arquivo, ou envie por fora.',
+        { motivo: 'sem_itens_visiveis' })
     }
   }
   const instante = agora()

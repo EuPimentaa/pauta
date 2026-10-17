@@ -39,6 +39,8 @@ interface LinkLinha {
 
 export const TEXTO_LINK_INATIVO = 'Este link de aprovação não está mais ativo. Peça um novo ao seu atendimento.'
 export const TEXTO_NAO_AGUARDA = 'Esta peça não aguarda mais sua decisão.'
+/** Versão enviada por link sem nada que o cliente veja (só caminho de rede; envios de antes da trava do envio). */
+export const TEXTO_SEM_PECA = 'A peça desta versão foi enviada por outro meio.'
 
 const linkInativo = () => new ErroHttp(410, 'link_inativo', TEXTO_LINK_INATIVO)
 const naoAguarda = () => new ErroHttp(409, 'conflito', TEXTO_NAO_AGUARDA)
@@ -113,6 +115,7 @@ function itemPublico(db: Db, link: LinkLinha, demandaId: Id): ItemAprovacaoPubli
   const versoes = versoesDoLink(db, link.id, demandaId)
   const atual = versoes[0]
   const modeloNome = d.modeloId ? um<{ nome: string }>(db, 'SELECT nome FROM modelo_demanda WHERE id = ?', d.modeloId)?.nome ?? null : null
+  const versao = atual ? versaoPublica(db, atual.id, atual.enviado_em) : null
   let decisao: DecisaoPublica | null = null
   let proximoPasso: string | null = null
   if (atual) {
@@ -131,6 +134,9 @@ function itemPublico(db: Db, link: LinkLinha, demandaId: Id): ItemAprovacaoPubli
     } else if (!d.envioPendenteEm || d.versaoEnviadaId !== atual.id) {
       // outra versão foi enviada por outro caminho (ou a agência já tratou): nada a decidir aqui
       proximoPasso = TEXTO_NAO_AGUARDA
+    } else if (versao!.itens.length === 0) {
+      // nada a ver por aqui: não se aprova às cegas (a página esconde os botões)
+      proximoPasso = TEXTO_SEM_PECA
     }
   }
   const anteriores = versoes.slice(1).map((v) => ({
@@ -146,7 +152,7 @@ function itemPublico(db: Db, link: LinkLinha, demandaId: Id): ItemAprovacaoPubli
   return {
     demandaId, numero: d.numero, titulo: d.titulo, modeloNome,
     prazoRetorno: atual?.prazo_retorno ?? null, prazoRetornoHora: atual?.prazo_retorno_hora ?? null,
-    versao: atual ? versaoPublica(db, atual.id, atual.enviado_em) : null,
+    versao,
     decisao, anteriores, comentarios, proximoPasso,
   }
 }
@@ -243,6 +249,7 @@ export function decidir(db: Db, token: string, chave: string, e: DecisaoPublicaE
       { versaoAtual: versaoPublica(db, atual.id, atual.enviado_em) })
   }
   if (decisaoValida(db, e.versaoId)) throw new ErroHttp(409, 'ja_decidida', 'Esta peça já recebeu uma decisão.')
+  if (versaoPublica(db, e.versaoId, '').itens.length === 0) throw new ErroHttp(409, 'conflito', `${TEXTO_SEM_PECA} Fale com o seu atendimento.`)
   if (e.contatoId != null && e.contatoId !== link.contato_id) {
     throw validacao('Confirme quem está decidindo.', { contatoId: 'não é o contato deste link' })
   }

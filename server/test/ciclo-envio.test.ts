@@ -146,3 +146,20 @@ describe('texto para WhatsApp e links', () => {
     assert.notEqual(novo.link!.id, links[0]!.id)
   })
 })
+
+describe('versão só com caminho de rede', () => {
+  test('enviar por link → 422 (o cliente não veria nada); por fora passa', async () => {
+    const a = await ambiente()
+    const d = await a.criarDemanda({ colunaId: a.coluna('criacao', 'Design').id })
+    const v = await entregar(a, d, { itens: [{ tipo: 'caminho', caminho: String.raw`M:\Clientes\HE\2026\SAIDA\Banner V1` }] })
+    const am = a.como(a.pessoas.am)
+    const r = await am.post(`/api/demandas/${d.id}/enviar`, { via: 'link' })
+    assert.equal(r.status, 422, r.texto)
+    assert.equal(r.corpo.erro.codigo, 'estado_invalido')
+    assert.equal(r.corpo.erro.detalhes.motivo, 'sem_itens_visiveis')
+    assert.equal(um<{ n: number }>(a.db, 'SELECT count(*) AS n FROM link_publico')!.n, 0)
+    const fora = await am.post(`/api/demandas/${d.id}/enviar`, { via: 'fora', canal: 'whatsapp' })
+    assert.equal(fora.status, 200, fora.texto)
+    assert.equal(fora.corpo.envio.versaoId, v.versao.id)
+  })
+})

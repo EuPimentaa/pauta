@@ -9,7 +9,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { PaginaAprovacao } from '../../shared/tipos/index.ts'
 import { criarApp } from '../src/app.ts'
-import { agora, rodar, um } from '../src/db.ts'
+import { agora, rodar, tx, um } from '../src/db.ts'
+import { decifrar } from '../src/servicos/cripto.ts'
+import { enviarPorSql } from '../scripts/ciclo-sql.ts'
 import { servirWeb } from '../src/web.ts'
 import { ambiente, enviarAoCliente, enviarPng, entregar, linkDrive, publico, tokenDe } from './ciclo-ajuda.ts'
 
@@ -138,5 +140,23 @@ describe('POST /api/publico/a/:token/visto', () => {
     const semCsrf = await a.app.request(`/api/publico/a/${token}/visto`, { method: 'POST' })
     assert.equal(semCsrf.status, 403)
     assert.equal(um<{ n: number }>(a.db, `SELECT count(*) AS n FROM evento WHERE entidade = 'link_publico' AND publico <> 'gestao'`)!.n, 0)
+  })
+})
+
+describe('link de uma versão sem nada visível (envio de antes da trava)', () => {
+  test('a página diz que a peça foi por outro meio e não aceita decisão às cegas', async () => {
+    const a = await ambiente()
+    const d = await a.criarDemanda({ colunaId: a.coluna('criacao', 'Design').id })
+    await entregar(a, d, { itens: [{ tipo: 'caminho', caminho: String.raw`M:\Clientes\HE\2026\SAIDA\Banner V1` }] })
+    const { linkId } = tx(a.db, () => enviarPorSql(a.db, d.id, { atendimentoId: a.pessoas.am.id, via: 'link' }))
+    const token = decifrar(um<{ token_cifrado: string }>(a.db, 'SELECT token_cifrado FROM link_publico WHERE id = ?', linkId)!.token_cifrado)
+    const pag = (await publico(a).pagina(token)).corpo as PaginaAprovacao
+    const item = pag.itens[0]!
+    assert.deepEqual(item.versao!.itens, [])
+    assert.equal(item.proximoPasso, 'A peça desta versão foi enviada por outro meio.')
+    const r = await publico(a).decidir(token, { demandaId: d.id, versaoId: item.versao!.id, decisao: 'aprovado', contatoId: pag.contato!.id })
+    assert.equal(r.status, 409, r.texto)
+    assert.equal(r.corpo.erro.codigo, 'conflito')
+    assert.equal(um<{ n: number }>(a.db, 'SELECT count(*) AS n FROM aprovacao')!.n, 0)
   })
 })

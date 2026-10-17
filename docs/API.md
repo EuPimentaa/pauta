@@ -770,8 +770,9 @@ Qualquer usuário. **Corpo:** `TestarDriveEntrada`. **Resposta:** `200 TestarDri
   do cliente (`400 validacao`; o gatilho `envio_contato_do_cliente` também recusa). Prazo de retorno padrão: hoje + `retornoPrazoDiasUteis`, limitado à véspera útil da publicação.
 - `via: 'link'`: testa o Drive dos itens; algum `privado` → `422 drive_privado` (`detalhes.itens`), a não ser que a
   versão tenha um arquivo enviado pelo app ("[Enviar arquivo (até 10 MB)]", `POST /api/versoes/:id/itens`): aí o envio
-  passa e a página pública deixa de fora o link privado. Caminho de rede nunca vai ao cliente (a tela avisa quando a
-  versão só tem caminhos). Reaproveita o link ativo da demanda para o mesmo contato (e estende a validade dele por mais
+  passa e a página pública deixa de fora o link privado. Caminho de rede nunca vai ao cliente: versão sem nenhum link
+  ou arquivo (só caminhos) → `422 estado_invalido` com `detalhes.motivo: 'sem_itens_visiveis'` (o cliente aprovaria
+  sem ver; a tela só oferece "Enviei por fora"). Reaproveita o link ativo da demanda para o mesmo contato (e estende a validade dele por mais
   `linkPublicoValidadeDias` a partir deste envio); senão gera token de 32 bytes, grava `token_hash` (sha256) e
   `token_cifrado` (AES-256-GCM com chave derivada de `SEGREDO`), validade `linkPublicoValidadeDias`, e o
   `link_publico_item`. `via: 'fora'`: exige `canal`; sem link.
@@ -862,7 +863,8 @@ HTML de `/a/:token`); `/a/*` e `/api/publico/*` mascarados nos logs. Token: `ran
   com `visivel_cliente = 1` e sem `excluido_em` (a menção sai trocada por "@Nome": a página mostra texto puro);
   `proximoPasso` = `null` sem decisão e aguardando, ou "Esta peça não aguarda mais sua decisão." quando a versão do
   link não tem decisão mas a peça não espera mais por ela (outra versão enviada por fora, envio pendente tratado de
-  outro jeito): a página esconde os botões; `modeloNome` = nome do modelo da demanda. Arquivos e o logo do
+  outro jeito), ou "A peça desta versão foi enviada por outro meio." quando a versão não tem nada que o cliente veja
+  (só caminho de rede, envio de antes da trava): a página esconde os botões; `modeloNome` = nome do modelo da demanda. Arquivos e o logo do
   cliente por URL assinada (`urlAssinada(id, linkPublicoArquivoMinutos)`).
 - **Erros:** `404` token desconhecido; `410 link_inativo` expirado, revogado ou sem itens.
 
@@ -885,7 +887,8 @@ Chamado pelo JS da página. Soma `acessos`, grava `ultimoAcessoEm`; `link.visto`
      aguarda mais sua decisão" (sem itens nem versão nos detalhes);
   4. `versaoId` = `versao_enviada_id`; senão `409 versao_desatualizada` com `versaoAtual` = a versão de maior número
      enviada por este link (`DetalhesVersaoDesatualizada`: "Chegou a V3");
-  5. sem decisão válida na versão (`409 ja_decidida`);
+  5. sem decisão válida na versão (`409 ja_decidida`); a versão tem algum item que o cliente vê (senão `409 conflito`
+     "A peça desta versão foi enviada por outro meio. Fale com o seu atendimento.");
   6. identidade: `contatoId` nulo ou igual a `link_publico.contato_id` (senão `400 validacao`); sem `contatoId`,
      `nomeInformado` obrigatório (1 a 120 caracteres, texto puro); ajuste com pelo menos 1 linha (`400 validacao`);
   7. grava a `aprovacao` com a chave, o hash, `ip_hmac` (HMAC-SHA256 com `SEGREDO`) e `user_agent`, e roda

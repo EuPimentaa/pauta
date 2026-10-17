@@ -123,12 +123,8 @@ Capturas: `scratchpad/integ3a/prod/` (01–71), auditorias em `scratchpad/integ3
 
 ## Pendente
 
-- **Worktrees não removidas.** `../melt-demandas-cadastros`, `-entrada` e `-modal` estão limpas e as branches ficam,
-  mas os Vites dos agentes do F5 (5188), F4 (5187) e F1 (5184) ainda rodam de dentro delas e seguram arquivos (no
-  Windows a remoção falharia no meio). Parar esses processos não foi permitido nesta sessão. Depois de pará-los:
-  `git worktree remove ../melt-demandas-cadastros`, `git worktree remove ../melt-demandas-entrada`,
-  `git worktree remove ../melt-demandas-modal` (o que se perde são só arquivos ignorados: `.env.<f>`, `data/agente-N`,
-  `node_modules`, `web/dist`).
+- ~~Worktrees não removidas.~~ Na segunda parte (abaixo), `git worktree list` já mostrava só a `master`: as worktrees
+  de F5, F4 e F1 foram removidas; as branches `funcionalidade/cadastros`, `entrada` e `modal` continuam (já mescladas).
 
 ## Avisos para a leva 2 (F2, F3, F6)
 
@@ -136,8 +132,8 @@ Capturas: `scratchpad/integ3a/prod/` (01–71), auditorias em `scratchpad/integ3
   `extensoes/tipos.ts`.
 - **F3:** os Primeiros passos já existem (`inicio/cadastros-primeiros-passos`, ordem 50, critérios pelo bootstrap): o
   Início só hospeda `secoesInicio()` e não repete o bloco. Ao entrar o Início, apagar a rota de DEV
-  `web/src/telas/quadros/dev/` (`/dev/cadastros-inicio`), que o F5 deixou só para testar. Hoje, sem o F3, `/inicio`
-  (a rota inicial) é "Página não encontrada".
+  `web/src/telas/quadros/dev/` (`/dev/cadastros-inicio`), que o F5 deixou só para testar. Sem o F3, `/inicio` era
+  "Página não encontrada"; na segunda parte (abaixo) ganhou um Início provisório que o F3 substitui.
 - **Camadas:** popover e modal estão na mesma camada (70); quem abriu depois fica por cima. Não crie z-index próprio
   para "subir" um popover.
 - **Tempo real:** a entidade `config` existe (objeto inteiro). E o achado 2 vale para todos: campo que o servidor manda
@@ -161,3 +157,151 @@ Capturas: `scratchpad/integ3a/prod/` (01–71), auditorias em `scratchpad/integ3
 editor · `c4cffde` busca vazia da paleta · `ac13423` prazo da conversa · `31cf35e` merge F1 · `be5367d` camadas e
 Checkbox · `3c01b8e` título e topo do modal · `7af4124` cronômetro sem contar em dobro · `8a0830b` prévia da etiqueta
 · `d8d7fba` e `2df3260` decisões do F1 e do F4 na API.
+
+---
+
+# Integração 3A, segunda parte: as revisões da leva 1 e as correções
+
+Três revisões adversariais rodaram sobre `0f6c1d5` (funcional ponta a ponta em produção, segurança e visual/UX). Esta
+parte corrige o que elas acharam, direto na `master` (27 commits, `9c6885d`..`7664f9b`, sem push). Quando fazia sentido,
+o teste novo falhou antes da correção (conferido tirando a correção e rodando de novo).
+
+Ambiente: API 7331 + Vite 5201 (`DATA_DIR=./data/integrador-3b`, `seed:demo`) para desenvolvimento e auditoria; build
+de produção servido pelo Node na 7332 (`NODE_ENV=production`, CSP real, banco que começou vazio em
+`./data/integrador-3b-prod`); Chrome headless na 9222, uma janela isolada por pessoa. Credenciais geradas em
+`.env.integrador-3b` e `.env.integrador-3b-prod` (não versionados).
+
+## Segurança
+
+| # | Grav. | Achado | O que foi feito | Commit |
+|---|---|---|---|---|
+| 1 | alta | `markdownParaTexto` quadrática numa descrição de 100 mil `[` parava o processo ~12 s a cada busca | O trecho sai de uma janela de 2.000 caracteres em volta do termo (busca sem acento no texto original) e as regexes têm quantificadores limitados. Teste: 100 mil `[` em < 50 ms e três plantadas não travam a busca de outra pessoa (falhava com 3,5 s e 10,7 s) | `9c6885d` |
+| 2 | média | `tituloDaConversa` quadrática em 50 mil espaços (~2,2 s por chamada de `/api/entrada/analisar`) | O título vai com espaços simples e no máximo 200 caracteres para as regexes do fim (3 ms). Teste: espaços, vírgulas e hífens em < 50 ms | `5519496` |
+| 3 | média | A equipe punha `rodadasInclusas` no modelo do quadro e a demanda herdava | `CAMPOS_MODELO_SO_ATENDIMENTO` (`shared/logica/permissoes.ts`): POST e PATCH de modelo pela equipe com a chave → `403 campo_nao_permitido`. API §4.9 | `dc58c55` |
+| 4 | média | A equipe renomeava, reescrevia e esvaziava o "Ajustes R2" sem rastro | `pode('checklist_rodada.editar')` (nova ação) em renomear, acrescentar, reescrever e tirar item de checklist com `rodadaId`; marcar e reordenar livres. Atividades novas `checklist.editado`, `checklist.item_editado`, `checklist.item_removido` (com o texto de antes; frases no histórico). O modal trava os controles para a equipe e diz por quê | `cb53d9f` |
+| 5 | média | Qualquer pessoa criava "Print do retorno" falso que ninguém removia | O zod de `POST /anexos` descarta `finalidade` e o serviço grava `referencia`; o modal marca e trava o Remover pela ligação com uma aprovação (`aprovacoes[].evidenciaAnexoId`) | `80c81be` |
+| 6 | média | Rascunho de comentário sobrevivia ao Sair e aparecia para a próxima pessoa | Chave `rascunho-comentario:<eu>:<demanda>`; o Sair apaga `pauta:rascunho-*` e o bootstrap também quando entra outra pessoa no navegador (`marcarPessoaLocal`) | `e7e4ffb` |
+| 7 | baixa | Rótulo da menção forjável (`@Diretoria Financeira` notificando a Bia) | `<Markdown nomeDaPessoa>`: no modal o chip mostra o nome atual da pessoa do id; id de ninguém vira texto. Conferido: o comentário com o rótulo trocado aparece como "@Pri" | `4117547` |
+| 8 | baixa | Menção a inativo/inexistente ficava na descrição e notificava depois da reativação | Criar e editar passam a descrição por `limparMencoes` (como o comentário) | `bc3543d` |
+| 9 | baixa | `GET /api/arquivo?q=%00x` → 500 | `termosFts` só manda pedaços de letras e números ao FTS ("pós-venda" vira "pós" e "venda") | `16112e2` |
+
+## Funcional
+
+| # | Grav. | Achado | O que foi feito | Commit |
+|---|---|---|---|---|
+| 1 | alta | `/inicio` era 404 para todo mundo; `/d/N` direto desenhava sobre o 404 e voltava para ele (também visual 3) | **Início provisório** em `web/src/telas/inicio/` (o F3 substitui a pasta): hospeda `secoesInicio()` (Primeiros passos) e a lista dos quadros; quem não tem seção vai direto ao quadro dele (favorito, da equipe, que segue). **Contrato:** `ExtensaoRota.fundo` (só sobrepostas): `/d/:numero` usa o quadro da demanda; `/quadros/novo`, `/config/quadros`; calculado uma vez por entrada do histórico (arquivar a demanda aberta ainda fecha no quadro dela) | `d2c912e` |
+| 2 | alta | Menções e notificações gravadas sem nenhuma superfície | **Adiado para o F3** (motivo abaixo) | — |
+| 3 | média | "15h30" digitado + Pronto deixava o prazo sem hora | `Combobox.aoSairComTexto` (Tab, clique fora e blur oferecem o texto digitado) e o `SeletorHora` aplica `lerHora`; hora ilegível fica no campo, marcada, e segura o Pronto com "Use 18h, 18h30 ou 9:15" | `dd7027b` |
+| 4 | média | O admin não via o convidado entrar; "Link de convite" dava 409 sem atualizar | `definirSenha` emite `usuario` (o tratador do F5 invalida a lista; ~1,6 s em produção) e o 409 atualiza a lista e oferece "Gerar link de nova senha". Teste: evento `usuario` sem e-mail no convite | `9f9150d` |
+| 5 | média | Nova demanda fechava com Esc ou clique fora e perdia tudo (também visual 1, alta) | Rascunho (`entrada/rascunho.ts`): fechar sem criar guarda o formulário (localStorage com o id de quem escreve, 3 dias; o Sair apaga) e a próxima abertura devolve, com "Rascunho de há 3 min · Descartar"; com o formulário mexido, o clique fora não fecha (`MolduraDialogo.fecharAoClicarFora`). O Novo quadro mexido pergunta "Descartar este quadro?" | `a991014` |
+| 6 | média | Anexo de 11 MB aparecia como "Sem conexão" | O servidor respondia 413 sem ler e o `@hono/node-server` derrubava a conexão em 500 ms (RST: o navegador nunca via o 413). `drenarCorpo` lê e descarta o corpo recusado (até 64 MB e 30 s) e o front confere `uploadLimiteBytes` antes de enviar. Teste com servidor de verdade e upload lento (falhava com `ECONNRESET`). Em produção: "grande.pdf: passa de 10 MB" | `e7e4ffb` |
+| 7 | média | "XYZ: Banner" + Enter criava sem cliente e com "XYZ:" no título | O Enter abre o `criar-cliente` e cria com o cliente novo; recusado, o Enter seguinte cria sem cliente e tira o "XYZ:" (`tirarMarcador`) | `4489574` |
+| 8 | baixa | O Desfazer de conclusão com repetição deixava a próxima no Arquivo com [Restaurar] | `SQL_PROXIMA_DESFEITA`: com a original aberta, a próxima arquivada não aparece no Arquivo e `POST /restaurar` dá 409 "Ela volta sozinha quando a #N for concluída" (concluir de novo restaura a mesma, sem gastar número). API §5.3 | `f7fcf70` |
+| 9 | baixa | "Convidar outra pessoa" deixava o foco no Cancelar | O formulário monta de novo e o foco entra no Nome | `9f9150d` |
+| 10 | baixa | "Criado: 1 colunas" | Plural condicional (coluna, automação) | `a8592a7` |
+| 11 | baixa | 401 do bootstrap no console deslogado; aviso de preload de fonte | Dica de sessão `pauta_sessao=1` (não é segredo): o login e o convite a põem, o logout a tira e o index.html servido pelo Node a acerta; em produção, sem a dica, o app vai a `/entrar` sem pedir o bootstrap. Os preloads das fontes saem. API §1 | `7664f9b` |
+| 12 | baixa | Com "Só as minhas", a coluna dizia "1" sem card | `Contador.visiveis`: com filtro, "1 de 2" (e "com o filtro" no leitor de tela) | `7e64586` |
+| 13 | baixa | Placeholders com cliente real | "Ex.: Clínica Exemplo"; o apelido sugere o do próprio cliente | `a8592a7` |
+| 14 | baixa | Nome do admin do primeiro boot vindo do e-mail, sem lugar óbvio para trocar | Seção **Sua conta** (todos os papéis, ordem 50) e o item "Sua conta" no menu do avatar; o primeiro boot grava "Admin Revfun" em vez de "admin.revfun" (`nomeDoEmail`) e os Primeiros passos pedem para conferir enquanto o nome for esse e não houver apelido | `d32afc6` |
+
+## Visual e UX
+
+| # | Grav. | Achado | O que foi feito | Commit |
+|---|---|---|---|---|
+| 1 | alta | Nova demanda e Novo quadro fechando sem guardar | Ver funcional 5 | `a991014` |
+| 2 | alta | Mudanças não salvas sumiam em Prazos e limites, Quadros e Aparência | `cadastros/pendentes.tsx`: o formulário fica em memória por chave (trocar de seção ou de quadro e voltar não perde), o rodapé gruda na tela com "1 mudança não salva · Descartar · Salvar" e fechar a aba pergunta (o `BrowserRouter` não tem `useBlocker`) | `d32afc6` |
+| 3 | média | Link direto com fundo errado | Ver funcional 1 | `d2c912e` |
+| 4 | média | 11 descrições de modelo cortadas, grade pesada | Descrição em até 2 linhas; com um modelo escolhido, a grade recolhe em "Carrossel · Trocar" (as setas andam sem recolher) | `75d081b` |
+| 5 | média | Etiquetas não marcadas pareciam aplicadas | Não marcada: contorno na cor, texto neutro e +; marcada: como no card, com ✓; o chip não muda de largura | `75d081b` |
+| 6 | média | Gatilho de data com outra altura e borda | `SeletorData` com a moldura do Campo (`tamanho` m = 40 px, p = 32 px); painel da Nova demanda e diálogo Datas todos em 32 px | `75d081b` |
+| 7 | média | Ação principal de cada seção num lugar e com dois laranjas | A ação da seção fica no cabeçalho, secundária e com ícone (Pessoas, Equipes, Clientes, Modelos, Feriados) | `9002031` |
+| 8 | média | Laranja demais nas seleções | Cartão escolhido com contorno escuro e o ponto do rádio laranja; listas de incluir com `Checkbox tom="neutro"`; modelo escolhido sem fundo laranja | `9002031`, `75d081b` |
+| 9 | média | Paleta começava por Convidar pessoa; comandos sem sentido | `Comando.ordem` (contrato, acréscimo; PLANO §4): Nova demanda 10, Colar 20…; as demandas abertas no modal entram nos Recentes; "Criar os quadros das equipes" só com equipe sem quadro; tema só o oposto; "Sua conta" em Ir para | `5fdc0d9` |
+| 10 | média | Sigla no fim da busca ignorada | "carrossel cla" e "CLA: carrossel" filtram o cliente (o fim só filtra se achar alguma coisa). API §4.13 | `9c6885d` |
+| 11 | baixa | Setas do atalho parecendo traços; linhas repetidas no ? | O `Kbd` desenha as setas com ícones; a mesma tecla em dois lugares vira uma linha | `b651977` |
+| 12 | baixa | X nativo azul na busca; vazios diferentes | X nativo escondido e "Limpar busca" no sufixo; "Nada encontrado para …" + [Limpar busca] nas três listas | `8a0b75c` |
+| 13 | baixa | Sigla com largura variável e repetida | 52 px fixos; embaixo do nome, a situação | `8a0b75c` |
+| 14 | baixa | Linhas cortadas a 390 px | Status desce para a linha de baixo; busca de Clientes na largura toda | `8a0b75c` |
+| 15 | baixa | "Sua conta" dentro de Aparência | Ver funcional 14 | `d32afc6` |
+| 16 | baixa | Detalhes do modal | Anexos em duas colunas iguais; caminho com peso 400 e 12 px; nome do cliente no title; o "0/3" não se repete ao lado da barra; respiro da menção 3 px | `183cbce`, `4117547` |
+| 17 | baixa | "Pediu ajuste em a V2" | "Pediu ajuste na V2" | `a8592a7` |
+| 18 | baixa | Exemplos que parecem valor | "Ex.:" em todos; identificador da Nova equipe vazio até o nome | `a8592a7` |
+| 19 | baixa | 9 paradas de Tab na barra do editor | Padrão ARIA de toolbar (uma parada; setas, Home e End) | `5b864ff` |
+| 20 | baixa | Miniaturas de fundo iguais no escuro | Metade clara e metade escura (`color-scheme` por metade) | `79c45cd` |
+| 21 | baixa | Colunas sem cabeçalho e salvando sem aviso | Cabeçalho Cor · Nome · Limite WIP, "Papel: Normal", "Sem pessoa na coluna" e a nota de que salvam na hora | `79c45cd` |
+| 22 | baixa | Estrela "principal" sem sentido | Texto "principal" só para quem está em mais de uma equipe, com o porquê no title | `8a0b75c` |
+| 23 | baixa | Dois h1 em Configurações; títulos do Markdown no nível do título | Título de seção é h2 (h1 "Configurações", oculto no celular); `<Markdown nivelBase>`: no modal, "## Objetivo" vira h4 com o mesmo tamanho | `d32afc6`, `4117547` |
+
+## Recusas e adiamentos
+
+- **Funcional 2 (notificações sem superfície): adiado para o F3.** O sino, a lista de notificações, `GET
+  /api/notificacoes` e "marcar lidas" são do F3 (PLANO §3, rotas §4.18), que entra na leva 2 a partir desta `master`; a
+  verificação final do PLANO §5 (passo 11) exige o sino antes de ir ao ar. Uma superfície provisória duplicaria o F3 e
+  mudaria o contrato dele. **A `master` não vai para a Melt antes do F3.**
+- **Visual 10, chip "CLA ×" no campo da paleta:** opcional; pediria o cliente entendido em `BuscaSaida` (contrato). A
+  busca passou a entender a sigla no fim e com dois-pontos, que era o problema.
+- **Visual 2, "Trocar a senha" guardado em memória:** senha digitada não fica guardada de propósito; sair da seção
+  limpa os campos de senha.
+- **Visual 9, "Recentes" com 5 demandas:** ficou com até 8 itens (as demandas abertas no modal e os comandos usados),
+  que é o que a paleta já guardava.
+
+## Contrato e pontos de extensão (acréscimos)
+
+`ExtensaoRota.fundo` e `Comando.ordem` (`web/src/extensoes/tipos.ts`); `TIPOS_ATIVIDADE` + `checklist.editado`,
+`checklist.item_editado`, `checklist.item_removido` (`shared/tipos/demandas.ts`; o CHECK do banco é por GLOB, sem
+migração); ação `checklist_rodada.editar` e `CAMPOS_MODELO_SO_ATENDIMENTO` (`shared/logica/permissoes.ts`); cookie
+`pauta_sessao` (API §1); `drenarCorpo` no upload recusado (API §1); próxima desfeita (API §5.3); `rodadasInclusas` no
+modelo (API §4.9); regras do checklist de rodada (API §2 e §4.15); anexo pelo modal sempre de referência (API §4.15);
+busca com sigla no fim e trecho em janela (API §4.13). Design system: `MolduraDialogo.fecharAoClicarFora`,
+`Combobox.aoSairComTexto`, `SeletorData.tamanho`, `Checkbox tom="neutro"`, `Contador.visiveis`,
+`Markdown.nomeDaPessoa` e `Markdown.nivelBase`. F5: seção `cadastros-conta` (ordem 50) e avatar `cadastros-conta` (100),
+no PLANO §4. Nenhuma migração nova.
+
+## Verificação
+
+- Regra 8 na `master` em `7664f9b`: `npx tsc --noEmit -p server` e `-p web` sem erros; `npm test` **360/360** (eram
+  347); `node server/scripts/verificar-migracoes.ts` 420 checagens, 0 falhas; `npm run build` sem aviso de chunk;
+  `npm run contraste --workspace web` 276 pares, 0 abaixo; auditoria de navegador com login nas páginas `/inicio,
+  /q/criacao, /d/25, /config/conta, /config/pessoas, /config/equipes, /config/quadros, /config/modelos,
+  /config/feriados, /config/parametros, /config/aparencia, /clientes, /clientes/CHZ, /arquivo, /quadros/novo` (claro e
+  escuro, 1440 e 390): **nenhum problema**.
+- **Roteiro de banco vazio em produção** (7332, `NODE_ENV=production`, CSP real), janelas isoladas para admin, Pri
+  (atendimento), Bia, Léo e Duda (designers):
+  - deslogado, `/` vai a `/entrar` sem nenhum erro no console (nem 401 nem aviso de fonte);
+  - o admin entra no Início provisório com os Primeiros passos e o aviso "Você aparece para a equipe como Admin
+    Integ3b"; pelo menu do avatar, Sua conta mostra "2 mudanças não salvas" e salva (o aviso some);
+  - convites de Pri, Bia e Léo com o foco no Nome; cada um define a senha numa janela limpa (URL sem token) e a lista do
+    admin tira o "Convite pendente" em ~1,6 s; "Convidar outra pessoa" volta o foco ao Nome;
+  - "Criar os quadros das equipes": "Criado: 5 colunas e 2 automações", "Criado: 1 coluna"…; a Bia em `/` vai para
+    `/q/criacao`; a Duda, convidada depois, ganha a coluna na janela da Bia ao vivo;
+  - HE pela tela (Nome com "Ex.: Clínica Exemplo"; apelido com "Ex.: hospital esperanca") e o resto pela API (AM,
+    contato, responsável); "Revisei os modelos"; os Primeiros passos somem;
+  - Pri cola a conversa na Nova demanda (título e cliente lidos), o clique fora não fecha, o Esc fecha e o Shift+N
+    devolve o rascunho; Ctrl+Enter cria a #1 (HE, Bia, prazo de "até quarta") e o rascunho sai;
+  - Bia: "XYZ: Banner da feira" + Enter abre "Criar cliente XYZ" e nasce a #2 com XYZ e o título sem "XYZ:";
+  - modal: "15h30" + Pronto + Salvar grava `prazoHora` 15:30 (e repetir semanal); PDF de 11 MB + PNG: "1 arquivo anexado;
+    1 não. grande.pdf: passa de 10 MB"; o comentário com `@[Diretoria Financeira](mencao:<Pri>)` aparece "@Pri";
+  - concluir: "A próxima fica para qua, 28/10 · Desfazer"; o Desfazer reabre e o Arquivo fica vazio;
+  - Ctrl+K vazio: Recentes (#1), depois Ações com "Nova demanda neste quadro" e "Colar do WhatsApp" primeiro;
+  - Q ("Só as minhas"): "Fila 1 de 2";
+  - Léo abre `/d/1` direto: por baixo, o quadro Criação; o Esc leva a `/q/criacao`;
+  - Prazos e limites: mudar, ir a Pessoas e voltar mantém o 4 com "1 mudança não salva · Descartar · Salvar";
+  - nenhum erro nem violação de CSP no console das cinco janelas; sem rolagem lateral a 390 px.
+- **Capturas finais** em `scratchpad/integ3b/fotos/final/`: `{claro,escuro}-{1440,390}-{1-quadro,2-modal,3-nova-demanda,
+  4-configuracoes,5-clientes}.png` (20) e as do roteiro (`p-entrar`, `p01-inicio-admin`, `p02-pessoas`,
+  `p03-quadros-equipes`, `p04-nova-rascunho`, `p05-modal-bia`). Auditoria em `scratchpad/integ3b/aud-dev/`.
+
+## Avisos para a leva 2 (F2, F3, F6), além dos de cima
+
+- **F3:** `web/src/telas/inicio/` é provisório: substitua a pasta inteira (o Início de verdade continua hospedando
+  `secoesInicio()`) e apague `web/src/telas/quadros/dev/` (`/dev/cadastros-inicio`). As notificações já são gravadas
+  (menção, membro, chegou): o sino e a lista são o que falta para a `master` ir ao ar. Os comandos novos do F3 na paleta
+  levam `ordem` (Ir para: Início 10 já existe no núcleo).
+- **F2:** o anexo de evidência nasce só pelas rotas do ciclo (`inserirAnexo` com `finalidade: 'evidencia'` ligado à
+  aprovação); `POST /api/demandas/:id/anexos` ignora `finalidade`. O checklist de rodada (aberto por `abrirRodada`) só
+  muda de conteúdo por atendimento e admin (`checklist_rodada.editar`).
+- **Todos:** formulário longo dentro de diálogo usa `fecharAoClicarFora={!sujo}`; rascunho no localStorage leva o
+  prefixo `rascunho-` e o id de quem escreve (o Sair apaga); Markdown de texto de usuário no modal usa `nomeDaPessoa` e
+  `nivelBase`; data ao lado de campos usa `SeletorData tamanho`; lista de "incluir" usa `Checkbox tom="neutro"`.
+- **F6:** o cabeçalho da coluna já mostra "1 de 2" com filtro (`Contador.visiveis`); a Lista e o Calendário seguem o
+  mesmo texto.

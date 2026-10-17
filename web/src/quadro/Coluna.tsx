@@ -103,12 +103,14 @@ function NomeEmEdicao({ coluna }: { coluna: Coluna }) {
 interface PropsCabeca {
   coluna: Coluna
   total: number
+  /** Com filtro ("Só as minhas" e afins): quantos cards aparecem. */
+  visiveis: number
   alca: ReturnType<typeof useSortable>
   abrirMenu(a: Ancora): void
   alternarRecolhida(): void
 }
 
-function Cabeca({ coluna, total, alca, abrirMenu, alternarRecolhida }: PropsCabeca) {
+function Cabeca({ coluna, total, visiveis, alca, abrirMenu, alternarRecolhida }: PropsCabeca) {
   const editando = useColunaEmEdicao() === coluna.id
   const Papel = coluna.papel === 'normal' ? null : ICONE_PAPEL[coluna.papel]
   const falado = `Coluna ${coluna.nome}, ${total} ${total === 1 ? 'demanda' : 'demandas'}${coluna.limiteWip !== null ? `, limite ${coluna.limiteWip}` : ''}`
@@ -129,7 +131,7 @@ function Cabeca({ coluna, total, alca, abrirMenu, alternarRecolhida }: PropsCabe
           <span className="ui-coluna-papel" role="img" aria-label={ROTULO_PAPEL_COLUNA[coluna.papel]}><Papel aria-hidden="true" /></span>
         </Tooltip>
       )}
-      <Contador valor={total} limite={coluna.limiteWip} rotulo={total === 1 ? 'demanda' : 'demandas'} />
+      <Contador valor={total} visiveis={visiveis} limite={coluna.limiteWip} rotulo={total === 1 ? 'demanda' : 'demandas'} />
       <BotaoIcone
         icone={MoreHorizontal}
         rotulo={`Ações da coluna ${coluna.nome}`}
@@ -152,6 +154,8 @@ export interface PropsColuna {
   demandas: ReadonlyMap<Id, Demanda>
   /** Cards da coluna sem filtro (o contador e o WIP contam todos). */
   total: number
+  /** Cards da coluna com o filtro (fora do arraste): diferente do total, o contador mostra "0 de 1". */
+  visiveis: number
   filtros: FiltrosQuadro
   eu: Eu
   alvoTab: Id | null
@@ -239,7 +243,7 @@ export const ColunaQuadro = memo(function ColunaQuadro(p: PropsColuna) {
       data-alvo={p.alvo || undefined}
       aria-label={`Coluna ${coluna.nome}`}
     >
-      <Cabeca coluna={coluna} total={p.total} alca={alca} abrirMenu={abrirMenu} alternarRecolhida={() => p.alternarRecolhida(coluna.id)} />
+      <Cabeca coluna={coluna} total={p.total} visiveis={p.visiveis} alca={alca} abrirMenu={abrirMenu} alternarRecolhida={() => p.alternarRecolhida(coluna.id)} />
       <div ref={(no) => { area.setNodeRef(no); cardsEl.current = no }} className="ui-coluna-cards">
         <SortableContext id={coluna.id} items={sortaveis} strategy={verticalListSortingStrategy}>
           {lista.map((d) => (sortavel(d.id)

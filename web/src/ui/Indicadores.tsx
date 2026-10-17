@@ -17,16 +17,22 @@ export interface PropsContador {
   limite?: number | null
   /** Palavra para o leitor de tela: "12 demandas". */
   rotulo?: string
+  /** Com filtro: quantas aparecem; mostra "0 de 1" (o total é `valor`) e o limite WIP não aparece. */
+  visiveis?: number
   tom?: 'neutro' | 'destaque' | 'suave' | 'acento'
   className?: string
 }
 
-export function Contador({ valor, limite, rotulo, tom, className }: PropsContador) {
-  const acima = limite != null && valor > limite
-  const texto = limite != null ? `${numero.format(valor)}/${numero.format(limite)}` : numero.format(valor)
-  const falado = limite != null
-    ? `${valor} de ${limite}${rotulo ? ` ${rotulo}` : ''}${acima ? ', acima do limite' : ''}`
-    : `${valor}${rotulo ? ` ${rotulo}` : ''}`
+export function Contador({ valor, limite, rotulo, visiveis, tom, className }: PropsContador) {
+  const filtrado = visiveis !== undefined && visiveis !== valor
+  const acima = !filtrado && limite != null && valor > limite
+  const texto = filtrado ? `${numero.format(visiveis)} de ${numero.format(valor)}`
+    : limite != null ? `${numero.format(valor)}/${numero.format(limite)}` : numero.format(valor)
+  const falado = filtrado
+    ? `${visiveis} de ${valor}${rotulo ? ` ${rotulo}` : ''} com o filtro`
+    : limite != null
+      ? `${valor} de ${limite}${rotulo ? ` ${rotulo}` : ''}${acima ? ', acima do limite' : ''}`
+      : `${valor}${rotulo ? ` ${rotulo}` : ''}`
   return (
     <span className={cx('ui-contador', className)} data-tom={acima ? 'destaque' : tom}>
       <span aria-hidden="true">{texto}</span>

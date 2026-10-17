@@ -415,6 +415,7 @@ export default function LayoutQuadro({ quadro, colunas, demandas, filtros, defin
                   ids={itens[c.id] ?? []}
                   demandas={porId}
                   total={totais.get(c.id) ?? 0}
+                  visiveis={base[c.id]?.length ?? 0}
                   filtros={filtros}
                   eu={eu}
                   alvoTab={alvoTab}

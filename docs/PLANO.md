@@ -672,12 +672,14 @@ export function CalendarioDemandas(p: {
 // web/src/quadro/index.ts
 export function CardDemanda(p: { demanda: Demanda; compacto?: boolean; mostrarQuadro?: boolean }): JSX.Element  // sem arrastar
 export function useRolarParaColuna(): (colunaId: Id) => void            // celular: barra de chips do F6
+export function MenuDoCard(p: { d: Demanda; ancora: Ancora; fechar(): void }): JSX.Element  // o menu do card (Lista do F6; integração 3B)
 // web/src/dialogos/index.ts
 export function useAbrirDialogo(): AbrirDialogo                          // id sem diálogo registrado → "Disponível em breve"
 export function useContextoAcao(): ContextoAcao                          // eu, navegar, abrirDialogo, demandaEmFoco, quadroAtual, qc, acoes
 // web/src/teclado/index.ts
 export function useEscopoAtalho(escopo: EscopoAtalho, ativo?: boolean): void
 export function useFocoDemanda(): [Demanda | null, (d: Demanda | null) => void]
+export function definirCardSobMouse(id: Id | null): void; export function sairDoCard(id: Id): void   // linha da Lista vale como card sob o mouse (integração 3B)
 // do DS: web/src/api/auth.ts useEu(); web/src/api/bootstrap.ts useBootstrap(); web/src/api/menu.ts useFavoritar(), useSeguir()
 ```
 
@@ -993,7 +995,7 @@ DS = DESIGN-SYSTEM-WEB, NS = NÚCLEO-SERVIDOR, NW = NÚCLEO-WEB.
 | menu ··· do modal e do card | `modal` 100–199 (mover 100, copiar 110, enviar para 120, membros 130, etiquetas 140, datas 150, capa 160) · `nucleo-copiar-link` 300 · `nucleo-arquivar` 900 · `nucleo-excluir` 950 |
 | menu ··· do quadro | `nucleo` (seguir 100, copiar link 110) · `modal-etiquetas` 200 · `ciclo-automacoes` 300 · `entrada-modelos` 400 · `cadastros` (editar 800, copiar 850, arquivar 900) |
 | menu da coluna | `nucleo` 100–900 (renomear 100, cor 110, papel 120, WIP 130, ordenar 200, mover todos 300, arquivar todos 800, arquivar coluna 900) |
-| cabeçalho do quadro | esquerda: `lista-filtros` 100; direita: `lista-colunas-celular` 100 |
+| cabeçalho do quadro | esquerda: `lista-filtros` 100; direita: `lista-colunas-celular` 100; abaixo: `lista-filtros-chips` 100 (integração 3B: o seletor de visão fica logo depois do nome e, no celular, só com os ícones na linha do total) |
 | layouts | `nucleo-quadro` 100 · `lista-lista` 200 · `lista-calendario` 300 |
 | selos do card | rodapé: `ciclo` 100 · `modal-cronometro` 200 |
 | soltar | `ciclo` 100 · `nucleo-concluir` 200 |

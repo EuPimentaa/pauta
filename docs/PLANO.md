@@ -828,7 +828,7 @@ Integração e correções pós-merge: faixa **090–099**.
 - **Extensões e telas:** `/inicio` com `inicio/paineis-*` (os Primeiros passos do admin já vieram com o F5 na
   integração 3A, `inicio/cadastros-primeiros-passos`, ordem 50: o Início só hospeda `secoesInicio()` e não repete o
   bloco; Minhas: Atrasadas, Hoje, Esta semana, Depois, Sem prazo, com `CardDemanda` e o quadro de cada
-  uma; Com o cliente há mais de 2 dias úteis, só atendimento, com "Copiar lembrete" (`copiar-whatsapp`, F2) e
+  uma; Com o cliente há mais de 2 dias úteis, só atendimento (e o admin nas que é o AM; integração 3B), com "Copiar lembrete" (`copiar-whatsapp`, F2) e
   "Registrar retorno" (F2) só com envio pendente; Menções recentes); `/agenda` (o `CalendarioDemandas` do NÚCLEO-WEB
   alimentado por `GET /api/agenda`: mês e semana, todos os quadros com a cor de cada um, "Só as minhas", filtro de
   quadros, prazo/início/publicação, concluídas riscadas, feriados, **arrastar muda o prazo**; clique abre
@@ -948,6 +948,11 @@ Integração e correções pós-merge: faixa **090–099**.
 - **Roteiro:** Lista ordenada por prazo e agrupada por membro; arrastar na Lista entre grupos de coluna move o card no
   quadro da outra janela; Calendário: arrastar muda o prazo e a Agenda (F3, se mergeado) concorda; filtros sobrevivem ao
   recarregar e ao compartilhar a URL; em 390 px, a barra de chips pula para a coluna e o modal abre em tela cheia.
+- **Decisões do F6 (integração 3B):** a busca por texto casa o começo das palavras (título, sigla, nome do cliente;
+  "email" acha "E-mail", "venda" acha "pós-venda"; um `#` sozinho não filtra), também no quadro do núcleo; `?ordem=`
+  (`prazo`, `-prazo`…) e `?agrupar=` (`coluna`, `membro`, `cliente`, `prioridade`, `prazo`, `nenhum`) ao lado de `?v=` e
+  `?f=`, com o último escolhido por quadro no aparelho; agrupada por membro, a demanda aparece em cada pessoa; soltar
+  na Lista só agrupada por coluna (com outra ordem, vai ao topo da coluna); a coluna do agrupamento some da tabela.
 
 ---
 
@@ -1005,7 +1010,7 @@ DS = DESIGN-SYSTEM-WEB, NS = NÚCLEO-SERVIDOR, NW = NÚCLEO-WEB.
 | avatar | `cadastros-conta` 100 ("Sua conta", integração 3A) · `nucleo-tema` 200 · `nucleo-sair` 900 |
 | Início | `cadastros-primeiros-passos` 50 (veio com o F5; o F3 não repete) · `paineis-minhas` 100 · `paineis-cliente-parado` 200 · `paineis-mencoes` 300 |
 | Configurações | `cadastros-conta` 50 (Sua conta: nome, apelido, cor e senha; integração 3A) · `cadastros-pessoas` 100 · `cadastros-equipes` 200 · `cadastros-quadros` 300 · `entrada-modelos` 400 · `cadastros-feriados` 500 · `cadastros-parametros` 550 (Prazos e limites) · `cadastros-aparencia` 600 |
-| paleta (comandos; integração 3A) | Ações: `entrada-nova` 10 · `entrada-colar` 20 · `nucleo-so-minhas` 30 · `nucleo-link-quadro` 40 · `cadastros` 500–530 · `nucleo-tema-*` 800 · `entrada-atalhos` 900; Ir para: `nucleo-ir-inicio` 10 · `cadastros` 100–140 (Clientes, Arquivo, Configurações, Sua conta) · `entrada-modelos` 120. Sem ordem: depois (1000). A busca vazia começa pelos Recentes (as demandas abertas no modal entram sozinhas) |
+| paleta (comandos; integrações 3A e 3B) | Ações: `entrada-nova` 10 · `entrada-colar` 20 · `nucleo-so-minhas` 30 · `nucleo-link-quadro` 40 · `ciclo` 60–80 (Entregar, Enviar, Registrar retorno, Automações) · `paineis` 100–110 (Ver notificações, Marcar como lidas) · `cadastros` 500–530 · `nucleo-tema-*` 800 · `entrada-atalhos` 900; Ir para: `nucleo-ir-inicio` 10 · `paineis` 20–30 (Agenda, Horas) · `cadastros` 100–140 (Clientes, Arquivo, Configurações, Sua conta) · `entrada-modelos` 120. Sem ordem: depois (1000). A busca vazia começa pelos Recentes (as demandas abertas no modal entram sozinhas) |
 | globais | `nucleo-tempo-real` 100 · `nucleo-dialogos` 200 · `nucleo-teclado` 300 · `nucleo-paleta` 400 |
 
 ### 4.1 Estados vazios, carregamento e erro: texto e dono

@@ -5,7 +5,7 @@
  */
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { AlarmClock, CalendarClock, CalendarDays, CalendarRange, Coffee, Inbox, Star } from 'lucide-react'
+import { AlarmClock, CalendarClock, CalendarDays, CalendarRange, ChevronDown, ChevronUp, Coffee, Inbox, Star } from 'lucide-react'
 import type { Bootstrap, Demanda, Id, MinhasPorPrazo, Quadro } from '@shared/tipos/index.ts'
 import type { Icone } from '../../extensoes/tipos.ts'
 import { useEu } from '../../api/auth.ts'
@@ -42,8 +42,16 @@ function Grupo({ g, ids, porId }: { g: (typeof GRUPOS)[number]; ids: Id[]; porId
         {visiveis.map((d) => <CardDemanda key={d.id} demanda={d} mostrarQuadro />)}
       </div>
       {resto > 0 && (
-        <Botao variante="ghost" tamanho="p" className="pnl-grupo-mais" onClick={() => setTodas(true)}>
+        <Botao variante="ghost" tamanho="p" icone={ChevronDown} className="pnl-grupo-mais" onClick={() => setTodas(true)}>
           Mostrar mais {resto}
+        </Botao>
+      )}
+      {todas && demandas.length > g.mostrar && (
+        <Botao variante="ghost" tamanho="p" icone={ChevronUp} className="pnl-grupo-mais" onClick={() => {
+          setTodas(false)
+          document.getElementById(g.ancora)?.scrollIntoView({ block: 'nearest' })
+        }}>
+          Mostrar menos
         </Botao>
       )}
     </section>

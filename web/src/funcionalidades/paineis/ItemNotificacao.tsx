@@ -15,7 +15,7 @@ import { Avatar } from '../../ui/Avatar.tsx'
 import { quando } from './logica.ts'
 
 export const TIPO_NOTIFICACAO: Record<TipoNotificacao, { rotulo: string; icone: Icone }> = {
-  membro: { rotulo: 'Você entrou', icone: UserPlus },
+  membro: { rotulo: 'Membro', icone: UserPlus },
   mencao: { rotulo: 'Menção', icone: AtSign },
   comentario: { rotulo: 'Comentário', icone: MessageSquare },
   versao_entregue: { rotulo: 'Versão entregue', icone: PackageCheck },

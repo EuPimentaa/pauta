@@ -34,6 +34,8 @@ export interface PropsCalendarioDemandas {
   semPrazo?: Demanda[]
   mostrarQuadro?: boolean
   abrir(numero: number): void
+  /** Celular, período sem nenhum item: o texto da lista por dia (padrão "Nada neste período."); null = nenhum (quem usa desenha o dele). */
+  vazio?: string | null
 }
 
 const ICONE_CAMPO = { prazo: CalendarClock, inicio: PlayCircle, publicacao: Megaphone } as const
@@ -79,7 +81,7 @@ function ListaPorDia(p: PropsCalendarioDemandas & { cores: Map<string, string>; 
         <BotaoIcone icone={ChevronLeft} rotulo={p.modo === 'mes' ? 'Mês anterior' : 'Semana anterior'} onClick={() => andar(-1)} />
         <BotaoIcone icone={ChevronRight} rotulo={p.modo === 'mes' ? 'Próximo mês' : 'Próxima semana'} onClick={() => andar(1)} />
       </div>
-      {comItens.length === 0 && <p className="cal-lista-vazia">Nada neste período.</p>}
+      {comItens.length === 0 && p.vazio !== null && <p className="cal-lista-vazia">{p.vazio ?? 'Nada neste período.'}</p>}
       {comItens.map((d) => (
         <div key={d} className="cal-lista-dia" data-hoje={d === hoje || undefined}>
           <h3 className="cal-lista-data">

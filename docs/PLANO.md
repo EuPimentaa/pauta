@@ -657,7 +657,7 @@ export function useClienteDetalhe(id: Id | null): UseQueryResult<Cliente, ErroDa
 export function useEnviarArquivo(): (f: File, sinal?: AbortSignal) => Promise<ArquivoInfo>
   // FormData sem Content-Type; rejeita com ErroDaApi (413 arquivo_grande, 415 tipo_arquivo); Ctrl+V (F1), print (F2), logo (F5)
 // web/src/api/horas.ts  (§4.20 da API; /horas do F3 e aba Horas do cliente do F5)
-export function useApontamentos(c: ListarApontamentosConsulta): UseQueryResult<ListarApontamentosSaida, ErroDaApi>
+export function useApontamentos(c: ListarApontamentosConsulta, opcoes?: { enabled?: boolean }): UseQueryResult<ListarApontamentosSaida, ErroDaApi>
 export function useEditarApontamento(): { editar(a: Apontamento, e: EditarApontamentoEntrada): Promise<Apontamento | null>;
   excluir(a: Apontamento): Promise<boolean> }   // "Excluído · Desfazer"
 // web/src/calendario/index.ts  (Agenda do F3 e Calendário do quadro do F6; sobre a GradeCalendario do DS)
@@ -665,7 +665,8 @@ export function CalendarioDemandas(p: {
   modo: 'mes' | 'semana'; inicio: DataLocal; mudarPeriodo(inicio: DataLocal, modo: 'mes' | 'semana'): void
   itens: { demanda: Demanda; campo: CampoAgenda; data: DataLocal; hora: HoraLocal | null }[]
   feriados: Feriado[]; semPrazo?: Demanda[]          // com semPrazo: faixa "Sem prazo" de onde se arrasta para um dia
-  mostrarQuadro?: boolean; abrir(numero: number): void }): JSX.Element
+  mostrarQuadro?: boolean; abrir(numero: number): void
+  vazio?: string | null }): JSX.Element               // vazio: texto da lista do celular sem itens (null = nenhum; integração 3B)
   // arrastar um item de campo 'prazo' (ou da faixa) para um dia chama useMudarPrazo; início e publicação só aparecem;
   // concluídas riscadas; feriados marcados; semana começa na segunda; no celular vira lista por dia
 // web/src/quadro/index.ts

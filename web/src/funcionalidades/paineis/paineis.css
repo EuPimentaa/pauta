@@ -159,7 +159,6 @@
     background: var(--surface-sunken); color: var(--text-2); font: 500 var(--fs-body) / var(--lh-body) var(--font);
   }
   .pnl-agenda-vazia svg { width: 16px; height: 16px; flex: none; color: var(--text-3); }
-  .pnl-agenda .cal-lista-vazia { display: none; }
   .pnl-agenda-dica { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-3); }
 
   /* ─────────────── Horas ─────────────── */

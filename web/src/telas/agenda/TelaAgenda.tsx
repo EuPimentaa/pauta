@@ -169,7 +169,7 @@ export default function TelaAgenda() {
         <p className="pnl-agenda-vazia" role="status"><CalendarX2 aria-hidden="true" />{textoVazio}</p>
       )}
       <CalendarioDemandas modo={modo} inicio={data} mudarPeriodo={mudarPeriodo} itens={itens} feriados={feriados}
-        semPrazo={semPrazo} mostrarQuadro abrir={(n) => abrir(`/d/${n}`)} />
+        semPrazo={semPrazo} mostrarQuadro abrir={(n) => abrir(`/d/${n}`)} vazio={null} />
       {!celular && (
         <p className="pnl-agenda-dica">
           Arraste um prazo para outro dia para mudar a data. <Kbd teclas="shift+arrowleft" /> <Kbd teclas="shift+arrowright" /> mudam o

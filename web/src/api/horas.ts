@@ -13,11 +13,13 @@ import { avisarErro } from './acoes.ts'
 import { chaves } from './chaves.ts'
 import { api, comConsulta, type ErroDaApi } from './cliente.ts'
 
-export function useApontamentos(c: ListarApontamentosConsulta): UseQueryResult<ListarApontamentosSaida, ErroDaApi> {
+/** `enabled: false` não busca (ex.: os totais do mês, que a equipe não vê; pedido 4 do F3). */
+export function useApontamentos(c: ListarApontamentosConsulta, opcoes: { enabled?: boolean } = {}): UseQueryResult<ListarApontamentosSaida, ErroDaApi> {
   return useQuery<ListarApontamentosSaida, ErroDaApi>({
     queryKey: chaves.apontamentos(c),
     queryFn: ({ signal }) => api<ListarApontamentosSaida>('GET', comConsulta('/api/apontamentos', { ...c }), { sinal: signal }),
     staleTime: 30_000,
+    enabled: opcoes.enabled ?? true,
   })
 }
 

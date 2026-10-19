@@ -81,6 +81,10 @@ test('criar_cliente validação: sigla de 1 a 12 letras ou números, nome obriga
   const casos: [Record<string, unknown>, string | RegExp][] = [
     [{ sigla: 'H-E', nome: 'Hífen' }, 'Confira "sigla": de 1 a 12 letras (A–Z) ou números'],
     [{ sigla: 'ABCDEFGHIJKLM', nome: 'Longa' }, 'Confira "sigla": de 1 a 12 letras (A–Z) ou números'],
+    // só ASCII: o maiúsculo de "ß", "ﬁ" e "ı" viraria SS, FI e I (outra sigla da que a pessoa mandou)
+    [{ sigla: 'ß', nome: 'Eszett' }, 'Confira "sigla": de 1 a 12 letras (A–Z) ou números'],
+    [{ sigla: 'ﬁx', nome: 'Ligadura' }, 'Confira "sigla": de 1 a 12 letras (A–Z) ou números'],
+    [{ sigla: 'ıd', nome: 'I sem ponto' }, 'Confira "sigla": de 1 a 12 letras (A–Z) ou números'],
     [{ sigla: 'OK', nome: '  ' }, /^Confira "nome"/],
     [{ sigla: 'OK' }, /^Confira "nome"/],
     [{ sigla: 'OK', nome: 'Ok', atendimento: 'pri' }, 'Parâmetro desconhecido: atendimento.'],

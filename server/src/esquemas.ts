@@ -125,7 +125,8 @@ export const editarEtiqueta: z.ZodType<EditarEtiquetaEntrada> = z.object({
 
 // ─────────────────────────────── clientes ───────────────────────────────
 
-const sigla = z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,12}$/, 'de 1 a 12 letras (A–Z) ou números')
+/** Só ASCII antes do maiúsculo: "ß" → "SS", "ﬁx" → "FIX" e "ıd" → "ID" seriam outra sigla. */
+const sigla = z.string().trim().regex(/^[A-Za-z0-9]{1,12}$/, 'de 1 a 12 letras (A–Z) ou números').toUpperCase()
 const camposCliente = {
   nome: nomeDeLinha(1, 160), paiId: id.nullable().optional(), status: z.enum(STATUS_CLIENTE).optional(),
   nivel: z.union([z.literal(1), z.literal(2), z.literal(3)]).nullable().optional(), cor: cor.optional(),

@@ -85,6 +85,8 @@ export function rotuloDemanda(db: Db, demandaId: Id): string {
  */
 export function notificarChegou(db: Db, p: {
   demandaId: Id; quadroId: Id; ator: Ator; via: ViaMovimento | 'criacao'; colunaPapel: PapelColuna; exceto?: Id[]
+  /** O texto no lugar de "#12 Carrossel chegou em Criação" (o lote do MCP: "12 demandas chegaram em Criação: #2–#13"). */
+  resumo?: (nomeQuadro: string) => string
 }): Id[] {
   if (p.via === 'automacao' && p.colunaPapel === 'aguardando_cliente') return []
   const quadro = um<{ nome: string; equipe_id: string | null }>(db, 'SELECT nome, equipe_id FROM quadro WHERE id = ?', p.quadroId)
@@ -102,6 +104,33 @@ export function notificarChegou(db: Db, p: {
   if (seguidores.length === 0) return []
   return notificar(db, {
     para: seguidores, tipo: 'chegou', demandaId: p.demandaId, ator: p.ator, exceto: p.exceto,
-    resumo: `${rotuloDemanda(db, p.demandaId)} chegou em ${quadro.nome}`,
+    resumo: p.resumo ? p.resumo(quadro.nome) : `${rotuloDemanda(db, p.demandaId)} chegou em ${quadro.nome}`,
   })
+}
+
+/** "#2–#13" (seguidos) ou "#2, #5, #9, #11, #12 e mais 3". */
+export function faixaDeNumeros(numeros: readonly number[]): string {
+  const n = [...numeros].sort((a, b) => a - b)
+  if (n.length === 0) return ''
+  if (n.length === 1) return `#${n[0]}`
+  if (n.every((x, i) => i === 0 || x === n[i - 1]! + 1)) return `#${n[0]}–#${n[n.length - 1]}`
+  return n.length <= 5 ? n.map((x) => `#${x}`).join(', ') : `${n.slice(0, 5).map((x) => `#${x}`).join(', ')} e mais ${n.length - 5}`
+}
+
+/**
+ * O aviso de um lote de demandas criadas juntas (o `criar_demanda` do MCP com `lote`, criadas com `emLote`): uma
+ * notificação `membro` por pessoa ("Pri via Claude pôs você em 12 demandas: #2–#13") e um `chegou` por seguidor, em vez
+ * de uma por demanda. As demandas do lote têm o mesmo quadro, a mesma coluna e os mesmos membros; o link vai à primeira.
+ */
+export function notificarLote(db: Db, p: { demandaIds: Id[]; membros: Id[]; quadroId: Id; colunaPapel: PapelColuna; ator: Ator }): void {
+  if (p.demandaIds.length === 0) return
+  const numeros = p.demandaIds.map((id) => um<{ numero: number }>(db, 'SELECT numero FROM demanda WHERE id = ?', id)!.numero)
+  const faixa = faixaDeNumeros(numeros)
+  const qtd = `${numeros.length} ${numeros.length === 1 ? 'demanda' : 'demandas'}`
+  const quem = nomeDoAtor(p.ator)
+  const primeira = p.demandaIds[0]!
+  const notificados = notificar(db, { para: p.membros, tipo: 'membro', demandaId: primeira, ator: p.ator,
+    resumo: quem ? `${quem} pôs você em ${qtd}: ${faixa}` : `Você entrou em ${qtd}: ${faixa}` })
+  notificarChegou(db, { demandaId: primeira, quadroId: p.quadroId, ator: p.ator, via: 'criacao', colunaPapel: p.colunaPapel,
+    exceto: notificados, resumo: (nomeQuadro) => `${qtd} ${numeros.length === 1 ? 'chegou' : 'chegaram'} em ${nomeQuadro}: ${faixa}` })
 }

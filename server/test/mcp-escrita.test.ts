@@ -74,6 +74,26 @@ test('criar_demanda com lote: todas numa transação (falhou uma, nenhuma fica)'
   assert.equal(um<{ n: number }>(amb.db, 'SELECT count(*) AS n FROM mcp_traco')!.n, 1)
 })
 
+test('criar_demanda com lote: um aviso por pessoa (membro e chegou), não um por demanda', async () => {
+  // revisão funcional, achado 11: o lote de 12 posts gerava 12 notificações para a mesma pessoa
+  const amb = await ambienteMcp()
+  const c = await conectar(amb, amb.pessoas.am)
+  const lote = Array.from({ length: 12 }, (_, i) => ({ titulo: `Post ${String(i + 1).padStart(2, '0')}/11`, prazo: '2026-11-03' }))
+  const r = await chamar(amb, c.at, 'criar_demanda', { quadro: 'criacao', cliente: 'he', membros: ['social'], lote })
+  assert.equal(r.erro, false, r.texto)
+  const de = (u: string) => todos<{ tipo: string; resumo: string; demanda_id: string }>(amb.db,
+    'SELECT tipo, resumo, demanda_id FROM notificacao WHERE usuario_id = ? ORDER BY id', u).map((x) => ({ ...x }))
+  const primeira = um<{ id: string }>(amb.db, 'SELECT id FROM demanda WHERE numero = 1')!.id
+  assert.deepEqual(de(amb.pessoas.social.id), [{ tipo: 'membro', resumo: 'Pri via Claude pôs você em 12 demandas: #1–#12', demanda_id: primeira }])
+  // ninguém da equipe Criação entre os membros: os seguidores da Criação recebem um chegou só
+  for (const p of [amb.pessoas.design, amb.pessoas.design2]) {
+    assert.deepEqual(de(p.id).map((x) => `${x.tipo}: ${x.resumo}`), ['chegou: 12 demandas chegaram em Criação: #1–#12'])
+  }
+  // uma demanda só continua com o aviso de sempre
+  await chamar(amb, c.at, 'criar_demanda', { quadro: 'criacao', titulo: 'Avulsa', membros: ['social'] })
+  assert.equal(de(amb.pessoas.social.id).at(-1)!.resumo, 'Pri via Claude pôs você em #13 Avulsa')
+})
+
 test('editar_demanda: rev obrigatório para texto; rev antigo → isError e nada grava; descrição longa; acrescentar', async () => {
   const amb = await ambienteMcp()
   const vigia = vigiarEntradas()

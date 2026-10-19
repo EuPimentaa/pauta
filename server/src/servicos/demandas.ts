@@ -340,6 +340,11 @@ function proximoNumero(db: Db): number {
 export interface OpcoesCriacao {
   /** Notificar membros, `chegou` e menções (padrão true). */
   notificar?: boolean
+  /**
+   * Parte de um lote (o `criar_demanda` do MCP com `lote`): não manda `membro` nem `chegou`, porque quem chama avisa uma
+   * vez pelo lote inteiro (`notificarLote`); as menções da descrição seguem, sem repetir os membros.
+   */
+  emLote?: boolean
   /** criado_por quando o ator não é usuário (repetição criada pelo cliente ou pelo sistema). */
   criadoPor?: Id
 }
@@ -475,9 +480,10 @@ export function criarDemanda(db: Db, e: Omit<CriarDemandaEntrada, 'origem'> & { 
   if (opcoes.notificar !== false) {
     const rotulo = `#${numero} ${titulo}`
     const quem = nomeDoAtor(ator)
-    const notificados = notificar(db, { para: membros, tipo: 'membro', demandaId: id, ator,
+    const notificados = opcoes.emLote ? membros : notificar(db, { para: membros, tipo: 'membro', demandaId: id, ator,
       resumo: quem ? `${quem} pôs você em ${rotulo}` : `Você entrou em ${rotulo}` })
-    const chegou = notificarChegou(db, { demandaId: id, quadroId: quadro.id, ator, via: 'criacao', colunaPapel: coluna.papel, exceto: notificados })
+    const chegou = opcoes.emLote ? []
+      : notificarChegou(db, { demandaId: id, quadroId: quadro.id, ator, via: 'criacao', colunaPapel: coluna.papel, exceto: notificados })
     notificar(db, { para: mencoes, tipo: 'mencao', demandaId: id, ator, exceto: [...notificados, ...chegou],
       resumo: quem ? `${quem} mencionou você em ${rotulo}` : `Você foi mencionado em ${rotulo}` })
   }

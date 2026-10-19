@@ -29,6 +29,7 @@ import { criarComentario } from './modal-comentarios.ts'
 import * as esquemaModal from './modal-esquemas.ts'
 import { lancarTempo } from './modal-tempo.ts'
 import { mover } from './mover.ts'
+import { notificarLote } from './notificacoes.ts'
 import { exigirCamposPermitidos, podeAtor } from './permissoes.ts'
 
 /**
@@ -115,6 +116,9 @@ const criar = ferramenta({
     const itens = a.lote ?? [{ titulo: a.titulo!, prazo: a.prazo, prazoHora: a.prazoHora, publicacao: a.publicacao,
       publicacaoHora: a.publicacaoHora, descricao: a.descricao }]
     const criadas: string[] = []
+    // lote: um aviso só por pessoa no fim (revisão funcional da Fase 2, achado 11), em vez de um por demanda
+    const emLote = itens.length > 1
+    const idsDoLote: Id[] = []
     for (const item of itens) {
       exigirData(a.inicio, 'inicio'); exigirData(item.prazo, 'prazo'); exigirData(item.publicacao, 'publicacao')
       exigirHora(item.prazoHora, 'prazoHora'); exigirHora(item.publicacaoHora, 'publicacaoHora')
@@ -136,7 +140,8 @@ const criar = ferramenta({
         ...(a.repetir ? { repetir: a.repetir } : {}),
       }
       const e = entradaDaApi(ator, bruto, esquemaNucleo.criarDemanda) as CriarDemandaEntrada
-      const { demanda, avisos } = criarDemanda(db, e, ator)
+      const { demanda, avisos } = criarDemanda(db, e, ator, emLote ? { emLote: true } : {})
+      idsDoLote.push(demanda.id)
       if (a.checklist?.length) {
         const existente = checklistsDe(db, demanda.id).find((c) => normalizarAlias(c.titulo) === 'checklist')
         if (existente) criarItens(db, existente.id, validar(esquemaModal.criarItens, { textos: a.checklist }), ator)
@@ -148,6 +153,11 @@ const criar = ferramenta({
       if (d.membroIds.length) partes.push(d.membroIds.map((m) => n.handle(m)).join(' '))
       partes.push(link(d.numero))
       criadas.push([partes.join(' · '), ...avisosTexto(avisos, d, n)].join('\n'))
+    }
+    if (emLote) {
+      const primeira = carregarDemanda(db, idsDoLote[0]!)
+      notificarLote(db, { demandaIds: idsDoLote, membros: primeira.membroIds, quadroId: quadro.id, ator,
+        colunaPapel: n.colunaPorId(primeira.colunaId)?.papel ?? 'normal' })
     }
     return criadas.join('\n')
   },

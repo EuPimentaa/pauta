@@ -606,7 +606,7 @@ const resumoCliente = ferramenta({
       const inicioAnterior = `${somarDias(inicioMes, -1).slice(0, 7)}-01`
       const soma = (de: string, ate: string) => Number(um<{ m: number }>(db, `SELECT coalesce(sum(minutos), 0) AS m FROM apontamento
         WHERE cliente_id = ? AND excluido_em IS NULL AND minutos IS NOT NULL AND data BETWEEN ? AND ?`, c.id, de, ate)!.m)
-      saida.push(`Horas: este mês ${duracao(soma(inicioMes, hoje)) || '0'} · mês passado ${duracao(soma(inicioAnterior, somarDias(inicioMes, -1))) || '0'}`)
+      saida.push(`Horas: este mês ${duracao(soma(inicioMes, hoje))} · mês passado ${duracao(soma(inicioAnterior, somarDias(inicioMes, -1)))}`)
     }
     if (partes.has('resultados')) saida.push(...await resultadosDoCliente(ctx, c.id, periodo))
     return saida.join('\n')

@@ -86,6 +86,7 @@ export default function ConfigWindsor() {
   const [busca, setBusca] = useState('')
   const [semCliente, setSemCliente] = useState(false)
   const [recarregando, setRecarregando] = useState(false)
+  const [ligandoSugestoes, setLigandoSugestoes] = useState(false)
   const { id: euId, papel } = eu.usuario
   const editaveis = useMemo(() => clientes.filter((c) => c.status !== 'ex' && pode('cliente.editar', { id: euId, papel }, { cliente: c })),
     [clientes, euId, papel])
@@ -111,6 +112,28 @@ export default function ConfigWindsor() {
     && (!termo || normalizarBusca(`${c.nome} ${c.contaId} ${c.clientes.map((x) => x.sigla).join(' ')}`).includes(termo)))
   const total = dados?.contas.length ?? 0
   const sem = (dados?.contas ?? []).filter((c) => c.clientes.length === 0).length
+  // as sugestões das contas visíveis sem cliente (a mesma de cada linha): ligar todas de uma vez
+  const sugestoes = visiveis.filter((c) => c.clientes.length === 0)
+    .map((conta) => ({ conta, cliente: sugerirCliente(conta.nome, editaveis) }))
+    .filter((x): x is { conta: ContaWindsor; cliente: ClienteResumo } => !!x.cliente)
+
+  async function ligarSugestoes() {
+    setLigandoSugestoes(true)
+    let ligadas = 0
+    const falhas: string[] = []
+    for (const { conta, cliente } of sugestoes) {
+      try {
+        await ligarConta(qc, cliente.id, { conector: conta.conector, contaId: conta.contaId })
+        ligadas += 1
+      } catch {
+        falhas.push(conta.nome)
+      }
+    }
+    setLigandoSugestoes(false)
+    const texto = `${NUM.format(ligadas)} ${ligadas === 1 ? 'conta ligada' : 'contas ligadas'} pela sugestão.`
+    if (falhas.length === 0) avisar(texto, { tipo: 'sucesso' })
+    else avisar(texto, { tipo: 'aviso', descricao: `Não deu para ligar: ${falhas.slice(0, 3).join(', ')}${falhas.length > 3 ? ` e mais ${falhas.length - 3}` : ''}.` })
+  }
 
   return (
     <div className="cad-secao">
@@ -142,13 +165,19 @@ export default function ConfigWindsor() {
             <div><dt>Chave</dt><dd>configurada</dd></div>
             <div><dt>Uso de hoje</dt><dd>{NUM.format(dados!.uso.hoje)} de {NUM.format(dados!.uso.tetoDia)} chamadas</dd></div>
             <div><dt>Lista</dt><dd>{dados!.atualizadaEm ? `buscada em ${textoHora(dados!.atualizadaEm, hojeLocal())}` : 'ainda não buscada por inteiro'} · vale 24 h</dd></div>
-            <div><dt>Contas</dt><dd>{NUM.format(total)} · {NUM.format(total - sem)} ligadas · {NUM.format(sem)} sem cliente</dd></div>
+            <div><dt>Contas</dt><dd>{NUM.format(total)} {total === 1 ? 'conta' : 'contas'} · {NUM.format(total - sem)} {total - sem === 1 ? 'ligada' : 'ligadas'} · {NUM.format(sem)} sem cliente</dd></div>
           </dl>
 
           <div className="res-lista-filtros">
             <Campo rotulo="Buscar" rotuloOculto icone={Search} value={busca} placeholder="Buscar pela conta, id ou sigla" tamanho="p"
               classeGrupo="res-busca" onChange={(e) => setBusca(e.target.value)} sufixo={<LimparBusca texto={busca} aoLimpar={() => setBusca('')} />} />
             <Checkbox checked={semCliente} onChange={(e) => setSemCliente(e.target.checked)}>Só as sem cliente</Checkbox>
+            {sugestoes.length > 1 && (
+              <Botao className="res-ligar-sugestoes" variante="secundario" tamanho="p" icone={Link2} carregando={ligandoSugestoes}
+                dica="Liga cada conta sem cliente ao cliente sugerido pelo nome dela (o mesmo da linha)." onClick={() => void ligarSugestoes()}>
+                Ligar as <span className="tabular">{NUM.format(sugestoes.length)}</span> sugestões
+              </Botao>
+            )}
           </div>
           {editaveis.length === 0 && <Faixa tom="info">Você não edita nenhum cliente: só o atendimento do cliente e o admin ligam contas.</Faixa>}
 

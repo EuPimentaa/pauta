@@ -168,6 +168,7 @@
   .res-estado dd { font: 500 var(--fs-body) / var(--lh-body) var(--font); color: var(--text); }
   .res-lista-filtros { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; }
   .res-busca { flex: 1; min-width: 220px; max-width: 420px; }
+  .res-ligar-sugestoes { margin-left: auto; }
   .res-contas { display: flex; flex-direction: column; }
   .res-conta {
     display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(260px, auto); align-items: center; gap: var(--space-2) var(--space-4);

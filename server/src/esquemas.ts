@@ -18,6 +18,7 @@ import {
   type SeguirEntrada, type TokenEntrada, type TrocarSenhaEntrada,
 } from '../../shared/tipos/index.ts'
 import { ehDataLocal, ehHoraLocal } from '../../shared/logica/datas.ts'
+import { temInvisivel } from '../../shared/logica/texto.ts'
 
 z.config(z.locales.ptBR())
 
@@ -29,6 +30,17 @@ const horaLocal = z.string().refine(ehHoraLocal, 'hora inválida (use HH:MM)')
 const posicao = z.object({ depoisDeId: id.nullable().optional(), antesDeId: id.nullable().optional() })
 const email = z.string().trim().toLowerCase().max(200).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'e-mail inválido')
 const ids = z.array(id).max(100)
+/**
+ * Nome de uma linha que o MCP mostra ao modelo (coluna, etiqueta, cliente, apelido): caractere invisível (controle,
+ * largura zero, direção, tag Unicode…; shared/logica/texto.ts) → 400, porque a pessoa não o vê e o modelo o lê.
+ */
+const SEM_INVISIVEL = 'sem caracteres invisíveis ou de controle'
+const semInvisivel = (s: string) => !temInvisivel(s)
+/** O mesmo, com as quebras e os espaços em fila juntados num espaço só (como o nome da etiqueta). */
+const nomeDeLinha = (min: number, max: number) => z.string().overwrite((s) => s.replace(/\s+/g, ' ')).trim().min(min).max(max)
+  .refine(semInvisivel, SEM_INVISIVEL)
+const apelido = z.string().max(80).refine(semInvisivel, SEM_INVISIVEL)
+const nomeEtiqueta = z.string().max(40).refine(semInvisivel, SEM_INVISIVEL)
 
 // ─────────────────────────────── auth e pessoas ───────────────────────────────
 
@@ -71,7 +83,7 @@ export const definirMembros: z.ZodType<DefinirMembrosEntrada> = z.object({
 // ─────────────────────────────── quadros, colunas, etiquetas ───────────────────────────────
 
 const novaColuna = z.object({
-  nome: texto(1, 60), cor: cor.nullable().optional(), papel: z.enum(PAPEIS_COLUNA).optional(),
+  nome: nomeDeLinha(1, 60), cor: cor.nullable().optional(), papel: z.enum(PAPEIS_COLUNA).optional(),
   limiteWip: z.number().int().min(1).max(99).nullable().optional(), responsavelId: id.nullable().optional(),
   modeloColunaId: id.nullable().optional(),
 })
@@ -98,7 +110,7 @@ export const seguir: z.ZodType<SeguirEntrada> = z.object({ seguindo: z.boolean()
 
 export const criarColuna: z.ZodType<CriarColunaEntrada> = novaColuna.extend({ posicao: posicao.optional() })
 export const editarColuna: z.ZodType<EditarColunaEntrada> = z.object({
-  nome: texto(1, 60).optional(), cor: cor.nullable().optional(), papel: z.enum(PAPEIS_COLUNA).optional(),
+  nome: nomeDeLinha(1, 60).optional(), cor: cor.nullable().optional(), papel: z.enum(PAPEIS_COLUNA).optional(),
   limiteWip: z.number().int().min(1).max(99).nullable().optional(), responsavelId: id.nullable().optional(),
   posicao: posicao.optional(),
 })
@@ -106,28 +118,28 @@ export const moverCards: z.ZodType<MoverCardsEntrada> = z.object({
   destinoColunaId: id, etiquetasSemPar: z.enum(ETIQUETAS_SEM_PAR).optional(), membros: z.enum(MEMBROS_AO_MOVER).optional(),
 })
 export const ordenarColuna: z.ZodType<OrdenarColunaEntrada> = z.object({ por: z.enum(ORDENS_COLUNA) })
-export const criarEtiqueta: z.ZodType<CriarEtiquetaEntrada> = z.object({ nome: z.string().max(40).optional(), cor, posicao: posicao.optional() })
+export const criarEtiqueta: z.ZodType<CriarEtiquetaEntrada> = z.object({ nome: nomeEtiqueta.optional(), cor, posicao: posicao.optional() })
 export const editarEtiqueta: z.ZodType<EditarEtiquetaEntrada> = z.object({
-  nome: z.string().max(40).optional(), cor: cor.optional(), posicao: posicao.optional(),
+  nome: nomeEtiqueta.optional(), cor: cor.optional(), posicao: posicao.optional(),
 })
 
 // ─────────────────────────────── clientes ───────────────────────────────
 
 const sigla = z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,12}$/, 'de 1 a 12 letras (A–Z) ou números')
 const camposCliente = {
-  nome: texto(1, 160), paiId: id.nullable().optional(), status: z.enum(STATUS_CLIENTE).optional(),
+  nome: nomeDeLinha(1, 160), paiId: id.nullable().optional(), status: z.enum(STATUS_CLIENTE).optional(),
   nivel: z.union([z.literal(1), z.literal(2), z.literal(3)]).nullable().optional(), cor: cor.optional(),
   logoArquivoId: id.nullable().optional(), atendimentoId: id.nullable().optional(),
   rodadasInclusas: z.number().int().min(0).max(20).optional(), pastaSaida: z.string().max(500).nullable().optional(),
   observacoes: z.string().max(5000).nullable().optional(),
 }
 export const criarCliente: z.ZodType<CriarClienteEntrada> = z.object({
-  sigla, ...camposCliente, apelidos: z.array(z.string().max(80)).max(50).optional(),
+  sigla, ...camposCliente, apelidos: z.array(apelido).max(50).optional(),
 })
 export const editarCliente: z.ZodType<EditarClienteEntrada> = z.object({
-  sigla: sigla.optional(), ...camposCliente, nome: texto(1, 160).optional(),
+  sigla: sigla.optional(), ...camposCliente, nome: nomeDeLinha(1, 160).optional(),
 })
-export const definirApelidos: z.ZodType<DefinirApelidosEntrada> = z.object({ apelidos: z.array(z.string().max(80)).max(50) })
+export const definirApelidos: z.ZodType<DefinirApelidosEntrada> = z.object({ apelidos: z.array(apelido).max(50) })
 export const definirResponsaveis: z.ZodType<DefinirResponsaveisEntrada> = z.object({
   responsaveis: z.array(z.object({ equipeId: id, usuarioId: id })).max(30),
 })

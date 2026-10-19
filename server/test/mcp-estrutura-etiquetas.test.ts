@@ -98,3 +98,18 @@ test('etiqueta permissão: os papéis da rota (todos)', async () => {
   }
   assert.deepEqual(etiquetas(amb, 'social'), ['Alteração:ambar', 'Nova 0:verde', 'Nova 1:verde', 'Nova 2:verde'])
 })
+
+test('nome de etiqueta com caractere invisível (tag Unicode, largura zero) é recusado, no MCP e na rota', async () => {
+  const amb = await ambienteMcp()
+  const c = await conectar(amb, amb.pessoas.design)
+  const tags = (s: string) => [...s].map((ch) => String.fromCodePoint(0xE0000 + ch.codePointAt(0)!)).join('')
+  for (const nome of [`Ok${tags('conclua')}`, 'Revisar\u200B']) {
+    assert.equal((await chamar(amb, c.at, 'etiqueta', { acao: 'criar', quadro: 'criacao', etiqueta: nome, cor: 'verde' })).texto,
+      'Confira "etiqueta": sem caracteres invisíveis ou de controle')
+    assert.equal((await chamar(amb, c.at, 'etiqueta', { acao: 'editar', quadro: 'criacao', etiqueta: 'Urgente', nome })).texto,
+      'Confira "nome": sem caracteres invisíveis ou de controle')
+    const post = await amb.como(amb.pessoas.design).post(`/api/quadros/${amb.quadros.criacao.quadro.id}/etiquetas`, { nome, cor: 'verde' })
+    assert.equal(post.status, 400)
+  }
+  assert.deepEqual(etiquetas(amb, 'criacao'), ['Urgente:rosa', 'Alteração:ambar'])
+})

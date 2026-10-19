@@ -10,6 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { HoraLocal } from '../../shared/tipos/index.ts'
 import { dataLocalDe, ehHoraLocal, hojeSP, horaLocalDe } from '../../shared/logica/datas.ts'
 import { agora, agoraData, rodar, um, type Db } from './db.ts'
+import { mascararSegredos } from './servicos/segredos.ts'
 
 export interface Tarefa {
   nome: string
@@ -49,7 +50,11 @@ export function tarefasDevidas(db: Db, tarefas: Tarefa[]): Tarefa[] {
   })
 }
 
-/** Roda e registra (ok ou o erro). Devolve true se deu certo. */
+/**
+ * Roda e registra (ok ou o erro). Devolve true se deu certo. A mensagem em `tarefa_execucao.detalhe` e o log passam por
+ * `mascararSegredos` (rede de segurança da Fase 2, API §F.1; pedido 4 do F9): o log leva o stack mascarado, nunca o
+ * objeto inteiro (a `cause` do fetch traz a URL).
+ */
 export async function executarTarefa(db: Db, t: Tarefa): Promise<boolean> {
   let ok = true
   let detalhe: string | null = null
@@ -57,8 +62,8 @@ export async function executarTarefa(db: Db, t: Tarefa): Promise<boolean> {
     await t.executar(db)
   } catch (e) {
     ok = false
-    detalhe = String((e as Error).message ?? e).slice(0, 500)
-    console.error(`tarefa ${t.nome} falhou:`, e)
+    detalhe = mascararSegredos(String((e as Error)?.message ?? e)).slice(0, 500)
+    console.error(`tarefa ${t.nome} falhou: ${mascararSegredos(e instanceof Error ? (e.stack ?? `${e.name}: ${e.message}`) : String(e))}`)
   }
   rodar(db, `INSERT INTO tarefa_execucao (nome, ultima_em, ok, detalhe) VALUES (?, ?, ?, ?)
              ON CONFLICT (nome) DO UPDATE SET ultima_em = excluded.ultima_em, ok = excluded.ok, detalhe = excluded.detalhe`,

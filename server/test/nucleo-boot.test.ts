@@ -238,6 +238,21 @@ describe('jobs diários', () => {
     assert.deepEqual(feitas, ['cedo'])
   })
 
+  test('tarefa que falha com segredo na mensagem: detalhe e log mascarados (Fase 2, API §F.1)', async (t) => {
+    const erros = t.mock.method(console, 'error', () => undefined)
+    const a = await ambiente()
+    const segredo = 'api_key=K9x8c7v6b5n4m3 https://calendar.google.com/calendar/ical/x%40y/private-0a1b2c3d4e5f/basic.ics pauta_at_abc123'
+    const falha: Tarefa = { nome: 'teste-segredo', horario: '01:00', executar: () => { throw new Error(`falhou: ${segredo}`) } }
+    assert.equal(await executarTarefa(a.db, falha), false)
+    const { detalhe } = um<{ detalhe: string }>(a.db, "SELECT detalhe FROM tarefa_execucao WHERE nome = 'teste-segredo'")!
+    const log = erros.mock.calls.map((c) => c.arguments.map(String).join(' ')).join('\n')
+    for (const texto of [detalhe, log]) {
+      assert.ok(!/K9x8c7v6b5n4m3|0a1b2c3d4e5f|pauta_at_abc123/.test(texto), texto)
+      assert.match(texto, /api_key=\*\*\*/)
+    }
+    assert.match(log, /tarefa teste-segredo falhou: Error: falhou:/)
+  })
+
   test('módulo em src/tarefas sem `tarefa` válida impede o boot', async () => {
     const pasta = mkdtempSync(join(tmpdir(), 'pauta-tarefas-'))
     writeFileSync(join(pasta, 'x-ruim.ts'), "export const tarefa = { nome: 'x', horario: '25:00', executar() {} }\n")

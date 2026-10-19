@@ -20,6 +20,9 @@ import type { Notificacao } from './notificacoes.ts'
 import type { Id } from './nucleo.ts'
 import type { AutomacaoQuadro, Coluna, Etiqueta, Quadro, QuadroUsuario } from './quadros.ts'
 import type { Equipe, Eu, UsuarioResumo } from './pessoas.ts'
+import type { ConexaoMcp } from './mcp.ts'
+import type { EstadoResultadosCliente } from './resultados.ts'
+import type { AgendaExterna } from './agenda-externa.ts'
 
 /**
  * Entidade do evento → objeto. Público de cada uma:
@@ -30,8 +33,10 @@ import type { Equipe, Eu, UsuarioResumo } from './pessoas.ts'
  * - usuario (só o dono): notificacao, quadro_usuario (estrela e seguir)
  * - usuario_admin (o dono + admins): apontamento. Os outros só veem demanda.minutosRegistrados, num evento com
  *   `a` e `t` nulos (não revela quem lançou)
+ * - Fase 2 (API.md §F.10): resultado_cliente e agenda_externa (interno); conexao (usuario_admin: o dono e admins)
  * Ids: automacao = `${quadroId}:${gatilho}` (= AutomacaoQuadro.id); quadro_usuario = quadroId; feriado = a data;
- * notificacao = o número; config = 'app' (sempre o objeto inteiro, `c` nulo).
+ * notificacao = o número; config = 'app' (sempre o objeto inteiro, `c` nulo); resultado_cliente = clienteId (sempre o
+ * objeto inteiro); agenda_externa e conexao = o id (objeto inteiro; agenda excluída = delete).
  */
 export interface MapaEntidades {
   quadro: Quadro
@@ -60,6 +65,13 @@ export interface MapaEntidades {
   apontamento: Apontamento
   /** Acrescentada na integração da Onda 3 (pedido 3 do F5): PATCH /api/config/app e "Revisei os modelos". */
   config: ConfigApp
+  // Fase 2
+  /** Contas ligadas/desligadas e busca na Windsor começou/terminou: o tratador invalida ['resultados', clienteId]. */
+  resultado_cliente: EstadoResultadosCliente
+  /** CRUD e cada busca que muda o estado ou as ocorrências (sem o endereço). */
+  agenda_externa: AgendaExterna
+  /** Conexão criada ou revogada (o último uso não gera evento). */
+  conexao: ConexaoMcp
 }
 
 export type Entidade = keyof MapaEntidades
@@ -68,6 +80,7 @@ export const ENTIDADES = [
   'quadro', 'coluna', 'etiqueta', 'automacao', 'quadro_usuario', 'modelo_demanda', 'demanda', 'checklist',
   'checklist_item', 'comentario', 'anexo', 'rodada', 'versao', 'envio', 'aprovacao', 'link_publico', 'cliente',
   'cliente_contato', 'cliente_link', 'usuario', 'equipe', 'feriado', 'notificacao', 'apontamento', 'config',
+  'resultado_cliente', 'agenda_externa', 'conexao',
 ] as const satisfies readonly Entidade[]
 
 /** interno = todos; gestao = atendimento + admin; usuario = só usuario_id; usuario_admin = usuario_id + admins; admin. */

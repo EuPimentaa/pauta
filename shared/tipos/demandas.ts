@@ -5,6 +5,7 @@ import type {
   Cor, DataLocal, HoraLocal, Id, Instante, PapelColuna, PosicaoRelativa, Prioridade, Repeticao,
 } from './nucleo.ts'
 import type { Coluna, EtiquetasSemPar, GatilhoAutomacao, MembrosAoMover, Quadro } from './quadros.ts'
+import type { ViaAtividade } from './mcp.ts'
 
 export const ORIGENS_DEMANDA = ['manual', 'rapida', 'whatsapp', 'copia', 'repeticao', 'importacao'] as const
 export type OrigemDemanda = (typeof ORIGENS_DEMANDA)[number]
@@ -153,6 +154,8 @@ export interface Comentario {
   editadoEm: Instante | null
   excluidoEm: Instante | null
   criadoEm: Instante
+  /** Fase 2: 'claude' = escrito por uma ferramenta do MCP com o token do autor ("Rafa · via Claude"; API.md §F.6). */
+  via?: ViaAtividade | null
 }
 
 /** Uma passagem por uma coluna (tabela demanda_movimento, gravada por gatilho). */
@@ -314,6 +317,8 @@ export interface Atividade<T extends TipoAtividade = TipoAtividade> {
   dados: MapaDadosAtividade[T]
   antes: Record<string, unknown> | null
   criadoEm: Instante
+  /** Fase 2: 'claude' = feito por uma ferramenta do MCP com o token do ator (mcp_traco; API.md §F.6). */
+  via?: ViaAtividade | null
 }
 
 // ─────────────────────────────── DTOs: criar e editar ───────────────────────────────

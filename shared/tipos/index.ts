@@ -17,3 +17,7 @@ export * from './paineis.ts'
 export * from './notificacoes.ts'
 export * from './horas.ts'
 export * from './tempo-real.ts'
+// Fase 2 (docs/FASE2.md; contrato em docs/API.md §F e docs/FASE2-PLANO.md)
+export * from './mcp.ts'
+export * from './resultados.ts'
+export * from './agenda-externa.ts'

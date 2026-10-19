@@ -156,9 +156,24 @@ function resultado(l: LinhaBusca, termos: string[]): ResultadoBuscaDemanda {
 
 /** GET /api/busca (até 20). */
 export function buscarDemandas(db: Db, c: BuscaConsulta): BuscaSaida {
-  const texto = c.q.trim()
   const limite = Math.min(LIMITE_BUSCA, Math.max(1, c.limite ?? LIMITE_BUSCA))
-  if (!texto) return { demandas: [] }
+  const { linhas, termos } = linhasDaBusca(db, c.q, { incluirArquivadas: c.incluirArquivadas, quadroId: c.quadroId, teto: limite })
+  return { demandas: linhas.map((l) => resultado(l, termos)) }
+}
+
+/**
+ * Os ids da busca, com as mesmas regras e a mesma ordem do GET /api/busca, até `teto` (o `buscar_demandas` do MCP usa
+ * 1.000 e filtra depois; a busca da paleta, 20). Texto vazio → [].
+ */
+export function idsDaBusca(db: Db, texto: string, o: { incluirArquivadas?: boolean; quadroId?: Id; teto: number }): Id[] {
+  return linhasDaBusca(db, texto, o).linhas.map((l) => l.id)
+}
+
+function linhasDaBusca(db: Db, q: string, c: { incluirArquivadas?: boolean; quadroId?: Id; teto: number }):
+  { linhas: LinhaBusca[]; termos: string[] } {
+  const texto = q.trim()
+  const limite = Math.max(1, c.teto)
+  if (!texto) return { linhas: [], termos: [] }
 
   const filtros: string[] = ['d.excluido_em IS NULL']
   const params: unknown[] = []
@@ -175,7 +190,7 @@ export function buscarDemandas(db: Db, c: BuscaConsulta): BuscaSaida {
   if (num) {
     juntar(todos<LinhaBusca>(db, `SELECT ${COLUNAS} FROM demanda d JOIN quadro q ON q.id = d.quadro_id
       WHERE d.numero = ? AND ${filtros.join(' AND ')}`, Number(num[1]), ...params))
-    if (texto.startsWith('#')) return { demandas: achadas.map((l) => resultado(l, [])) }
+    if (texto.startsWith('#')) return { linhas: achadas, termos: [] }
   }
 
   const consultar = (clienteId: Id | null, termos: string[]): LinhaBusca[] => {
@@ -192,9 +207,9 @@ export function buscarDemandas(db: Db, c: BuscaConsulta): BuscaSaida {
     return todos<LinhaBusca>(db, `SELECT ${COLUNAS} FROM demanda d JOIN quadro q ON q.id = d.quadro_id
       WHERE ${f.join(' AND ')} ORDER BY ${ordem}, d.atualizado_em DESC LIMIT ?`, ...p, limite)
   }
-  const responder = (linhas: LinhaBusca[], termos: string[]): BuscaSaida => {
+  const responder = (linhas: LinhaBusca[], termos: string[]): { linhas: LinhaBusca[]; termos: string[] } => {
     juntar(linhas)
-    return { demandas: achadas.map((l) => resultado(l, termos)) }
+    return { linhas: achadas, termos }
   }
 
   const palavras = texto.split(/\s+/)

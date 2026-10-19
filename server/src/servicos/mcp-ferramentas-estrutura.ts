@@ -1,21 +1,26 @@
 /**
- * Ferramentas de estrutura do MCP (API.md §F.5, 16 em diante): as colunas de um quadro, para o Claude recriar um quadro
- * do Trello. Como as de escrita: cada uma traduz nomes em ids, monta a entrada da rota e passa por `entradaDaApi()` (o
- * esquema da rota) antes do MESMO serviço da rota (`criarColuna`, `editarColuna`, `arquivarColuna`): mesmas regras,
+ * Ferramentas de estrutura do MCP (API.md §F.5, 16 a 18): colunas e etiquetas de um quadro e a criação de cliente, para
+ * o Claude recriar um quadro do Trello. Como as de escrita: cada uma traduz nomes em ids, monta a entrada da rota e passa
+ * por `entradaDaApi()` (o esquema da rota e, no cliente, os campos do papel) antes do MESMO serviço da rota
+ * (`criarColuna`, `editarColuna`, `arquivarColuna`, `criarEtiqueta`, `editarEtiqueta`, `criarCliente`): mesmas regras,
  * mesmos eventos SSE, nenhum SQL de negócio aqui. Rodam dentro da tx() do adaptador, que já gravou o mcp_traco ("via
- * Claude"). Nada apaga: coluna só arquiva (vazia).
+ * Claude"). Nada apaga: coluna só arquiva (vazia), etiqueta não se exclui por aqui.
  */
 import { z } from 'zod'
-import type { Coluna, Id, PosicaoRelativa, Quadro } from '../../../shared/tipos/index.ts'
+import type { Coluna, Etiqueta, Id, PosicaoRelativa, Quadro } from '../../../shared/tipos/index.ts'
 import { CORES, PAPEIS_COLUNA } from '../../../shared/tipos/index.ts'
 import { plural, umaLinha } from '../../../shared/logica/mcp-texto.ts'
+import { config } from '../config.ts'
 import { ErroHttp } from '../erros.ts'
 import * as esquemaNucleo from '../esquemas.ts'
+import { criarCliente } from './clientes.ts'
 import { arquivarColuna, criarColuna, editarColuna } from './colunas.ts'
 import { carregarDemanda } from './demandas.ts'
+import { criarEtiqueta, editarEtiqueta } from './etiquetas.ts'
 import { ErroMcp, escrita, ferramenta, type Ferramenta } from './mcp-comum.ts'
 import { entradaDaApi } from './mcp-ferramentas-escrita.ts'
 import { chave, Nomes } from './mcp-nomes.ts'
+import { exigir } from './permissoes.ts'
 import { colunasDoQuadro } from './quadros.ts'
 
 const nome = z.string().max(80)
@@ -140,4 +145,67 @@ const coluna = ferramenta({
   },
 })
 
-export const FERRAMENTAS_ESTRUTURA: Ferramenta[] = [coluna] as unknown as Ferramenta[]
+// ─────────────────────────────── 17. etiqueta ───────────────────────────────
+
+/** "Urgente (rosa)"; a só de cor: "verde (sem nome)". */
+const rotEtiqueta = (e: Pick<Etiqueta, 'nome' | 'cor'>) => e.nome ? `${umaLinha(e.nome, 40)} (${e.cor})` : `${e.cor} (sem nome)`
+
+const etiqueta = ferramenta({
+  nome: 'etiqueta', titulo: 'Etiqueta', descricao: 'Cria ou edita uma etiqueta de um quadro.',
+  esquema: z.object({
+    acao: z.enum(['criar', 'editar']),
+    quadro: nome,
+    etiqueta: nome.optional().describe('Criar: o nome (sem ele, só cor); editar: a atual.'),
+    nome: z.string().max(40).optional().describe('Novo nome (editar).'),
+    cor: cor.optional().describe('Obrigatória em criar.'),
+  }).strict(),
+  anotacoes: escrita(false), escrita: true,
+  executar({ db, ator, usuario }, a) {
+    const n = new Nomes(db, usuario.id)
+    const q = n.quadro(a.quadro)
+    if (a.acao === 'criar') {
+      if (!a.cor) throw new ErroMcp('Em criar, mande a cor.')
+      const e = comParametros(() => entradaDaApi(ator, { ...(a.etiqueta ? { nome: a.etiqueta } : {}), cor: a.cor },
+        esquemaNucleo.criarEtiqueta, null), { nome: 'etiqueta' })
+      return `Criada a etiqueta ${rotEtiqueta(criarEtiqueta(db, q.id, e, ator))} em ${q.slug}`
+    }
+    if (!a.etiqueta) throw new ErroMcp('Em editar, mande a etiqueta atual (o nome, ou a cor se ela não tem nome).')
+    const antes = n.etiqueta(q.id, a.etiqueta)
+    if (a.nome === undefined && a.cor === undefined) throw new ErroMcp('Nada para mudar: mande nome ou cor.')
+    const e = entradaDaApi(ator, { ...(a.nome !== undefined ? { nome: a.nome } : {}), ...(a.cor ? { cor: a.cor } : {}) },
+      esquemaNucleo.editarEtiqueta, null)
+    const depois = editarEtiqueta(db, antes.id, e, ator)
+    const mudou: string[] = []
+    if (antes.nome !== depois.nome) mudou.push(`nome ${umaLinha(antes.nome, 40) || '—'} → ${umaLinha(depois.nome, 40) || '—'}`)
+    if (antes.cor !== depois.cor) mudou.push(`cor ${antes.cor} → ${depois.cor}`)
+    return `Etiqueta ${rotEtiqueta(depois)} em ${q.slug}: ${mudou.length ? mudou.join('; ') : 'nada mudou'}`
+  },
+})
+
+// ─────────────────────────────── 18. criar_cliente ───────────────────────────────
+
+const criarClienteMcp = ferramenta({
+  nome: 'criar_cliente', titulo: 'Criar cliente',
+  descricao: 'Cria um cliente com sigla e nome; o resto do cadastro fica na tela.',
+  esquema: z.object({
+    sigla: z.string().max(20).describe('Até 12 letras ou números.'),
+    nome: z.string().max(200),
+    apelidos: z.array(z.string().max(80)).max(50).optional().describe('Só atendimento e admin.'),
+  }).strict(),
+  anotacoes: escrita(false), escrita: true,
+  executar({ db, ator, usuario }, a) {
+    exigir(ator, 'cliente.criar')
+    const n = new Nomes(db, usuario.id)
+    const bruto = { sigla: a.sigla, nome: a.nome, ...(a.apelidos?.length ? { apelidos: a.apelidos } : {}) }
+    const e = entradaDaApi(ator, bruto, esquemaNucleo.criarCliente, 'cliente')
+    const c = criarCliente(db, e, ator)
+    const partes = [`Criado o cliente ${c.sigla} · ${umaLinha(c.nome, 80)}`,
+      c.atendimentoId ? `AM ${n.handle(c.atendimentoId)}` : 'sem AM (o atendimento completa o cadastro)']
+    const apelidos = c.apelidos.filter((x) => chave(x) !== chave(c.sigla))
+    if (apelidos.length) partes.push(`apelidos: ${apelidos.map((x) => umaLinha(x, 40)).join(', ')}`)
+    partes.push(`${config.appUrl}/clientes/${c.sigla}`)
+    return partes.join(' · ')
+  },
+})
+
+export const FERRAMENTAS_ESTRUTURA: Ferramenta[] = [coluna, etiqueta, criarClienteMcp] as unknown as Ferramenta[]

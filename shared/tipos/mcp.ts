@@ -143,7 +143,11 @@ export const LIMITES_MCP = {
  * de um teto reprova o aceite do F7. A linha de base fica em docs/fase2/operacao-mcp.md.
  */
 export const ORCAMENTO_MCP = {
-  toolsList: 12000,
+  /**
+   * 12.000 nas 15 da Fase 2; 13.000 com as 3 de estrutura (coluna, etiqueta, criar_cliente: ~2.250 caracteres, dos
+   * quais ~450 voltaram enxugando o esquema). Medido: 12.587 (≈ 3.800 tokens). Detalhe em docs/fase2/operacao-mcp.md.
+   */
+  toolsList: 13000,
   minhasDemandas: 2500,
   lerDemanda: 4000,
   agenda7Dias: 3000,
@@ -299,20 +303,20 @@ export interface ListarConexoesSaida {
 // ─────────────────────────────── ferramentas ───────────────────────────────
 
 /**
- * Ordem fixa do tools/list (API.md §F.5). As de estrutura no fim (colunas, para o Claude recriar um quadro do Trello)
- * vieram depois da Fase 2, com os mesmos serviços e regras das rotas.
+ * Ordem fixa do tools/list (API.md §F.5). As três últimas (estrutura: colunas, etiquetas e clientes, para o Claude
+ * recriar um quadro do Trello) vieram depois da Fase 2, com os mesmos serviços e regras das rotas.
  */
 export const FERRAMENTAS_MCP = [
   'minhas_demandas', 'buscar_demandas', 'ler_demanda', 'agenda', 'listar', 'resumo_cliente',
   'criar_demanda', 'editar_demanda', 'mover_demanda', 'comentar', 'checklist', 'concluir_demanda',
   'arquivar_demanda', 'lancar_horas', 'registrar_retorno',
-  'coluna',
+  'coluna', 'etiqueta', 'criar_cliente',
 ] as const
 export type FerramentaMcp = (typeof FERRAMENTAS_MCP)[number]
 /** As que escrevem (readOnlyHint false): gravam mcp_traco e marcam o histórico "via Claude". */
 export const FERRAMENTAS_MCP_ESCRITA = [
   'criar_demanda', 'editar_demanda', 'mover_demanda', 'comentar', 'checklist', 'concluir_demanda',
-  'arquivar_demanda', 'lancar_horas', 'registrar_retorno', 'coluna',
+  'arquivar_demanda', 'lancar_horas', 'registrar_retorno', 'coluna', 'etiqueta', 'criar_cliente',
 ] as const satisfies readonly FerramentaMcp[]
 /** Escritas com destructiveHint true (trocam texto inteiro ou registram a decisão do cliente): o Claude pede confirmação. */
 export const FERRAMENTAS_MCP_DESTRUTIVAS = ['editar_demanda', 'registrar_retorno'] as const satisfies readonly FerramentaMcp[]

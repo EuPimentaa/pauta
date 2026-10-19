@@ -30,7 +30,7 @@ import { descreverErro } from './segredos.ts'
 export const VERSOES_PROTOCOLO = ['2025-11-25', '2025-06-18', '2025-03-26'] as const
 const VERSAO_PADRAO = '2025-11-25'
 
-/** As 16, na ordem de FERRAMENTAS_MCP (o teste confere). */
+/** As 18, na ordem de FERRAMENTAS_MCP (o teste confere). */
 export const FERRAMENTAS: Ferramenta[] = (() => {
   const todas = new Map([...FERRAMENTAS_LEITURA, ...FERRAMENTAS_ESCRITA, ...FERRAMENTAS_ESTRUTURA].map((f) => [f.nome, f]))
   return FERRAMENTAS_MCP.map((nome) => {

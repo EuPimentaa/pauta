@@ -14,3 +14,12 @@ O domínio passa pela Cloudflare (proxy laranja) antes do Traefik do EasyPanel.
 ## Repositório
 
 Código em https://github.com/EuPimentaa/pauta (privado), branch `master`. O EasyPanel faz o build a partir dele.
+
+## Cloudflare para o MCP (feito pelo dono em 19/10/2026)
+
+- Regra personalizada de segurança "Claude (Anthropic) MCP": `(ip.src in {160.79.104.0/21})` → **Ignorar** (regras
+  personalizadas restantes, Rate Limiting, regras gerenciadas, Super Bot Fight e os componentes extras), com log ligado.
+  Faixa conferida em https://platform.claude.com/docs/en/api/ip-addresses (saída da Anthropic, só IPv4).
+- Ainda a conferir no teste da conexão: o Bot Fight Mode comum (plano Free) não obedece a regra; se o claude.ai disser
+  "Couldn't reach the MCP server", desligar em Segurança → Configurações.
+- `WINDSOR_API_KEY` já está no Environment do EasyPanel (o código que a usa chega com a fase 2).

@@ -59,9 +59,17 @@ export function seguidoresDoQuadro(db: Db, quadroId: Id): Id[] {
      WHERE qu.quadro_id = ? AND qu.seguindo = 1 AND u.ativo = 1 ORDER BY qu.usuario_id`, quadroId).map((l) => l.usuario_id)
 }
 
-/** Nome curto de quem agiu ("Rafa"), ou null para cliente e sistema. */
+/**
+ * Trace de uma ferramenta do MCP ('mcp-' + uuid v4, API.md §F.6). O navegador não manda esse formato nas mutações (o
+ * anti-CSRF exige uuid v4 puro), e só o /mcp põe um trace assim no ator.
+ */
+const TRACE_MCP = /^mcp-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** Nome curto de quem agiu ("Rafa"; pelo MCP, "Rafa via Claude"), ou null para cliente e sistema. */
 export function nomeDoAtor(ator: Ator): string | null {
-  return ator.usuario ? (ator.usuario.apelido ?? ator.usuario.nome.split(' ')[0]!) : null
+  if (!ator.usuario) return null
+  const nome = ator.usuario.apelido ?? ator.usuario.nome.split(' ')[0]!
+  return ator.tipo === 'usuario' && ator.traceId && TRACE_MCP.test(ator.traceId) ? `${nome} via Claude` : nome
 }
 
 /** "#12 Carrossel" para os resumos. */

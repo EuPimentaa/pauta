@@ -22,7 +22,13 @@ export function demandaEditavel(db: Db, id: Id): Demanda {
 
 type Linha = Record<string, unknown>
 
-/** Linha de `atividade` → Atividade (dados e antes em objeto). */
+/**
+ * "Via Claude" (API.md §F.6): a atividade tem um `mcp_traco` com o mesmo trace e o mesmo usuário. Coluna para o SELECT
+ * sobre `atividade a`: `via` = 'claude' ou NULL.
+ */
+export const SQL_VIA_ATIVIDADE = `(SELECT 'claude' FROM mcp_traco m WHERE m.trace_id = a.trace_id AND m.usuario_id = a.ator_id) AS via`
+
+/** Linha de `atividade` → Atividade (dados e antes em objeto; `via` só quando veio pelo Claude). */
 export function mapearAtividade(l: Linha): Atividade {
   return {
     id: Number(l.id),
@@ -34,5 +40,6 @@ export function mapearAtividade(l: Linha): Atividade {
     dados: JSON.parse(String(l.dados ?? '{}')),
     antes: l.antes === null || l.antes === undefined ? null : JSON.parse(String(l.antes)),
     criadoEm: String(l.criado_em),
+    ...(l.via === 'claude' ? { via: 'claude' } : {}),
   } as Atividade
 }

@@ -8,7 +8,7 @@ import type { Ator } from '../auth.ts'
 import { todos, type Db } from '../db.ts'
 import { validacao } from '../erros.ts'
 import { demandaViva } from './demandas.ts'
-import { mapearAtividade } from './modal-comum.ts'
+import { mapearAtividade, SQL_VIA_ATIVIDADE } from './modal-comum.ts'
 
 const LIMITE_PADRAO = 50
 
@@ -35,7 +35,7 @@ export function listarHistorico(db: Db, demandaId: Id, c: ListarHistoricoConsult
     params.push(ator.usuario?.id ?? null)
   }
   const linhas = todos<Record<string, unknown>>(db,
-    `SELECT a.* FROM atividade a WHERE ${condicoes.join(' AND ')} ORDER BY a.id DESC LIMIT ?`, ...params, limite + 1)
+    `SELECT a.*, ${SQL_VIA_ATIVIDADE} FROM atividade a WHERE ${condicoes.join(' AND ')} ORDER BY a.id DESC LIMIT ?`, ...params, limite + 1)
   const itens = linhas.slice(0, limite).map(mapearAtividade)
   const proximo = linhas.length > limite ? Buffer.from(String(itens.at(-1)!.id), 'utf8').toString('base64url') : null
   return { itens, proximo }

@@ -47,9 +47,10 @@ export default defineConfig({
     // navegadores com light-dark() nativo (Baseline maio/2024, marca §7); ver exigirLightDarkNativo()
     cssTarget: ['chrome123', 'edge123', 'firefox120', 'safari17.5'],
   },
-  // o `preview` herda este proxy
+  // o `preview` herda este proxy. Fase 2 (F7, API §F.1): /mcp, /oauth e /.well-known também vão para a API, porque o
+  // emissor e o resource do OAuth derivam do APP_URL (em desenvolvimento, a origem do Vite)
   server: {
     port: 5173,
-    proxy: { '/api': proxyDaApi },
+    proxy: { '/api': proxyDaApi, '/mcp': proxyDaApi, '/oauth': proxyDaApi, '/.well-known': proxyDaApi },
   },
 })

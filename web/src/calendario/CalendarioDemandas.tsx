@@ -6,20 +6,27 @@
  * - no celular vira uma lista por dia (o mês inteiro não cabe numa grade de 390 px);
  * - cada item traz a sigla do cliente antes do título (o primeiro dado do card em todo o produto), o título inteiro
  *   no `title` e, no prazo vencido, o destaque de atrasada (texto em --danger-ink e o triângulo), como no card.
+ * - Fase 2 (F9): `externos` = itens das agendas externas (só a Agenda passa; o Calendário do quadro não). Estilo
+ *   próprio (contorno na cor da agenda, fundo leve, hora antes do título), só leitura (nunca arrastam), clicar abre os
+ *   detalhes. No mês os prazos têm prioridade: os externos do dia viram uma linha depois deles ("3 eventos", que abre a
+ *   lista do dia); na semana e no celular, tudo, dia inteiro no topo e o resto por horário (calendario/externos.ts).
  */
 import './calendario.css'
-import { useMemo } from 'react'
-import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, Megaphone, PlayCircle } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { AlertTriangle, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Megaphone, PlayCircle } from 'lucide-react'
 import type { Bootstrap, CampoAgenda, DataLocal, Demanda, Feriado, HoraLocal, PapelColuna } from '@shared/tipos/index.ts'
 import { estadoPrazo } from '@shared/logica/prazo.ts'
 import { useMudarPrazo } from '../api/demandas.ts'
 import { useClientes, useDoBootstrap, useQuadros } from '../api/seletores.ts'
+import type { ItemAgendaExterno } from '../extensoes/tipos.ts'
 import { useAgora } from '../quadro/estado.ts'
 import { DIAS_LONGOS, MESES, diaDaSemana, diasDaSemana, formatarHora, gradeDoMes, hojeLocal, inicioDaSemana, mesmoMes, somarDias, somarMeses } from '../lib/datas.ts'
 import { useCelular } from '../lib/midia.ts'
 import { Abas } from '../ui/Abas.tsx'
 import { Botao, BotaoIcone } from '../ui/Botao.tsx'
 import { CalendarioArrastar, GradeCalendario, ItemCalendario, type ItemDia } from '../ui/GradeCalendario.tsx'
+import { Popover } from '../ui/Popover.tsx'
+import { diaDoMes, diaPorHorario, porHoraExterno, rotuloResumo, type EntradaDia } from './externos.ts'
 
 export interface ItemCalendarioDemanda {
   demanda: Demanda
@@ -42,6 +49,8 @@ export interface PropsCalendarioDemandas {
   vazio?: string | null
   /** Faixa "Sem prazo" vazia: o texto (padrão "Todas têm prazo."; com filtro, quem usa diz "Nenhuma sem prazo com estes filtros."). */
   semPrazoVazio?: string
+  /** Fase 2: itens das agendas externas (só leitura). Só a Agenda passa. */
+  externos?: ItemAgendaExterno[]
 }
 
 /** O que o item do calendário precisa saber além da demanda: a sigla do cliente e se o prazo venceu. */
@@ -90,14 +99,77 @@ function Chip({ demanda: d, campo, hora, corQuadro, abrir, marcas }: {
   )
 }
 
+// ─────────────────────────────── externos (Fase 2) ───────────────────────────────
+
+/** Hora curta do item externo: "10h", "até 1h" (último dia de um evento que atravessa a noite) ou nada (dia inteiro). */
+function horaExterno(i: ItemAgendaExterno): string | null {
+  if (i.hora) return formatarHora(i.hora)
+  if (i.horaFim) return `até ${formatarHora(i.horaFim)}`
+  return null
+}
+
+function rotuloExterno(i: ItemAgendaExterno): string {
+  const h = i.hora ? `, ${formatarHora(i.hora)}${i.horaFim ? ` às ${formatarHora(i.horaFim)}` : ''}`
+    : i.horaFim ? `, até ${formatarHora(i.horaFim)}` : ', dia inteiro'
+  return `${i.origem}: ${i.titulo}${h}${i.leve ? ', livre ou talvez' : ''}. Abre os detalhes.`
+}
+
+/** Item de agenda externa: contorno na cor da agenda, fundo leve, hora antes do título; só leitura. */
+function ChipExterno({ item, tabavel = true, aoAbrir }: { item: ItemAgendaExterno; tabavel?: boolean; aoAbrir?(): void }) {
+  const h = horaExterno(item)
+  return (
+    <button type="button" className="cal-externo" data-cor={item.cor} data-leve={item.leve || undefined}
+      data-dia-inteiro={!item.hora && !item.horaFim ? '' : undefined} tabIndex={tabavel ? undefined : -1}
+      title={`${item.titulo} · ${item.origem}`} aria-label={rotuloExterno(item)}
+      onClick={(e) => { aoAbrir?.(); item.abrir(e.currentTarget) }}>
+      {h && <span className="cal-externo-hora">{h}</span>}
+      <span className="cal-externo-titulo">{item.titulo}</span>
+    </button>
+  )
+}
+
+/** "3 eventos": a linha dos externos de um dia no mês; abre a lista do dia (popover; folha no celular). */
+function ResumoExternos({ dia, itens, tabavel }: { dia: DataLocal; itens: ItemAgendaExterno[]; tabavel: boolean }) {
+  const [aberto, setAberto] = useState(false)
+  const [ancora, setAncora] = useState<HTMLButtonElement | null>(null)
+  const nome = `${DIAS_LONGOS[diaDaSemana(dia)]}, ${Number(dia.slice(8))} de ${MESES[Number(dia.slice(5, 7)) - 1]}`
+  // o nome da agenda embaixo de cada evento só quando o dia mistura agendas (a cor já diz quando é uma só)
+  const variasOrigens = new Set(itens.map((i) => i.origem)).size > 1
+  return (
+    <>
+      <button ref={setAncora} type="button" className="cal-externos-resumo" tabIndex={tabavel ? undefined : -1}
+        data-cor={itens[0]?.cor} aria-haspopup="dialog" aria-expanded={aberto}
+        aria-label={`${rotuloResumo(itens.length)} das agendas externas em ${nome}. Abre a lista.`}
+        onClick={() => setAberto((a) => !a)}>
+        <CalendarDays aria-hidden="true" />
+        <span>{rotuloResumo(itens.length)}</span>
+      </button>
+      <Popover aberto={aberto} aoFechar={() => setAberto(false)} ancora={ancora} titulo={`Agenda · ${nome}`} mostrarTitulo largura={300}>
+        <ul className="ui-popover-corpo cal-externos-lista" aria-label={`Eventos de ${nome}`}>
+          {itens.map((i) => (
+            <li key={i.id}>
+              <ChipExterno item={{ ...i, abrir: () => i.abrir(ancora) }} aoAbrir={() => setAberto(false)} />
+              {variasOrigens && <span className="cal-externos-origem" data-cor={i.cor}><span className="cal-externos-ponto" aria-hidden="true" />{i.origem}</span>}
+            </li>
+          ))}
+        </ul>
+      </Popover>
+    </>
+  )
+}
+
+// ─────────────────────────────── celular: lista por dia ───────────────────────────────
+
 function ordenar(a: ItemCalendarioDemanda, b: ItemCalendarioDemanda) {
   return (a.hora ?? '99:99').localeCompare(b.hora ?? '99:99') || a.demanda.numero - b.demanda.numero
 }
 
 /** Lista por dia (celular): os dias do período que têm item, com o cabeçalho de período da grade. */
-function ListaPorDia(p: PropsCalendarioDemandas & { cores: Map<string, string>; porDia: Map<DataLocal, ItemCalendarioDemanda[]>; marcas: Marcas }) {
+function ListaPorDia(p: PropsCalendarioDemandas & {
+  cores: Map<string, string>; porDia: Map<DataLocal, ItemCalendarioDemanda[]>; externosPorDia: Map<DataLocal, ItemAgendaExterno[]>; marcas: Marcas
+}) {
   const dias = p.modo === 'mes' ? gradeDoMes(p.inicio).filter((d) => mesmoMes(d, p.inicio)) : diasDaSemana(p.inicio)
-  const comItens = dias.filter((d) => p.porDia.has(d))
+  const comItens = dias.filter((d) => p.porDia.has(d) || p.externosPorDia.has(d))
   const feriados = new Map(p.feriados.map((f) => [f.data, f.nome]))
   const hoje = hojeLocal()
   const andar = (n: number) => p.mudarPeriodo(p.modo === 'mes' ? somarMeses(p.inicio, n) : somarDias(inicioDaSemana(p.inicio), 7 * n), p.modo)
@@ -122,9 +194,9 @@ function ListaPorDia(p: PropsCalendarioDemandas & { cores: Map<string, string>; 
             {feriados.get(d) && <span className="ui-cal-feriado">{feriados.get(d)}</span>}
           </h3>
           <div className="cal-lista-itens">
-            {p.porDia.get(d)!.map((i) => (
-              <Chip key={idDoItem(i)} demanda={i.demanda} campo={i.campo} hora={i.hora} corQuadro={p.mostrarQuadro ? p.cores.get(i.demanda.quadroId) : undefined} abrir={p.abrir} marcas={p.marcas} />
-            ))}
+            {diaPorHorario(p.porDia.get(d) ?? [], p.externosPorDia.get(d) ?? []).map((e) => (e.tipo === 'demanda'
+              ? <Chip key={idDoItem(e.item)} demanda={e.item.demanda} campo={e.item.campo} hora={e.item.hora} corQuadro={p.mostrarQuadro ? p.cores.get(e.item.demanda.quadroId) : undefined} abrir={p.abrir} marcas={p.marcas} />
+              : e.tipo === 'externo' ? <ChipExterno key={e.item.id} item={e.item} /> : null))}
           </div>
         </div>
       ))}
@@ -144,6 +216,12 @@ export function CalendarioDemandas(p: PropsCalendarioDemandas) {
     for (const lista of m.values()) lista.sort(ordenar)
     return m
   }, [p.itens])
+  const externosPorDia = useMemo(() => {
+    const m = new Map<DataLocal, ItemAgendaExterno[]>()
+    for (const i of p.externos ?? []) m.set(i.data, [...(m.get(i.data) ?? []), i])
+    for (const lista of m.values()) lista.sort(porHoraExterno)
+    return m
+  }, [p.externos])
   const porId = useMemo(() => {
     const m = new Map<string, Demanda>()
     for (const i of p.itens) if (i.campo === 'prazo') m.set(idDoItem(i), i.demanda)
@@ -151,18 +229,36 @@ export function CalendarioDemandas(p: PropsCalendarioDemandas) {
     return m
   }, [p.itens, p.semPrazo])
 
-  if (celular) return <ListaPorDia {...p} cores={cores} porDia={porDia} marcas={marcas} />
+  if (celular) return <ListaPorDia {...p} cores={cores} porDia={porDia} externosPorDia={externosPorDia} marcas={marcas} />
 
   const soltar = (idItem: string, dia: DataLocal) => {
     const d = porId.get(idItem)
     if (d && d.prazo !== dia) void mudarPrazo(d, dia)
   }
-  const itensDoDia = (dia: DataLocal): ItemDia[] => (porDia.get(dia) ?? []).map((i) => ({
+  const itemDemanda = (i: ItemCalendarioDemanda): ItemDia => ({
     id: idDoItem(i),
     arrastavel: i.campo === 'prazo' && !i.demanda.concluidaEm,
     rotulo: `#${i.demanda.numero} ${i.demanda.titulo}`,
     conteudo: <Chip demanda={i.demanda} campo={i.campo} hora={i.hora} corQuadro={p.mostrarQuadro ? cores.get(i.demanda.quadroId) : undefined} abrir={p.abrir} marcas={marcas} />,
-  }))
+  })
+  const itemExterno = (i: ItemAgendaExterno): ItemDia => ({ id: `externo:${i.id}`, arrastavel: false, conteudo: <ChipExterno item={i} /> })
+  const entrada = (e: EntradaDia<ItemCalendarioDemanda, ItemAgendaExterno>): ItemDia[] =>
+    (e.tipo === 'demanda' ? [itemDemanda(e.item)] : e.tipo === 'externo' ? [itemExterno(e.item)] : [])
+
+  // mês: os prazos ocupam as vagas da célula; os externos ficam no rodapé do dia, numa linha só
+  const itensDoDia = (dia: DataLocal): ItemDia[] => (p.modo === 'mes'
+    ? (porDia.get(dia) ?? []).map(itemDemanda)
+    : diaPorHorario(porDia.get(dia) ?? [], externosPorDia.get(dia) ?? []).flatMap(entrada))
+  const rodapeDoDia = p.modo === 'mes' && externosPorDia.size > 0 ? (dia: DataLocal, foco: boolean) => {
+    const { rodape } = diaDoMes(porDia.get(dia) ?? [], externosPorDia.get(dia) ?? [])
+    if (!rodape) return null
+    return (
+      <div className="cal-externos-linha">
+        {rodape.tipo === 'externo' ? <ChipExterno item={rodape.item} tabavel={foco} />
+          : rodape.tipo === 'resumo' ? <ResumoExternos dia={dia} itens={rodape.itens} tabavel={foco} /> : null}
+      </div>
+    )
+  } : undefined
 
   return (
     <CalendarioArrastar aoSoltar={soltar}>
@@ -181,7 +277,7 @@ export function CalendarioDemandas(p: PropsCalendarioDemandas) {
           </aside>
         )}
         <GradeCalendario rotulo="Calendário de demandas" modo={p.modo} data={p.inicio} feriados={p.feriados} itensDoDia={itensDoDia}
-          aoMudarPeriodo={p.mudarPeriodo} className="cal-grade" />
+          rodapeDoDia={rodapeDoDia} aoMudarPeriodo={p.mudarPeriodo} className="cal-grade" />
       </div>
     </CalendarioArrastar>
   )

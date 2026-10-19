@@ -171,6 +171,11 @@ export interface PropsGradeCalendario {
   aoMudarPeriodo?(data: DataLocal, modo: 'mes' | 'semana'): void
   /** Conteúdo extra no cabeçalho embutido (ex.: "Só as minhas"). */
   extrasCabecalho?: ReactNode
+  /**
+   * Linha fixa no fim da célula, fora do limite do "+N" (Fase 2: os eventos das agendas externas no mês, "3 eventos").
+   * `foco`: o dia é o da parada do Tab (o que for focável dentro dela entra no Tab só então).
+   */
+  rodapeDoDia?(dia: DataLocal, foco: boolean): ReactNode
   className?: string
 }
 
@@ -182,7 +187,7 @@ export function GradeCalendario(p: PropsGradeCalendario) {
   return <Grade {...p} />
 }
 
-function Grade({ rotulo, modo, data, feriados = [], itensDoDia, maxPorDia, aoVerMais, aoAtivarDia, aoMudarPeriodo, extrasCabecalho, className }: PropsGradeCalendario) {
+function Grade({ rotulo, modo, data, feriados = [], itensDoDia, maxPorDia, aoVerMais, aoAtivarDia, aoMudarPeriodo, extrasCabecalho, rodapeDoDia, className }: PropsGradeCalendario) {
   const hoje = hojeLocal()
   const dias = useMemo(() => (modo === 'mes' ? gradeDoMes(data) : diasDaSemana(data)), [modo, data])
   const mapaFeriados = useMemo(() => new Map(feriados.map((f) => [f.data, f.nome])), [feriados])
@@ -241,7 +246,7 @@ function Grade({ rotulo, modo, data, feriados = [], itensDoDia, maxPorDia, aoVer
             {dias.slice(s * 7, s * 7 + 7).map((d) => (
               <Dia key={d} dia={d} hoje={hoje} foco={d === focoValido} fora={modo === 'mes' && !mesmoMes(d, data)}
                 feriado={mapaFeriados.get(d)} itens={itensDoDia?.(d) ?? []} limite={limite} aoVerMais={aoVerMais}
-                aoFocar={() => setFoco(d)} aoAtivar={aoAtivarDia} />
+                aoFocar={() => setFoco(d)} aoAtivar={aoAtivarDia} rodape={rodapeDoDia?.(d, d === focoValido)} />
             ))}
           </div>
         ))}
@@ -252,10 +257,10 @@ function Grade({ rotulo, modo, data, feriados = [], itensDoDia, maxPorDia, aoVer
 
 interface PropsDia {
   dia: DataLocal; hoje: DataLocal; foco: boolean; fora: boolean; feriado?: string; itens: ItemDia[]; limite: number
-  aoVerMais?(d: DataLocal): void; aoFocar(): void; aoAtivar?(d: DataLocal): void
+  aoVerMais?(d: DataLocal): void; aoFocar(): void; aoAtivar?(d: DataLocal): void; rodape?: ReactNode
 }
 
-function Dia({ dia, hoje, foco, fora, feriado, itens, limite, aoVerMais, aoFocar, aoAtivar }: PropsDia) {
+function Dia({ dia, hoje, foco, fora, feriado, itens, limite, aoVerMais, aoFocar, aoAtivar, rodape }: PropsDia) {
   const { setNodeRef, isOver } = useDroppable({ id: PREFIXO_DIA + dia })
   const [expandido, setExpandido] = useState(false)
   const visiveis = expandido ? itens : itens.slice(0, limite)
@@ -294,6 +299,7 @@ function Dia({ dia, hoje, foco, fora, feriado, itens, limite, aoVerMais, aoFocar
           +{resto}<span className="ui-cal-mais-texto"> {resto === 1 ? 'outro' : 'outros'}</span>
         </button>
       )}
+      {rodape}
     </div>
   )
 }

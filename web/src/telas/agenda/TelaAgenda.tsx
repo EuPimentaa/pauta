@@ -6,11 +6,15 @@
  * O período e os filtros ficam na URL (?modo=semana&data=2026-10-12&minhas=1&quadros=…&campos=prazo,inicio);
  * o modo e o "Só as minhas" também ficam lembrados neste navegador.
  * As listas saem do bootstrap (mudam na hora); a API traz as concluídas antigas (extras) e os feriados do período.
+ * Fase 2 (F9, host de `agenda-fonte`): chama o `usarItens` de cada fonte (sempre na mesma ordem: a lista é fixa depois
+ * do carregamento) com o período visível, passa os itens ao calendário como `externos` (só leitura, estilo próprio) e
+ * desenha o `Filtro` de cada fonte abaixo da legenda dos quadros.
  */
 import { useCallback, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router'
 import { CalendarClock, CalendarX2, Megaphone, PlayCircle, UserRound } from 'lucide-react'
 import type { AgendaConsulta, Bootstrap, CampoAgenda, DataLocal, Demanda, Id } from '@shared/tipos/index.ts'
+import type { FonteAgenda, ItemAgendaExterno } from '../../extensoes/tipos.ts'
 import { CAMPOS_AGENDA } from '@shared/tipos/index.ts'
 import { ehMinha } from '@shared/logica/quadro.ts'
 import { useEu } from '../../api/auth.ts'
@@ -23,6 +27,7 @@ import { useTituloAba } from '../../lib/app.ts'
 import { lerLocal, gravarLocal } from '../../lib/armazenamento.ts'
 import { ehDataLocal, hojeLocal, inicioDaSemana, somarDias, somarMeses } from '../../lib/datas.ts'
 import { useCelular } from '../../lib/midia.ts'
+import { useRegistro } from '../../sessao/registro.ts'
 import { useAbrirSobreposta } from '../../sessao/sobreposta.tsx'
 import { useEscopoAtalho } from '../../teclado/index.ts'
 import { Kbd } from '../../ui/Kbd.tsx'
@@ -33,6 +38,13 @@ const ROTULO_CAMPO: Record<CampoAgenda, string> = { prazo: 'Prazo', inicio: 'In�
 const ICONE_CAMPO = { prazo: CalendarClock, inicio: PlayCircle, publicacao: Megaphone } as const
 
 const selColunas = (b: Bootstrap) => b.colunas
+
+/** Os itens de todas as fontes de fora (hooks: as fontes vêm sempre na mesma ordem). */
+function useExternos(fontes: readonly FonteAgenda[], de: DataLocal, ate: DataLocal): ItemAgendaExterno[] {
+  const listas = fontes.map((f) => f.usarItens({ de, ate }).itens)
+  // as dependências são as próprias listas (cada fonte memoriza a sua): junta só quando uma muda
+  return useMemo(() => listas.flat(), listas)
+}
 
 export default function TelaAgenda() {
   useTituloAba('Agenda')
@@ -45,6 +57,7 @@ export default function TelaAgenda() {
   const demandas = useDemandas()
   const colunas = useDoBootstrap(selColunas)
   const feriadosDoBootstrap = useListaFeriados()
+  const fontes = useRegistro().fontesAgenda()
 
   // ─────────── estado na URL (com o modo e o "Só as minhas" lembrados) ───────────
   const modo: 'mes' | 'semana' = params.get('modo') === 'semana' ? 'semana' : params.get('modo') === 'mes' ? 'mes' : lerLocal<'mes' | 'semana'>('agenda-modo', celular ? 'semana' : 'mes')
@@ -83,6 +96,7 @@ export default function TelaAgenda() {
     ...(quadroIds.length > 0 ? { quadroIds } : {}),
   }), [de, ate, campos, soMinhas, quadroIds])
   const { data: api } = useAgendaApi(consulta)
+  const externos = useExternos(fontes, de, ate)
 
   const vivas = useMemo(() => demandas.filter((d) => d.arquivadoEm === null), [demandas])
   const itens = useMemo(() => juntarAgenda(vivas, consulta, eu.usuario.id, api), [vivas, consulta, eu.usuario.id, api])
@@ -165,11 +179,12 @@ export default function TelaAgenda() {
           <button type="button" className="pnl-legenda-limpar" onClick={() => mudar((p) => p.delete('quadros'))}>Todos os quadros</button>
         )}
       </div>
+      {fontes.map((f) => (f.Filtro ? <f.Filtro key={f.id} /> : null))}
       {vazio && (
         <p className="pnl-agenda-vazia" role="status"><CalendarX2 aria-hidden="true" />{textoVazio}</p>
       )}
       <CalendarioDemandas modo={modo} inicio={data} mudarPeriodo={mudarPeriodo} itens={itens} feriados={feriados}
-        semPrazo={semPrazo} mostrarQuadro abrir={(n) => abrir(`/d/${n}`)} vazio={null} />
+        semPrazo={semPrazo} mostrarQuadro abrir={(n) => abrir(`/d/${n}`)} vazio={null} externos={externos} />
       {!celular && (
         <p className="pnl-agenda-dica">
           Arraste um prazo para outro dia para mudar a data. <Kbd teclas="shift+arrowleft" /> <Kbd teclas="shift+arrowright" /> mudam o

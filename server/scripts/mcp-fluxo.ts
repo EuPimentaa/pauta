@@ -1,19 +1,21 @@
 /**
  * Roteiro de protocolo do MCP (F7, FASE2-PLANO §3): o fluxo inteiro como o claude.ai / Claude Code faz, contra um Pauta
- * no ar, sem navegador. Imprime "N/17 ok|falhou <passo>" por passo e NUNCA um token, código, state ou cookie.
+ * no ar, sem navegador. Imprime "N/20 ok|falhou <passo>" por passo e NUNCA um token, código, state ou cookie.
  *
  *   PAUTA_EMAIL=<seu> PAUTA_SENHA=<sua> node server/scripts/mcp-fluxo.ts --base http://localhost:5230 --quadro criacao
- *   (--limpar arquiva a demanda de teste no fim; o e-mail e a senha só pelo ambiente)
+ *   (--limpar arquiva a demanda de teste e apaga a etiqueta de teste no fim; o e-mail e a senha só pelo ambiente)
  *
  * 1 registro com loopback → 2 PKCE → 3 GET /oauth/autorizar sem seguir (guarda o cookie do pedido) → 4 login →
  * 5 a tela (GET /api/oauth/pedidos/:id) → 6 decisão → 7 code do redirecionar → 8 token → 9 initialize + tools/list →
- * 10 minhas_demandas → 11 criar_demanda → 12 histórico "via Claude" → 13 comentar → 14 refresh (rotação) →
- * 15 o refresh antigo de novo em 60 s (o mesmo par) → 16 revogar em Conexões → 17 /mcp → 401 invalid_token.
+ * 10 minhas_demandas → 11 criar_demanda → 12 histórico "via Claude" → 13 comentar → 14 etiqueta (criar e editar) →
+ * 15 coluna (criar no fim e arquivar, vazia: fica uma coluna arquivada "mcp-fluxo …" no quadro) → 16 criar_cliente com
+ * uma sigla que já existe (isError, nada grava) → 17 refresh (rotação) → 18 o refresh antigo de novo em 60 s (o mesmo
+ * par) → 19 revogar em Conexões → 20 /mcp → 401 invalid_token.
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { FERRAMENTAS_MCP } from '../../shared/tipos/index.ts'
 
-const TOTAL = 17
+const TOTAL = 20
 
 function arg(nome: string, padrao?: string): string | undefined {
   const i = process.argv.indexOf(`--${nome}`)
@@ -94,6 +96,16 @@ async function main(): Promise<number> {
     exigir(!c.result.isError, `isError: ${c.result.content?.[0]?.text}`)
     return String(c.result.content[0].text)
   }
+  /** Uma chamada que TEM de voltar como isError (regra da API): devolve o texto do erro. */
+  const recusada = async (nome: string, args: Record<string, unknown>) => {
+    const r = await rpc(at, 'tools/call', { name: nome, arguments: args })
+    const c = await json(r)
+    exigir(r.status === 200 && c?.result, `HTTP ${r.status}`)
+    exigir(c.result.isError === true, `devia recusar: ${String(c.result.content?.[0]?.text).slice(0, 80)}`)
+    return String(c.result.content[0].text)
+  }
+  const sufixo = randomBytes(3).toString('hex')
+  const nomeTeste = `mcp-fluxo ${sufixo}`
 
   try {
     const porta = 40000 + Math.floor(Math.random() * 20000)
@@ -168,7 +180,7 @@ async function main(): Promise<number> {
       rt = c.refresh_token
       segredos.push(at, rt)
     })
-    await etapa('initialize + tools/list (15, na ordem)', async () => {
+    await etapa(`initialize + tools/list (${FERRAMENTAS_MCP.length}, na ordem)`, async () => {
       const i = await rpc(at, 'initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'mcp-fluxo', version: '1' } })
       const ci = await json(i)
       exigir(i.status === 200 && ci.result?.protocolVersion === '2025-11-25', `initialize HTTP ${i.status}`)
@@ -200,6 +212,31 @@ async function main(): Promise<number> {
     await etapa('comentar', async () => {
       const t = await ferramenta('comentar', { numero, texto: 'Comentário do roteiro de protocolo (mcp-fluxo).' })
       exigir(t.startsWith(`Comentário em #${numero}`), `resposta: ${t.slice(0, 80)}`)
+    })
+    await etapa(`etiqueta: criar e editar em ${quadro}`, async () => {
+      const t = await ferramenta('etiqueta', { acao: 'criar', quadro, etiqueta: nomeTeste, cor: 'grafite' })
+      exigir(t.startsWith(`Criada a etiqueta ${nomeTeste} (grafite)`), `resposta: ${t.slice(0, 80)}`)
+      const e = await ferramenta('etiqueta', { acao: 'editar', quadro, etiqueta: nomeTeste, cor: 'azul' })
+      exigir(e.endsWith('cor grafite → azul'), `resposta: ${e.slice(0, 80)}`)
+    })
+    await etapa(`coluna: criar no fim e arquivar (vazia) em ${quadro}`, async () => {
+      const t = await ferramenta('coluna', { acao: 'criar', quadro, coluna: nomeTeste })
+      exigir(t.startsWith(`Criada a coluna ${nomeTeste} em `) && t.includes(`· ${nomeTeste}`), `resposta: ${t.slice(0, 80)}`)
+      const repetida = await recusada('coluna', { acao: 'criar', quadro, coluna: nomeTeste.toUpperCase() })
+      exigir(repetida.startsWith('Já existe a coluna'), `resposta: ${repetida.slice(0, 80)}`)
+      const a = await ferramenta('coluna', { acao: 'arquivar', quadro, coluna: nomeTeste })
+      exigir(a.startsWith(`Coluna ${nomeTeste} arquivada`) && !a.includes(`· ${nomeTeste}`), `resposta: ${a.slice(0, 80)}`)
+    })
+    await etapa('criar_cliente com uma sigla que já existe (isError, nada grava)', async () => {
+      const lista = await ferramenta('listar', { tipo: 'clientes', incluirInativos: true })
+      let sigla = /^([A-Z0-9]{1,12}) · /.exec(lista)?.[1]
+      if (!sigla) {
+        // Pauta sem nenhum cliente (banco novo): cria um para conferir o conflito
+        sigla = 'MCPFLUXO'
+        await ferramenta('criar_cliente', { sigla, nome: 'Cliente do roteiro mcp-fluxo' })
+      }
+      const t = await recusada('criar_cliente', { sigla: sigla.toLowerCase(), nome: 'Teste do roteiro' })
+      exigir(t === `A sigla ${sigla} já é de outro cliente.`, `resposta: ${t.slice(0, 80)}`)
     })
     const novo = await etapa('refresh (rotação)', async () => {
       const r = await fetch(`${base}/oauth/token`, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -236,6 +273,10 @@ async function main(): Promise<number> {
     if (limpar) {
       const r = await fetch(`${base}/api/demandas/${demandaId}/arquivar`, { method: 'POST', redirect: 'manual', headers: tela(true), body: '{}' })
       console.log(r.status === 200 ? `demanda #${numero} arquivada (--limpar)` : `não arquivou a #${numero}: HTTP ${r.status}`)
+      const q = await json(await fetch(`${base}/api/quadros/${encodeURIComponent(quadro)}`, { headers: tela(false) }))
+      const et = (q?.etiquetas ?? []).find((x: { nome: string }) => x.nome === nomeTeste)
+      const d = et ? await fetch(`${base}/api/etiquetas/${et.id}`, { method: 'DELETE', redirect: 'manual', headers: tela(true) }) : null
+      console.log(d?.status === 204 ? `etiqueta ${nomeTeste} apagada (--limpar)` : `não apagou a etiqueta ${nomeTeste}: ${d ? `HTTP ${d.status}` : 'não achada'}`)
     }
   } catch (e) {
     if (!(e instanceof Falhou)) console.log(`erro: ${seguro(e instanceof Error ? e.message : String(e), segredos)}`)

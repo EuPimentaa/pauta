@@ -78,7 +78,7 @@ desligar ou IP Access "Allow" para a faixa), o Browser Integrity Check em `/mcp`
 
 **Depois do deploy:**
 1. MCP: os `curl` e o `node server/scripts/mcp-fluxo.ts --base https://demandas.meltcomunicacao.com.br --quadro criacao
-   --limpar` (e-mail e senha só pelo ambiente; termina com "17/17 ok"); o Owner adiciona o conector em *Organization
+   --limpar` (e-mail e senha só pelo ambiente; termina com "20/20 ok"); o Owner adiciona o conector em *Organization
    settings → Connectors*; uma pessoa de cada papel faz 3 perguntas e 1 escrita.
 2. Windsor: `WINDSOR_API_KEY` no EasyPanel; os 5 comandos da `docs/fase2/pesquisa-windsor.md` §10 (anotar só o
    resultado em `operacao-resultados.md`); ligar as contas em Configurações → Resultados (Windsor); conferir 2 clientes

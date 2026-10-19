@@ -6,7 +6,7 @@
  */
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Building2, Laptop, Link2, PlugZap, ShieldCheck, Sparkles, TerminalSquare, UserRound } from 'lucide-react'
+import { Building2, Check, Copy, Laptop, Link2, PlugZap, ShieldCheck, Sparkles, TerminalSquare, UserRound } from 'lucide-react'
 import { ROTULO_MOTIVO_REVOGACAO, type ConexaoMcp } from '@shared/tipos/index.ts'
 import { useEu } from '../../api/auth.ts'
 import { mensagemDeErro } from '../../api/cliente.ts'
@@ -16,11 +16,32 @@ import { avisar } from '../../ui/avisos.tsx'
 import { Botao } from '../../ui/Botao.tsx'
 import { Checkbox, Interruptor } from '../../ui/Checkbox.tsx'
 import { EsqueletoLinhas } from '../../ui/Indicadores.tsx'
-import { CopiarTexto } from '../../ui/Texto.tsx'
+import { copiarParaAreaDeTransferencia } from '../../ui/Texto.tsx'
+import { BotaoIcone } from '../../ui/Botao.tsx'
 import { Painel } from '../cadastros/comum.tsx'
 import '../cadastros/cadastros.css'
 import { diaHoraDe, haQuanto, revogarConexao, useConexoes } from './api.ts'
 import './mcp.css'
+
+/** O texto inteiro (quebra em vez de cortar) e o botão de copiar. */
+function Copiavel({ texto, rotulo, aviso, className }: { texto: string; rotulo: string; aviso: string; className?: string }) {
+  const [copiado, setCopiado] = useState(false)
+  async function copiar() {
+    if (await copiarParaAreaDeTransferencia(texto)) {
+      setCopiado(true)
+      avisar(aviso, { tipo: 'sucesso', duracao: 2500 })
+      window.setTimeout(() => setCopiado(false), 1600)
+    } else {
+      avisar('Não foi possível copiar. Selecione o texto e copie com Ctrl+C.', { tipo: 'erro' })
+    }
+  }
+  return (
+    <div className={`mcp-endereco${className ? ` ${className}` : ''}`}>
+      <code>{texto}</code>
+      <BotaoIcone icone={copiado ? Check : Copy} rotulo={copiado ? 'Copiado' : rotulo} variante="secundario" onClick={() => void copiar()} />
+    </div>
+  )
+}
 
 const ROTULO_DESTINO = { claude_ai: 'claude.ai', claude_code: 'Claude Code neste computador', outro: 'Outro aplicativo' } as const
 
@@ -48,10 +69,7 @@ function Passos({ url }: { url: string }) {
         <div className="min-w-0">
           <h3>Claude Code</h3>
           <p>No terminal, rode o comando abaixo e, dentro do Claude Code, <code>/mcp</code> para autenticar.</p>
-          <div className="mcp-endereco mcp-endereco-comando">
-            <code>{comando}</code>
-            <CopiarTexto texto={comando} rotulo="Copiar o comando" avisoCopiado="Comando copiado." />
-          </div>
+          <Copiavel texto={comando} rotulo="Copiar o comando" aviso="Comando copiado." className="mcp-endereco-comando" />
         </div>
       </li>
     </ol>
@@ -137,10 +155,7 @@ export default function ConfigConexoes() {
 
       <Painel titulo="Endereço do conector" icone={PlugZap} id="mcp-endereco">
         <div className="cad-painel-corpo">
-          <div className="mcp-endereco">
-            <code>{url}</code>
-            <CopiarTexto texto={url} rotulo="Copiar o endereço" avisoCopiado="Endereço copiado." />
-          </div>
+          <Copiavel texto={url} rotulo="Copiar o endereço" aviso="Endereço copiado." />
           <p className="mcp-ajuda">Cole exatamente este endereço no Claude, sem barra no fim.</p>
           <Passos url={url} />
         </div>

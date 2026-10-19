@@ -59,8 +59,9 @@
   .aut-app-nome { font: 600 17px / 1.3 var(--font); color: var(--text); overflow-wrap: anywhere; }
 
   .aut-pessoa { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-md); background: var(--surface-sunken); }
-  .aut-pessoa strong { display: block; font-weight: 600; color: var(--text); }
-  .aut-pessoa span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: var(--fs-meta); }
+  .aut-pessoa-texto { min-width: 0; }
+  .aut-pessoa-texto strong { display: block; font-weight: 600; color: var(--text); }
+  .aut-pessoa-texto span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: var(--fs-meta); }
 
   .aut-listas { display: grid; gap: var(--space-4); }
   .aut-lista { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
@@ -121,4 +122,9 @@
     .aut-acoes { grid-template-columns: 1fr; }
     .aut-acoes > :last-child { order: -1; }
   }
+}
+
+/* o título recebe o foco ao abrir (leitor de tela); não é interativo, então sem o anel */
+@layer foco {
+  .aut-titulo:focus-visible { box-shadow: none; }
 }

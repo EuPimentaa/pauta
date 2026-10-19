@@ -126,7 +126,7 @@ function Formulario({ pedido }: { pedido: PedidoAutorizacao }) {
 
       <div className="aut-pessoa">
         <Avatar pessoa={eu.usuario} tamanho={36} dica={false} />
-        <div className="min-w-0">
+        <div className="aut-pessoa-texto">
           <strong>{eu.usuario.nome}</strong>
           <span>{ROTULO_PAPEL[eu.usuario.papel]} · {eu.usuario.email}</span>
         </div>

@@ -124,6 +124,11 @@ export const LIMITES_MCP = {
   /** Registro dinâmico por IP por hora: fora da FAIXA_ANTHROPIC e dentro dela (todo o claude.ai do mundo). */
   registrosPorHoraIp: 10,
   registrosPorHoraIpAnthropic: 300,
+  /**
+   * Registro só com redirects de loopback (o Claude Code registra do computador da pessoa: a equipe inteira sai pelo IP
+   * do escritório), num limite próprio por IP por hora; o teto de clientes sem concessão segura o resto.
+   */
+  registrosPorHoraIpLoopback: 30,
   /** Ao chegar aqui, apaga os clientes sem concessão e sem pedido pendente criados há mais de 15 min (nunca 429). */
   clientesSemConcessaoMax: 300,
   /** GET /oauth/autorizar: pedidos pendentes por client_id (o 6º apaga o mais antigo) e por IP do navegador por hora. */

@@ -1362,7 +1362,9 @@ aqui (o Claude espera no máximo 10 s pela descoberta, registro e token; 30 s pe
   endereço de `MCP_REDIRECTS_EXTRAS` corta também os clientes e as conexões que já o usavam.
 - **Erros:** `400 invalid_client_metadata` (`grant_types`/`response_types` fora do aceito, JSON inválido);
   `429` com `Retry-After` acima de `LIMITES_MCP.registrosPorHoraIp` (10/h por IP fora de `FAIXA_ANTHROPIC`;
-  `registrosPorHoraIpAnthropic`, 300/h, dentro dela: todo o claude.ai do mundo sai dessa faixa). **Teto de clientes:** ao
+  `registrosPorHoraIpAnthropic`, 300/h, dentro dela: todo o claude.ai do mundo sai dessa faixa; registro só com
+  redirects de loopback, o Claude Code, num limite próprio de `registrosPorHoraIpLoopback`, 30/h por IP, porque a equipe
+  inteira divide o IP do escritório; corpo inválido conta no de 10). **Teto de clientes:** ao
   chegar a `clientesSemConcessaoMax` (300) clientes sem concessão, o registro apaga os sem concessão e sem pedido pendente
   criados há mais de 15 min (mais antigos primeiro) e segue; nunca responde `429` por isso (encher o teto não trava o
   claude.ai da Melt).

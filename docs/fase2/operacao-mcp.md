@@ -82,7 +82,7 @@ faz 3 perguntas e 1 escrita. Falha no claude.ai mostra um `ofid_…` para o cham
 |---|---|
 | Chamadas de ferramenta | 60 por minuto por pessoa (somando as conexões dela); acima, `isError` "Muitas chamadas seguidas". |
 | Buscas na Windsor pelo `resumo_cliente` | 10 por pessoa por hora; acima, só o cache. |
-| Registro dinâmico | 10 por hora por IP; 300 dentro da faixa da Anthropic. **Em desenvolvimento** (`TRUST_PROXY_HOPS=0`) tudo vem de 127.0.0.1: depois de 10 registros na hora, reinicie a API. |
+| Registro dinâmico | 300 por hora por IP dentro da faixa da Anthropic (o claude.ai); fora dela, **30 por hora para o Claude Code** (registro só com loopback: a equipe inteira sai pelo IP do escritório) e 10 para o resto. No dia de conectar todo mundo pelo Claude Code, mais de 30 pessoas na mesma hora recebem `429` (o Claude Code mostra a falha do registro): conecte em grupos ou pelo claude.ai. Os limites ficam em memória (um deploy zera). **Em desenvolvimento** (`TRUST_PROXY_HOPS=0`) tudo vem de 127.0.0.1: depois de 30 registros do Claude Code (ou 10 dos outros) na hora, reinicie a API. |
 | `/oauth/autorizar` | 60 por hora pelo IP do navegador. |
 | `/oauth/token` | 30 por minuto por `client_id`. |
 | Clientes sem concessão | 300; ao chegar, o registro apaga os sem pedido vivo criados há mais de 15 min. A tarefa `oauth-poda` (03:30) apaga os com mais de 24 h. |

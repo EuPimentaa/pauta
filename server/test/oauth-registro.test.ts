@@ -79,6 +79,31 @@ test('limite por IP: o 11º na hora fora da faixa da Anthropic → 429; dentro d
   }
 })
 
+test('Claude Code do escritório: registro só de loopback tem o limite próprio, 30 por IP por hora', async () => {
+  // revisão funcional, achado 10: a equipe inteira atrás do IP do escritório dividia 10 registros por hora
+  const amb = await ambienteMcp()
+  const antes = configurar({ trustProxyHops: 1 })
+  try {
+    const ip = '198.51.100.40'
+    for (let i = 0; i < 30; i++) {
+      assert.equal((await registrarCliente(amb, `http://127.0.0.1:${40000 + i}/callback`, { client_name: 'Claude Code' }, ip)).status, 201, `n ${i}`)
+    }
+    const r = await registrarCliente(amb, 'http://localhost:41000/callback', {}, ip)
+    assert.equal(r.status, 429)
+    assert.ok(Number(r.headers.get('retry-after')) > 0)
+    // o limite de sempre (10) continua para o resto, contado à parte; corpo inválido conta nele
+    for (let i = 0; i < 9; i++) assert.equal((await registrarCliente(amb, undefined, {}, ip)).status, 201)
+    assert.equal((await registrarCliente(amb, 'https://evil.example/cb', {}, ip)).status, 400)
+    assert.equal((await registrarCliente(amb, undefined, {}, ip)).status, 429)
+    // loopback misturado com outro endereço não ganha o limite do Claude Code
+    const misto = await req(amb, '/oauth/registrar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '198.51.100.41' },
+      body: JSON.stringify({ redirect_uris: ['http://127.0.0.1/callback', 'https://claude.ai/api/mcp/auth_callback'] }) })
+    assert.equal(misto.status, 201)
+  } finally {
+    configurar(antes)
+  }
+})
+
 test('teto: com 300 clientes sem concessão, o registro apaga os velhos sem pedido vivo e dá 201', async () => {
   const amb = await ambienteMcp()
   const velho = '2026-10-14T12:00:00.000Z'

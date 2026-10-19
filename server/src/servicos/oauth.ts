@@ -215,11 +215,24 @@ function abrirEspaco(db: Db): void {
        ORDER BY c.criado_em)`, limite, instante, instante)
 }
 
-/** POST /oauth/registrar (RFC 7591). `ip`: o IP real (o limite por hora é por IP, folgado na faixa da Anthropic). */
+/** O corpo do registro pede só redirects de loopback (o Claude Code)? Corpo inválido: não (conta no limite de sempre). */
+function soLoopback(corpo: unknown): boolean {
+  if (!corpo || typeof corpo !== 'object' || Array.isArray(corpo)) return false
+  const redirects = listaDeTextos((corpo as Record<string, unknown>).redirect_uris)
+  return !!redirects && redirects.length > 0 && redirects.length <= 10 && redirects.every((x) => x.length <= 500 && ehLoopback(x))
+}
+
+/**
+ * POST /oauth/registrar (RFC 7591). `ip`: o IP real. O limite por hora é por IP: folgado na faixa da Anthropic (o
+ * claude.ai) e, fora dela, um para o Claude Code (só loopback; 30, porque a equipe inteira divide o IP do escritório) e
+ * outro para o resto (10). Corpo inválido conta no de 10.
+ */
 export function registrarCliente(db: Db, corpo: unknown, ip: string): RegistroClienteSaida {
   const daAnthropic = ipNaFaixa(ip, FAIXA_ANTHROPIC)
-  const max = daAnthropic ? LIMITES_MCP.registrosPorHoraIpAnthropic : LIMITES_MCP.registrosPorHoraIp
-  const r = usar(`oauth-registro|${ip}`, max, 3600)
+  const loopback = !daAnthropic && soLoopback(corpo)
+  const max = daAnthropic ? LIMITES_MCP.registrosPorHoraIpAnthropic
+    : loopback ? LIMITES_MCP.registrosPorHoraIpLoopback : LIMITES_MCP.registrosPorHoraIp
+  const r = usar(`oauth-registro${loopback ? '-loopback' : ''}|${ip}`, max, 3600)
   if (!r.ok) throw new ErroOAuthHttp(429, 'temporarily_unavailable', 'Muitos registros deste endereço. Tente mais tarde.', r.esperaSeg)
 
   if (!corpo || typeof corpo !== 'object' || Array.isArray(corpo)) {

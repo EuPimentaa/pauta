@@ -298,6 +298,33 @@ describe('resultados do cliente', () => {
     })
   })
 
+  test('erro com os dados bons ainda na validade: 10 min depois do erro a leitura automática busca de novo', async () => {
+    // dados de 09:58, "Atualizar agora" às 10:00 com a Windsor fora do ar, a Windsor volta: às 10:11 a aba busca sozinha
+    // (antes ficava com o erro até os dados de 09:58 vencerem, 3 h depois)
+    await ligarFixtures()
+    await resultadosProntos()
+    mais(2 * 60_000)
+    definirBuscaWindsor({ dados: async () => { throw new FalhaWindsor('fora_do_ar', 503, 'server_error') }, contas: async () => [] })
+    await capturarLog(async () => {
+      const r = await env.como(env.pessoas.design).post(`/api/clientes/${env.clientes.he.id}/resultados/atualizar`, { periodo: '7d' })
+      assert.equal(r.status, 202, r.texto)
+      await esperarBuscas(env.db)
+    })
+    assert.equal((await resultados()).meta!.estado, 'fora_do_ar')
+    definirBuscaWindsor()
+    const n = dadosDaWindsor().length
+    mais(2 * 60_000 + 9 * 60_000)
+    assert.equal((await resultados()).atualizando, false, '9 min depois do erro: ainda espera')
+    assert.equal(dadosDaWindsor().length, n)
+    mais(2 * 60_000 + 11 * 60_000)
+    assert.equal((await resultados()).atualizando, true, '11 min depois do erro: busca, mesmo com os dados de 2 min antes do erro')
+    await esperarBuscas(env.db)
+    const r = await resultados()
+    assert.equal(r.meta!.estado, 'ok')
+    assert.equal(r.googleAds!.estado, 'ok')
+    assert.equal(dadosDaWindsor().length, n + 8)
+  })
+
   test('duas leituras ao mesmo tempo → uma busca', async () => {
     await ligarFixtures()
     const [a, b] = await Promise.all([resultados(), resultados('7d', env.clientes.he.id, env.pessoas.am)])

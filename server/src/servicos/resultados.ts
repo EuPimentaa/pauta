@@ -122,13 +122,17 @@ interface LinhaCache {
   erro: ErroWindsor | null
 }
 
-/** O cache precisa de busca nova? */
+/**
+ * O cache precisa de busca nova? Contas diferentes: sim. Depois de um erro: 10 min depois do `tentado_em`, mesmo com os
+ * dados bons de antes ainda na validade (API §F.8; sem isso o erro de um "Atualizar agora" na queda ficava na tela até
+ * os dados velhos vencerem, 3 h ou 24 h, com a Windsor já de volta). Sem erro: a validade dos dados (3 h ou 24 h).
+ */
 function vencido(l: LinhaCache | undefined, contas: readonly string[], ate: DataLocal, hoje: DataLocal): boolean {
   if (!l || l.contas !== JSON.stringify(contas)) return true
   const agoraMs = Date.parse(agora())
+  if (l.erro) return agoraMs - Date.parse(l.tentado_em) >= REPETIR_ERRO_MS
   const idade = l.buscado_em ? agoraMs - Date.parse(l.buscado_em) : Number.POSITIVE_INFINITY
-  if (idade <= validadeCacheMs(ate, hoje)) return false
-  return !(l.erro && agoraMs - Date.parse(l.tentado_em) < REPETIR_ERRO_MS)
+  return idade > validadeCacheMs(ate, hoje)
 }
 
 function linhaCache(db: Db, clienteId: Id, conector: ConectorWindsor, d: DatasPeriodo): LinhaCache | undefined {

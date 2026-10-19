@@ -108,7 +108,7 @@ test('coluna arquivar: só vazia; desliga as automações que apontavam para ela
   assert.notEqual(linha(amb, 'social', 'Agendar')!.arquivada_em, null)
   assert.equal(um<{ ativa: number }>(amb.db, "SELECT ativa FROM automacao_quadro WHERE gatilho = 'aprovado'")!.ativa, 0)
   // arquivada some dos nomes: arquivar de novo não acha
-  assert.match((await chamar(amb, c.at, 'coluna', { acao: 'arquivar', quadro: 'social', coluna: 'Agendar' })).texto, /^Nenhum coluna em social "Agendar"/)
+  assert.match((await chamar(amb, c.at, 'coluna', { acao: 'arquivar', quadro: 'social', coluna: 'Agendar' })).texto, /^Nenhuma coluna em social "Agendar"/)
   // e o nome volta a ficar livre
   assert.equal((await chamar(amb, c.at, 'coluna', { acao: 'criar', quadro: 'social', coluna: 'Agendar' })).erro, false)
 })
@@ -149,9 +149,9 @@ test('coluna validação: erros curtos que dizem o que mandar, e nada grava', as
     [{ acao: 'editar', quadro: 'criacao', coluna: 'Pronto', cor: 'laranja' }, /^Confira "cor": .*"ambar"\|"amarelo"/],
     [{ acao: 'apagar', quadro: 'criacao', coluna: 'Pronto' }, /^Confira "acao"/],
     [{ acao: 'criar', quadro: 'criacao' }, /^Confira "coluna"/],
-    [{ acao: 'editar', quadro: 'criacao', coluna: 'Xyz', cor: 'azul' }, /^Nenhum coluna em criacao "Xyz"\. Opções: Fila, Design, Design2, Pronto, Concluído\. Use listar\.$/],
+    [{ acao: 'editar', quadro: 'criacao', coluna: 'Xyz', cor: 'azul' }, /^Nenhuma coluna em criacao "Xyz"\. Opções: Fila, Design, Design2, Pronto, Concluído\. Use listar\.$/],
     [{ acao: 'criar', quadro: 'trello', coluna: 'Nova' }, /^Nenhum quadro "trello"/],
-    [{ acao: 'criar', quadro: 'criacao', coluna: 'Nova', responsavel: 'ninguem' }, /^Nenhum pessoa "ninguem"/],
+    [{ acao: 'criar', quadro: 'criacao', coluna: 'Nova', responsavel: 'ninguem' }, /^Nenhuma pessoa "ninguem"/],
     [{ acao: 'criar', quadro: 'social', coluna: 'Nova', responsavel: 'web', papel: 'concluida' }, 'Coluna de pessoa é sempre de papel normal.'],
     [{ acao: 'editar', quadro: 'criacao', coluna: 'Design', papel: 'aguardando_cliente' }, 'Tire a pessoa da coluna antes.'],
     [{ acao: 'criar', quadro: 'criacao', coluna: 'Nova', apagar: true }, 'Parâmetro desconhecido: apagar.'],
@@ -257,4 +257,18 @@ test('coluna de nome parecido: invisível não burla o nome repetido, pontuaçã
     'Coluna Em revisão em social: WIP — → 2')
   assert.equal((await chamar(amb, c.at, 'coluna', { acao: 'editar', quadro: 'social', coluna: 'Em-revisão', limiteWip: 3 })).texto,
     'Coluna Em-revisão em social: WIP — → 3')
+})
+
+test('coluna: duas de nome igual (pela tela) saem com a posição e o pedido de renomear; arquivar não aceita outros parâmetros', async () => {
+  const amb = await ambienteMcp()
+  const c = await conectar(amb, amb.pessoas.am)
+  const http = amb.como(amb.pessoas.am)
+  for (let i = 0; i < 2; i++) assert.equal((await http.post(`/api/quadros/${amb.quadros.social.quadro.id}/colunas`, { nome: 'Arquivo' })).status, 201)
+  assert.equal((await chamar(amb, c.at, 'coluna', { acao: 'editar', quadro: 'social', coluna: 'Arquivo', cor: 'azul' })).texto,
+    'Mais de uma coluna em social com esse nome: Arquivo (4ª), Arquivo (5ª). Renomeie uma delas na tela.')
+  for (const extra of [{ nome: 'Outro' }, { cor: 'azul' }, { limiteWip: 3 }, { depoisDe: 'Fila' }]) {
+    const r = await chamar(amb, c.at, 'coluna', { acao: 'arquivar', quadro: 'social', coluna: 'Publicado', ...extra })
+    assert.equal(r.texto, 'Em arquivar, mande só quadro e coluna.', JSON.stringify(extra))
+  }
+  assert.equal(linha(amb, 'social', 'Publicado')!.arquivada_em, null)
 })

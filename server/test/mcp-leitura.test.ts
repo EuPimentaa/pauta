@@ -234,7 +234,7 @@ test('listar: cada tipo, com o nome a usar; colunas e etiquetas exigem quadro; n
   rodar(amb.db, "UPDATE usuario SET nome = 'Rafa Souza' WHERE id = ?", amb.pessoas.design2.id)
   const amb2 = await chamar(amb, c.at, 'buscar_demandas', { membro: 'rafa' })
   assert.equal(amb2.erro, true)
-  assert.equal(amb2.texto, 'Mais de um pessoa com esse nome: @rafalima, @rafasouza.')
+  assert.equal(amb2.texto, 'Mais de uma pessoa com esse nome: @rafalima, @rafasouza.')
 })
 
 function resultadosFalsos(estado: ResultadosCliente['estado'] = 'ok', atualizando = false): ResultadosCliente {

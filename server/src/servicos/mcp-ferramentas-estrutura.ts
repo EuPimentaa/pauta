@@ -111,6 +111,9 @@ const coluna = ferramenta({
   executar({ db, ator, usuario }, a) {
     const n = new Nomes(db, usuario.id)
     const q = n.quadro(a.quadro)
+    if (a.acao === 'arquivar' && [a.nome, a.cor, a.papel, a.responsavel, a.limiteWip, a.depoisDe, a.antesDe].some((x) => x !== undefined)) {
+      throw new ErroMcp('Em arquivar, mande só quadro e coluna.')
+    }
     const atual = a.acao === 'criar' ? null : n.coluna(q, a.coluna)
     if (a.depoisDe !== undefined && a.antesDe !== undefined) throw new ErroMcp('Use depoisDe ou antesDe, não os dois.')
     const ref = a.depoisDe ?? a.antesDe

@@ -30,13 +30,26 @@ function opcoes(lista: string[]): string {
   return unicas.length > 8 ? `${unicas.slice(0, 8).join(', ')}…` : unicas.join(', ')
 }
 
-/** Uma escolha entre candidatos: exatamente um. Senão ErroMcp com as opções. */
+/** "Nenhuma coluna", "Mais de uma pessoa", "Nenhum quadro". */
+const FEMININOS = /^(coluna|pessoa|etiqueta)\b/
+
+/**
+ * Uma escolha entre candidatos: exatamente um. Senão ErroMcp com as opções. Mais de um com o mesmo rótulo (duas
+ * "Arquivo" feitas pela tela): cada uma com a posição no quadro (`todos`), e o pedido de renomear uma na tela.
+ */
 function escolher<T>(tipo: string, texto: string, achados: T[], rotulo: (x: T) => string, todos: T[]): T {
   if (achados.length === 1) return achados[0]!
-  if (achados.length > 1) throw new ErroMcp(`Mais de um ${tipo} com esse nome: ${opcoes(achados.map(rotulo))}.`)
+  const fem = FEMININOS.test(tipo)
+  if (achados.length > 1) {
+    const nomes = achados.map((x) => umaLinha(rotulo(x), 60))
+    const repetidos = new Set(nomes).size < nomes.length
+    const lista = repetidos ? achados.map((x, i) => `${nomes[i]} (${todos.indexOf(x) + 1}ª)`) : nomes
+    throw new ErroMcp(`Mais de ${fem ? 'uma' : 'um'} ${tipo} com esse nome: ${opcoes(lista)}.`
+      + `${repetidos ? ` Renomeie ${fem ? 'uma delas' : 'um deles'} na tela.` : ''}`)
+  }
   const parecidos = todos.filter((x) => chave(rotulo(x)).includes(chave(texto)))
   const lista = (parecidos.length ? parecidos : todos).map(rotulo)
-  throw new ErroMcp(`Nenhum ${tipo} "${umaLinha(texto, 60)}".${lista.length ? ` Opções: ${opcoes(lista)}.` : ''} Use listar.`)
+  throw new ErroMcp(`${fem ? 'Nenhuma' : 'Nenhum'} ${tipo} "${umaLinha(texto, 60)}".${lista.length ? ` Opções: ${opcoes(lista)}.` : ''} Use listar.`)
 }
 
 /**

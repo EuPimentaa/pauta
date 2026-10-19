@@ -159,7 +159,7 @@ test('mover_demanda: outra coluna, outro quadro (etiqueta sem par fica), coluna 
   assert.equal(fim.texto, '#1 movida para Social › Publicado · concluída')
   const nao = await chamar(amb, c.at, 'mover_demanda', { numero: d.numero, coluna: 'Inexistente' })
   assert.equal(nao.erro, true)
-  assert.match(nao.texto, /^Nenhum coluna em social "Inexistente"\. Opções: Fila, Agendar, Publicado\. Use listar\.$/)
+  assert.match(nao.texto, /^Nenhuma coluna em social "Inexistente"\. Opções: Fila, Agendar, Publicado\. Use listar\.$/)
   assert.deepEqual(vigia.fora, [])
   observarEntradas(null)
 })

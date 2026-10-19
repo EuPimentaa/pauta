@@ -74,7 +74,7 @@ test('etiqueta validação: erros curtos, nada grava', async () => {
     [{ acao: 'editar', quadro: 'criacao', etiqueta: 'Urgente', nome: 'x'.repeat(41) }, /^Confira "nome"/],
     [{ acao: 'criar', quadro: 'criacao', etiqueta: 'Nova', cor: 'laranja' }, /^Confira "cor": .*"grafite"/],
     [{ acao: 'excluir', quadro: 'criacao', etiqueta: 'Urgente' }, /^Confira "acao"/],
-    [{ acao: 'editar', quadro: 'criacao', etiqueta: 'Prioridade', cor: 'azul' }, /^Nenhum etiqueta "Prioridade"\. Opções: Urgente, Alteração\. Use listar\.$/],
+    [{ acao: 'editar', quadro: 'criacao', etiqueta: 'Prioridade', cor: 'azul' }, /^Nenhuma etiqueta "Prioridade"\. Opções: Urgente, Alteração\. Use listar\.$/],
     [{ acao: 'criar', quadro: 'nada', etiqueta: 'Nova', cor: 'azul' }, /^Nenhum quadro "nada"/],
   ]
   for (const [args, esperado] of casos) {

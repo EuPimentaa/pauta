@@ -23,6 +23,15 @@ export interface Config {
   /** Log de cada requisição (desligado nos testes). */
   log: boolean
   versao: string
+  // Fase 2 (docs/FASE2-PLANO.md §1.3; .env.example)
+  /** WINDSOR_API_KEY: só no servidor; nunca em log, resposta ou mensagem de erro. Null = "sem chave" (F8). */
+  windsorApiKey: string | null
+  /** MCP_ATIVO (padrão 1): 0 desliga /mcp, /oauth/* e os metadados (404) sem deploy de código (F7). */
+  mcpAtivo: boolean
+  /** MCP_REDIRECTS_EXTRAS: redirect_uri https aceitos no registro além dos do Claude e do loopback (F7). */
+  mcpRedirectsExtras: string[]
+  /** MCP_ORIGENS_EXTRAS: Origins https aceitos no POST /mcp além do APP_URL, claude.ai e claude.com (F7). */
+  mcpOrigensExtras: string[]
 }
 
 function inteiro(valor: string | undefined, padrao: number): number {
@@ -30,6 +39,22 @@ function inteiro(valor: string | undefined, padrao: number): number {
   const n = Number(valor)
   if (!Number.isInteger(n) || n < 0) throw new Error(`Número inválido no ambiente: ${valor}`)
   return n
+}
+
+/** Lista separada por vírgula, cada item https:// (origem: sem caminho). Vazia → []. */
+function listaHttps(nome: string, valor: string | undefined, soOrigem: boolean): string[] {
+  const itens = (valor ?? '').split(',').map((x) => x.trim()).filter(Boolean)
+  for (const item of itens) {
+    let url: URL
+    try {
+      url = new URL(item)
+    } catch {
+      throw new Error(`${nome}: endereço inválido: ${item}`)
+    }
+    if (url.protocol !== 'https:') throw new Error(`${nome}: só https: ${item}`)
+    if (soOrigem && url.origin !== item.replace(/\/+$/, '')) throw new Error(`${nome}: só a origem, sem caminho: ${item}`)
+  }
+  return soOrigem ? itens.map((x) => new URL(x).origin) : itens
 }
 
 function lerAmbiente(env: NodeJS.ProcessEnv): Config {
@@ -54,6 +79,10 @@ function lerAmbiente(env: NodeJS.ProcessEnv): Config {
     adminSenha: env.ADMIN_SENHA || null,
     log: env.NODE_ENV !== 'test',
     versao: env.APP_VERSAO ?? '0.1.0',
+    windsorApiKey: env.WINDSOR_API_KEY?.trim() || null,
+    mcpAtivo: env.MCP_ATIVO !== '0',
+    mcpRedirectsExtras: listaHttps('MCP_REDIRECTS_EXTRAS', env.MCP_REDIRECTS_EXTRAS, false),
+    mcpOrigensExtras: listaHttps('MCP_ORIGENS_EXTRAS', env.MCP_ORIGENS_EXTRAS, true),
   }
 }
 

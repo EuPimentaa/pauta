@@ -63,16 +63,20 @@ export function SeletorPeriodo({ valor, aoMudar }: { valor: PeriodoResultados; a
   )
 }
 
-/** A variação com seta, número e a cor de `tomVariacao` (verde bom, vermelho ruim, cinza neutro). */
+/**
+ * A variação com seta, número e a cor de `tomVariacao` (verde bom, vermelho ruim, cinza neutro). Ícone só com
+ * porcentagem (o traço só no 0%): sem base de comparação sai "—" sozinho, e conta nova, "novo" (antes "— —" e
+ * "— novo", que pareciam defeito). O texto do MCP (linhaKpi) não muda.
+ */
 export function Variacao<C extends ConectorWindsor>({ conector, chave, atual, anterior }: {
   conector: C; chave: ChaveKpi<C>; atual: number | null; anterior: number | null
 }) {
   const v = variacao(atual, anterior)
   const tom = tomVariacao(definicaoKpi(conector, chave).sentido, v)
-  const I = v.tipo !== 'pct' || Math.round(v.fracao * 100) === 0 ? Minus : v.fracao > 0 ? ArrowUpRight : ArrowDownRight
+  const I = v.tipo !== 'pct' ? null : Math.round(v.fracao * 100) === 0 ? Minus : v.fracao > 0 ? ArrowUpRight : ArrowDownRight
   return (
-    <span className="res-variacao" data-tom={tom} aria-hidden="true">
-      <I aria-hidden="true" />{formatarVariacao(v)}
+    <span className="res-variacao" data-tom={tom} aria-hidden="true" title={v.tipo === 'nada' ? 'sem base de comparação' : undefined}>
+      {I && <I aria-hidden="true" />}{formatarVariacao(v)}
     </span>
   )
 }

@@ -47,7 +47,12 @@
   .res-canal-cabeca { display: flex; align-items: baseline; gap: var(--space-2) var(--space-3); flex-wrap: wrap; min-width: 0; }
   .res-canal-titulo { font: 600 var(--fs-col) / var(--lh-col) var(--font); color: var(--text); }
   .res-canal-contas { font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); overflow-wrap: anywhere; }
-  .res-aviso { font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text); background: var(--surface-sunken); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+  .res-aviso {
+    display: flex; align-items: center; gap: var(--space-2) var(--space-3); flex-wrap: wrap; padding: var(--space-2) var(--space-3);
+    background: var(--warning-bg); color: var(--warning-ink); border-radius: var(--radius-md); font: 500 var(--fs-meta) / var(--lh-meta) var(--font);
+  }
+  .res-aviso > svg { width: 16px; height: 16px; flex: none; }
+  .res-aviso > p { flex: 1; min-width: 12rem; }
   .res-cartoes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
   .res-cartao {
     display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--space-3) var(--space-4);
@@ -78,6 +83,7 @@
   }
   .res-grafico-cabeca { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
   .res-grafico-corpo { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+  .res-grafico-titulo { font: 600 var(--fs-body) / var(--lh-body) var(--font); color: var(--text); }
   .res-chips { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
   .res-chips-grupo { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .res-chips-rotulo { font: 700 var(--fs-micro) / var(--lh-micro) var(--font); text-transform: uppercase; letter-spacing: var(--tracking-micro); color: var(--text-3); }
@@ -180,7 +186,7 @@
   /* Números: algarismos alinhados à linha e de largura fixa, como o resto do Pauta (.tabular). Depois do atalho font:
      de cada classe (ele zera o lnum herdado do body; base.css) e sempre os dois valores. */
   .res-cartao-valor, .res-variacao, .res-tabela .num, .res-celula, .res-dica-linha strong, .res-evento-n, .res-comparacao, .res-periodo,
-  .res-dados-texto, .res-estado dd, .res-opcao-meta, .res-conta-meta { font-variant-numeric: lining-nums tabular-nums; }
+  .res-dados-texto, .res-legenda, .res-estado dd, .res-opcao-meta, .res-conta-meta { font-variant-numeric: lining-nums tabular-nums; }
 
   /* ─────────────── celular ─────────────── */
   @media (max-width: 767.98px) {
@@ -190,13 +196,19 @@
     .res-periodos { display: flex; }
     .res-periodo { flex: 1 1 auto; padding: 8px 8px; }
     .res-dados { justify-content: space-between; }
-    .res-cartoes { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
-    .res-cartao { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "rotulo variacao" "valor variacao"; align-items: center; column-gap: var(--space-3); }
-    .res-cartao-rotulo { grid-area: rotulo; }
-    .res-cartao-valor { grid-area: valor; font-size: var(--fs-h3); line-height: var(--lh-h3); }
-    .res-variacao { grid-area: variacao; }
-    .res-cartoes-mais { grid-template-columns: minmax(0, 1fr); }
+    /* dois cartões por linha, a variação embaixo do valor (como no desktop): os 12 principais sem ~2.300 px de rolagem */
+    .res-cartoes, .res-cartoes-mais { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+    .res-cartao { padding: var(--space-2) var(--space-3); }
+    .res-cartao-valor { font-size: var(--fs-h3); line-height: var(--lh-h3); }
     .res-grafico { padding: var(--space-3) var(--space-4); }
+    /* os chips do gráfico numa linha que rola de lado (eram 6 linhas acima de um gráfico de 190 px) */
+    .res-grafico-cabeca { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
+    .res-chips {
+      flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; margin: 0 calc(-1 * var(--space-4));
+      padding: 4px var(--space-4) 6px; gap: var(--space-2) var(--space-4);
+    }
+    .res-chips-grupo { flex: none; flex-wrap: nowrap; }
+    .res-chip { flex: none; white-space: nowrap; }
     .res-tabela-rolagem { overflow-x: visible; }
     .res-tabela thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .res-tabela, .res-tabela tbody, .res-tabela tr, .res-tabela td, .res-tabela tbody th { display: block; width: 100%; }

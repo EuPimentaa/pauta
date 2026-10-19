@@ -33,6 +33,8 @@ function useLargura(ref: RefObject<HTMLElement | null>, padrao: number): number 
 
 export interface PropsGraficoSerie {
   metrica: MetricaGrafico
+  /** O que o gráfico mostra, em texto visível acima da legenda ("Investimento · Meta Ads, por dia"). */
+  titulo?: string
   atual: PontoGrafico[]
   anterior: PontoGrafico[]
   /** "12/10–18/10" */
@@ -40,7 +42,7 @@ export interface PropsGraficoSerie {
   rotuloAnterior: string
 }
 
-export function GraficoSerie({ metrica, atual, anterior, rotuloAtual, rotuloAnterior }: PropsGraficoSerie) {
+export function GraficoSerie({ metrica, titulo, atual, anterior, rotuloAtual, rotuloAnterior }: PropsGraficoSerie) {
   const caixa = useRef<HTMLDivElement>(null)
   const celular = useCelular()
   const largura = useLargura(caixa, 640)
@@ -97,6 +99,7 @@ export function GraficoSerie({ metrica, atual, anterior, rotuloAtual, rotuloAnte
   const dicaEsquerda = indice !== null && x(indice) > largura / 2
   return (
     <div className="res-grafico-corpo">
+      {titulo && <p className="res-grafico-titulo">{titulo}</p>}
       <ul className="res-legenda" aria-label="Legenda">
         <li><span className="res-chave-linha" data-serie="atual" aria-hidden="true" />{rotuloAtual}</li>
         <li><span className="res-chave-linha" data-serie="anterior" aria-hidden="true" />{rotuloAnterior} (anterior)</li>
@@ -130,8 +133,13 @@ export function GraficoSerie({ metrica, atual, anterior, rotuloAtual, rotuloAnte
           role="slider" tabIndex={0} aria-label={`${metrica.rotulo} por dia: escolha o dia com as setas`}
           aria-valuemin={1} aria-valuemax={n} aria-valuenow={(indice ?? n - 1) + 1} aria-valuetext={textoDia(indice ?? n - 1)}
           aria-describedby={idResumo}
-          onPointerMove={aoMover} onPointerDown={aoMover} onPointerLeave={(e) => { if (document.activeElement !== e.currentTarget) setIndice(null) }}
-          onFocus={() => setIndice((i) => i ?? n - 1)} onBlur={() => setIndice(null)} onKeyDown={aoTeclar}
+          onPointerMove={aoMover} onPointerDown={aoMover}
+          // no toque, o pointerleave chega logo depois do pointerup (antes do foco): só o mouse e a caneta saem do
+          // gráfico; o dia tocado fica até o foco sair
+          onPointerLeave={(e) => { if (e.pointerType !== 'touch' && document.activeElement !== e.currentTarget) setIndice(null) }}
+          // o foco do teclado começa no último dia; o do toque e do clique já tem o dia escolhido pelo pointerdown
+          onFocus={(e) => { if (e.currentTarget.matches(':focus-visible')) setIndice((i) => i ?? n - 1) }}
+          onBlur={() => setIndice(null)} onKeyDown={aoTeclar}
         />
         {indice !== null && (
           <div className="res-dica" aria-hidden="true"

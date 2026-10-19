@@ -8,7 +8,7 @@
  */
 import { useId, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { BarChart3, Link2, Loader2, RefreshCw } from 'lucide-react'
+import { AlertTriangle, BarChart3, Link2, Loader2, RefreshCw } from 'lucide-react'
 import {
   ROTULO_CONECTOR, type CampanhaResultado, type Cliente, type ConectorWindsor, type ContaLigada, type ResultadoConector,
   type ResultadosCliente,
@@ -55,7 +55,10 @@ function EsqueletoCartoes() {
   )
 }
 
-function BlocoConector({ r, b }: { r: ResultadosCliente; b: ResultadoConector }) {
+/** Erro que "Tentar de novo" pode resolver (a chave recusada, não: quem resolve é o admin). */
+const TENTAR_DE_NOVO = new Set(['fora_do_ar', 'limite', 'resposta_invalida'])
+
+function BlocoConector({ r, b, tentando, aoTentar }: { r: ResultadosCliente; b: ResultadoConector; tentando: boolean; aoTentar(): void }) {
   const id = useId()
   const c = b.conector
   const contas = contasDe(r, c)
@@ -77,11 +80,20 @@ function BlocoConector({ r, b }: { r: ResultadosCliente; b: ResultadoConector })
         <h3 className="res-canal-titulo" id={id}>{ROTULO_CONECTOR[c]}</h3>
         <span className="res-canal-contas">{contas.map((x) => x.nome).join(' · ')}</span>
       </div>
-      {aviso && <p className="res-aviso" role="status">{aviso}</p>}
+      {/* o erro do canal na faixa de aviso (antes uma caixa cinza seguida de outra dizendo quase o mesmo) */}
+      {aviso && (
+        <div className="res-aviso" role="status">
+          <AlertTriangle aria-hidden="true" />
+          <p>{aviso}</p>
+          {TENTAR_DE_NOVO.has(b.estado) && !r.atualizando && (
+            <Botao tamanho="p" variante="secundario" icone={RefreshCw} carregando={tentando} onClick={aoTentar}>Tentar de novo</Botao>
+          )}
+        </div>
+      )}
       {!b.kpis ? (
-        r.atualizando ? <EsqueletoCartoes /> : (
+        r.atualizando ? <EsqueletoCartoes /> : aviso ? null : (
           <p className="res-vazio">{b.estado === 'conta_nao_conectada' ? 'Sem dados: a conta não está conectada na Windsor.'
-            : aviso ? 'Sem dados deste canal por enquanto.' : 'Ainda sem dados deste canal. Use “Atualizar agora”.'}</p>
+            : 'Ainda sem dados deste canal. Use “Atualizar agora”.'}</p>
         )
       ) : b.estado === 'sem_dados' ? (
         <p className="res-vazio">Nenhum dado neste período: a conta não teve {c === 'googleanalytics4' ? 'visitas registradas' : 'entrega'} entre {rotuloIntervalo(r.de, r.ate)}.</p>
@@ -136,6 +148,7 @@ function GraficoResultados({ r }: { r: ResultadosCliente }) {
         </div>
       </div>
       <GraficoSerie metrica={{ ...metrica, rotulo: grupos ? `${metrica.rotulo} (${ROTULO_CONECTOR[metrica.conector]})` : metrica.rotulo }}
+        titulo={`${metrica.rotulo}${grupos ? ` · ${ROTULO_CONECTOR[metrica.conector]}` : ''}, por dia`}
         atual={atual} anterior={anterior}
         rotuloAtual={rotuloIntervalo(r.de, r.ate)} rotuloAnterior={rotuloIntervalo(r.deAnterior, r.ateAnterior)} />
     </section>
@@ -218,6 +231,14 @@ export default function AbaResultados({ cliente }: { cliente: Cliente }) {
     }
   }
 
+  /** Canais com a última busca em erro (o "Dados de…" do topo diz quantos). */
+  const comErro = (r: ResultadosCliente) => [r.meta, r.googleAds, r.ga4]
+    .filter((b) => b && b.estado !== 'ok' && b.estado !== 'sem_dados').length
+  const textoTopo = (r: ResultadosCliente) => {
+    const n = comErro(r)
+    const erro = n === 0 ? null : n === 1 ? '1 canal com erro' : `${n} canais com erro`
+    return [textoDados(buscadoMaisAntigo(r), hoje), erro].filter(Boolean).join(' · ')
+  }
   const filtros = (r?: ResultadosCliente) => (
     <div className="res-filtros">
       <div className="res-filtros-esquerda">
@@ -227,7 +248,7 @@ export default function AbaResultados({ cliente }: { cliente: Cliente }) {
       {r?.estado === 'ok' && (
         <div className="res-dados">
           <span aria-live="polite" className="res-dados-texto">
-            {r.atualizando || pedindo ? <><Loader2 className="ui-giro" aria-hidden="true" />Atualizando…</> : textoDados(buscadoMaisAntigo(r), hoje) ?? ''}
+            {r.atualizando || pedindo ? <><Loader2 className="ui-giro" aria-hidden="true" />Atualizando…</> : textoTopo(r)}
           </span>
           <Botao tamanho="p" variante="secundario" icone={RefreshCw} carregando={pedindo} disabled={r.atualizando}
             dica="Relê o que a Windsor tem agora. Os 3 últimos dias podem chegar com até 6 h de atraso." onClick={() => void atualizar()}>
@@ -275,7 +296,7 @@ export default function AbaResultados({ cliente }: { cliente: Cliente }) {
     <div className="res-aba" aria-busy={r.atualizando} data-recarregando={consulta.isPlaceholderData ? '' : undefined}>
       {filtros(r)}
       <FaixaAtencao alertas={r.alertas} />
-      {blocos.map((b) => <BlocoConector key={b.conector} r={r} b={b} />)}
+      {blocos.map((b) => <BlocoConector key={b.conector} r={r} b={b} tentando={pedindo} aoTentar={() => void atualizar()} />)}
       <GraficoResultados r={r} />
       {r.meta?.kpis && r.meta.estado !== 'sem_dados' && <TabelaCampanhas conector="facebook" campanhas={r.meta.campanhas} />}
       {r.googleAds?.kpis && r.googleAds.estado !== 'sem_dados' && <TabelaCampanhas conector="google_ads" campanhas={r.googleAds.campanhas} />}

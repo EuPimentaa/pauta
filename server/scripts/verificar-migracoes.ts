@@ -125,7 +125,9 @@ for (const [t, c] of [['demanda', 'retorno_em'], ['coluna', 'responsavel_id'], [
 conferir(todos(db, 'PRAGMA table_info(apontamento)').find((c) => c.name === 'demanda_id')?.notnull === 1,
   'apontamento sempre numa demanda (demanda_id NOT NULL)')
 const TABELAS_FASE2 = ['oauth_cliente', 'oauth_concessao', 'oauth_pedido', 'oauth_token', 'mcp_traco', 'windsor_conta',
-  'cliente_conta_resultados', 'resultado_cache', 'windsor_uso', 'agenda_externa', 'agenda_ocorrencia']
+  'cliente_conta_resultados', 'resultado_cache', 'windsor_uso', 'agenda_externa', 'agenda_ocorrencia',
+  // 120 (F8): o cache da carteira e quando a lista de contas de cada conector foi buscada
+  'resultado_panorama_cache', 'windsor_lista']
 for (const nova of TABELAS_FASE2) conferir(tabelasBanco.includes(nova), `tabela ${nova} existe (Fase 2)`)
 conferir(!colunasDe('atividade').includes('via') && !colunasDe('sessao').includes('concessao_id'),
   'Fase 2 não mexe em atividade nem em sessao (via Claude = mcp_traco; conexões fora de sessao)')
@@ -179,8 +181,11 @@ mesmaLista('oauth_pedido', 'decisao', DECISOES_AUTORIZACAO)
 mesmaLista('oauth_concessao', 'escopo', [ESCOPO_MCP])
 mesmaLista('oauth_concessao', 'motivo_revogacao', MOTIVOS_REVOGACAO_CONEXAO)
 mesmaLista('oauth_token', 'tipo', TIPOS_TOKEN_OAUTH)
-for (const t of ['windsor_conta', 'cliente_conta_resultados', 'resultado_cache']) mesmaLista(t, 'conector', CONECTORES_WINDSOR)
-mesmaLista('resultado_cache', 'erro', ERROS_WINDSOR)
+for (const t of ['windsor_conta', 'cliente_conta_resultados', 'resultado_cache', 'resultado_panorama_cache', 'windsor_lista']) {
+  mesmaLista(t, 'conector', CONECTORES_WINDSOR)
+}
+for (const t of ['resultado_cache', 'resultado_panorama_cache', 'windsor_lista']) mesmaLista(t, 'erro', ERROS_WINDSOR)
+mesmaLista('windsor_lista', 'origem', ['ds_accounts', 'dados'])
 mesmaLista('windsor_uso', 'ultimo_erro', ERROS_WINDSOR)
 mesmaLista('agenda_externa', 'cor', CORES)
 mesmaLista('agenda_externa', 'erro', ERROS_AGENDA_EXTERNA)
@@ -282,7 +287,7 @@ for (const nome of ['demanda_arquivo_ix', 'demanda_arquivo_cli_ix', 'demanda_col
   'quadro_usuario_seguidores_ix', 'modelo_demanda_nome_uk', 'demanda_inicio_ix', 'demanda_publicacao_ix',
   'coluna_responsavel_uk', 'notificacao_atrasada_ix', 'oauth_concessao_ativa_uk', 'oauth_token_expira_ix',
   'oauth_pedido_expira_ix', 'mcp_traco_concessao_ix', 'cliente_conta_resultados_conta_ix', 'resultado_cache_tentado_ix',
-  'agenda_ocorrencia_dia_ix']) conferir(indices.includes(nome), `índice ${nome}`)
+  'agenda_ocorrencia_dia_ix', 'resultado_panorama_cache_tentado_ix']) conferir(indices.includes(nome), `índice ${nome}`)
 const plano = (sql: string) => todos(db, `EXPLAIN QUERY PLAN ${sql}`).map((l) => String(l.detail)).join(' | ')
 const planoArquivo = plano(`SELECT id FROM demanda
   WHERE excluido_em IS NULL AND (arquivado_em IS NOT NULL OR concluida_em IS NOT NULL)

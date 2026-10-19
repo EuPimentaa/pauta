@@ -244,6 +244,15 @@ function tentarGravarErro(db: Db, id: Id, inicio: string, erro: ErroAgendaExtern
   }
 }
 
+/**
+ * Grava um corpo iCal já obtido como se fosse uma busca boa (seed de demonstração e scripts; síncrono). Devolve o
+ * erro da agenda depois (ex.: `teto_ocorrencias`), ou null.
+ */
+export function gravarCorpoAgenda(db: Db, id: Id, corpo: Uint8Array): ErroAgendaExterna | null {
+  processar(db, id, agora(), corpo, performance.now())
+  return (linhaAgenda(db, id)?.erro ?? null) as ErroAgendaExterna | null
+}
+
 /** Corpo bom: compara o hash, lê, confere os tetos e grava (numa transação). */
 function processar(db: Db, id: Id, inicio: string, corpo: Uint8Array, t0: number): void {
   const hash = hashSemDtstamp(corpo)

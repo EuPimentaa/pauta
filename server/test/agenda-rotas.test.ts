@@ -5,8 +5,10 @@
  */
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { join } from 'node:path'
 import type { AgendaExterna, EventosAgendaSaida } from '../../shared/tipos/index.ts'
-import { rodar, um } from '../src/db.ts'
+import { rodar, tx, um } from '../src/db.ts'
 import { ErroHttp } from '../src/erros.ts'
 import { carregarTarefas, executarTarefa, tarefasDevidas, type Tarefa } from '../src/tarefas.ts'
 import { cifrar } from '../src/servicos/cripto.ts'
@@ -404,5 +406,29 @@ describe('segredo nunca escapa (FASE2-PLANO §0 regra 6; API §F.1)', () => {
     guardar(await admin.get('/api/bootstrap'))
     const tudo = [...respostas, ...log, JSON.stringify(eventos(a.db))].join('\n')
     assert.ok(!tudo.includes('private-'), 'o endereço apareceu')
+  })
+})
+
+describe('scripts', () => {
+  test('demo: a agenda "Melt" com o endereço de teste e as ocorrências da fixture, sem rede', async () => {
+    const a = await ambienteAgenda()
+    let chamadas = 0
+    definirBuscaAgenda(async () => { chamadas++; return { ok: false, erro: 'fora_do_ar' } })
+    const { semear } = await import('../scripts/demo/agenda.ts')
+    tx(a.db, () => semear({ db: a.db, pessoas: { admin: a.pessoas.admin } } as unknown as Parameters<typeof semear>[0]))
+    const [ag] = (await a.como(a.pessoas.design).get('/api/agendas-externas')).corpo as AgendaExterna[]
+    assert.deepEqual([ag!.nome, ag!.erro, ag!.contagens!.eventos], ['Melt', null, 44])
+    assert.ok(ocorrencias(a.db, ag!.id) > 200)
+    assert.equal(chamadas, 0)
+  })
+
+  test('diagnóstico: só contagens e nomes de propriedades, nunca o conteúdo', () => {
+    const saida = execFileSync(process.execPath, [join(import.meta.dirname, '..', 'scripts', 'agenda-diagnostico.ts'), '--arquivo',
+      join(import.meta.dirname, 'fixtures', 'agenda', 'google-2026.ics')], { encoding: 'utf8', env: { ...process.env, AGENDA_ENDERECO: '' } })
+    assert.match(saida, /VEVENT 44/)
+    assert.match(saida, /fora do subconjunto 1/)
+    for (const proibido of ['Reunião', 'pauta.teste', 'Clínica', 'meet.google.com', 'mailto', 'Sala 2']) assert.ok(!saida.includes(proibido), proibido)
+    const sem = spawnSync(process.execPath, [join(import.meta.dirname, '..', 'scripts', 'agenda-diagnostico.ts')], { encoding: 'utf8', env: { ...process.env, AGENDA_ENDERECO: 'http://evil.example/x' } })
+    assert.equal(sem.status, 2)
   })
 })

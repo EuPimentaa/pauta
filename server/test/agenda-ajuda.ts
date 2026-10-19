@@ -8,7 +8,10 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
 import type { AddressInfo } from 'node:net'
-import { definirBuscaAgenda, lerIcalHttp, type BuscaAgenda } from '../src/servicos/agenda-busca.ts'
+import type { AgendaExterna } from '../../shared/tipos/index.ts'
+import { definirBuscaAgenda, esperarBuscasAgenda, lerIcalHttp, type BuscaAgenda } from '../src/servicos/agenda-busca.ts'
+import { zerarPedidosAgenda } from '../src/servicos/agenda.ts'
+import { ambiente, type Ambiente } from './ajuda.ts'
 import { lerIcal, type LeituraIcal, type OcorrenciaIcal } from '../src/servicos/agenda-ical.ts'
 
 const PASTA = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'agenda')
@@ -161,4 +164,27 @@ export function capturarLog(t: { mock: { method: (o: object, m: never, f: (...a:
     })
   }
   return linhas
+}
+
+// ─────────────────────────────── ambiente ───────────────────────────────
+
+/**
+ * O ambiente de todos (test/ajuda.ts) com o relógio dos casos do google-2026.ics, o limite do "Atualizar agora" zerado
+ * e a busca servindo a fixture da memória (nenhum teste da agenda sai para a rede). Quem precisa de HTTP de verdade
+ * aponta a busca para o servidor falso com `apontarPara`.
+ */
+export async function ambienteAgenda(): Promise<Ambiente> {
+  const a = await ambiente()
+  a.relogio(RELOGIO_2026)
+  zerarPedidosAgenda()
+  definirBuscaAgenda(async () => ({ ok: true, corpo: fixture('google-2026.ics') }))
+  return a
+}
+
+/** Cria a agenda pelo admin (POST) e espera a primeira busca. */
+export async function criarAgendaTeste(a: Ambiente, corpo: Record<string, unknown> = {}): Promise<AgendaExterna> {
+  const r = await a.como(a.pessoas.admin).post('/api/agendas-externas', { nome: 'Melt', cor: 'roxo', url: URL_TESTE, ...corpo })
+  if (r.status !== 201) throw new Error(`POST /api/agendas-externas: ${r.status} ${r.texto}`)
+  await esperarBuscasAgenda()
+  return r.corpo as AgendaExterna
 }

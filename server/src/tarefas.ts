@@ -1,7 +1,8 @@
 /**
- * Jobs diários descobertos em src/tarefas/*.ts (cada arquivo exporta `tarefa: Tarefa`). Cada um roda uma vez por dia
- * depois do horário (São Paulo); quem perdeu o horário com o servidor desligado roda ao subir. A última execução
- * fica em `tarefa_execucao`.
+ * Jobs descobertos em src/tarefas/*.ts (cada arquivo exporta `tarefa: Tarefa`). Os diários rodam uma vez por dia
+ * depois do horário (São Paulo); quem perdeu o horário com o servidor desligado roda ao subir. Os de intervalo
+ * (`aCadaMin`, Fase 2: `agenda-busca` a cada 15 min) ignoram o horário e rodam quando a última execução passou de
+ * `aCadaMin` minutos (ou nunca rodaram). A última execução fica em `tarefa_execucao`.
  */
 import { readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -12,8 +13,10 @@ import { agora, agoraData, rodar, um, type Db } from './db.ts'
 
 export interface Tarefa {
   nome: string
-  /** "HH:MM" de São Paulo. */
+  /** "HH:MM" de São Paulo (ignorado com `aCadaMin`). */
   horario: HoraLocal
+  /** Intervalo em minutos (inteiro >= 1): com ele, a tarefa roda quando a última execução passou disso. */
+  aCadaMin?: number
   executar(db: Db): void | Promise<void>
 }
 
@@ -24,20 +27,24 @@ export async function carregarTarefas(pasta = PASTA): Promise<Tarefa[]> {
   for (const nome of readdirSync(pasta).filter((n) => n.endsWith('.ts')).sort()) {
     const mod = (await import(pathToFileURL(join(pasta, nome)).href)) as { tarefa?: Tarefa }
     const t = mod.tarefa
-    if (!t || typeof t.executar !== 'function' || !ehHoraLocal(t.horario)) throw new Error(`src/tarefas/${nome} não exporta uma tarefa válida`)
+    const intervaloOk = t?.aCadaMin === undefined || (Number.isInteger(t.aCadaMin) && t.aCadaMin >= 1)
+    if (!t || typeof t.executar !== 'function' || !ehHoraLocal(t.horario) || !intervaloOk) {
+      throw new Error(`src/tarefas/${nome} não exporta uma tarefa válida`)
+    }
     tarefas.push(t)
   }
   return tarefas
 }
 
-/** Devidas agora: passou do horário hoje e ainda não rodaram hoje. */
+/** Devidas agora: as diárias, se passou do horário hoje e ainda não rodaram hoje; as de intervalo, se o intervalo passou. */
 export function tarefasDevidas(db: Db, tarefas: Tarefa[]): Tarefa[] {
   const agoraDt = agoraData()
   const hoje = hojeSP(agoraDt)
   const hora = horaLocalDe(agoraDt.toISOString())
   return tarefas.filter((t) => {
-    if (hora < t.horario) return false
     const ultima = um<{ ultima_em: string }>(db, 'SELECT ultima_em FROM tarefa_execucao WHERE nome = ?', t.nome)
+    if (t.aCadaMin !== undefined) return !ultima || agoraDt.getTime() - Date.parse(ultima.ultima_em) >= t.aCadaMin * 60_000
+    if (hora < t.horario) return false
     return !ultima || dataLocalDe(ultima.ultima_em) < hoje
   })
 }

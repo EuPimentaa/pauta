@@ -79,6 +79,7 @@ function Formulario({ pedido }: { pedido: PedidoAutorizacao }) {
     'Ler as demandas, a agenda e o resumo dos clientes',
     'Criar, editar, mover, concluir e arquivar demandas',
     'Comentar, marcar checklists e lançar as suas horas',
+    'Criar e arrumar colunas e etiquetas dos quadros; criar clientes',
     ...(atendimento ? ['Registrar o retorno do cliente (aprovado ou ajuste)'] : []),
   ]
 

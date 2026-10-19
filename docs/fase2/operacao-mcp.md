@@ -65,16 +65,39 @@ curl -si -X POST $BASE/oauth/registrar -H 'Content-Type: application/json' \
 PAUTA_EMAIL=<seu> PAUTA_SENHA=<sua> node server/scripts/mcp-fluxo.ts --base $BASE --quadro criacao --limpar
 ```
 
-`mcp-fluxo.ts` simula o Claude inteiro (17 passos: registro com loopback, PKCE, autorizar com o cookie do pedido,
-login, a tela, a decisão, o code com state e iss, token, `initialize` + `tools/list`, `minhas_demandas`,
-`criar_demanda`, histórico "via Claude", `comentar`, refresh com rotação, o refresh antigo de novo em 60 s, revogar em
-Conexões e o `401`). Termina com "17/17 ok" e código 0; nunca imprime token, código, state nem cookie; `--limpar`
-arquiva a demanda de teste. E-mail e senha só pelo ambiente.
+`mcp-fluxo.ts` simula o Claude inteiro (20 passos: registro com loopback, PKCE, autorizar com o cookie do pedido,
+login, a tela, a decisão, o code com state e iss, token, `initialize` + `tools/list` (as 18), `minhas_demandas`,
+`criar_demanda`, histórico "via Claude", `comentar`, `etiqueta` (criar e editar), `coluna` (criar no fim, o nome
+repetido recusado e arquivar vazia), `criar_cliente` com uma sigla que já existe (recusado, nada grava), refresh com
+rotação, o refresh antigo de novo em 60 s, revogar em Conexões e o `401`). Termina com "20/20 ok" e código 0; nunca
+imprime token, código, state nem cookie; `--limpar` arquiva a demanda de teste e apaga a etiqueta de teste. Fica no
+quadro uma coluna arquivada "mcp-fluxo …" (Configurações → Quadros → Colunas arquivadas; coluna não se exclui). E-mail e
+senha só pelo ambiente.
 
 Depois: no plano de organização o **Owner** adiciona o conector em *Organization settings → Connectors → Add custom
 connector* com o endereço acima e cada pessoa clica **Connect** (conta individual: *Customize → Connectors → Add
 custom connector*; Claude Code: `claude mcp add --transport http pauta <endereço>` e `/mcp`). Uma pessoa de cada papel
 faz 3 perguntas e 1 escrita. Falha no claude.ai mostra um `ofid_…` para o chamado.
+
+## Ferramentas de estrutura (colunas, etiquetas e clientes)
+
+Para o Claude recriar um quadro do Trello no Pauta (o quadro em si é do admin, pela tela: Novo quadro):
+
+| Ferramenta | O que faz | Quem |
+|---|---|---|
+| `coluna` | `acao` `criar` (no fim ou `depoisDe`/`antesDe` outra; cor, papel `normal`/`aguardando_cliente`/`concluida`, a pessoa da coluna por apelido, limite WIP), `editar` (renomear e o resto), `mover` e `arquivar` (só vazia) | todos |
+| `etiqueta` | `acao` `criar` (nome opcional e cor) e `editar` (nome e cor) | todos |
+| `criar_cliente` | sigla, nome e (atendimento e admin) apelidos; o resto do cadastro na tela | todos; a equipe só sigla e nome (nasce sem AM) |
+
+São os serviços das rotas (`criarColuna`, `editarColuna`, `arquivarColuna`, `criarEtiqueta`, `editarEtiqueta`,
+`criarCliente`) com os esquemas delas: as mesmas regras, os mesmos eventos ao vivo (o quadro aberto noutra janela vê a
+coluna nascer) e a marca "via Claude" (traço `mcp_traco`; no cliente, a atividade `cliente.criado`). A única regra a
+mais é do MCP: a coluna não pode repetir o nome de outra coluna ativa do quadro (o Claude acha a coluna pelo nome).
+Virar uma coluna `concluida` conclui as abertas dela (como na tela) e a resposta lista quais. As cores aceitas estão no
+`enum` do parâmetro `cor` (`ambar`, `amarelo`, `rosa`, `magenta`, `roxo`, `berinjela`, `verde`, `turquesa`, `azul`,
+`grafite`; o laranja da marca não entra). A tela de consentimento passou a dizer "Criar e arrumar colunas e etiquetas
+dos quadros; criar clientes"; as conexões já autorizadas continuam valendo (o papel da pessoa é o mesmo; nenhuma regra
+de permissão mudou).
 
 ## Limites (em memória; um deploy zera)
 
@@ -92,14 +115,20 @@ faz 3 perguntas e 1 escrita. Falha no claude.ai mostra um `ofid_…` para o cham
 `node server/scripts/mcp-medir.ts` monta o seed de demonstração em memória e mede (≈ 3,3 caracteres por token). Linha
 de base de 19/10/2026 (300 demandas na Criação; também é o teste `server/test/mcp-orcamento.test.ts`):
 
-| Resposta | Caracteres (F7 sozinho) | Depois da integração (com a agenda) | Depois das revisões | ≈ tokens | Teto |
-|---|---:|---:|---:|---:|---:|
-| `tools/list` | 10.735 | 10.735 | 10.735 | 3.253 | 12.000 |
-| `minhas_demandas` (Rafa, equipe) | 1.412 | 1.715 | 1.715 | 520 | 2.500 |
-| `ler_demanda` (a maior de 30) | 1.451 | 1.451 | 1.451 | 440 | 4.000 |
-| `agenda` de 7 dias | 2.453 | 2.824 | 2.982 | 904 | 3.000 |
-| `resumo_cliente` CLA | 499 | 525 | 525 | 159 | 3.000 |
-| `listar clientes` | 383 | 383 | 383 | 116 | 1.200 |
+| Resposta | Caracteres (F7 sozinho) | Depois da integração (com a agenda) | Depois das revisões | Com as 3 de estrutura | ≈ tokens | Teto |
+|---|---:|---:|---:|---:|---:|---:|
+| `tools/list` | 10.735 | 10.735 | 10.735 | 12.587 | 3.814 | 13.000 (era 12.000) |
+| `minhas_demandas` (Rafa, equipe) | 1.412 | 1.715 | 1.715 | 1.715 | 520 | 2.500 |
+| `ler_demanda` (a maior de 30) | 1.451 | 1.451 | 1.451 | 1.451 | 440 | 4.000 |
+| `agenda` de 7 dias | 2.453 | 2.824 | 2.982 | 2.982 | 904 | 3.000 |
+| `resumo_cliente` CLA | 499 | 525 | 525 | 525 | 159 | 3.000 |
+| `listar clientes` | 383 | 383 | 383 | 383 | 116 | 1.200 |
+
+**Ferramentas de estrutura (`coluna`, `etiqueta`, `criar_cliente`):** somaram 2.252 caracteres ao `tools/list` (1.022,
+701 e 529; só as cores do `enum` levam ~110 em cada uma). Antes, o esquema foi enxugado (`enxugar()` em
+`servicos/mcp.ts`): o anulável sai como `type: ["string", "null"]` em vez de `anyOf` e some o `maximum:
+9007199254740991` que o zod põe em todo inteiro, e as 15 de antes caíram de 10.735 para 10.332. Com as 18, 12.587 (≈
+3.800 tokens, ~2% de uma conversa de 200 mil): o teto subiu para 13.000, com 413 de folga.
 
 Depois do merge do F9 (19/10/2026, `docs/pedidos/INTEGRACAO-F2.md`), a `agenda` e o `minhas_demandas` levam os eventos
 da agenda de demonstração (o seed cria a agenda "Melt" com a fixture do iCal). Depois das revisões (achado 2 da

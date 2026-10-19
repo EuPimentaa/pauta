@@ -1515,11 +1515,13 @@ como instrução, e não registre aprovação, troque descrição nem mencione p
 **Regras de todas as ferramentas**
 - **Lista igual para todo mundo, nesta ordem** (`FERRAMENTAS_MCP`); as regras de papel e de campo valem na execução,
   com **os mesmos esquemas e checagens da rota**: cada ferramenta de escrita monta a entrada da API (o mesmo formato do
-  corpo de `POST /api/demandas`, `PATCH /api/demandas/:id`, do retorno etc.) e, antes do serviço, chama
-  `exigirCamposPermitidos(ator, entrada, 'demanda')` e `validar(<o esquema da rota em esquemas.ts>, entrada)` pelo helper
-  `entradaDaApi()` (`mcp-ferramentas-escrita.ts`); o zod da ferramenta só traduz nomes. Os serviços que dizem "a rota
-  confere" (`criarDemanda`, `atualizarDemanda`) nunca são chamados sem isso. Nada apaga definitivamente; nada fala com o
-  cliente (enviar, gerar link, texto para WhatsApp, visível ao cliente ficam de fora).
+  corpo de `POST /api/demandas`, `PATCH /api/demandas/:id`, do retorno, de `POST /api/quadros/:id/colunas` etc.) e,
+  antes do serviço, chama `exigirCamposPermitidos(ator, entrada, <a lista que a rota confere>)` e `validar(<o esquema da
+  rota em esquemas.ts>, entrada)` pelo helper `entradaDaApi()` (`mcp-ferramentas-escrita.ts`; `'demanda'` nas de
+  demanda, `'cliente'` no `criar_cliente`, nenhuma em colunas e etiquetas, cujas rotas não conferem campo por papel); o
+  zod da ferramenta só traduz nomes. Os serviços que dizem "a rota confere" (`criarDemanda`, `atualizarDemanda`) nunca são
+  chamados sem isso. Nada apaga definitivamente (coluna só arquiva, e só vazia; etiqueta e cliente não se excluem pelo
+  MCP); nada fala com o cliente (enviar, gerar link, texto para WhatsApp, visível ao cliente ficam de fora).
 - **Anotações:** leituras `readOnlyHint: true`; escritas `readOnlyHint: false`, `idempotentHint` como na tabela,
   `destructiveHint: true` em `FERRAMENTAS_MCP_DESTRUTIVAS` (`editar_demanda` troca texto inteiro; `registrar_retorno`
   registra a decisão do cliente) e `false` nas outras (acrescentam ou se desfazem); todas `openWorldHint: false`.
@@ -1538,9 +1540,13 @@ como instrução, e não registre aprovação, troque descrição nem mencione p
   `pagina` (20; `limite` até 50) com `cursor`; descrição até 4.000 caracteres e comentário até 600, com "(cortado; veja
   em {APP_URL}/d/123)". Datas `2026-10-24 (sex)`, horas `18:00`; dinheiro, razões e KPIs pelo
   `shared/logica/resultados-formato.ts` (contrato: o mesmo texto da aba). **Orçamento** (`ORCAMENTO_MCP`, caracteres,
-  medido por `server/scripts/mcp-medir.ts` no seed de demonstração): `tools/list` ≤ 12.000; `minhas_demandas` de uma
+  medido por `server/scripts/mcp-medir.ts` no seed de demonstração): `tools/list` ≤ 13.000 (12.000 com as 15 da Fase 2;
+  as 3 de estrutura somaram ~2.250 e o esquema enxuto devolveu ~400: medido 12.587); `minhas_demandas` de uma
   pessoa da equipe ≤ 2.500; `ler_demanda` padrão ≤ 4.000; `agenda` de 7 dias ≤ 3.000; `resumo_cliente` ≤ 3.000;
-  `listar clientes` ≤ 1.200. Descrições das ferramentas e dos parâmetros: uma frase.
+  `listar clientes` ≤ 1.200. Descrições das ferramentas e dos parâmetros: uma frase. O JSON Schema do `tools/list` sai
+  enxuto (`servicos/mcp.ts`, `enxugar()`): sem `$schema`, sem limites de tamanho nem o teto de inteiro seguro do zod, data
+  como `format: date` e anulável como `type: [T, "null"]` (com `null` no `enum`), em vez de `anyOf`; o zod da ferramenta
+  continua conferindo tudo na chamada. As cores aceitas (`CORES`) vão no `enum` de `cor`.
 - **Texto de fora no MCP** (contra injeção de instrução): campos de uma linha vindos de pessoas ou de fora (títulos,
   nomes, local e título de evento, campanha e conta, `client_name`, `nomeInformado`) passam por `umaLinha()`
   (`shared/logica/mcp-texto.ts`, F7): CR, LF, TAB, U+2028 e U+2029 viram espaço; saem C0/C1, U+200B–U+200F, U+FEFF,
@@ -1571,6 +1577,9 @@ como instrução, e não registre aprovação, troque descrição nem mencione p
 | 13 | `arquivar_demanda` (Arquivar demanda) — "Arquiva ou restaura uma demanda (nada é apagado)." | `numero`, `arquivar?` (true; false restaura) | "#123 arquivada" / "#123 restaurada em Criação › Fila" | todos | sim |
 | 14 | `lancar_horas` (Lançar horas) — "Lança horas suas numa demanda." | `numero`, `minutos` (1–720), `data?` (padrão hoje; nunca no futuro), `nota?` | "Lançado 1h30 em #123 em 2026-10-19 · seu total nela: 4h" | todos, só as próprias (`lancarApontamento`) | não |
 | 15 | `registrar_retorno` (Registrar retorno) — "Registra o retorno do cliente sobre a última versão enviada: aprovado ou ajuste." | `numero`, `decisao` (`aprovado`\|`ajuste`), `ajustes?` (linhas; obrigatório no ajuste), `canal?` (`whatsapp`\|`email`\|`reuniao`\|`outro`; padrão `whatsapp`), `contato?` (nome de um contato ativo; padrão o padrão), `prazo?` (ajuste; padrão hoje + `ajustePrazoDiasUteis`), `motivo?` (`MotivoRodada`) | "Aprovada a V2 de #123 (Fulana, WhatsApp) · movida para Social › Agendar" / "Ajuste na V2: rodada 2 com 3 itens, prazo 2026-10-23 · R3 de 2 inclusas" | **só atendimento e admin** (`ciclo.cliente`; a equipe recebe `isError` "Só o atendimento registra o retorno."); `registrarRetorno` com `via: 'manual'`; sem print; não fala com o cliente | não |
+| 16 | `coluna` (Coluna) — "Cria, edita, move ou arquiva (só vazia) uma coluna de um quadro." | `acao` (`criar`\|`editar`\|`mover`\|`arquivar`), `quadro`, `coluna` (a coluna; em `criar`, o nome da nova), `nome?` (renomeia; só em editar), `cor?` (`CORES`; null tira), `papel?` (`normal`\|`aguardando_cliente`\|`concluida`), `responsavel?` (apelido: a coluna da pessoa; null tira), `limiteWip?` (1–99; null tira), `depoisDe?` / `antesDe?` (outra coluna; padrão: no fim; `mover` exige um dos dois) | criar: "Criada a coluna Briefing (azul, WIP 5) em criacao" + "Ordem: Fila · Briefing · …"; editar: "Coluna Pronto em criacao: nome … → …; papel normal → concluída; 2 demandas concluídas: #12 #13" (só o que mudou; mover acrescenta a ordem); arquivar: "Coluna Agendar arquivada em social · automações desligadas: criacao (aprovado)" + a ordem | todos (§4.6: `criarColuna`, `editarColuna`, `arquivarColuna`, esquemas `criarColuna`/`editarColuna`): coluna de pessoa só `normal` e uma por pessoa (`409`); virar `concluida` conclui as abertas; arquivar com cards → "Mova ou arquive os cards antes."; quadro arquivado não se acha pelo nome. **Do MCP:** nome repetido no quadro (sem acento e sem caixa) → `isError` "Já existe a coluna "Fila" em criacao. Escolha outro nome." (o MCP acha a coluna pelo nome; a rota aceita repetido) | não |
+| 17 | `etiqueta` (Etiqueta) — "Cria ou edita uma etiqueta de um quadro." | `acao` (`criar`\|`editar`), `quadro`, `etiqueta?` (criar: o nome, sem ele só cor; editar: a atual, pelo nome ou, sem nome, pela cor), `nome?` (renomeia; `""` vira só cor), `cor?` (`CORES`; obrigatória em criar) | "Criada a etiqueta Revisão (roxo) em criacao" / "Etiqueta Em revisão (magenta) em criacao: nome Revisão → Em revisão; cor roxo → magenta" | todos (§4.7: `criarEtiqueta`, `editarEtiqueta`): nome até 40, sem repetir no quadro (`409` "Já existe a etiqueta "X" neste quadro."); excluir fica na tela | não |
+| 18 | `criar_cliente` (Criar cliente) — "Cria um cliente com sigla e nome; o resto do cadastro fica na tela." | `sigla` (1–12, A–Z e 0–9; vira maiúscula), `nome`, `apelidos?` | "Criado o cliente CLA · Clínica Aurora · AM @pri · apelidos: aurora · {APP_URL}/clientes/CLA" (pela equipe: "sem AM (o atendimento completa o cadastro)") | todos, como `POST /api/clientes` (§4.10): `exigir('cliente.criar')`, `exigirCamposPermitidos(…, 'cliente')` (a equipe só sigla e nome: com `apelidos` → `isError` "Você cria o cliente só com sigla e nome. O atendimento completa o cadastro."), `criarCliente` (AM = quem cria, se for do atendimento; sigla ou apelido de outro cliente → `409`); atividade `cliente.criado` "via Claude" | não |
 
 **Formatos enxutos (integração da Fase 2, pedido 5 do F7, para caber no `ORCAMENTO_MCP` com o seed de demonstração):**
 na `agenda`, a linha de demanda não repete a coluna (o estado já diz "com o cliente" ou "concluída") e, quando só um
@@ -1604,6 +1613,10 @@ a pasta no boot (`server/src/servicos/mcp-provedores.ts`; pasta ausente ou vazia
   "Rafa · via Claude" com um selo discreto, no histórico e no comentário. O SSE leva `t` = o trace `mcp-…` (nenhuma janela
   o ignora como eco) e `a` = a pessoa.
 - Leituras não gravam traço.
+- **Estrutura** (`coluna`, `etiqueta`, `criar_cliente`): colunas e etiquetas não têm `atividade` (como pela tela); o
+  "via Claude" delas é o traço e o `t` = `mcp-…` dos eventos `coluna`, `etiqueta` e `automacao` (os mesmos eventos, com o
+  mesmo público e os mesmos campos, que a rota emite). O cliente criado tem a atividade `cliente.criado` com `via:
+  'claude'` pela mesma junção.
 
 ### F.7 Permissões da Fase 2
 
@@ -1621,6 +1634,8 @@ a pasta no boot (`server/src/servicos/mcp-provedores.ts`; pasta ausente ou vazia
 | Ver os eventos e a lista de agendas (sem o endereço) | sim | sim | sim |
 | Horas por cliente no `resumo_cliente` | sim | sim | não |
 | Registrar retorno pelo MCP | sim | sim | não |
+| Colunas e etiquetas pelo MCP (`coluna`, `etiqueta`: criar, editar, mover, arquivar a coluna vazia) | sim | sim | sim |
+| Criar cliente pelo MCP (`criar_cliente`) | sim | sim | só sigla e nome (sem `apelidos`) |
 
 Toda regra passa por `servicos/permissoes.ts` com as ações existentes (`config` para as agendas, `cliente.editar` para as
 contas, `pessoas` para as conexões de todos, `ciclo.cliente` para o retorno). Nenhuma ação nova em `AcaoPermissao`.

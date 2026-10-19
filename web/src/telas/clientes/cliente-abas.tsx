@@ -2,8 +2,10 @@
  * Página do cliente, as abas (F5): Demandas (de todos os quadros, por quadro, com o CardDemanda), Aprovações (a
  * trilha), Horas (atendimento e admin: o total do mês; o admin vê por pessoa e os lançamentos) e Configurações (o
  * cadastro: nome, sigla, status, nível, cor, rodadas inclusas, grupo, observações e apelidos).
+ * A aba Configurações é o host do ponto `cliente-config` (Fase 2, F8; FASE2-PLANO §4): as seções das extensões vêm
+ * abaixo do cadastro, pela `ordem`, com `podeEditar` (a mesma regra do cadastro).
  */
-import { useId, useMemo, useState } from 'react'
+import { Suspense, useId, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Archive, Check, ChevronLeft, ChevronRight, Clock3, PencilLine, Plus, ShieldAlert, X } from 'lucide-react'
@@ -19,11 +21,13 @@ import { definirApelidos, editarCliente, useTrilha } from '../../funcionalidades
 import { erroDoCampo, Faixa, mensagemGeral, nomeCurto, Painel, Pilula } from '../../funcionalidades/cadastros/comum.tsx'
 import { MESES, hojeLocal } from '../../lib/datas.ts'
 import { CardDemanda } from '../../quadro/index.ts'
+import { useRegistro } from '../../sessao/registro.ts'
 import { Avatar } from '../../ui/Avatar.tsx'
 import { avisar } from '../../ui/avisos.tsx'
 import { Botao, BotaoIcone } from '../../ui/Botao.tsx'
 import { AreaTexto, Campo, Selecao } from '../../ui/Campo.tsx'
 import { EsqueletoLinhas, EstadoVazio } from '../../ui/Indicadores.tsx'
+import { LimiteErro } from '../../ui/LimiteErro.tsx'
 import { SeletorCor } from '../../ui/SeletorCor.tsx'
 import { TextoPuro } from '../../ui/Texto.tsx'
 import { ROTULO_STATUS } from './comum-clientes.tsx'
@@ -259,6 +263,26 @@ function Apelidos({ cliente, podeEditar }: { cliente: Cliente; podeEditar: boole
   )
 }
 
+/** As seções de extensoes/cliente-config (Contas de resultados…), abaixo do cadastro. */
+function SecoesDoCliente({ cliente, podeEditar }: { cliente: Cliente; podeEditar: boolean }) {
+  const eu = useEu()
+  const reg = useRegistro()
+  return (
+    <>
+      {reg.secoesCliente().filter((s) => !s.visivel || s.visivel(eu)).map((s) => {
+        const Secao = reg.componenteDe('cliente-config', s.id, s.carregar)
+        return (
+          <LimiteErro key={s.id} nome={`configurações do cliente ${s.id}`}>
+            <Suspense fallback={<Painel><div className="cad-painel-corpo" aria-busy="true"><EsqueletoLinhas linhas={3} /></div></Painel>}>
+              <Secao cliente={cliente} podeEditar={podeEditar} />
+            </Suspense>
+          </LimiteErro>
+        )
+      })}
+    </>
+  )
+}
+
 export function AbaConfiguracoes({ cliente, podeEditar }: { cliente: Cliente; podeEditar: boolean }) {
   const qc = useQueryClient()
   const navegar = useNavigate()
@@ -333,6 +357,7 @@ export function AbaConfiguracoes({ cliente, podeEditar }: { cliente: Cliente; po
         </div>
       </Painel>
       <Painel><div className="cad-painel-corpo"><Apelidos cliente={cliente} podeEditar={podeEditar} /></div></Painel>
+      <SecoesDoCliente cliente={cliente} podeEditar={podeEditar} />
     </div>
   )
 }

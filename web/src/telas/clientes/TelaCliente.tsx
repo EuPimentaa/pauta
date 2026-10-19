@@ -2,8 +2,10 @@
  * /clientes/:sigla (F5; PLANO §3): cabeçalho com o logo (upload), o AM e o "Completar cadastro"; contatos, pasta de
  * saída, links e responsáveis por equipe; abas Demandas, Aprovações, Horas (atendimento e admin) e Configurações.
  * O cliente vem de useClienteDetalhe (chave ['cliente', sigla]); o tempo real mantém o cache.
+ * Host do ponto `cliente-aba` (Fase 2, F8; FASE2-PLANO §4): as abas das extensões entram entre as fixas pela `ordem`
+ * (Demandas 100, Aprovações 200, Horas 300, Configurações 900), com `?aba=<id>` e o painel carregado sob demanda.
  */
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { ArrowLeft, Building2 } from 'lucide-react'
 import { pode } from '@shared/logica/permissoes.ts'
@@ -12,15 +14,17 @@ import { useClienteDetalhe } from '../../api/clientes.ts'
 import { useClientes, useUsuarios } from '../../api/seletores.ts'
 import { nomeCurto, Pilula } from '../../funcionalidades/cadastros/comum.tsx'
 import { useTituloAba } from '../../lib/app.ts'
+import { useRegistro } from '../../sessao/registro.ts'
 import { Abas, painelAba } from '../../ui/Abas.tsx'
 import { Avatar } from '../../ui/Avatar.tsx'
 import { Botao, propsBotao } from '../../ui/Botao.tsx'
 import { Esqueleto, EsqueletoLinhas, EstadoVazio } from '../../ui/Indicadores.tsx'
+import { LimiteErro } from '../../ui/LimiteErro.tsx'
 import { AbaAprovacoes, AbaConfiguracoes, AbaDemandas, AbaHoras } from './cliente-abas.tsx'
 import { CompletarCadastro, Contatos, Links, LogoCliente, Responsaveis } from './cliente-cadastro.tsx'
 import { ROTULO_STATUS } from './comum-clientes.tsx'
 
-type Aba = 'demandas' | 'aprovacoes' | 'horas' | 'configuracoes'
+type AbaFixa = 'demandas' | 'aprovacoes' | 'horas' | 'configuracoes'
 
 export default function TelaCliente() {
   const { sigla = '' } = useParams()
@@ -28,6 +32,7 @@ export default function TelaCliente() {
   const clientes = useClientes()
   const usuarios = useUsuarios()
   const [params, setParams] = useSearchParams()
+  const reg = useRegistro()
   const resumo = clientes.find((c) => c.sigla === sigla.toUpperCase())
   const detalhe = useClienteDetalhe(resumo?.id ?? null)
   const [novoContato, setNovoContato] = useState(false)
@@ -35,13 +40,16 @@ export default function TelaCliente() {
 
   const gestao = eu.usuario.papel !== 'equipe'
   const admin = eu.usuario.papel === 'admin'
-  const abas: { id: Aba; rotulo: string }[] = [
-    { id: 'demandas', rotulo: 'Demandas' }, { id: 'aprovacoes', rotulo: 'Aprovações' },
-    ...(gestao ? [{ id: 'horas' as const, rotulo: 'Horas' }] : []), { id: 'configuracoes', rotulo: 'Configurações' },
+  const fixas: { id: AbaFixa; rotulo: string; ordem: number }[] = [
+    { id: 'demandas', rotulo: 'Demandas', ordem: 100 }, { id: 'aprovacoes', rotulo: 'Aprovações', ordem: 200 },
+    ...(gestao ? [{ id: 'horas' as const, rotulo: 'Horas', ordem: 300 }] : []), { id: 'configuracoes', rotulo: 'Configurações', ordem: 900 },
   ]
-  const pedida = params.get('aba') as Aba | null
-  const aba: Aba = abas.some((a) => a.id === pedida) ? pedida! : 'demandas'
-  const mudarAba = (a: Aba) => setParams((p) => { const n = new URLSearchParams(p); if (a === 'demandas') n.delete('aba'); else n.set('aba', a); return n }, { replace: true })
+  const extras = reg.abasCliente().filter((a) => !a.visivel || a.visivel(eu))
+  const abas: { id: string; rotulo: string; ordem: number }[] = [...fixas, ...extras.map((a) => ({ id: a.id, rotulo: a.rotulo, ordem: a.ordem }))]
+    .sort((a, b) => a.ordem - b.ordem)
+  const pedida = params.get('aba')
+  const aba: string = abas.some((a) => a.id === pedida) ? pedida! : 'demandas'
+  const mudarAba = (a: string) => setParams((p) => { const n = new URLSearchParams(p); if (a === 'demandas') n.delete('aba'); else n.set('aba', a); return n }, { replace: true })
 
   if (!resumo) {
     return (
@@ -114,6 +122,14 @@ export default function TelaCliente() {
           {a.id === aba && aba === 'aprovacoes' && <AbaAprovacoes cliente={c} />}
           {a.id === aba && aba === 'horas' && gestao && <AbaHoras cliente={c} admin={admin} />}
           {a.id === aba && aba === 'configuracoes' && <AbaConfiguracoes key={`${c.id}:${c.atualizadoEm}`} cliente={c} podeEditar={podeEditar} />}
+          {a.id === aba && extras.filter((x) => x.id === aba).map((x) => {
+            const Painel = reg.componenteDe('cliente-aba', x.id, x.carregar)
+            return (
+              <LimiteErro key={x.id} nome={`aba do cliente ${x.id}`}>
+                <Suspense fallback={<div aria-busy="true"><EsqueletoLinhas linhas={6} /></div>}><Painel cliente={c} /></Suspense>
+              </LimiteErro>
+            )
+          })}
         </div>
       ))}
     </div>

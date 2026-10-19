@@ -38,12 +38,13 @@ export function formatarCompacto(v: number, formato: FormatoKpi): string {
   return dinheiro ? `R$ ${corpo}` : corpo
 }
 
-/** 3 ou 4 marcas "redondas" de 0 até cobrir `max` (1, 2, 2,5 ou 5 × 10^n). */
-export function marcasEixo(max: number): number[] {
+/** 3 ou 4 marcas "redondas" de 0 até cobrir `max` (1, 2, 2,5 ou 5 × 10^n); `inteiro`: passo de 1 ou mais (contagens). */
+export function marcasEixo(max: number, inteiro = false): number[] {
   if (!(max > 0)) return [0, 1]
   const bruto = max / 3
   const potencia = 10 ** Math.floor(Math.log10(bruto))
-  const passo = [1, 2, 2.5, 5, 10].map((m) => m * potencia).find((p) => p * 3 >= max) ?? 10 * potencia
+  const candidatos = [1, 2, 2.5, 5, 10].map((m) => m * potencia).filter((p) => !inteiro || (p >= 1 && Number.isInteger(p)))
+  const passo = candidatos.find((p) => p * 3 >= max) ?? Math.max(inteiro ? 1 : 0, 10 * potencia)
   const marcas = [0]
   while (marcas[marcas.length - 1]! < max - 1e-9) marcas.push(Math.round((marcas[marcas.length - 1]! + passo) * 1e6) / 1e6)
   return marcas
@@ -65,6 +66,18 @@ export function textoDados(buscadoEm: Instante | null, hoje: DataLocal): string 
 export function buscadoMaisAntigo(r: Pick<ResultadosCliente, 'meta' | 'googleAds' | 'ga4'>): Instante | null {
   const lista = [r.meta?.buscadoEm, r.googleAds?.buscadoEm, r.ga4?.buscadoEm].filter((x): x is string => !!x).sort()
   return lista[0] ?? null
+}
+
+const STATUS: Record<string, string | null> = {
+  active: null, enabled: null, ok: null, paused: 'pausada', inactive: 'inativa', disabled: 'desativada', removed: 'removida',
+  closed: 'encerrada', unsettled: 'pagamento pendente', pending: 'pendente',
+}
+
+/** O status da conta na Windsor em português; ativa → null (não aparece). */
+export function rotuloStatus(status: string | null): string | null {
+  if (!status) return null
+  const s = status.toLowerCase()
+  return s in STATUS ? STATUS[s]! : status
 }
 
 /** "12/10" */

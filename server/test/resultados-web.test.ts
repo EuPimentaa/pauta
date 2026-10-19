@@ -19,6 +19,8 @@ describe('lógica do front dos resultados', () => {
     assert.deepEqual(marcasEixo(42), [0, 20, 40, 60])
     assert.deepEqual(marcasEixo(1), [0, 0.5, 1])
     assert.deepEqual(marcasEixo(0), [0, 1])
+    assert.deepEqual(marcasEixo(1, true), [0, 1], 'contagem: passo inteiro')
+    assert.deepEqual(marcasEixo(4, true), [0, 2, 4])
     for (const max of [3, 17, 99, 1234, 98765]) {
       const m = marcasEixo(max)
       assert.ok(m.length >= 3 && m.length <= 5 && m.at(-1)! >= max, `${max}: ${m}`)

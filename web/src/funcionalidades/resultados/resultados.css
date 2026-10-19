@@ -202,7 +202,8 @@
     .res-tabela td[data-rotulo]::before { content: attr(data-rotulo); font: 500 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); text-align: left; white-space: normal; }
     .res-tabela .num { text-align: right; }
     .res-celula { flex-direction: row; align-items: baseline; gap: var(--space-2); }
-    .res-campanha { min-width: 0; padding-bottom: var(--space-1) !important; }
+    .res-campanha { min-width: 0; padding-bottom: var(--space-1); }
+    .res-campanha-nome { font-weight: 600; }
     .res-canal-coluna { display: none !important; }
     .res-canal-celular { display: inline; margin-left: var(--space-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); color: var(--text-2); }
     .res-carteira-cliente { padding-bottom: var(--space-1) !important; }

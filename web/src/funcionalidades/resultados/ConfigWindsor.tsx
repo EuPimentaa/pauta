@@ -23,7 +23,7 @@ import { normalizarBusca } from '../../ui/Combobox.tsx'
 import { EsqueletoLinhas, EstadoVazio } from '../../ui/Indicadores.tsx'
 import { Faixa, LimparBusca, Painel, Pilula, textoNadaEncontrado } from '../cadastros/comum.tsx'
 import { ligarConta, recarregarContasWindsor, useContasWindsor } from './api.ts'
-import { sugerirCliente, textoHora } from './logica.ts'
+import { rotuloStatus, sugerirCliente, textoHora } from './logica.ts'
 import './resultados.css'
 
 const NUM = new Intl.NumberFormat('pt-BR')
@@ -57,7 +57,7 @@ function LinhaConta({ conta, editaveis }: { conta: ContaWindsor; editaveis: Clie
         <span className="res-conta-nome">{conta.nome}</span>
         <span className="res-conta-meta">
           <span className="tabular">{conta.contaId}</span>
-          {conta.status && conta.status !== 'active' && <span>{conta.status}</span>}
+          {rotuloStatus(conta.status) && <span>{rotuloStatus(conta.status)}</span>}
         </span>
       </div>
       <div className="res-conta-clientes">

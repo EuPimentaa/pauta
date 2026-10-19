@@ -5,7 +5,10 @@
  *   ['resultados', clienteId, 'contas']         GET /api/clientes/:id/resultados/contas
  *   ['resultados', 'panorama', periodo]         GET /api/resultados/panorama
  *   ['resultados', 'contas']                    GET /api/resultados/contas (admin e atendimento)
- * Com `atualizando: true`, a consulta pede de novo a cada 15 s (o SSE costuma chegar antes).
+ * Com `atualizando: true`, a consulta pede de novo a cada 15 s (o SSE costuma chegar antes). Corrida: com as fixtures ou
+ * o cache quente da Windsor, a busca termina e o SSE do fim chega ANTES da resposta do GET que a começou; numa consulta
+ * ainda sem dados o TanStack não cancela o GET em voo e a resposta "atualizando" ficaria na tela por 15 s. Por isso o
+ * tratador marca o fim (`marcarFimDaBusca`) e a consulta que volta "atualizando" depois de um fim pede de novo na hora.
  * As mutações LANÇAM o ErroDaApi; quem chama decide o aviso.
  */
 import { useQuery, type QueryClient } from '@tanstack/react-query'
@@ -26,10 +29,25 @@ export const chavesResultados = {
 
 const REPETIR_MS = 15_000
 
+/** Quando chegou o último fim de busca de cada cliente (o SSE `resultado_cliente` com `atualizando: false`). */
+const fimDaBusca = new Map<Id, number>()
+
+export function marcarFimDaBusca(clienteId: Id): void {
+  fimDaBusca.set(clienteId, performance.now())
+}
+
+async function lerResultados(clienteId: Id, periodo: PeriodoResultados, sinal: AbortSignal): Promise<ResultadosCliente> {
+  const caminho = comConsulta(`/api/clientes/${clienteId}/resultados`, { periodo })
+  const inicio = performance.now()
+  const r = await api<ResultadosCliente>('GET', caminho, { sinal })
+  if (r.atualizando && (fimDaBusca.get(clienteId) ?? -1) >= inicio) return api<ResultadosCliente>('GET', caminho, { sinal })
+  return r
+}
+
 export function useResultadosCliente(clienteId: Id, periodo: PeriodoResultados) {
   return useQuery<ResultadosCliente, ErroDaApi>({
     queryKey: chavesResultados.doCliente(clienteId, periodo),
-    queryFn: ({ signal }) => api<ResultadosCliente>('GET', comConsulta(`/api/clientes/${clienteId}/resultados`, { periodo }), { sinal: signal }),
+    queryFn: ({ signal }) => lerResultados(clienteId, periodo, signal),
     staleTime: 60_000,
     placeholderData: (anterior, consulta) => (consulta?.queryKey[1] === clienteId ? anterior : undefined),
     refetchInterval: (q) => (q.state.data?.atualizando ? REPETIR_MS : false),

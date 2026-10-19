@@ -53,11 +53,11 @@ export function GraficoSerie({ metrica, atual, anterior, rotuloAtual, rotuloAnte
   const fmt = (v: number) => formatarValor(v, metrica.formato)
   const resumo = resumoGrafico(metrica, atual, anterior, { atual: rotuloAtual, anterior: rotuloAnterior })
   const valores = [...atual, ...anterior].map((p) => p.valor)
-  const marcas = marcasEixo(Math.max(0, ...valores))
+  const marcas = marcasEixo(Math.max(0, ...valores), metrica.formato === 'inteiro')
   const topo = marcas[marcas.length - 1]!
   const rotulosY = marcas.map((m) => formatarCompacto(m, metrica.formato))
   const altura = celular ? 190 : 230
-  const margem = { esq: Math.max(...rotulosY.map((r) => r.length)) * 7 + 10, dir: 14, cima: 10, baixo: 28 }
+  const margem = { esq: Math.max(36, Math.max(...rotulosY.map((r) => r.length)) * 7.5 + 12), dir: 14, cima: 10, baixo: 28 }
   const w = Math.max(40, largura - margem.esq - margem.dir)
   const h = altura - margem.cima - margem.baixo
   const passo = n > 1 ? w / (n - 1) : 0

@@ -17,6 +17,7 @@ import { normalizarBusca } from '../../ui/Combobox.tsx'
 import { EsqueletoLinhas } from '../../ui/Indicadores.tsx'
 import { erroDoCampo, Faixa, mensagemGeral } from '../cadastros/comum.tsx'
 import { ligarConta, useContasLigadas, useContasWindsor } from './api.ts'
+import { rotuloStatus } from './logica.ts'
 import './resultados.css'
 
 const DICA_ID: Record<ConectorWindsor, string> = {
@@ -133,7 +134,7 @@ export default function DialogoLigarConta({ params, fechar }: PropsDialogo<'resu
                           <span className="res-opcao-nome">{c.nome}</span>
                           <span className="res-opcao-meta">
                             <span>{c.contaId}</span>
-                            {c.status && c.status !== 'active' && <span>{c.status}</span>}
+                            {rotuloStatus(c.status) && <span>{rotuloStatus(c.status)}</span>}
                             {ja && <span>já ligada a este cliente</span>}
                             {outros.length > 0 && <span>usada por {outros.join(', ')}</span>}
                           </span>

@@ -163,7 +163,7 @@ function TabelaCampanhas({ conector, campanhas }: { conector: 'facebook' | 'goog
             <tbody>
               {campanhas.map((c) => (
                 <tr key={c.id}>
-                  <td className="res-campanha"><span className="res-campanha-nome">{c.nome}</span>{c.tipo && <span className="res-campanha-tipo">{rotuloTipo(c.tipo)}</span>}</td>
+                  <td><div className="res-campanha"><span className="res-campanha-nome">{c.nome}</span>{c.tipo && <span className="res-campanha-tipo">{rotuloTipo(c.tipo)}</span>}</div></td>
                   <td className="num" data-rotulo="Investimento">{formatarKpi('facebook', 'investimento', c.investimento)}</td>
                   <td className="num" data-rotulo={rotuloRes}>{res(c.resultados)}</td>
                   <td className="num" data-rotulo={rotuloCusto}>{formatarKpi('facebook', 'custoPorResultado', c.custoPorResultado)}</td>
@@ -227,7 +227,7 @@ export default function AbaResultados({ cliente }: { cliente: Cliente }) {
       {r?.estado === 'ok' && (
         <div className="res-dados">
           <span aria-live="polite" className="res-dados-texto">
-            {r.atualizando ? <><Loader2 className="ui-giro" aria-hidden="true" />Atualizando…</> : textoDados(buscadoMaisAntigo(r), hoje) ?? ''}
+            {r.atualizando || pedindo ? <><Loader2 className="ui-giro" aria-hidden="true" />Atualizando…</> : textoDados(buscadoMaisAntigo(r), hoje) ?? ''}
           </span>
           <Botao tamanho="p" variante="secundario" icone={RefreshCw} carregando={pedindo} disabled={r.atualizando}
             dica="Relê o que a Windsor tem agora. Os 3 últimos dias podem chegar com até 6 h de atraso." onClick={() => void atualizar()}>

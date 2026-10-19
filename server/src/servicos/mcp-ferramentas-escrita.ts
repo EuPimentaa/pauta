@@ -262,7 +262,11 @@ const editar = ferramenta({
     }
     for (const u of depois.membroIds.filter((x) => !antes.membroIds.includes(x))) mudou.push(`+${n.handle(u)}`)
     for (const u of antes.membroIds.filter((x) => !depois.membroIds.includes(x))) mudou.push(`−${n.handle(u)}`)
-    const rotEt = (id: Id) => umaLinha(n.etiquetas(depois.quadroId).find((e) => e.id === id)?.nome || '(etiqueta)', 40)
+    // a só de cor como "(verde)", o mesmo texto que a acha
+    const rotEt = (id: Id) => {
+      const e = n.etiquetas(depois.quadroId).find((x) => x.id === id)
+      return umaLinha(e ? n.rotuloEtiqueta(e) : '(etiqueta)', 40)
+    }
     for (const id of depois.etiquetaIds.filter((x) => !antes.etiquetaIds.includes(x))) mudou.push(`+${rotEt(id)}`)
     for (const id of antes.etiquetaIds.filter((x) => !depois.etiquetaIds.includes(x))) mudou.push(`−${rotEt(id)}`)
     return `#${depois.numero}: ${mudou.length ? mudou.join('; ') : 'nada mudou'} · rev ${depois.rev}`

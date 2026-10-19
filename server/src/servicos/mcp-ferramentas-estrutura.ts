@@ -7,7 +7,7 @@
  * Claude"). Nada apaga: coluna só arquiva (vazia), etiqueta não se exclui por aqui.
  */
 import { z } from 'zod'
-import type { Coluna, Etiqueta, Id, PosicaoRelativa, Quadro } from '../../../shared/tipos/index.ts'
+import type { Coluna, Cor, Etiqueta, Id, PosicaoRelativa, Quadro } from '../../../shared/tipos/index.ts'
 import { CORES, PAPEIS_COLUNA } from '../../../shared/tipos/index.ts'
 import { plural, umaLinha } from '../../../shared/logica/mcp-texto.ts'
 import { normalizarAlias } from '../../../shared/logica/texto.ts'
@@ -59,14 +59,34 @@ function comParametros<T>(fn: () => T, mapa: Record<string, string>): T {
 }
 
 /**
- * O MCP acha a coluna pelo nome: dois nomes iguais no quadro deixariam as duas sem como chamar. Igual = a mesma chave
- * (sem caixa, acento, espaço, ponto, hífen e invisível); nome só de pontuação ("---", chave vazia): o nome sem caixa.
+ * Mesmo nome para o MCP: a mesma chave (sem caixa, acento, espaço, ponto, hífen e invisível); nome só de pontuação
+ * ("---", chave vazia): o nome sem caixa.
  */
-function exigirNomeLivre(n: Nomes, q: Quadro, texto: string, exceto: Id | null): void {
+function mesmoNome(texto: string): (x: string) => boolean {
   const k = chave(texto)
-  const igual = k ? (x: string) => chave(x) === k : (x: string) => normalizarAlias(umaLinha(x)) === normalizarAlias(umaLinha(texto))
+  return k ? (x) => chave(x) === k : (x) => normalizarAlias(umaLinha(x)) === normalizarAlias(umaLinha(texto))
+}
+
+/** O MCP acha a coluna pelo nome: dois nomes iguais no quadro deixariam as duas sem como chamar. */
+function exigirNomeLivre(n: Nomes, q: Quadro, texto: string, exceto: Id | null): void {
+  const igual = mesmoNome(texto)
   if (n.colunas(q.id).some((c) => c.id !== exceto && igual(c.nome))) {
     throw new ErroMcp(`Já existe a coluna "${rot(texto)}" em ${q.slug}. Escolha outro nome.`)
+  }
+}
+
+/**
+ * O MCP acha a etiqueta pelo nome e a só de cor pela cor: um nome igual ao de outra do quadro (mesmoNome; a rota só
+ * compara sem caixa e sem acento) ou uma segunda só de cor da mesma cor deixariam as duas sem como chamar.
+ */
+function exigirEtiquetaLivre(n: Nomes, q: Quadro, nome: string, cor: Cor, exceto: Id | null): void {
+  const outras = n.etiquetas(q.id).filter((e) => e.id !== exceto)
+  const limpo = umaLinha(nome, 40)
+  if (limpo) {
+    const igual = mesmoNome(limpo)
+    if (outras.some((e) => e.nome && igual(e.nome))) throw new ErroMcp(`Já existe a etiqueta "${limpo}" neste quadro.`)
+  } else if (outras.some((e) => !e.nome && e.cor === cor)) {
+    throw new ErroMcp(`Já existe uma etiqueta ${cor} sem nome em ${q.slug}. Dê um nome a esta.`)
   }
 }
 
@@ -170,6 +190,7 @@ const etiqueta = ferramenta({
       if (!a.cor) throw new ErroMcp('Em criar, mande a cor.')
       const e = comParametros(() => entradaDaApi(ator, { ...(a.etiqueta ? { nome: a.etiqueta } : {}), cor: a.cor },
         esquemaNucleo.criarEtiqueta, null), { nome: 'etiqueta' })
+      exigirEtiquetaLivre(n, q, e.nome ?? '', e.cor, null)
       return `Criada a etiqueta ${rotEtiqueta(criarEtiqueta(db, q.id, e, ator))} em ${q.slug}`
     }
     if (!a.etiqueta) throw new ErroMcp('Em editar, mande a etiqueta atual (o nome, ou a cor se ela não tem nome).')
@@ -177,6 +198,9 @@ const etiqueta = ferramenta({
     if (a.nome === undefined && a.cor === undefined) throw new ErroMcp('Nada para mudar: mande nome ou cor.')
     const e = entradaDaApi(ator, { ...(a.nome !== undefined ? { nome: a.nome } : {}), ...(a.cor ? { cor: a.cor } : {}) },
       esquemaNucleo.editarEtiqueta, null)
+    const nome = e.nome !== undefined ? umaLinha(e.nome, 40) : antes.nome
+    const cor = e.cor ?? antes.cor
+    if (normalizarAlias(nome) !== normalizarAlias(antes.nome) || (!nome && cor !== antes.cor)) exigirEtiquetaLivre(n, q, nome, cor, antes.id)
     const depois = editarEtiqueta(db, antes.id, e, ator)
     const mudou: string[] = []
     if (antes.nome !== depois.nome) mudou.push(`nome ${umaLinha(antes.nome, 40) || '—'} → ${umaLinha(depois.nome, 40) || '—'}`)

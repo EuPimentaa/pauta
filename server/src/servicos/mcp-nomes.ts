@@ -203,13 +203,27 @@ export class Nomes {
     return escolher('modelo', texto, validos.filter((m) => chave(m.nome) === k), (m) => m.nome, validos)
   }
 
-  /** Etiqueta do quadro pelo nome (sem nome: pela cor). */
+  /**
+   * Etiqueta do quadro: primeiro o nome igual (sem caixa e sem acento: "Em revisão" ≠ "Em-revisão"), depois pela chave;
+   * a só de cor pela cor ("verde"), ou só ela com "(verde)", "verde (sem nome)" ou "(sem nome) (verde)" (as formas das
+   * respostas), mesmo havendo uma etiqueta chamada "verde".
+   */
   etiqueta(quadroId: Id, texto: string): Etiqueta {
-    const k = chave(texto)
     const todas = this.etiquetas(quadroId)
-    const porNome = todas.filter((e) => e.nome && chave(e.nome) === k)
-    const achadas = porNome.length ? porNome : todas.filter((e) => !e.nome && chave(e.cor) === k)
-    return escolher('etiqueta', texto, achadas, (e) => this.rotuloEtiqueta(e), todas)
+    const rotulo = (e: Etiqueta) => this.rotuloEtiqueta(e)
+    const exato = todas.filter((e) => e.nome && normalizarAlias(e.nome) === normalizarAlias(texto))
+    if (exato.length === 1) return exato[0]!
+    const semNome = /\(sem nome\)/i.test(texto)
+    const resto = texto.replace(/\(sem nome\)/gi, '').trim()
+    const entre = /^\((.+)\)$/.exec(resto)
+    if (!exato.length && (semNome || entre)) {
+      const cor = chave(entre ? entre[1]! : resto)
+      return escolher('etiqueta', texto, todas.filter((e) => !e.nome && chave(e.cor) === cor), rotulo, todas)
+    }
+    const k = chave(texto)
+    const porNome = exato.length || !k ? exato : todas.filter((e) => e.nome && chave(e.nome) === k)
+    const achadas = porNome.length || !k ? porNome : todas.filter((e) => !e.nome && chave(e.cor) === k)
+    return escolher('etiqueta', texto, achadas, rotulo, todas)
   }
 
   rotuloEtiqueta(e: Etiqueta): string {

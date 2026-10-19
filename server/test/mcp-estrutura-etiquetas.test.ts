@@ -113,3 +113,39 @@ test('nome de etiqueta com caractere invisível (tag Unicode, largura zero) é r
   }
   assert.deepEqual(etiquetas(amb, 'criacao'), ['Urgente:rosa', 'Alteração:ambar'])
 })
+
+test('etiqueta de nome parecido: o MCP não cria duas com a mesma chave nem duas só de cor da mesma cor; o nome igual vem primeiro', async () => {
+  const amb = await ambienteMcp()
+  const c = await conectar(amb, amb.pessoas.design)
+  const et = (args: Record<string, unknown>) => chamar(amb, c.at, 'etiqueta', { quadro: 'criacao', ...args })
+  assert.equal((await et({ acao: 'criar', etiqueta: 'Em revisão', cor: 'roxo' })).erro, false)
+  assert.equal((await et({ acao: 'criar', etiqueta: 'Em-revisão', cor: 'roxo' })).texto, 'Já existe a etiqueta "Em-revisão" neste quadro.')
+  assert.equal((await et({ acao: 'editar', etiqueta: 'Urgente', nome: 'em.revisao' })).texto, 'Já existe a etiqueta "em.revisao" neste quadro.')
+  // só de cor: uma por cor (a Trello tem 30 cores, aqui são 10: as outras ganham nome)
+  assert.equal((await et({ acao: 'criar', cor: 'turquesa' })).erro, false)
+  assert.equal((await et({ acao: 'criar', cor: 'turquesa' })).texto, 'Já existe uma etiqueta turquesa sem nome em criacao. Dê um nome a esta.')
+  assert.equal((await et({ acao: 'editar', etiqueta: 'Em revisão', nome: '', cor: 'turquesa' })).texto,
+    'Já existe uma etiqueta turquesa sem nome em criacao. Dê um nome a esta.')
+  assert.equal((await et({ acao: 'criar', cor: 'verde' })).erro, false)
+  assert.equal((await et({ acao: 'editar', etiqueta: 'verde', cor: 'turquesa' })).texto,
+    'Já existe uma etiqueta turquesa sem nome em criacao. Dê um nome a esta.')
+  assert.deepEqual(etiquetas(amb, 'criacao'), ['Urgente:rosa', 'Alteração:ambar', 'Em revisão:roxo', ':turquesa', ':verde'])
+
+  // "Em-revisão" pela tela (a rota só compara sem caixa e sem acento): cada uma pelo seu nome
+  const http = amb.como(amb.pessoas.design)
+  assert.equal((await http.post(`/api/quadros/${amb.quadros.criacao.quadro.id}/etiquetas`, { nome: 'Em-revisão', cor: 'azul' })).status, 201)
+  assert.equal((await et({ acao: 'editar', etiqueta: 'Em revisão', cor: 'magenta' })).texto,
+    'Etiqueta Em revisão (magenta) em criacao: cor roxo → magenta')
+  const d = await chamar(amb, c.at, 'criar_demanda', { titulo: 'Revisar', quadro: 'criacao', etiquetas: ['Em-revisão'] })
+  assert.equal(d.erro, false, d.texto)
+  // uma etiqueta chamada "verde" não esconde a só de cor verde: "(verde)" e "verde (sem nome)" a acham
+  assert.equal((await et({ acao: 'criar', etiqueta: 'Verde', cor: 'azul' })).erro, false)
+  assert.equal((await et({ acao: 'editar', etiqueta: 'verde', cor: 'grafite' })).texto, 'Etiqueta Verde (grafite) em criacao: cor azul → grafite')
+  assert.equal((await et({ acao: 'editar', etiqueta: '(verde)', nome: 'Aprovado' })).texto, 'Etiqueta Aprovado (verde) em criacao: nome — → Aprovado')
+  assert.equal((await et({ acao: 'editar', etiqueta: 'turquesa (sem nome)', nome: 'Pausa' })).texto,
+    'Etiqueta Pausa (turquesa) em criacao: nome — → Pausa')
+  const numero = Number(/#(\d+)/.exec(d.texto)![1])
+  assert.equal((await et({ acao: 'criar', cor: 'roxo' })).erro, false)
+  const ed = await chamar(amb, c.at, 'editar_demanda', { numero, etiquetasPor: ['(roxo)'] })
+  assert.ok(ed.texto.startsWith(`#${numero}: +(roxo) · rev `), ed.texto)
+})

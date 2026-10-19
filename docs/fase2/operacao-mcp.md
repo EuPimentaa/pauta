@@ -35,12 +35,17 @@ só nesse arquivo (as ferramentas ficam no nosso formato, `servicos/mcp-comum.ts
 
 ## Antes do deploy: Cloudflare (pesquisa-mcp §7)
 
-1. Security → Bots: o Bot Fight Mode desafia o backend da Anthropic e, no plano Free, não aceita exceção. Desligar, ou
-   IP Access "Allow" para os oito `/24` de `160.79.104.0/21` (160.79.104.0/24 … 160.79.111.0/24).
-2. Regra WAF **Skip** das regras gerenciadas + Configuration Rule **sem Browser Integrity Check** para `/mcp`,
-   `/oauth/registrar`, `/oauth/token`, `/oauth/revogar` e `/.well-known/oauth-*`.
-3. Skip do **rate limiting** só em `/mcp`, `/oauth/token` e `/.well-known/*` (`/oauth/registrar` e `/oauth/autorizar`
-   ficam com o limite da borda).
+Já feito pelo dono em 19/10/2026 (`docs/pedidos/dono.md`): a regra "Claude (Anthropic) MCP",
+`(ip.src in {160.79.104.0/21})` → Ignorar (regras personalizadas, Rate Limiting, gerenciadas, Super Bot Fight e os
+componentes extras), com log. Falta conferir:
+
+1. Security → Bots: o **Bot Fight Mode** comum (Free) não obedece a regra acima. Se o claude.ai disser "Couldn't reach
+   the MCP server", desligar em Segurança → Configurações (ou IP Access "Allow" para os oito `/24` de `160.79.104.0/21`).
+2. Browser Integrity Check: a regra acima ignora os componentes extras para a faixa da Anthropic; se o log de borda
+   mostrar desafio em `/mcp`, `/oauth/registrar`, `/oauth/token`, `/oauth/revogar` ou `/.well-known/oauth-*`, uma
+   Configuration Rule sem Browser Integrity Check nesses caminhos.
+3. `/oauth/autorizar` e `/autorizar` são navegação da pessoa (o IP dela, não o da Anthropic): ficam com as regras de
+   sempre.
 4. Cache Rule **Bypass** para `/mcp`, `/oauth/*` e `/.well-known/*` (as respostas já saem com `Cache-Control: no-store`).
 
 ## Depois do deploy

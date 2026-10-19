@@ -75,9 +75,11 @@ export const ROTULO_MOTIVO_REVOGACAO: Record<MotivoRevogacaoConexao, string> = {
 }
 
 /**
- * Cookie do pedido de autorização (randomBytes(32) base64url; HttpOnly, SameSite=Lax, Path=/, Max-Age = pedidoMin;
- * Secure e o prefixo __Host- só em produção, como o `sid`). GET /oauth/autorizar grava; a tela e a decisão exigem o
- * mesmo navegador (oauth_pedido.navegador_hash = sha256 hex).
+ * Cookie do pedido de autorização (randomBytes(32) base64url; HttpOnly, SameSite=Lax, Path=/, Max-Age =
+ * PRAZOS_OAUTH.cookiePedidoHoras; Secure e o prefixo __Host- só em produção, como o `sid`). GET /oauth/autorizar grava;
+ * a tela e a decisão exigem o mesmo navegador (oauth_pedido.navegador_hash = sha256 hex). Vale mais que o pedido e fica
+ * depois da decisão: no navegador certo, o pedido vencido ou já respondido diz isso (e não "abra neste navegador"); num
+ * link encaminhado, sem o cookie, a tela continua sem dizer nada do pedido.
  */
 export const COOKIE_PEDIDO_OAUTH = { producao: '__Host-pauta_oauth', desenvolvimento: 'pauta_oauth' } as const
 
@@ -87,6 +89,8 @@ export const FAIXA_ANTHROPIC = '160.79.104.0/21'
 /** Prazos do OAuth e do MCP. */
 export const PRAZOS_OAUTH = {
   pedidoMin: 10,
+  /** O cookie do pedido (COOKIE_PEDIDO_OAUTH): mais que o pedido, para a tela chegar a "expirou" e "já respondido". */
+  cookiePedidoHoras: 24,
   codigoMin: 5,
   acessoSeg: 3600,
   /**

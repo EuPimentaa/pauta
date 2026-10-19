@@ -1381,7 +1381,9 @@ Navegação da pessoa (vinda do claude.ai ou do Claude Code). **Consulta:** `res
    o nosso.
 3. Grava `oauth_pedido` (expira em 10 min; com mais de `pedidosPendentesPorCliente` (5) pendentes do mesmo `client_id`,
    apaga o mais antigo) com `navegador_hash` = sha256 de um valor novo (`randomBytes(32)`) que vai no cookie
-   `COOKIE_PEDIDO_OAUTH` (`__Host-pauta_oauth` em produção; HttpOnly, SameSite=Lax, Path=/, Max-Age=600), e redireciona
+   `COOKIE_PEDIDO_OAUTH` (`__Host-pauta_oauth` em produção; HttpOnly, SameSite=Lax, Path=/, Max-Age=86400: vale 1 dia,
+   mais que o pedido, e fica depois da decisão, para que no navegador certo o pedido vencido ou já respondido diga isso
+   em vez do aviso de link encaminhado; revisão funcional da Fase 2, achado 3), e redireciona
    (`302`) para `/autorizar?pedido=<id>`. A tela é rota autenticada: sem sessão, `/entrar?volta=...` e volta (o cookie
    continua no navegador). `Referrer-Policy: same-origin` já basta (a tela só carrega recursos do próprio Pauta e sai por
    `location.assign`).
@@ -1403,7 +1405,7 @@ Navegação da pessoa (vinda do claude.ai ou do Claude Code). **Consulta:** `res
 #### `POST /api/oauth/pedidos/:id/decisao`
 - **Quem:** usuário com sessão (anti-CSRF de sempre) e o mesmo cookie do pedido. **Corpo:** `DecisaoAutorizacaoEntrada`.
   **Resposta:** `200 DecisaoAutorizacaoSaida`: `{ redirecionar }` com `code`, `state` e `iss` (ou `error=access_denied`,
-  `state`, `iss`); a tela faz `location.assign` e apaga o cookie. Não usar `<form>` com `302`: a CSP `form-action 'self'`
+  `state`, `iss`); a tela faz `location.assign` (o cookie do pedido fica e vence sozinho). Não usar `<form>` com `302`: a CSP `form-action 'self'`
   bloqueia no Chrome e no Safari.
 - Grava `decisao`, `decidido_em`, `usuario_id` e, se permitido, `codigo_hash` + `codigo_expira_em` (5 min) e
   `substituir` (padrão 1), numa transação que exige o pedido ainda pendente (`changes = 1`).

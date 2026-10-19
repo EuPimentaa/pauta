@@ -105,7 +105,9 @@ export function registrar(app: App): void {
     }
     if (r.tipo === 'redirecionar') return c.redirect(r.url, 302)
     setCookie(c, config.producao ? COOKIE_PEDIDO_OAUTH.producao : COOKIE_PEDIDO_OAUTH.desenvolvimento, r.cookie, {
-      httpOnly: true, sameSite: 'Lax', path: '/', secure: config.producao, maxAge: PRAZOS_OAUTH.pedidoMin * 60,
+      // vale mais que o pedido (10 min) e fica depois da decisão: no navegador certo, a tela diz "expirou" ou "já foi
+      // respondido" em vez do aviso de link encaminhado (revisão funcional da Fase 2, achado 3)
+      httpOnly: true, sameSite: 'Lax', path: '/', secure: config.producao, maxAge: PRAZOS_OAUTH.cookiePedidoHoras * 3600,
     })
     return c.redirect(`/autorizar?pedido=${encodeURIComponent(r.id)}`, 302)
   }))

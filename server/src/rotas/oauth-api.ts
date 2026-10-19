@@ -4,7 +4,7 @@
  * ErroHttp sai como veio: vira 500 `interno` com o log mascarado. MCP_ATIVO=0: 404 em /api/oauth/*; Conexões continua.
  */
 import type { Context } from 'hono'
-import { deleteCookie, getCookie } from 'hono/cookie'
+import { getCookie } from 'hono/cookie'
 import { z } from 'zod'
 import { COOKIE_PEDIDO_OAUTH, type DecisaoAutorizacaoEntrada, type ListarConexoesConsulta } from '../../../shared/tipos/index.ts'
 import { corpoJson, exigirUsuario, validar, type Ambiente, type App } from '../auth.ts'
@@ -48,10 +48,9 @@ export function registrar(app: App): void {
 
   app.post('/api/oauth/pedidos/:id/decisao', exigirUsuario, (c) => seguro(c, 'oauth decisao', async () => {
     const e = validar(decisao, await corpoJson(c))
-    const saida = decidirPedido(c.get('db'), c.req.param('id'), getCookie(c, nomeCookiePedido()), c.get('ator'), e)
-    // o pedido acabou: o cookie dele também (é HttpOnly; a tela não consegue apagar)
-    deleteCookie(c, nomeCookiePedido(), { path: '/', secure: config.producao })
-    return c.json(saida)
+    // o cookie do pedido fica (vence sozinho em PRAZOS_OAUTH.cookiePedidoHoras): reabrir a tela neste navegador mostra
+    // "Este pedido já foi respondido", não o aviso de outro navegador
+    return c.json(decidirPedido(c.get('db'), c.req.param('id'), getCookie(c, nomeCookiePedido()), c.get('ator'), e))
   }))
 
   app.get('/api/conexoes', exigirUsuario, (c) => seguro(c, 'conexoes', () =>

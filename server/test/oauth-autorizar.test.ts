@@ -66,7 +66,7 @@ test('pedido gravado, cookie do pedido e 302 para a tela; loopback com outra por
   assert.match(cookie, /^pauta_oauth=[A-Za-z0-9_-]{43};/)
   assert.match(cookie, /HttpOnly/)
   assert.match(cookie, /SameSite=Lax/)
-  assert.match(cookie, /Max-Age=600/)
+  assert.match(cookie, /Max-Age=86400/, 'o cookie vale 1 dia: mais que o pedido (10 min)')
   assert.match(cookie, /Path=\//)
   const l = um<{ expira_em: string; state: string; navegador_hash: string; resource: string }>(amb.db, 'SELECT * FROM oauth_pedido WHERE id = ?', pedido)!
   assert.equal(l.expira_em, '2026-10-14T13:10:00.000Z')
@@ -155,7 +155,7 @@ test('decisão: anti-CSRF, permitir com code/state/iss, negar com access_denied,
   assert.match(u.searchParams.get('code')!, /^[A-Za-z0-9_-]{43}$/)
   assert.equal(u.searchParams.get('state'), p.state)
   assert.equal(u.searchParams.get('iss'), ORIGEM)
-  assert.match(ok.headers.get('set-cookie') ?? '', /pauta_oauth=;.*Max-Age=0/)
+  assert.doesNotMatch(ok.headers.get('set-cookie') ?? '', /pauta_oauth=/, 'a decisão não apaga o cookie do pedido')
   const l = um<{ decisao: string; usuario_id: string; substituir: number; codigo_expira_em: string }>(amb.db,
     'SELECT * FROM oauth_pedido WHERE id = ?', p.pedidoId)!
   assert.equal(l.decisao, 'permitido')
@@ -177,4 +177,30 @@ test('decisão: anti-CSRF, permitir com code/state/iss, negar com access_denied,
   const vencido = await decidir(amb, v, amb.pessoas.design)
   assert.equal(vencido.status, 410)
   assert.equal(vencido.corpo.erro.mensagem, 'Este pedido expirou. Volte ao Claude e conecte de novo.')
+})
+
+test('no navegador do pedido, o vencido e o já respondido dizem isso; noutro, só "abra neste navegador"', async () => {
+  // revisão funcional, achado 3: o cookie vencia com o pedido e era apagado na decisão, então quem só demorou (ou
+  // voltou à aba) via o alerta de link encaminhado
+  const amb = await ambienteMcp()
+  const sessao = sessaoPara(amb.db, amb.pessoas.design.id)
+  const ler = (p: { pedidoId: string }, cookie: string | null) =>
+    req(amb, `/api/oauth/pedidos/${p.pedidoId}`, { headers: cabecalhosTela(sessao, cookie) })
+  const respondido = await abrirPedido(amb)
+  assert.equal((await decidir(amb, respondido, amb.pessoas.design, false)).status, 200)
+  const r1 = await ler(respondido, respondido.cookie)
+  assert.equal(r1.status, 410)
+  assert.equal(r1.corpo.erro.detalhes.motivo, 'decidido')
+  const demorou = await abrirPedido(amb)
+  amb.relogio('2026-10-14T13:11:00.000Z')
+  const r2 = await ler(demorou, demorou.cookie)
+  assert.equal(r2.status, 410)
+  assert.equal(r2.corpo.erro.detalhes.motivo, 'vencido')
+  assert.equal(r2.corpo.erro.mensagem, 'Este pedido expirou. Volte ao Claude e conecte de novo.')
+  // o link encaminhado (outro navegador, sem o cookie) continua sem dizer nada do pedido
+  for (const p of [respondido, demorou]) {
+    const r = await ler(p, null)
+    assert.equal(r.status, 410)
+    assert.equal(r.corpo.erro.detalhes.motivo, 'outro_navegador')
+  }
 })

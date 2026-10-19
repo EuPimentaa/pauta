@@ -25,7 +25,7 @@ import { BotaoCor, erroDoCampo, Faixa, mensagemGeral, Painel, Pilula } from '../
 import {
   atualizarAgendaExterna, criarAgendaExterna, editarAgendaExterna, excluirAgendaExterna, useAgendasExternas,
 } from './api.ts'
-import { estadoDaAgenda } from './logica.ts'
+import { corLivre, ERROS_DO_ENDERECO, estadoDaAgenda } from './logica.ts'
 import './agenda.css'
 
 const MENSAGEM_ENDERECO = 'Cole o Endereço secreto no formato iCal do Google Agenda.'
@@ -55,11 +55,13 @@ function Passos() {
   )
 }
 
-function NovaAgenda({ aoCriar }: { aoCriar(a: AgendaExterna): void }) {
+function NovaAgenda({ existentes, aoCriar }: { existentes: AgendaExterna[]; aoCriar(a: AgendaExterna): void }) {
   const qc = useQueryClient()
   const id = useId()
   const [nome, setNome] = useState('')
-  const [cor, setCor] = useState<Cor>('azul')
+  // a primeira cor que nenhuma agenda usa (antes toda agenda nascia azul e os chips ficavam iguais)
+  const [cor, setCor] = useState<Cor>(() => corLivre(existentes.map((a) => a.cor)))
+  const mesmaCor = existentes.find((a) => a.cor === cor)
   const [url, setUrl] = useState('')
   const [tentou, setTentou] = useState(false)
   const [erro, setErro] = useState<unknown>(null)
@@ -75,7 +77,7 @@ function NovaAgenda({ aoCriar }: { aoCriar(a: AgendaExterna): void }) {
     try {
       const a = await criarAgendaExterna(qc, { nome: nome.trim(), cor, url: url.trim() })
       avisar(`${a.nome} adicionada. Buscando os eventos…`, { tipo: 'sucesso' })
-      setNome(''); setUrl(''); setCor('azul'); setTentou(false)
+      setNome(''); setUrl(''); setCor(corLivre([...existentes.map((x) => x.cor), a.cor])); setTentou(false)
       aoCriar(a)
     } catch (err) {
       setErro(err)
@@ -93,7 +95,8 @@ function NovaAgenda({ aoCriar }: { aoCriar(a: AgendaExterna): void }) {
           erro={tentou && !nome.trim() ? 'Escreva o nome.' : erroDoCampo(erro, 'nome')} classeGrupo="agd-form-nome" />
         <div className="ui-campo-grupo">
           <span className="ui-rotulo">Cor</span>
-          <BotaoCor valor={cor} aoMudar={(c) => setCor(c ?? 'azul')} rotulo="Cor da agenda" />
+          <BotaoCor valor={cor} aoMudar={(c) => setCor(c ?? corLivre(existentes.map((a) => a.cor)))} rotulo="Cor da agenda" />
+          {mesmaCor && <span className="agd-cor-dica">Mesma cor de {mesmaCor.nome}</span>}
         </div>
       </div>
       <Campo rotulo="Endereço secreto no formato iCal" value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url"
@@ -191,6 +194,8 @@ function LinhaAgenda({ agenda: a, anterior, proxima, atualizando, aoAtualizar, a
   const abrirDialogo = useAbrirDialogo()
   const [editando, setEditando] = useState<'nome' | 'endereco' | null>(null)
   const estado = estadoDaAgenda(a, hojeLocal())
+  // erro do endereço: a ação que resolve fica no próprio aviso, e "Atualizar agora" (que não resolve) desabilita
+  const doEndereco = a.ativa && !!a.erro && ERROS_DO_ENDERECO.includes(a.erro)
 
   async function pausar(ativa: boolean) {
     try {
@@ -242,8 +247,9 @@ function LinhaAgenda({ agenda: a, anterior, proxima, atualizando, aoAtualizar, a
           <p className="agd-linha-dica" title="O endereço completo fica só no servidor, cifrado.">{a.urlDica}</p>
         </div>
         <div className="cad-acoes agd-linha-acoes">
-          <Botao variante="secundario" tamanho="p" icone={RefreshCw} carregando={atualizando} disabled={!a.ativa}
-            dica={a.ativa ? undefined : 'Retome a agenda para atualizar.'} onClick={() => aoAtualizar(a)}>
+          <Botao variante="secundario" tamanho="p" icone={RefreshCw} carregando={atualizando} disabled={!a.ativa || doEndereco}
+            dica={!a.ativa ? 'Retome a agenda para atualizar.' : doEndereco ? 'Cole o endereço novo: atualizar não resolve.' : undefined}
+            onClick={() => aoAtualizar(a)}>
             {atualizando ? 'Atualizando…' : 'Atualizar agora'}
           </Botao>
           <Menu rotulo={`Ações de ${a.nome}`} itens={itens} alinhar="fim">
@@ -257,6 +263,11 @@ function LinhaAgenda({ agenda: a, anterior, proxima, atualizando, aoAtualizar, a
           <p>{atualizando ? 'Buscando a agenda…' : estado.texto}</p>
           {estado.detalhe && <p className="agd-estado-detalhe">{estado.detalhe}</p>}
           {estado.avisos.map((t) => <p key={t} className="agd-estado-detalhe">{t}</p>)}
+          {doEndereco && editando !== 'endereco' && (
+            <Botao className="agd-estado-acao" tamanho="p" variante="secundario" icone={KeyRound} onClick={() => setEditando('endereco')}>
+              Trocar o endereço
+            </Botao>
+          )}
         </div>
       </div>
       {editando === 'nome' && <Renomear agenda={a} aoFechar={() => setEditando(null)} />}
@@ -332,7 +343,7 @@ export default function ConfigAgendas() {
         <Painel titulo="Adicionar agenda" icone={CalendarPlus} id="agd-nova"
           acoes={agendas.length > 0 ? <Botao tamanho="p" variante="ghost" onClick={() => setAdicionando(false)}>Fechar</Botao> : undefined}>
           <div className="cad-painel-corpo">
-            <NovaAgenda aoCriar={(a) => { setAdicionando(false); acompanhar(a) }} />
+            <NovaAgenda existentes={agendas} aoCriar={(a) => { setAdicionando(false); acompanhar(a) }} />
             <Passos />
           </div>
         </Painel>

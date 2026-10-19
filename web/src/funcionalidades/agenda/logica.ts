@@ -170,6 +170,21 @@ export function alternarDesligada(desligadas: readonly string[], id: string): st
 
 // ─────────────────────────────── estado da agenda (Configurações) ───────────────────────────────
 
+/** A ordem das cores sugeridas para uma agenda nova (a primeira ainda livre; azul era a de todas). */
+export const CORES_SUGERIDAS: readonly Cor[] = ['azul', 'verde', 'roxo', 'ambar', 'rosa', 'turquesa', 'magenta', 'berinjela', 'amarelo', 'grafite']
+
+/**
+ * A cor sugerida para uma agenda nova: a primeira de CORES_SUGERIDAS que nenhuma agenda usa (na grade, a cor é a única
+ * pista da origem do evento). Todas usadas: a menos usada, na mesma ordem.
+ */
+export function corLivre(usadas: readonly Cor[]): Cor {
+  const conta = (c: Cor) => usadas.filter((u) => u === c).length
+  return [...CORES_SUGERIDAS].sort((a, b) => conta(a) - conta(b) || CORES_SUGERIDAS.indexOf(a) - CORES_SUGERIDAS.indexOf(b))[0]!
+}
+
+/** Os erros que só se resolvem colando o endereço de novo (a tela mostra "Trocar o endereço" no próprio aviso). */
+export const ERROS_DO_ENDERECO: readonly ErroAgendaExterna[] = ['endereco_invalido', 'endereco_ilegivel', 'nao_e_ical']
+
 export const TEXTO_ERRO: Record<ErroAgendaExterna, string> = {
   endereco_invalido: 'O Google não reconhece mais este endereço (ele foi redefinido ou apagado). Cole o endereço novo.',
   endereco_ilegivel: 'Não deu para ler o endereço guardado (o segredo do servidor mudou). Cole o endereço de novo.',

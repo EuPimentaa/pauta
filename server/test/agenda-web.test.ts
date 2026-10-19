@@ -10,7 +10,7 @@ import type { AgendaExterna, EventoAgendaExterna, EventosAgendaSaida, EventoTemp
 import { diaDoMes, diaPorHorario, rotuloResumo } from '../../web/src/calendario/externos.ts'
 import { tratarAgendaExterna } from '../../web/src/funcionalidades/agenda/cache.ts'
 import {
-  acontecendo, alternarDesligada, chavesAgenda, diasDoEvento, encerrado, estadoDaAgenda, eventosDeHoje, horarioCurto, horarioDoEvento,
+  acontecendo, alternarDesligada, chavesAgenda, corLivre, diasDoEvento, encerrado, estadoDaAgenda, eventosDeHoje, horarioCurto, horarioDoEvento,
   itensDoPeriodo,
 } from '../../web/src/funcionalidades/agenda/logica.ts'
 
@@ -135,6 +135,15 @@ describe('Hoje na agenda e os textos', () => {
     // às 23h nada mais vem, só os de dia inteiro
     const noite = eventosDeHoje(saida(eventos), new Set(), hoje, 5, new Date('2026-10-21T02:00:00.000Z'))
     assert.deepEqual([noite.itens.map((i) => i.titulo), noite.passados.length, noite.aindaHoje], [['dia1', 'dia2'], 7, 0])
+  })
+
+  test('cor da agenda nova: a primeira ainda livre (antes todas nasciam azuis); todas usadas, a menos usada', () => {
+    // revisão funcional 9 e visual 11
+    assert.equal(corLivre([]), 'azul')
+    assert.equal(corLivre(['azul']), 'verde')
+    assert.equal(corLivre(['azul', 'verde', 'roxo']), 'ambar')
+    const todas = ['azul', 'verde', 'roxo', 'ambar', 'rosa', 'turquesa', 'magenta', 'berinjela', 'amarelo', 'grafite'] as const
+    assert.equal(corLivre([...todas, 'azul', 'verde']), 'roxo')
   })
 
   test('horário dos detalhes e o curto', () => {

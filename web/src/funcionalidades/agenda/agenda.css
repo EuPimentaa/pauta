@@ -107,6 +107,8 @@
   .agd-estado[data-tom="ok"] { color: var(--success-ink); }
   .agd-estado[data-tom="erro"] { color: var(--danger-ink); }
   .agd-estado-detalhe { color: var(--text-2); }
+  .agd-estado-acao { margin-top: var(--space-2); }
+  .agd-cor-dica { display: block; margin-top: 4px; color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
   .agd-edicao { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) var(--space-4); margin-left: calc(12px + var(--space-3)); border-radius: var(--radius-md); background: var(--surface-sunken); }
 
   @media (max-width: 767.98px) {

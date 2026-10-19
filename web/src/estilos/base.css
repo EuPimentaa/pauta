@@ -11,8 +11,11 @@
     -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
     font-synthesis-weight: none;
     /* A Syne vem com algarismos de estilo antigo (o 3 desce da linha, o 1 é baixo): contadores, #número, 0/5 e 13/10
-       ficavam tortos nas pílulas. Ela tem `lnum` e `tnum`; o lnum vai por font-feature-settings porque o atalho
-       `font:` (usado em quase todo componente) zera o font-variant-numeric e não zera esta propriedade (herdada). */
+       ficavam tortos nas pílulas. Ela tem `lnum` e `tnum`. ATENÇÃO: este lnum herdado NÃO sobrevive ao atalho `font:`
+       (usado em quase todo componente): no Chrome, o `font:` zera também o font-feature-settings (medido na revisão
+       visual da Fase 2). Número que precisa alinhar (contador, valor, data, hora, tabela) leva
+       `font-variant-numeric: lining-nums tabular-nums` (ou a classe .tabular) DEPOIS do `font:`, sempre os dois: só
+       "tabular-nums" dá algarismo antigo de largura fixa. */
     font-feature-settings: "lnum" 1;
   }
   #root { min-height: 100%; isolation: isolate; }

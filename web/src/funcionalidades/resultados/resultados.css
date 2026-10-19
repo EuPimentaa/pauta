@@ -95,7 +95,7 @@
   .res-plot { position: relative; width: 100%; min-width: 0; touch-action: pan-y; }
   .res-plot svg { display: block; max-width: 100%; overflow: visible; }
   .res-grade { stroke: var(--border); stroke-width: 1; shape-rendering: crispEdges; }
-  .res-eixo { fill: var(--text-3); font: 500 12px / 1 var(--font); font-variant-numeric: tabular-nums; }
+  .res-eixo { fill: var(--text-3); font: 500 12px / 1 var(--font); font-variant-numeric: lining-nums tabular-nums; }
   .res-linha { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
   .res-linha[data-serie="atual"] { stroke: var(--accent); }
   .res-linha[data-serie="anterior"] { stroke: var(--text-3); stroke-dasharray: 5 4; }
@@ -176,6 +176,11 @@
   .res-pilula-link:hover { background: var(--veu-2); }
   .res-conta-ligar { display: flex; align-items: flex-start; gap: var(--space-2); justify-content: flex-end; }
   .res-conta-ligar > :first-child { flex: 1; min-width: 0; }
+
+  /* Números: algarismos alinhados à linha e de largura fixa, como o resto do Pauta (.tabular). Depois do atalho font:
+     de cada classe (ele zera o lnum herdado do body; base.css) e sempre os dois valores. */
+  .res-cartao-valor, .res-variacao, .res-tabela .num, .res-celula, .res-dica-linha strong, .res-evento-n, .res-comparacao, .res-periodo,
+  .res-dados-texto, .res-estado dd, .res-opcao-meta, .res-conta-meta { font-variant-numeric: lining-nums tabular-nums; }
 
   /* ─────────────── celular ─────────────── */
   @media (max-width: 767.98px) {

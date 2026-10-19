@@ -78,7 +78,7 @@
   .agd-linha-nome > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .agd-linha-dica { color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); overflow-wrap: anywhere; }
   .agd-linha-acoes { flex: none; }
-  .agd-estado { display: flex; align-items: flex-start; gap: 8px; padding-left: calc(12px + var(--space-3)); color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); }
+  .agd-estado { display: flex; align-items: flex-start; gap: 8px; padding-left: calc(12px + var(--space-3)); color: var(--text-2); font: 400 var(--fs-meta) / var(--lh-meta) var(--font); font-variant-numeric: lining-nums tabular-nums; }
   .agd-estado > svg { width: 15px; height: 15px; flex: none; margin-top: 1px; }
   .agd-estado[data-tom="ok"] { color: var(--success-ink); }
   .agd-estado[data-tom="erro"] { color: var(--danger-ink); }

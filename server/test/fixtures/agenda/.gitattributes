@@ -1,0 +1,2 @@
+# As fixtures de iCal precisam manter CRLF e as dobras em bytes (RFC 5545 §3.1): sem conversão de fim de linha.
+*.ics -text

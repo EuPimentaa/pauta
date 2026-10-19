@@ -125,6 +125,10 @@ test('tools/list: as 15 na ordem, título, anotações e esquemas que recusam ca
     criar_demanda: false, editar_demanda: true, mover_demanda: true, comentar: false, checklist: false, concluir_demanda: true,
     arquivar_demanda: true, lancar_horas: false, registrar_retorno: false,
   })
+  // os anuláveis saem como type [T, "null"] (não anyOf) e sem o teto de inteiro seguro do zod (orçamento do tools/list)
+  const texto = JSON.stringify(r.corpo.result)
+  assert.ok(!texto.includes('anyOf') && !texto.includes(String(Number.MAX_SAFE_INTEGER)), 'esquema sem enxugar')
+  assert.deepEqual(tools.find((t) => t.name === 'editar_demanda').inputSchema.properties.prazo, { type: ['string', 'null'], format: 'date' })
   const extra = await chamar(amb, c.at, 'listar', { tipo: 'quadros', apagar: true })
   assert.equal(extra.erro, true)
   assert.match(extra.texto, /Parâmetro desconhecido: apagar/)

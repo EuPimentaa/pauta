@@ -52,8 +52,10 @@ export function instrucoes(): string {
 const PADRAO_DATA = '^\\d{4}-\\d{2}-\\d{2}$'
 
 /**
- * Enxuga o JSON Schema para o `tools/list` (orçamento de 12.000 caracteres): tira `$schema` e os limites de tamanho
- * (o zod continua conferindo na chamada, com a mensagem do campo) e troca o padrão de data por `format: date`.
+ * Enxuga o JSON Schema para o `tools/list` (orçamento de ORCAMENTO_MCP.toolsList): tira `$schema`, os limites de tamanho
+ * e o teto de inteiro seguro que o zod põe em todo `.int()` (o zod continua conferindo na chamada, com a mensagem do
+ * campo), troca o padrão de data por `format: date` e escreve o anulável como `type: [T, "null"]` em vez de `anyOf` (o
+ * mesmo esquema, mais curto).
  */
 function enxugar(no: unknown): unknown {
   if (Array.isArray(no)) return no.map(enxugar)
@@ -61,13 +63,31 @@ function enxugar(no: unknown): unknown {
   const saida: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(no)) {
     if (k === '$schema' || k === 'maxLength' || k === 'maxItems' || k === 'minItems' || k === 'minLength') continue
+    if ((k === 'maximum' || k === 'minimum') && Math.abs(Number(v)) === Number.MAX_SAFE_INTEGER) continue
     if (k === 'pattern') {
       if (v === PADRAO_DATA) saida.format = 'date'
       continue
     }
+    if (k === 'anyOf' && Array.isArray(v)) {
+      const anulavel = anulavelSimples(v.map(enxugar))
+      if (anulavel) {
+        Object.assign(saida, anulavel)
+        continue
+      }
+    }
     saida[k] = enxugar(v)
   }
   return saida
+}
+
+/** `anyOf: [{ type: T, ... }, { type: 'null' }]` → `{ type: [T, 'null'], ... }` (e `null` no `enum`, se houver). */
+function anulavelSimples(opcoes: unknown[]): Record<string, unknown> | null {
+  if (opcoes.length !== 2) return null
+  const [a, b] = opcoes as Record<string, unknown>[]
+  const nulo = (x: Record<string, unknown> | undefined) => !!x && Object.keys(x).length === 1 && x.type === 'null'
+  const base = nulo(b) ? a : nulo(a) ? b : null
+  if (!base || typeof base.type !== 'string' || 'anyOf' in base) return null
+  return { ...base, type: [base.type, 'null'], ...(Array.isArray(base.enum) ? { enum: [...base.enum, null] } : {}) }
 }
 
 /** O JSON Schema de entrada (enxuto: o zod da ferramenta é quem confere). */

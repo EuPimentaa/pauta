@@ -22,7 +22,12 @@ type Linha = Record<string, unknown>
 
 /** Comentários pelo WHERE (sobre `c`), com menções e anexos (os do comentário excluído não vêm). */
 function carregarComentarios(db: Db, onde: string, params: unknown[]): Comentario[] {
-  const linhas = todos<Linha>(db, `SELECT c.* FROM comentario c WHERE ${onde} ORDER BY c.criado_em, c.rowid`, ...params)
+  // "via Claude" (API.md §F.6): pela atividade comentario.criado do comentário com um mcp_traco do mesmo autor
+  const linhas = todos<Linha>(db, `SELECT c.*, (SELECT 'claude' FROM atividade a
+      JOIN mcp_traco m ON m.trace_id = a.trace_id AND m.usuario_id = a.ator_id
+     WHERE a.demanda_id = c.demanda_id AND a.tipo = 'comentario.criado' AND json_extract(a.dados, '$.comentarioId') = c.id
+     LIMIT 1) AS via
+    FROM comentario c WHERE ${onde} ORDER BY c.criado_em, c.rowid`, ...params)
   if (linhas.length === 0) return []
   const ids = linhas.map((l) => String(l.id))
   const mencoes = new Map<string, string[]>()
@@ -38,7 +43,8 @@ function carregarComentarios(db: Db, onde: string, params: unknown[]): Comentari
   }
   return linhas.map((l) => {
     const id = String(l.id)
-    return mapear.comentario(l, mencoes.get(id) ?? [], l.excluido_em ? [] : (anexos.get(id) ?? []))
+    const comentario = mapear.comentario(l, mencoes.get(id) ?? [], l.excluido_em ? [] : (anexos.get(id) ?? []))
+    return l.via === 'claude' ? { ...comentario, via: 'claude' as const } : comentario
   })
 }
 

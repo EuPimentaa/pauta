@@ -203,10 +203,14 @@ export interface TokenSaida {
   scope: 'pauta'
 }
 
-/** Erro do /oauth/registrar e do /oauth/token (RFC 6749 §5.2, RFC 7591 §3.2.2). Nunca ErroApi aqui. */
+/**
+ * Erro do /oauth/registrar e do /oauth/token (RFC 6749 §5.2, RFC 7591 §3.2.2). Nunca ErroApi aqui. `invalid_target`:
+ * `resource` de outro servidor (RFC 8707); `server_error`: o 500 de `/oauth/*` (API §F.1).
+ */
 export interface ErroOAuth {
   error: 'invalid_request' | 'invalid_client' | 'invalid_grant' | 'unauthorized_client' | 'unsupported_grant_type'
     | 'invalid_scope' | 'invalid_redirect_uri' | 'invalid_client_metadata' | 'temporarily_unavailable'
+    | 'invalid_target' | 'server_error'
   error_description?: string
 }
 

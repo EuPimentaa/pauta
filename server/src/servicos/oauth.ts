@@ -27,9 +27,8 @@ import { exigir } from './permissoes.ts'
 
 type Linha = Record<string, unknown>
 
-/** Códigos de erro do OAuth que o Pauta usa (os do contrato + os das respostas de autorização e do RFC 8707). */
-export type CodigoErroOAuth = ErroOAuth['error'] | 'invalid_target' | 'access_denied' | 'unsupported_response_type'
-  | 'server_error'
+/** Códigos de erro do OAuth que o Pauta usa (os do contrato + os que só saem no redirecionamento da autorização). */
+export type CodigoErroOAuth = ErroOAuth['error'] | 'access_denied' | 'unsupported_response_type'
 
 /** Erro no formato das RFCs (`{ error, error_description }`), nunca ErroApi. */
 export class ErroOAuthHttp extends Error {

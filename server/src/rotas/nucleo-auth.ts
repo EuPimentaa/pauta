@@ -14,6 +14,7 @@ import {
 } from '../servicos/acesso.ts'
 import { hashToken } from '../servicos/cripto.ts'
 import { emitirObjeto } from '../servicos/eventos.ts'
+import { revogarConexoesDe } from '../servicos/oauth.ts'
 import { carregarUsuario, montarEu, revogarTokens } from '../servicos/pessoas.ts'
 
 type Finalidade = 'convite' | 'redefinicao'
@@ -87,7 +88,11 @@ async function definirSenha(c: Context<Ambiente>, finalidade: Finalidade): Promi
     if (r.changes !== 1) throw tokenInvalido()
     rodar(db, 'UPDATE usuario SET senha_hash = ?, senha_definida_em = ?, atualizado_em = ? WHERE id = ?', hash, instante, instante, t.usuario_id)
     revogarTokens(db, t.usuario_id)
-    if (finalidade === 'redefinicao') revogarSessoes(db, t.usuario_id)
+    if (finalidade === 'redefinicao') {
+      revogarSessoes(db, t.usuario_id)
+      // as conexões do Claude seguem as sessões (API.md §F.4): quem conectou com a senha roubada perde o acesso
+      revogarConexoesDe(db, t.usuario_id, 'credenciais')
+    }
     criarSessao(db, c, t.usuario_id, c.get('ator').ip)
     // a lista de Pessoas do admin (aberta em outra janela) tira o "Convite pendente" na hora
     emitirUsuario(db, carregarUsuario(db, t.usuario_id), c)
@@ -169,6 +174,7 @@ export function registrar(app: App): void {
       const instante = agora()
       rodar(db, 'UPDATE usuario SET senha_hash = ?, senha_definida_em = ?, atualizado_em = ? WHERE id = ?', hash, instante, instante, u.id)
       revogarSessoes(db, u.id, sessao?.id)
+      revogarConexoesDe(db, u.id, 'credenciais')
       revogarTokens(db, u.id)
     })
     return c.body(null, 204)

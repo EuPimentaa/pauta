@@ -17,6 +17,7 @@ import { gerarToken } from './cripto.ts'
 import { emitirObjeto } from './eventos.ts'
 import { pararCronometros } from './horas.ts'
 import { mapear } from './mapear.ts'
+import { revogarConexoesDe } from './oauth.ts'
 import { posicaoEntre } from './posicao.ts'
 import { criarColunasDaPessoa, seguirQuadrosDaEquipe } from './quadros.ts'
 
@@ -193,6 +194,8 @@ export function editarPessoa(db: Db, id: Id, e: EditarPessoaEntrada, ator: Ator)
   if (desativou) pararCronometros(db, { usuarioId: id }, ator)
   if (desativou || trocouPapel) {
     revogarSessoes(db, id)
+    // as conexões do Claude seguem as sessões (API.md §F.4): um token antigo não ganha o papel novo
+    revogarConexoesDe(db, id, desativou ? 'desativacao' : 'papel')
     depoisDoCommit(db, () => fecharConexoesDe(db, id))
   }
 

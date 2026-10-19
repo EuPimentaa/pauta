@@ -9,10 +9,10 @@ export function normalizarAlias(s: string): string {
 /**
  * Caracteres que não se veem na tela e o modelo lê: controles (Cc, menos \t \n \r, que cada uso trata), formatação
  * (Cf: largura zero, direção, tags U+E0000–E007F, hífen suave, U+2060…) e os ignoráveis do Unicode (seletores de
- * variação, preenchedores Hangul). Ficam só as "colas" de emoji: U+200D entre dois emojis (👩‍💻) e um U+FE0E/U+FE0F
- * sozinho (✔️); uma fila de seletores (dados escondidos) sai.
+ * variação, preenchedores Hangul). Ficam só as "colas" de emoji: U+200D entre dois emojis e um U+FE0E/U+FE0F
+ * sozinho (o do ✔ como emoji); uma fila de seletores (dados escondidos) sai.
  */
-const COLA_DE_EMOJI = /(?<=[\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}️])‍(?=\p{Extended_Pictographic})|(?<![︀-️‍])[︎️](?![︀-️])/u
+const COLA_DE_EMOJI = /(?<=[\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}\uFE0F])\u200D(?=\p{Extended_Pictographic})|(?<![\uFE00-\uFE0F\u200D])[\uFE0E\uFE0F](?![\uFE00-\uFE0F])/u
 const INVISIVEL = /(?![\t\n\r])[\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}]/u
 const INVISIVEIS = new RegExp(`(${COLA_DE_EMOJI.source})|${INVISIVEL.source}`, 'gu')
 

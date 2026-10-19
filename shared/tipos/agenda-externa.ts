@@ -10,6 +10,13 @@ import type { Cor, DataLocal, Id, Instante, PosicaoRelativa } from './nucleo.ts'
 export const JANELA_AGENDA_EXTERNA = { diasAntes: 30, diasDepois: 180 } as const
 /** Intervalo da busca automática de cada agenda ativa. */
 export const INTERVALO_AGENDA_EXTERNA_MIN = 15
+/**
+ * De quanto em quanto a tarefa `agenda-busca` confere quais agendas estão devidas (passaram de
+ * INTERVALO_AGENDA_EXTERNA_MIN). Com a tarefa a cada 15 min, uma agenda buscada fora dela (cadastro, "Atualizar agora",
+ * trocar o endereço, retomar) pulava a rodada seguinte e ficava até 30 min sem busca; conferindo a cada minuto, nenhuma
+ * passa de 16 min (revisão funcional da Fase 2, achado 8). A conferência é uma consulta pequena e não gera log.
+ */
+export const RODADA_AGENDA_EXTERNA_MIN = 1
 /** Tetos de uma busca (passou: falha, mantém as ocorrências anteriores e mostra o erro). */
 export const TETOS_AGENDA_EXTERNA = {
   bytes: 32 * 1024 * 1024, segundos: 60, ocorrenciasPorSerie: 1000, ocorrenciasPorAgenda: 20000,

@@ -315,10 +315,10 @@ describe('tarefa agenda-busca (aCadaMin)', () => {
     assert.deepEqual(feitas, ['i', 'd'])
   })
 
-  test('a tarefa é descoberta com aCadaMin 15; busca só as ativas cuja última tentativa passou de 15 min', async () => {
+  test('a tarefa é descoberta com aCadaMin 1; busca só as ativas cuja última tentativa passou de 15 min', async () => {
     const a = await ambienteAgenda()
     const tarefa = (await carregarTarefas()).find((x) => x.nome === 'agenda-busca')!
-    assert.equal(tarefa.aCadaMin, 15)
+    assert.equal(tarefa.aCadaMin, 1)
     const m = await criarAgendaTeste(a)
     const o = await criarAgendaTeste(a, { nome: 'Outra', url: URL_OUTRA })
     const p = await criarAgendaTeste(a, { nome: 'Pausada', url: URL_TESTE.replace('agencia%40melt.test', 'outra%40melt.test') })
@@ -334,6 +334,32 @@ describe('tarefa agenda-busca (aCadaMin)', () => {
     assert.deepEqual(buscadas, [URL_OUTRA, URL_TESTE])
     assert.equal(um<{ ok: number; detalhe: string | null }>(a.db, "SELECT ok, detalhe FROM tarefa_execucao WHERE nome = 'agenda-busca'")!.ok, 1)
     assert.notEqual(m.id, o.id)
+  })
+
+  test('uma agenda buscada fora da tarefa não pula a rodada: no máximo 16 min sem busca', async () => {
+    // revisão funcional, achado 8: com a tarefa a cada 15 min, a agenda cadastrada às 16:30:46 pulava a rodada das
+    // 16:44:44 (menos de 15 min) e só era buscada às 16:59:44, 29 min depois
+    const a = await ambienteAgenda()
+    const tarefa = (await carregarTarefas()).find((x) => x.nome === 'agenda-busca')!
+    const buscadas: string[] = []
+    definirBuscaAgenda(async (url) => { buscadas.push(url); return { ok: true, corpo: fixture('google-2026.ics') } })
+    a.relogio('2026-10-19T16:30:00.000Z')
+    await executarTarefa(a.db, tarefa)                               // a rodada de antes (nenhuma agenda ainda)
+    a.relogio('2026-10-19T16:30:46.000Z')
+    const m = await criarAgendaTeste(a)                             // o cadastro busca na hora, fora da tarefa
+    await esperarBuscasAgenda()
+    buscadas.length = 0
+    const rodada = async (instante: string) => {
+      a.relogio(instante)
+      for (const t of tarefasDevidas(a.db, [tarefa])) await executarTarefa(a.db, t)
+    }
+    await rodada('2026-10-19T16:44:44.000Z')
+    assert.deepEqual(buscadas, [], 'buscada há 14 min: ainda não')
+    await rodada('2026-10-19T16:45:44.000Z')
+    assert.deepEqual(buscadas, [], 'buscada há 14 min e 58 s: ainda não')
+    await rodada('2026-10-19T16:46:44.000Z')
+    assert.deepEqual(buscadas, [URL_TESTE], 'na rodada seguinte, 16 min depois (antes: 29 min)')
+    assert.ok(m.id)
   })
 })
 

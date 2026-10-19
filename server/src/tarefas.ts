@@ -1,7 +1,7 @@
 /**
  * Jobs descobertos em src/tarefas/*.ts (cada arquivo exporta `tarefa: Tarefa`). Os diários rodam uma vez por dia
  * depois do horário (São Paulo); quem perdeu o horário com o servidor desligado roda ao subir. Os de intervalo
- * (`aCadaMin`, Fase 2: `agenda-busca` a cada 15 min) ignoram o horário e rodam quando a última execução passou de
+ * (`aCadaMin`, Fase 2: `agenda-busca` confere a cada minuto) ignoram o horário e rodam quando a última execução passou de
  * `aCadaMin` minutos (ou nunca rodaram). A última execução fica em `tarefa_execucao`.
  */
 import { readdirSync } from 'node:fs'

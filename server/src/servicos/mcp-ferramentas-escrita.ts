@@ -36,8 +36,19 @@ import { exigirCamposPermitidos, podeAtor } from './permissoes.ts'
  * esquema zod da rota (400 validacao com o campo). O zod da ferramenta só traduziu nomes em ids.
  */
 export function entradaDaApi<T>(ator: Ator, entrada: Record<string, unknown>, esquema: z.ZodType<T>): T {
+  observador?.(entrada, esquema)
   exigirCamposPermitidos(ator, entrada, 'demanda')
   return validar(esquema, entrada)
+}
+
+let observador: ((entrada: Record<string, unknown>, esquema: z.ZodType) => void) | null = null
+
+/**
+ * Testes: vê cada entrada montada (o teste confere que as chaves estão no esquema da rota; o zod da rota descartaria
+ * em silêncio uma chave a mais). null desliga.
+ */
+export function observarEntradas(fn: typeof observador): void {
+  observador = fn
 }
 
 const data = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)

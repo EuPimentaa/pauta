@@ -42,25 +42,28 @@
   .cal-lista .cal-chip { padding: 8px 10px; font-size: var(--fs-body); line-height: var(--lh-body); }
 
   /* Fase 2 (F9): itens das agendas externas. Contorno e texto na tinta da cor da agenda (--cor-ink, AA sobre o fundo
-     leve --cor-bg e sobre a superfície), fundo leve; "livre" e "talvez" sem fundo e com o contorno tracejado. Só
-     leitura: nunca arrastam (cursor de clique, não de pegar). */
+     leve --cor-bg e sobre a superfície), fundo leve; "livre" e "talvez" sem a cor de fundo, na superfície (como os
+     chips das demandas) e com o contorno tracejado. Só leitura: nunca arrastam (cursor de clique, não de pegar).
+     Integração: a superfície, e não transparente, porque a tinta de âmbar e amarelo não chega a 4,5:1 sobre a célula
+     de fora do mês (80% de --surface-sunken) no tema claro; sobre --surface é o par já medido pelo contraste.ts. */
   .cal-externo {
     display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; padding: 2px 6px; border: 0; border-radius: var(--radius-xs);
     background: var(--cor-bg); color: var(--cor-ink); box-shadow: inset 0 0 0 1px var(--cor-ink);
     font: 500 var(--fs-meta) / 16px var(--font); text-align: left; cursor: pointer;
   }
   .cal-externo:hover { box-shadow: inset 0 0 0 2px var(--cor-ink); }
-  .cal-externo[data-leve] { background: transparent; box-shadow: none; outline: 1px dashed var(--cor-ink); outline-offset: -1px; }
+  .cal-externo[data-leve] { background: var(--surface); box-shadow: none; outline: 1px dashed var(--cor-ink); outline-offset: -1px; }
   .cal-externo[data-leve]:hover { outline-width: 2px; outline-offset: -2px; }
   .cal-externo-hora { flex: none; font-weight: 600; font-variant-numeric: lining-nums tabular-nums; }
   .cal-externo-titulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cal-lista .cal-externo { padding: 8px 10px; font-size: var(--fs-body); line-height: var(--lh-body); }
 
-  /* mês: a linha dos externos do dia, depois dos prazos */
+  /* mês: a linha dos externos do dia, depois dos prazos (na superfície: o contorno de controle fica a 3:1 também na
+     célula de fora do mês) */
   .cal-externos-linha { display: flex; min-width: 0; }
   .cal-externos-resumo {
     display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; padding: 2px 6px; border: 0; border-radius: var(--radius-xs);
-    background: transparent; color: var(--text-2); box-shadow: inset 0 0 0 1px var(--border-control);
+    background: var(--surface); color: var(--text-2); box-shadow: inset 0 0 0 1px var(--border-control);
     font: 500 var(--fs-meta) / 16px var(--font); text-align: left; cursor: pointer;
   }
   .cal-externos-resumo:hover { background: var(--veu-1); color: var(--text); }

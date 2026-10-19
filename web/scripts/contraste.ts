@@ -297,6 +297,13 @@ export function pares(): Par[] {
   // card selecionado e o sinal do card (véu sobre a superfície)
   p('--text-2', '--accent-soft', T, 'card selecionado: metadado (sobe para --text-2)')
   p('--text-2', '--veu-1', T, 'sinal do card (parado há)', ['var(--surface)'])
+  // Fase 2 (FASE2-PLANO §0 regra 9). F9, agenda externa: o evento (tinta da agenda sobre --label-<c>-bg) e o "livre" ou
+  // "talvez" e a linha "3 eventos" (sobre --surface, também na célula de fim de semana e na de fora do mês: a tinta de
+  // âmbar e amarelo ficava abaixo de 4,5:1 sobre --surface-sunken no claro) usam pares que já estão acima; o chip
+  // desligado do filtro de calendários é tracejado direto no fundo da página.
+  p('--border-control', '--bg', UI, 'agenda externa: contorno tracejado do chip desligado no filtro de calendários')
+  // F7, tela de consentimento: o nome informado pelo aplicativo, em destaque na caixa de aviso
+  p('--text', '--warning-bg', T, 'consentimento: nome do aplicativo na caixa de aviso')
   return lista
 }
 

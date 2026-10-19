@@ -133,6 +133,8 @@ function ResumoExternos({ dia, itens, tabavel }: { dia: DataLocal; itens: ItemAg
   const [aberto, setAberto] = useState(false)
   const [ancora, setAncora] = useState<HTMLButtonElement | null>(null)
   const nome = `${DIAS_LONGOS[diaDaSemana(dia)]}, ${Number(dia.slice(8))} de ${MESES[Number(dia.slice(5, 7)) - 1]}`
+  // o nome da agenda embaixo de cada evento só quando o dia mistura agendas (a cor já diz quando é uma só)
+  const variasOrigens = new Set(itens.map((i) => i.origem)).size > 1
   return (
     <>
       <button ref={setAncora} type="button" className="cal-externos-resumo" tabIndex={tabavel ? undefined : -1}
@@ -143,11 +145,11 @@ function ResumoExternos({ dia, itens, tabavel }: { dia: DataLocal; itens: ItemAg
         <span>{rotuloResumo(itens.length)}</span>
       </button>
       <Popover aberto={aberto} aoFechar={() => setAberto(false)} ancora={ancora} titulo={`Agenda · ${nome}`} mostrarTitulo largura={300}>
-        <ul className="cal-externos-lista" aria-label={`Eventos de ${nome}`}>
+        <ul className="ui-popover-corpo cal-externos-lista" aria-label={`Eventos de ${nome}`}>
           {itens.map((i) => (
             <li key={i.id}>
               <ChipExterno item={{ ...i, abrir: () => i.abrir(ancora) }} aoAbrir={() => setAberto(false)} />
-              <span className="cal-externos-origem" data-cor={i.cor}><span className="cal-externos-ponto" aria-hidden="true" />{i.origem}</span>
+              {variasOrigens && <span className="cal-externos-origem" data-cor={i.cor}><span className="cal-externos-ponto" aria-hidden="true" />{i.origem}</span>}
             </li>
           ))}
         </ul>

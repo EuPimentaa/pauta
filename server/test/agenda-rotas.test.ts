@@ -284,6 +284,16 @@ describe('provedor do MCP (FASE2-PLANO §5)', () => {
     assert.deepEqual(provedor.eventos(a.db, { de: '2026-10-19', ate: '2026-10-25' }), pelaRota)
     assert.throws(() => provedor.eventos(a.db, { de: '2026-10-01', ate: '2026-12-31' }), (e) => e instanceof ErroHttp && e.status === 400)
   })
+
+  test('erro inesperado (api_key, private-…, pauta_at_ na mensagem do banco) sai mascarado', () => {
+    const segredo = 'RAISE: https://calendar.google.com/calendar/ical/x/private-abc123/basic.ics?api_key=KEY123456789 pauta_at_tokensecreto'
+    const dbQuebrado = { prepare() { throw new Error(segredo) } } as unknown as Parameters<typeof provedor.eventos>[0]
+    assert.throws(() => provedor.eventos(dbQuebrado, { de: '2026-10-19', ate: '2026-10-25' }), (e: Error) => {
+      assert.ok(!(e instanceof ErroHttp))
+      for (const proibido of ['private-abc123', 'KEY123456789', 'pauta_at_tokensecreto']) assert.ok(!e.message.includes(proibido), proibido)
+      return e.message.startsWith('agenda: Error: ')
+    })
+  })
 })
 
 describe('tarefa agenda-busca (aCadaMin)', () => {

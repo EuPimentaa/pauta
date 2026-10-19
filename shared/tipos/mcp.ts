@@ -318,8 +318,11 @@ export const FERRAMENTAS_MCP_ESCRITA = [
   'criar_demanda', 'editar_demanda', 'mover_demanda', 'comentar', 'checklist', 'concluir_demanda',
   'arquivar_demanda', 'lancar_horas', 'registrar_retorno', 'coluna', 'etiqueta', 'criar_cliente',
 ] as const satisfies readonly FerramentaMcp[]
-/** Escritas com destructiveHint true (trocam texto inteiro ou registram a decisão do cliente): o Claude pede confirmação. */
-export const FERRAMENTAS_MCP_DESTRUTIVAS = ['editar_demanda', 'registrar_retorno'] as const satisfies readonly FerramentaMcp[]
+/**
+ * Escritas com destructiveHint true (trocam texto inteiro, registram a decisão do cliente, ou concluem em massa e
+ * arquivam: coluna com papel concluída conclui as abertas dela): o Claude pede confirmação.
+ */
+export const FERRAMENTAS_MCP_DESTRUTIVAS = ['editar_demanda', 'registrar_retorno', 'coluna'] as const satisfies readonly FerramentaMcp[]
 
 // ─────────────────────────────── ponte F7 ↔ F8/F9 (sem import cruzado) ───────────────────────────────
 

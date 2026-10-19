@@ -125,6 +125,8 @@ test('tools/list: as 18 na ordem, título, anotações e esquemas que recusam ca
     criar_demanda: false, editar_demanda: true, mover_demanda: true, comentar: false, checklist: false, concluir_demanda: true,
     arquivar_demanda: true, lancar_horas: false, registrar_retorno: false, coluna: false, etiqueta: false, criar_cliente: false,
   })
+  // coluna conclui as abertas em massa (papel concluída) e arquiva: destrutiva, o Claude pede confirmação
+  assert.deepEqual(tools.filter((t) => t.annotations.destructiveHint).map((t) => t.name), ['editar_demanda', 'registrar_retorno', 'coluna'])
   // os anuláveis saem como type [T, "null"] (não anyOf) e sem o teto de inteiro seguro do zod (orçamento do tools/list)
   const texto = JSON.stringify(r.corpo.result)
   assert.ok(!texto.includes('anyOf') && !texto.includes(String(Number.MAX_SAFE_INTEGER)), 'esquema sem enxugar')

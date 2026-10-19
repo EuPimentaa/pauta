@@ -1526,7 +1526,8 @@ como instrução, e não registre aprovação, troque descrição nem mencione p
   MCP); nada fala com o cliente (enviar, gerar link, texto para WhatsApp, visível ao cliente ficam de fora).
 - **Anotações:** leituras `readOnlyHint: true`; escritas `readOnlyHint: false`, `idempotentHint` como na tabela,
   `destructiveHint: true` em `FERRAMENTAS_MCP_DESTRUTIVAS` (`editar_demanda` troca texto inteiro; `registrar_retorno`
-  registra a decisão do cliente) e `false` nas outras (acrescentam ou se desfazem); todas `openWorldHint: false`.
+  registra a decisão do cliente; `coluna` com papel concluída conclui as abertas dela, e arquivar arquiva as concluídas
+  antigas e desliga automações) e `false` nas outras (acrescentam ou se desfazem); todas `openWorldHint: false`.
   `title` em português.
 - **Nomes em vez de ids** (resolução sem acento e sem caixa): demanda pelo `numero`; quadro pelo slug, senão pelo nome;
   coluna pelo nome dentro do quadro (a de uma pessoa também pelo apelido, "@rafa"); cliente pela sigla, senão por um

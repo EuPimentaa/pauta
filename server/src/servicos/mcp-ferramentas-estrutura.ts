@@ -107,7 +107,7 @@ const coluna = ferramenta({
     depoisDe: nome.optional().describe('Coluna; padrão: no fim.'),
     antesDe: nome.optional(),
   }).strict(),
-  anotacoes: escrita(false), escrita: true,
+  anotacoes: escrita(false, true), escrita: true,
   executar({ db, ator, usuario }, a) {
     const n = new Nomes(db, usuario.id)
     const q = n.quadro(a.quadro)

@@ -1284,11 +1284,13 @@ Sumário: [F.1 Convenções](#f1-convenções-da-fase-2) · [F.2 Metadados](#f2-
   em qualquer caixa, `api_key=`, `private-…`, `pauta_at_…`/`pauta_rt_…`, `Bearer`, `code=`/`state=`).
 - **Erro que não é `ErroHttp` nunca sai como veio** (um RAISE do SQLite, SQL, caminho de arquivo, o "Failed to parse URL
   from <URL inteira>" do `fetch`): as rotas de `/mcp`, `/oauth/*`, `/api/oauth/*`, `/api/conexoes`, resultados e agendas
-  capturam tudo dentro do handler (`ErroHttp` segue o caminho de sempre; o resto vira `500 erro_interno` / `ErroOAuth
-  server_error` com o log `descreverErro(e)`), sem chegar ao `onError` do `app.ts` (que imprime o objeto inteiro). As
-  tarefas `agenda-*`, `resultados-*` e `oauth-*` capturam cada agenda ou cliente e nunca deixam a exceção subir (o
-  `detalhe` de `tarefa_execucao` é `descreverErro`). Todo `void busca…()` em segundo plano leva
-  `.catch(registrarFalhaMascarada('<rótulo>'))`: sem ele, a rejeição derruba o processo no Node 24.
+  capturam tudo dentro do handler (`ErroHttp` segue o caminho de sempre; o resto vira `500 interno`, o código que já
+  existe em `CODIGOS_ERRO`, / `ErroOAuth server_error` com o log `descreverErro(e)`), sem chegar ao `onError` do `app.ts`
+  (que imprime o objeto inteiro). As tarefas `agenda-*`, `resultados-*` e `oauth-*` capturam cada agenda ou cliente e
+  nunca deixam a exceção subir (o `detalhe` de `tarefa_execucao` é `descreverErro`); como rede de segurança de todas as
+  tarefas, `executarTarefa` (`server/src/tarefas.ts`) grava o `detalhe` e o log já passados por `mascararSegredos`. Todo
+  `void busca…()` em segundo plano leva `.catch(registrarFalhaMascarada('<rótulo>'))`: sem ele, a rejeição derruba o
+  processo no Node 24. O log de requisição mascara também o id de `/api/oauth/pedidos/:id` (`caminhoParaLog`).
 - **Texto de fora** (nome de campanha e de conta da Windsor; título, local e descrição da agenda; `client_name` do
   registro OAuth; texto do cliente pelo link público e pelo Colar do WhatsApp) é dado: só texto puro na tela (PLANO §0,
   regra 9), links só `https:`. No MCP, além disso: campos de uma linha passam por `umaLinha()` e textos de várias linhas
@@ -1394,7 +1396,9 @@ Navegação da pessoa (vinda do claude.ai ou do Claude Code). **Consulta:** `res
   pessoa; o que poderá fazer; **o host do redirect em destaque**; o `client_name` como "nome informado pelo aplicativo";
   "Pedido criado às 14:05" e "Só continue se você acabou de clicar em Conectar no Claude. Se alguém te mandou este link,
   cancele."; com `anteriores > 0`, a caixa "Substituir a conexão anterior" (marcada).
-- **Erros:** `404` pedido inexistente; `410 token_invalido` vencido, já decidido ou de outro navegador.
+- **Erros:** `404` pedido inexistente; `410 token_invalido` vencido, já decidido ou de outro navegador, com
+  `detalhes.motivo` = `vencido` | `decidido` | `outro_navegador` (a tela escolhe o texto: "Este pedido expirou. Volte ao
+  Claude e conecte de novo." / "Abra a conexão pelo Claude neste navegador."; acréscimo da integração, pedido 4 do F7).
 
 #### `POST /api/oauth/pedidos/:id/decisao`
 - **Quem:** usuário com sessão (anti-CSRF de sempre) e o mesmo cookie do pedido. **Corpo:** `DecisaoAutorizacaoEntrada`.
@@ -1403,7 +1407,7 @@ Navegação da pessoa (vinda do claude.ai ou do Claude Code). **Consulta:** `res
   bloqueia no Chrome e no Safari.
 - Grava `decisao`, `decidido_em`, `usuario_id` e, se permitido, `codigo_hash` + `codigo_expira_em` (5 min) e
   `substituir` (padrão 1), numa transação que exige o pedido ainda pendente (`changes = 1`).
-- **Erros:** `404`; `410 token_invalido` (vencido, já decidido ou de outro navegador).
+- **Erros:** `404`; `410 token_invalido` (vencido, já decidido ou de outro navegador; o mesmo `detalhes.motivo`).
 
 #### `POST /oauth/token`
 - Público. Só `application/x-www-form-urlencoded` (outro tipo → `400 invalid_request`). `Cache-Control: no-store`,
@@ -1476,15 +1480,20 @@ Depois de cada caminho, o `/mcp` responde `401 invalid_token` e o refresh, `inva
 3. **Limite** por pessoa (somando todas as concessões dela): `LIMITES_MCP.chamadasPorMinuto` (60) `tools/call` por
    minuto; acima, o resultado vem com `isError` ("Muitas chamadas seguidas. Espere um minuto.") e HTTP `200`. Nunca por
    IP. Buscas na Windsor disparadas pelo MCP: `buscasWindsorPorHora` (10) por pessoa; acima, o provedor responde só do
-   cache (`buscar: false`) com "dados de 2026-10-19 14:05".
-4. **Protocolo:** as duas eras no mesmo endereço, sempre resposta `application/json` (nunca SSE). Era 2025-11-25:
-   `initialize` (devolve a versão pedida se for 2025-11-25, 2025-06-18 ou 2025-03-26, senão 2025-11-25;
-   `capabilities: { tools: { listChanged: false } }`, `serverInfo: { name: APP_NOME, version }`, `instructions`), `ping`,
-   `tools/list`, `tools/call`; notificações → `202` sem corpo. Era 2026-07-28 (pela SDK v2): `server/discover`,
-   `tools/list`, `tools/call` com `_meta`, cabeçalhos `Mcp-Method`/`Mcp-Name` conferidos. Método desconhecido →
-   `-32601`. Com o plano B (JSON-RPC à mão, FASE2-PLANO §3.F7), só a era 2025: um cliente só-2026 recebe `400` e volta
-   ao `initialize`. `Mcp-Session-Id` recebido é ignorado e nunca emitido: um deploy não derruba ninguém. Sem recursos, prompts
-   nem sampling.
+   cache (`buscar: false`) com "dados de 2026-10-19 14:05". Todos os limites de `LIMITES_MCP` (estes e os do registro, da
+   autorização e do token, §F.3) contam em memória do processo (`servicos/mcp-limites.ts`, sem migração na faixa
+   110–119): reiniciar o Pauta zera as contagens.
+4. **Protocolo:** sempre resposta `application/json` (nunca SSE). Era 2025-11-25: `initialize` (devolve a versão
+   pedida se for 2025-11-25, 2025-06-18 ou 2025-03-26, senão 2025-11-25; `capabilities: { tools: { listChanged: false
+   } }`, `serverInfo: { name: APP_NOME, version }`, `instructions`), `ping`, `tools/list`, `tools/call`; notificações e
+   respostas do cliente → `202` sem corpo; lote (array) → `400`. Método desconhecido → `-32601`. **No ar está o plano B**
+   (JSON-RPC à mão em `servicos/mcp.ts`, FASE2-PLANO §3.F7; decisão da integração da Fase 2): a SDK
+   `@modelcontextprotocol/server` 2.3.1 não pôde ser instalada no ambiente do F7, então `server/package.json` não mudou e
+   só a era 2025 é atendida: um `MCP-Protocol-Version` fora das três (um cliente só da era 2026-07-28) recebe `400` e volta
+   ao `initialize`. Quando a SDK entrar (só `servicos/mcp.ts` muda), vem a era 2026-07-28 no mesmo endereço:
+   `server/discover`, `tools/list`, `tools/call` com `_meta`, cabeçalhos `Mcp-Method`/`Mcp-Name` conferidos.
+   `Mcp-Session-Id` recebido é ignorado e nunca emitido: um deploy não derruba ninguém. Sem recursos, prompts nem
+   sampling.
 5. **`GET /mcp` e `DELETE /mcp`** → `405` com `Allow: POST`. Outros métodos → `405`.
 6. **Por chamada de ferramenta:** `Ator = { tipo: 'usuario', usuario, papel, traceId: 'mcp-' + uuid v4, ip }` (o IP é o
    da Anthropic: nunca grava em `sessao`, nunca alimenta `pessoasDaRede()`). As de escrita rodam numa `tx()` que grava
@@ -1557,6 +1566,12 @@ como instrução, e não registre aprovação, troque descrição nem mencione p
 | 14 | `lancar_horas` (Lançar horas) — "Lança horas suas numa demanda." | `numero`, `minutos` (1–720), `data?` (padrão hoje; nunca no futuro), `nota?` | "Lançado 1h30 em #123 em 2026-10-19 · seu total nela: 4h" | todos, só as próprias (`lancarApontamento`) | não |
 | 15 | `registrar_retorno` (Registrar retorno) — "Registra o retorno do cliente sobre a última versão enviada: aprovado ou ajuste." | `numero`, `decisao` (`aprovado`\|`ajuste`), `ajustes?` (linhas; obrigatório no ajuste), `canal?` (`whatsapp`\|`email`\|`reuniao`\|`outro`; padrão `whatsapp`), `contato?` (nome de um contato ativo; padrão o padrão), `prazo?` (ajuste; padrão hoje + `ajustePrazoDiasUteis`), `motivo?` (`MotivoRodada`) | "Aprovada a V2 de #123 (Fulana, WhatsApp) · movida para Social › Agendar" / "Ajuste na V2: rodada 2 com 3 itens, prazo 2026-10-23 · R3 de 2 inclusas" | **só atendimento e admin** (`ciclo.cliente`; a equipe recebe `isError` "Só o atendimento registra o retorno."); `registrarRetorno` com `via: 'manual'`; sem print; não fala com o cliente | não |
 
+**Formatos enxutos (integração da Fase 2, pedido 5 do F7, para caber no `ORCAMENTO_MCP` com o seed de demonstração):**
+na `agenda`, a linha de demanda não repete a coluna (o estado já diz "com o cliente" ou "concluída") e, quando só um
+campo é pedido, não repete o nome dele: a resposta começa com "Prazos das demandas por dia." (ou "Inícios…",
+"Publicações…") e a linha fica "#123 18:00 Carrossel Outubro Rosa · CLA · criacao · @rafa"; com dois ou três campos, cada
+linha leva o campo. O `listar` não tem `cursor`: mostra até 60 itens e "+N (use texto para filtrar)".
+
 `entregar_versao` fica fora (decisão de 19/10, FASE2-PLANO §7): entregar uma versão é anexar arquivos e escolher itens,
 o que o MCP não faz bem; "entreguei a V2 da #123" vira `comentar` com o link.
 
@@ -1623,7 +1638,7 @@ conector vão juntas em `select_accounts`; datas explícitas de São Paulo, nunc
 | 1 | `facebook` | `date,account_id,campaign_id,campaign,objective,spend,impressions,clicks,link_clicks,actions_lead,actions_onsite_conversion_messaging_conversation_started_7d,actions_omni_purchase,action_values_omni_purchase` | início de B → fim de A | série, campanhas, somas de A e B |
 | 2–3 | `facebook` | `account_id,reach,impressions` | A; depois B | alcance deduplicado |
 | 4 | `google_ads` | `date,account_id,campaign_id,campaign,advertising_channel_type,spend,impressions,clicks,conversions,conversions_value` | início de B → fim de A | tudo do Google Ads |
-| 5 | `googleanalytics4` | `date,account_id,sessions,engaged_sessions,average_session_duration,screen_page_views,conversions` | início de B → fim de A | série e somas |
+| 5 | `googleanalytics4` | `date,account_id,sessions,engaged_sessions,average_session_duration,screen_page_views,conversions,active_users` | início de B → fim de A | série e somas (`active_users` só para a série diária de usuários; o KPI vem das chamadas 6–7) |
 | 6–7 | `googleanalytics4` | `account_id,active_users,newusers` | A; depois B | usuários deduplicados |
 | 8 | `googleanalytics4` | `event_name,conversions` + `filter=[["conversions","gt",0]]` | A | eventos-chave por nome |
 
@@ -1635,8 +1650,9 @@ verdes ao subir; custos verdes ao descer; volume e investimento neutros) e `linh
 só isso: os números saem iguais, caractere a caractere.
 
 **Atenção** (`ResultadosCliente.alertas`, `shared/logica/resultados-alertas.ts`, F8): investimento zero ontem numa conta
-que gastou nos 7 dias antes; `conta_nao_conectada`; custo por resultado/conversão +30% contra o período anterior. O
-`texto` é o mesmo na faixa "Atenção" da aba e no MCP.
+que gastou nos 7 dias antes (só nos períodos que terminam ontem: todos menos "Mês passado", que não fala de ontem);
+`conta_nao_conectada`; custo por resultado/conversão +30% contra o período anterior. O `texto` é o mesmo na faixa
+"Atenção" da aba e no MCP.
 
 **Cálculos** (`shared/logica/resultados-*.ts`, puros): `ctr = cliques / impressões`, `cpc = investimento / cliques`,
 `cpm = investimento / impressões × 1000`, Meta `resultados = leads + conversas`, `custoPorResultado = investimento /
@@ -1647,15 +1663,22 @@ que pessoas em comum entre contas contam duas vezes). Campanhas: as 10 de maior 
 
 **Cache** (`resultado_cache`): chave cliente + conector + as quatro datas; `contas` diferente das ligadas agora =
 vencido. Validade: 3 h; período que terminou há mais de 3 dias: 24 h (a Windsor não rebusca esses dias). Erro numa busca
-grava `erro` e `tentado_em` e mantém os dados e o `buscado_em` de antes. Uma busca por cliente e período por vez (trava
-em memória). Cota: cada chamada soma em `windsor_uso` (dia de São Paulo); passou de 8.000 no dia → `limite` sem chamar.
+grava `erro` e `tentado_em` e mantém os dados e o `buscado_em` de antes; depois de um erro, a busca automática (abrir a
+aba, a carteira, o MCP) espera 10 min desde o `tentado_em` antes de tentar de novo (a Windsor fora do ar não leva uma
+chamada por abertura de tela); "Atualizar agora" não espera. Uma busca por cliente e período por vez (trava em memória).
+Cota: cada chamada soma em `windsor_uso` (dia de São Paulo); passou de 8.000 no dia → `limite` sem chamar. A carteira usa
+o mesmo esquema em `resultado_panorama_cache` (120_resultados_panorama.sql); `windsor_lista` guarda quando a lista de
+contas de cada conector foi buscada (e de onde veio).
 
 #### `GET /api/resultados/contas`
 - **Quem:** admin e atendimento. `?recarregar=1` só admin (1 a cada 10 min; antes disso `429 muitas_tentativas` com
   `detalhes.tenteEmSegundos`). **Resposta:** `200 ListarContasWindsorSaida` (lista em cache de 24 h; vencida, busca na
   hora). Sem chave: `estado: 'sem_chave'` e a lista vazia.
-- A origem da lista (endpoint `ds-accounts` com a chave, ou o MCP da Windsor) é decisão do F8 depois do teste com a chave
-  real (pesquisa-windsor §5 e §10); o contrato não muda. Nunca o endpoint de dados (traz só parte das contas).
+- **Origem da lista** (decisão do orquestrador na Fase 2, sem a chave real para rodar a pesquisa-windsor §10): o endpoint
+  `ds-accounts`; se ele vier vazio para um conector, o endpoint de dados com `fields=account_id,account_name` dos últimos
+  90 dias (`windsor_lista.origem = 'dados'`). Essa reserva é incompleta (só as contas com dados no período: pode faltar
+  conta parada); "Digitar o id" cobre. Os 5 comandos da pesquisa §10 com a chave real ficam pendentes para o deploy
+  (`docs/fase2/operacao-resultados.md`).
 
 #### `GET /api/clientes/:id/resultados/contas`
 Qualquer usuário. `200 ContaLigada[]` (por conector e nome).
@@ -1673,8 +1696,11 @@ Qualquer usuário. `200 ContaLigada[]` (por conector e nome).
 #### `GET /api/resultados/panorama?periodo=30d`
 - **Quem:** qualquer usuário. **Resposta:** `200 PanoramaResultados` na hora (mesmas regras de cache e segundo plano do
   cliente; com `atualizando: true` a tela pede de novo em 15 s; o tratador de `resultado_cliente` também invalida
-  `['resultados', 'panorama']`). Uma chamada sem `date` por conector e período, com todas
-  as contas ligadas a algum cliente em `select_accounts` (~6 chamadas; cache de 3 h, chave = conector + datas + contas).
+  `['resultados', 'panorama']`). Uma chamada por conector e período, com todas as contas ligadas a algum cliente em
+  `select_accounts` (até 6 chamadas; cache de 3 h, chave = conector + datas + contas): sem `date`, menos a do período
+  atual de Meta e Google Ads, que vai com `date` de `min(de, ate − 7)` a `ate` (a mesma soma dos dias da aba, que difere
+  em centavos do total sem `date` da Windsor, e o "parou de gastar" sem chamada a mais). No GA4, sessões e eventos-chave
+  da carteira vêm do total do período (podem diferir em poucas unidades da soma diária da aba).
   Sem chave → `estado: 'sem_chave'`. Tela: `/resultados` (F8), uma linha por cliente (investimento, resultados, custo,
   variação, alertas), ordenada por sigla, com o mesmo seletor de período.
 
@@ -1707,11 +1733,18 @@ do token>"). Nunca volta ao navegador, ao log nem a mensagem de erro (cuidado co
 
 **Busca** (a cada 15 min por agenda ativa, e "Atualizar agora"): `fetch(url, { redirect: 'error', credentials: 'omit',
 signal: AbortSignal.timeout(60_000), headers: { Accept: 'text/calendar' } })`, corpo lido em fluxo com teto de 32 MB
-contados **depois de descomprimir** (`TETOS_AGENDA_EXTERNA`); `404` → `endereco_invalido`; `429`/`5xx`/rede → `fora_do_ar` (tenta na próxima rodada, não
-insiste); corpo sem `BEGIN:VCALENDAR` → `nao_e_ical`. Hash do corpo **sem as linhas `DTSTAMP`** igual ao anterior → só
-`buscada_em` muda (sem regravar ocorrências e sem SSE). Erro: grava `erro`, mantém as ocorrências da última busca boa.
-Busca boa: substitui as ocorrências da agenda numa transação, grava `ok_em`, `contagens`, `hash_conteudo` e
-`ocorrencias_em`, emite `agenda_externa`.
+contados **depois de descomprimir** (`TETOS_AGENDA_EXTERNA`); `404`, `401`, `403` e `410` → `endereco_invalido` (o Google
+responde `404` ao endereço redefinido; os outros são a mesma situação para quem cola: "cole o endereço novo");
+redirecionamento, `429`, `5xx`, outro status que não seja `200` e rede → `fora_do_ar` (tenta na próxima rodada, não
+insiste); corpo sem `BEGIN:VCALENDAR` → `nao_e_ical`. Hash do corpo **sem as linhas `DTSTAMP`** igual ao anterior, com a
+última leitura boa (`ok_em`) do mesmo dia em São Paulo e a agenda sem erro → só `buscada_em` muda (sem regravar
+ocorrências e sem SSE); num dia novo o mesmo corpo é lido de novo (a janela anda um dia), e corpo igual depois de um erro
+limpa o erro e publica. Erro: grava `erro`, mantém as ocorrências da última busca boa. Busca boa: substitui as
+ocorrências da agenda numa transação, grava `ok_em`, `contagens`, `hash_conteudo` e `ocorrencias_em`, emite
+`agenda_externa`; conteúdo mudado com as mesmas ocorrências na janela grava `hash_conteudo`, `ok_em` e `contagens` e
+publica, sem regravar `agenda_ocorrencia` nem mudar `ocorrencias_em`. Erro inesperado (a busca lança, a leitura quebra, o
+banco falha): a agenda fica com `fora_do_ar` (busca) ou `nao_e_ical` (leitura), as ocorrências anteriores ficam e a falha
+sobe já mascarada (`FalhaBuscaAgenda`). `buscada_em` = o instante em que a tentativa começou (gravado no fim dela).
 
 **Leitura do iCal** (leitor próprio, sem dependência; pesquisa-ical §5 e §6): desdobrar em bytes antes do UTF-8 (CRLF,
 LF solto e BOM); fuso **pelo `Intl`** (o `VTIMEZONE` do Google só serve de reserva para TZID que o `Intl` não conhece;
@@ -1721,7 +1754,11 @@ inteiro como data (`DTEND` exclusivo); RRULE no subconjunto do Google (DAILY, WE
 conta em `repeticoesNaoEntendidas`); `EXDATE` (lista, TZID ou UTC, casado por instante); exceções por `UID` +
 `RECURRENCE-ID` em UTC (movidas para dentro e para fora da janela, sem mestre, `SEQUENCE` maior vence); `STATUS:CANCELLED`
 some; "esta e as seguintes" (`UID` com `_R<data>`) é série própria. Janela: de hoje − 30 a hoje + 180 (São Paulo); entra
-a ocorrência cujo intervalo cruza a janela. Tetos: 1.000 ocorrências por série, 20.000 por agenda (`teto_ocorrencias`).
+a ocorrência cujo intervalo cruza a janela. Tetos: 1.000 ocorrências por série (corta a série e conta 1 em
+`contagens.avisos`; a contagem inclui 2 dias de folga antes da janela) e 20.000 por agenda (erro `teto_ocorrencias`, que
+mantém as anteriores). Chave da ocorrência (`agenda_ocorrencia.chave`): evento avulso = o `UID`; ocorrência de série (ou
+de evento com exceção ou RDATE) = `UID|<início original em UTC ISO>` (dia inteiro: `UID|AAAA-MM-DD`); `UID` acima de 300
+caracteres vira `h:<sha256>`; VEVENT sem `UID` = `sem-uid:<posição>`.
 
 **Texto e privacidade:** `SUMMARY` vazio → "(sem título)"; `CLASS:PRIVATE`/`CONFIDENTIAL` → "Ocupado", sem local,
 descrição nem link; descrição HTML → texto puro (`<br>`, `</p>`, `</div>` viram quebra; `<a href="https://x">t</a>` vira
@@ -1742,24 +1779,32 @@ Qualquer usuário. `200 AgendaExterna[]` (por `pos`; sem o endereço).
 
 #### `PATCH /api/agendas-externas/:id`
 - **Quem:** admin. **Corpo:** `EditarAgendaExternaEntrada` (`url` = colar o novo endereço: valida, cifra, zera
-  `hash_conteudo` e busca de novo; `ativa: false` pausa e tira da Agenda; `posicao` reordena). **Resposta:** `200
-  AgendaExterna`. **Erros:** `400`, `404`, `409`. **SSE:** `agenda_externa`.
+  `hash_conteudo` e `erro` (o erro era do endereço antigo) e busca de novo, com as ocorrências da última busca boa até a
+  nova terminar; `ativa: false` pausa e tira da Agenda, `ativa: true` busca de novo; `posicao` reordena). **Resposta:**
+  `200 AgendaExterna`. **Erros:** `400`, `404`, `409`. **SSE:** `agenda_externa`.
 
 #### `DELETE /api/agendas-externas/:id`
 Admin. `204`; as ocorrências vão junto (cascade). **SSE:** `agenda_externa` (delete).
 
 #### `POST /api/agendas-externas/:id/atualizar`
-Admin. `202 AgendaExterna` (a busca roda em segundo plano). 1 por agenda por minuto → `429 muitas_tentativas`. Pausada
-→ `422 estado_invalido`.
+Admin. `202 AgendaExterna` como estava (a busca roda em segundo plano; uma busca já em andamento da mesma agenda não
+começa outra). 1 por agenda por minuto → `429 muitas_tentativas`. Pausada → `422 estado_invalido`. O fim chega pelo SSE
+quando algo muda; quando nada muda (o mesmo feed), a tela de Configurações relê a lista a cada 2 s até a `buscadaEm`
+mudar (no máximo 75 s).
 
 #### `GET /api/agendas-externas/eventos?de=&ate=&agendaIds=`
 - **Quem:** qualquer usuário. **Consulta:** `EventosAgendaConsulta` (até 62 dias; `ate` antes de `de` ou data inválida →
-  `400`; `agendaIds` repetido ou separado por vírgula). **Resposta:** `200 EventosAgendaSaida`: só agendas ativas;
-  ocorrências com `dia_inicio <= ate AND dia_fim >= de` (índice `agenda_ocorrencia_dia_ix`), dia inteiro primeiro, depois
-  por início e título.
+  `400`; `agendaIds` repetido ou separado por vírgula, até 50; desconhecido ou de agenda pausada não traz nada).
+  **Resposta:** `200 EventosAgendaSaida`: só agendas ativas (`agendas` traz sempre todas as ativas, mesmo com `agendaIds`,
+  para a cor e o filtro); ocorrências com `dia_inicio <= ate AND dia_fim >= de` (índice `agenda_ocorrencia_dia_ix`), dia
+  inteiro primeiro, depois por início e título.
 - Na Agenda: estilo distinto das demandas (contorno na cor da agenda, sem arrastar), clique abre os detalhes (horário,
-  local, link da reunião como link, descrição em texto puro), filtro por calendário guardado no aparelho
-  (`localStorage`). No Início: "Hoje na agenda" (eventos de hoje).
+  local, link da reunião como link, descrição em texto puro; popover no desktop, folha no celular: diálogo
+  `agenda-evento`), filtro por calendário guardado no aparelho (`localStorage` `pauta:agenda-externa-desligadas`, a
+  lista de ids escondidos, a mesma na Agenda e no Início). No mês, os externos do dia viram uma linha só depois dos
+  prazos, fora do limite do "+N" (um evento: o próprio; dois ou mais: "N eventos", que abre a lista do dia), pela prop
+  `rodapeDoDia` da `GradeCalendario`; na semana e no celular, os de dia inteiro no topo e o resto pelo horário. No
+  Início: "Hoje na agenda" (eventos de hoje).
 
 ### F.10 Tempo real da Fase 2
 
@@ -1778,4 +1823,4 @@ Sempre o objeto inteiro (`c` nulo). Busca automática da agenda e fim de busca d
 |---|---|---|---|
 | `oauth-poda` | diária, 03:30 | apaga pedidos vencidos há mais de 1 dia, tokens vencidos há mais de 1 dia e clientes OAuth sem nenhuma concessão criados há mais de 24 h; zera `filho_cifrado` dos refresh trocados há mais de 60 s | mcp |
 | `resultados-poda` | diária, 03:40 | apaga `resultado_cache` com `tentado_em` de mais de 7 dias e `windsor_uso` de mais de 90 dias | resultados |
-| `agenda-busca` | a cada 15 min (`aCadaMin: 15`, `server/src/tarefas.ts`) | busca cada agenda ativa cujo `buscada_em` passou de 15 min, uma de cada vez | agenda |
+| `agenda-busca` | a cada 15 min (`aCadaMin: 15`, `server/src/tarefas.ts`) | busca cada agenda ativa cujo `buscada_em` passou de 15 min (ou nulo), a mais atrasada primeiro, uma de cada vez; se alguma falhou, termina com "1 de 2 agendas falharam: …" (mascarado) em `tarefa_execucao.detalhe` | agenda |

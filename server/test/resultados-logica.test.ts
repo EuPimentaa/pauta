@@ -135,7 +135,7 @@ describe('cálculo com as fixtures da pesquisa (período atual = 12–18/10, ant
   test('carteira: somas por conta e os KPIs principais saem iguais aos da aba', () => {
     const a = calcularMeta({ diario: dados('meta-diario-campanha.json'), totalAtual: [], totalAnterior: [], datas })
     const porConta = somasPorConta('facebook', dados('meta-diario-campanha.json'))
-    const somas = somarContas(porConta, ['1000000000000001', 'outra'])
+    const somas = somarContas<'facebook'>(porConta, ['1000000000000001', 'outra'])
     assert.deepEqual(principaisDeSomas('facebook', somas), principaisDeKpis('facebook', a.kpis.atual))
     assert.equal(somarContas(porConta, ['nenhuma']), null)
     assert.deepEqual(principaisDeSomas('google_ads', null), { investimento: null, conversoes: null, custoPorConversao: null, ctr: null })

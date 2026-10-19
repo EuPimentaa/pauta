@@ -37,7 +37,13 @@ valor > 0.
 
 - Até 8 chamadas por cliente e período (Meta 3, Google Ads 1, GA4 4); a carteira, até 6 para todos os clientes.
 - Cache no banco: 3 h; período que terminou há mais de 3 dias, 24 h. Ligar ou desligar uma conta vence o cache do canal.
-  Depois de um erro, a próxima tentativa automática só 10 min depois (os dados de antes continuam na tela, com a hora).
+  Depois de um erro, a próxima tentativa automática só 10 min depois (os dados de antes continuam na tela, com a hora),
+  mesmo que os dados de antes ainda estejam na validade: a Windsor voltou, a tela volta sozinha.
+- A carteira sem dados de um canal (a busca dela falhou ou ainda não terminou) usa o cache da aba de cada cliente, sem
+  chamada a mais: nunca diz "A Windsor não respondeu" para um cliente que a aba mostra.
+- O Claude (MCP) busca na Windsor no máximo 10 vezes por pessoa por hora, contando só busca de verdade (ler o cache não
+  gasta). Acima disso responde do cache e, no canal sem número, "ainda sem dados (limite de buscas da hora; pergunte de
+  novo às HH:MM)".
 - "Atualizar agora": 1 por cliente a cada 5 min. O plano Basic da Windsor não força a atualização na fonte: o botão relê
   o que a Windsor tem, e os 3 últimos dias podem chegar com até ~6 h de atraso.
 - Teto do Pauta: 8.000 chamadas por dia (São Paulo); a Windsor aceita 10.000. O uso de hoje aparece em Configurações ›

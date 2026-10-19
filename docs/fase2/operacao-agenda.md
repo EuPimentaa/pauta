@@ -5,8 +5,8 @@ Agendas externas (FASE2 §3; API.md §F.9). O integrador leva este texto ao READ
 ## O que é
 
 O admin cola, em **Configurações → Agendas externas**, o "Endereço secreto no formato iCal" de uma ou mais agendas do
-Google (nome e cor por agenda). O servidor lê cada agenda a cada 15 minutos (tarefa `agenda-busca`) e no "Atualizar
-agora", e guarda as ocorrências de 30 dias atrás a 180 dias à frente. Os eventos aparecem:
+Google (nome e cor por agenda). O servidor lê cada agenda a cada 15 minutos (a tarefa `agenda-busca` confere a cada minuto
+quais passaram de 15 min: uma agenda buscada fora dela não fica mais de 16 min sem busca) e no "Atualizar agora", e guarda as ocorrências de 30 dias atrás a 180 dias à frente. Os eventos aparecem:
 
 - na **Agenda**, junto com os prazos: contorno na cor da agenda, só leitura (não arrastam), clicar abre os detalhes
   (horário, local, [Entrar na reunião] para Meet, Zoom e Teams, descrição em texto puro). No mês, os prazos têm

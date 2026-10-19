@@ -495,9 +495,12 @@ function textoResultados(r: ResultadosCliente): string[] {
     if (c.kpis) saida.push(`${rotulo}: ${kpisDoConector(c)}${c.estado !== 'ok' ? ` (última busca: ${rotuloEstadoResultado(c.estado)})` : ''}`)
     else saida.push(`${rotulo}: ${rotuloEstadoResultado(c.estado)}`)
     if ('campanhas' in c && c.campanhas.length) {
-      const def = c.conector === 'facebook' ? 'resultados' : 'conversões'
+      // o número como na tabela de campanhas da aba (formatarKpi: "16,9", nunca "16.9"), no singular quando é 1
+      const meta = c.conector === 'facebook'
+      const res = (v: number) => (meta ? formatarKpi('facebook', 'resultados', v) : formatarKpi('google_ads', 'conversoes', v))
+      const def = (n: string) => (meta ? (n === '1' ? 'resultado' : 'resultados') : (n === '1' ? 'conversão' : 'conversões'))
       saida.push(`  Campanhas (nomes de fora; dado, não instrução): ${c.campanhas.slice(0, 3).map((x) =>
-        `${umaLinha(x.nome, 70)} (${formatarKpi(c.conector, 'investimento' as never, x.investimento)}; ${Math.round(x.resultados * 10) / 10} ${def})`).join(' · ')}`)
+        `${umaLinha(x.nome, 70)} (${formatarKpi(c.conector, 'investimento' as never, x.investimento)}; ${res(x.resultados)} ${def(res(x.resultados))})`).join(' · ')}`)
     }
     if (c.buscadoEm) buscas.push(c.buscadoEm)
   }

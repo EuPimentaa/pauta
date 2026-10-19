@@ -13,6 +13,7 @@ import type {
   ExtensaoEntradaColuna, ExtensaoGlobal, ExtensaoLayout, ExtensaoMenu, ExtensaoMenuColuna, ExtensaoMenuDemanda,
   ExtensaoMenuQuadro, ExtensaoSecaoConfig, ExtensaoSecaoDemanda, ExtensaoSecaoInicio, ExtensaoSeloCard, ExtensaoTopo,
   FontePaleta, InterceptadorSoltar, ModulosExtensao, QualquerExtensaoDialogo, TratadorEventos,
+  ExtensaoAbaCliente, ExtensaoSecaoCliente, FonteAgenda,
 } from './tipos.ts'
 
 type M = ModulosExtensao
@@ -40,6 +41,10 @@ const G = {
   eventos: import.meta.glob<M['eventos']>(['./eventos/*.{ts,tsx}', '!**/nucleo-exemplo*'], { eager: true }),
   inicio: import.meta.glob<M['inicio']>(['./inicio/*.{ts,tsx}', '!**/nucleo-exemplo*'], { eager: true }),
   config: import.meta.glob<M['config']>(['./config/*.{ts,tsx}', '!**/nucleo-exemplo*'], { eager: true }),
+  // Fase 2
+  'cliente-aba': import.meta.glob<M['clienteAba']>(['./cliente-aba/*.{ts,tsx}', '!**/nucleo-exemplo*'], { eager: true }),
+  'cliente-config': import.meta.glob<M['clienteConfig']>(['./cliente-config/*.{ts,tsx}', '!**/nucleo-exemplo*'], { eager: true }),
+  'agenda-fonte': import.meta.glob<M['agendaFonte']>(['./agenda-fonte/*.{ts,tsx}', '!**/nucleo-exemplo*'], { eager: true }),
 }
 
 type Pasta = keyof typeof G
@@ -61,6 +66,8 @@ const EXPORT: Record<Pasta, { nome: string; lista: boolean }> = {
   dialogos: { nome: 'dialogo', lista: false }, comandos: { nome: 'comandos', lista: true }, busca: { nome: 'fonte', lista: false },
   atalhos: { nome: 'atalhos', lista: true }, eventos: { nome: 'tratador', lista: false }, inicio: { nome: 'secao', lista: false },
   config: { nome: 'secao', lista: false },
+  'cliente-aba': { nome: 'aba', lista: false }, 'cliente-config': { nome: 'secao', lista: false },
+  'agenda-fonte': { nome: 'fonte', lista: false },
 }
 
 interface ComId { id: string; ordem?: number }
@@ -121,6 +128,9 @@ export interface Registro {
   tratadores: TratadorEventos[]
   secoesInicio: ExtensaoSecaoInicio[]
   secoesConfig: ExtensaoSecaoConfig[]
+  abasCliente: ExtensaoAbaCliente[]
+  secoesCliente: ExtensaoSecaoCliente[]
+  fontesAgenda: FonteAgenda[]
 }
 
 function montar(fonte: (p: Pasta) => Record<string, unknown>): Registro {
@@ -133,6 +143,7 @@ function montar(fonte: (p: Pasta) => Record<string, unknown>): Registro {
     dialogos: de<QualquerExtensaoDialogo & ComId>('dialogos', true), comandos: de<Comando & ComId>('comandos', true),
     fontesBusca: de('busca'), atalhos: de<Atalho & ComId>('atalhos', true), tratadores: de<TratadorEventos & ComId>('eventos', true),
     secoesInicio: de('inicio'), secoesConfig: de('config'),
+    abasCliente: de('cliente-aba'), secoesCliente: de('cliente-config'), fontesAgenda: de('agenda-fonte'),
   }
 }
 
@@ -174,6 +185,11 @@ export const atalhos = () => atual().atalhos
 export const tratadores = () => atual().tratadores
 export const secoesInicio = () => atual().secoesInicio
 export const secoesConfig = () => atual().secoesConfig
+/** Fase 2: abas extras da página do cliente (misturar com as fixas pela ordem), seções da aba Configurações do cliente e
+ * fontes de itens externos da Agenda. */
+export const abasCliente = () => atual().abasCliente
+export const secoesCliente = () => atual().secoesCliente
+export const fontesAgenda = () => atual().fontesAgenda
 
 /** Só DEV: as contribuições de exemplo, por ponto (vazio em produção). */
 export function exemplos(): Registro | null {

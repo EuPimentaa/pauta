@@ -43,6 +43,9 @@
  * | extensoes/eventos/*.ts(x)        | tratador: TratadorEventos              | cliente SSE                          |
  * | extensoes/inicio/*.tsx           | secao: ExtensaoSecaoInicio             | tela Início                          |
  * | extensoes/config/*.tsx           | secao: ExtensaoSecaoConfig             | tela Configurações                   |
+ * | extensoes/cliente-aba/*.tsx      | aba: ExtensaoAbaCliente                | página do cliente: abas (Fase 2)     |
+ * | extensoes/cliente-config/*.tsx   | secao: ExtensaoSecaoCliente            | cliente: aba Configurações (Fase 2)  |
+ * | extensoes/agenda-fonte/*.ts(x)   | fonte: FonteAgenda                     | tela Agenda: itens de fora (Fase 2)  |
  *
  * Componentes de extensão (código React) usam os hooks do núcleo-web (useContextoAcao, useAbrirDialogo, useMover...;
  * assinaturas no PLANO §2.2). Funções que rodam FORA do render (executar de menus, ações, comandos, atalhos,
@@ -55,9 +58,9 @@ import type { ComponentType } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import type { LucideIcon } from 'lucide-react'
 import type {
-  ClienteResumo, Coluna, ConcluirSaida, DataLocal, Demanda, DemandaDetalhe, EditarDemandaEntrada, EditarDemandaSaida,
+  Cliente, ClienteResumo, Coluna, Cor, ConcluirSaida, DataLocal, Demanda, DemandaDetalhe, EditarDemandaEntrada, EditarDemandaSaida,
   Entidade, Etiqueta, Eu, EventoTempoReal, FiltrosQuadro, Id, ModeloWhatsapp, MoverEntrada, MoverSaida, Papel,
-  PosicaoRelativa, Quadro, VisaoQuadro,
+  PosicaoRelativa, Quadro, VisaoQuadro, HoraLocal,
 } from '@shared/tipos/index.ts'
 
 export type Icone = LucideIcon
@@ -616,6 +619,63 @@ export interface ExtensaoSecaoConfig {
   carregar: Carregar
 }
 
+// ─────────────────────────────── Fase 2: página do cliente e fontes da Agenda ───────────────────────────────
+// docs/FASE2-PLANO.md §4. Os hosts são da Fase 2: telas/clientes (F8) e telas/agenda + calendario/ (F9).
+
+/**
+ * Aba extra da página do cliente (/clientes/:sigla?aba=<id>). O host mistura com as fixas pela `ordem`: Demandas 100,
+ * Aprovações 200, Horas 300 (só atendimento e admin), Configurações 900. Ex.: `resultados` 150.
+ */
+export interface ExtensaoAbaCliente {
+  /** Vira o ?aba=<id> (sem acento, minúsculas). */
+  id: string
+  rotulo: string
+  ordem: number
+  visivel?(eu: Eu): boolean
+  carregar: Carregar<{ cliente: Cliente }>
+}
+
+/** Seção da aba Configurações do cliente, abaixo do cadastro (ex.: "Contas de resultados"). */
+export interface ExtensaoSecaoCliente {
+  id: string
+  ordem: number
+  visivel?(eu: Eu): boolean
+  /** `podeEditar` = pode('cliente.editar') para este cliente (a mesma regra do cadastro). */
+  carregar: Carregar<{ cliente: Cliente; podeEditar: boolean }>
+}
+
+/** Item de fora do Pauta no calendário da Agenda: só leitura, estilo próprio, nunca arrasta. */
+export interface ItemAgendaExterno {
+  /** Único no período (um evento de vários dias gera um item por dia: `${idDoEvento}:${data}`). */
+  id: string
+  fonteId: string
+  /** O dia em que o item aparece. */
+  data: DataLocal
+  titulo: string
+  cor: Cor
+  /** Nulas no dia inteiro (e nos dias do meio de um evento que atravessa vários dias). */
+  hora: HoraLocal | null
+  horaFim: HoraLocal | null
+  /** Nome curto da origem (o nome da agenda), para a dica e o leitor de tela. */
+  origem: string
+  /** "Livre" e "talvez" pintam mais leve. */
+  leve?: boolean
+  /** Abre os detalhes (horário, local, link da reunião) ancorados no item; no celular, folha. */
+  abrir(ancora: HTMLElement | null): void
+}
+
+/**
+ * Fonte de itens externos da Agenda (e de quem mais desenhar o CalendarioDemandas com `externos`). `usarItens` é um
+ * HOOK: o host chama o de cada fonte em toda renderização, sempre na mesma ordem (a lista é fixa depois do carregamento).
+ */
+export interface FonteAgenda {
+  id: string
+  ordem: number
+  usarItens(periodo: { de: DataLocal; ate: DataLocal }): { itens: ItemAgendaExterno[]; carregando: boolean }
+  /** Controle da fonte na barra da Agenda (ex.: mostrar ou esconder cada calendário). */
+  Filtro?: ComponentType
+}
+
 /** Formato de cada módulo descoberto (para tipar o import.meta.glob em registro-rotas.ts e registro.ts). */
 export interface ModulosExtensao {
   rota: { rota?: ExtensaoRota; rotas?: ExtensaoRota[] }
@@ -641,4 +701,7 @@ export interface ModulosExtensao {
   eventos: { tratador: TratadorEventos }
   inicio: { secao: ExtensaoSecaoInicio }
   config: { secao: ExtensaoSecaoConfig }
+  clienteAba: { aba: ExtensaoAbaCliente }
+  clienteConfig: { secao: ExtensaoSecaoCliente }
+  agendaFonte: { fonte: FonteAgenda }
 }

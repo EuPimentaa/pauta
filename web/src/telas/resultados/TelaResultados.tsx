@@ -115,7 +115,7 @@ export default function TelaResultados() {
     <div className="res-pagina">
       <header className="res-pagina-cabeca">
         <h1 className="res-pagina-titulo">Resultados</h1>
-        <p className="res-pagina-sub">Os clientes com conta ligada, lado a lado. Toque na sigla para ver o cliente.</p>
+        <p className="res-pagina-sub">Os clientes com conta ligada, lado a lado. Abra a sigla para ver o cliente.</p>
       </header>
       <div className="res-filtros">
         <div className="res-filtros-esquerda">

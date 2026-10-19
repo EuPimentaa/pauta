@@ -25,7 +25,8 @@ import type {
 import { hojeSP, somarDias } from '../../../shared/logica/datas.ts'
 import { alertasResultados, type ConectorParaAlertas } from '../../../shared/logica/resultados-alertas.ts'
 import {
-  calcularGa4, calcularGoogleAds, calcularMeta, gastoRecente, linhasEntre, principaisDeSomas, somarContas, somasPorConta,
+  calcularGa4, calcularGoogleAds, calcularMeta, gastoRecente, linhasEntre, principaisDeKpis, principaisDeSomas, somarContas,
+  somasPorConta,
 } from '../../../shared/logica/resultados-calculo.ts'
 import { periodoDe, validadeCacheMs, type DatasPeriodo } from '../../../shared/logica/resultados-periodo.ts'
 import { atorSistema, type Ator } from '../auth.ts'
@@ -461,6 +462,24 @@ const ZEROS: { [C in ConectorWindsor]: SomasPorConector[C] } = {
   googleanalytics4: { usuarios: 0, sessoes: 0, sessoesEngajadas: 0, eventosChave: 0 },
 }
 
+/**
+ * A reserva da carteira: quando a busca da carteira não tem dados de um conector (a primeira falhou ou ainda não
+ * terminou), o cliente usa o cache da própria aba (resultado_cache do mesmo período e das mesmas contas), sem chamada a
+ * mais. Assim a carteira nunca contradiz a aba: uma queda na busca da carteira não esvazia quem a aba já mostra.
+ */
+function daAba(db: Db, clienteId: Id, conector: ConectorWindsor, d: DatasPeriodo, contas: readonly string[]):
+  { estado: ResultadoConector['estado']; atual: Record<string, number | null>; anterior: Record<string, number | null>;
+    gastoRecente: GastoRecente | null; buscadoEm: string } | null {
+  const l = linhaCache(db, clienteId, conector, d)
+  if (!l?.dados || !l.buscado_em || l.contas !== JSON.stringify([...contas].sort())) return null
+  const dados = JSON.parse(l.dados) as DadosConector
+  if (!dados.kpis) return null
+  return {
+    estado: l.erro ?? (dados.vazio ? 'sem_dados' : 'ok'), atual: principaisDeKpis(conector, dados.kpis.atual),
+    anterior: principaisDeKpis(conector, dados.kpis.anterior), gastoRecente: gastoDoCache(l), buscadoEm: l.buscado_em,
+  }
+}
+
 /** GET /api/resultados/panorama: uma linha por cliente com conta ligada, por sigla. Mesmas regras de cache da aba. */
 export function lerPanorama(db: Db, periodo: PeriodoResultados, opcoes: { buscar: PodeBuscarResultados }): PanoramaResultados {
   const hoje = hojeSP(agoraData())
@@ -486,6 +505,7 @@ export function lerPanorama(db: Db, periodo: PeriodoResultados, opcoes: { buscar
 
   const porCliente = new Map<string, LigacaoComSigla[]>()
   for (const l of ligacoes) porCliente.set(l.cliente_id, [...(porCliente.get(l.cliente_id) ?? []), l])
+  const buscadosDaAba: string[] = []
   const linhas: LinhaPanorama[] = []
   for (const [clienteId, ls] of porCliente) {
     const conectores: LinhaPanorama['conectores'] = []
@@ -498,7 +518,13 @@ export function lerPanorama(db: Db, periodo: PeriodoResultados, opcoes: { buscar
       let estado: ResultadoConector['estado'] = l?.erro ?? 'ok'
       let atual = principaisDeSomas(conector, null)
       let anterior = principaisDeSomas(conector, null)
-      if (dados) {
+      const aba = dados ? null : daAba(db, clienteId, conector, d, contas)
+      let gasto: GastoRecente | null = dados?.gastoRecente ?? null
+      if (aba) {
+        ({ estado, atual, anterior } = aba)
+        gasto = aba.gastoRecente
+        buscadosDaAba.push(aba.buscadoEm)
+      } else if (dados) {
         const a = somarContas(dados.atual as Record<string, SomasPorConector[typeof conector]>, contas)
         const b = somarContas(dados.anterior as Record<string, SomasPorConector[typeof conector]>, contas)
         if (a || b) {
@@ -510,13 +536,14 @@ export function lerPanorama(db: Db, periodo: PeriodoResultados, opcoes: { buscar
       const chaveCusto = conector === 'facebook' ? 'custoPorResultado' : conector === 'google_ads' ? 'custoPorConversao' : null
       paraAlertas.push({
         conector, estado, ate: d.ate, contas: doConector.map((x) => ({ contaId: x.conta_id, nome: x.nome })),
-        custo: chaveCusto && dados ? { atual: atual[chaveCusto] ?? null, anterior: anterior[chaveCusto] ?? null } : null,
-        gastoRecente: dados?.gastoRecente ?? null,
+        custo: chaveCusto && (dados || aba) ? { atual: atual[chaveCusto] ?? null, anterior: anterior[chaveCusto] ?? null } : null,
+        gastoRecente: gasto,
       })
     }
     linhas.push({ clienteId, sigla: ls[0]!.sigla, conectores, alertas: alertasResultados(paraAlertas, hoje) as AlertaResultado[] })
   }
-  const buscados = [...dadosPor.values()].map((x) => x.l?.buscado_em ?? null).filter((x): x is string => !!x).sort()
+  const buscados = [...[...dadosPor.values()].map((x) => x.l?.buscado_em ?? null), ...buscadosDaAba]
+    .filter((x): x is string => !!x).sort()
   return {
     ...base, estado: 'ok', atualizando: memoria(db).panoramas.has(chaveDatas(d)), buscadoEm: buscados[0] ?? null, linhas,
   }

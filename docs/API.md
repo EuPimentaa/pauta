@@ -1702,7 +1702,12 @@ Qualquer usuário. `200 ContaLigada[]` (por conector e nome).
   `select_accounts` (até 6 chamadas; cache de 3 h, chave = conector + datas + contas): sem `date`, menos a do período
   atual de Meta e Google Ads, que vai com `date` de `min(de, ate − 7)` a `ate` (a mesma soma dos dias da aba, que difere
   em centavos do total sem `date` da Windsor, e o "parou de gastar" sem chamada a mais). No GA4, sessões e eventos-chave
-  da carteira vêm do total do período (podem diferir em poucas unidades da soma diária da aba).
+  da carteira vêm do total do período (podem diferir em poucas unidades da soma diária da aba). **Reserva:** quando a
+  busca da carteira não tem dados de um conector (a primeira falhou ou ainda não terminou), cada cliente usa o cache da
+  própria aba (`resultado_cache` do mesmo período e das mesmas contas), sem chamada a mais: a carteira nunca contradiz a
+  aba (revisão visual da Fase 2, achado 8). A Windsor ignora em silêncio os ids desconhecidos de `select_accounts`
+  (pesquisa-windsor §3), então uma conta ruim não derruba a chamada inteira; por isso não há nova tentativa conta a
+  conta.
   Sem chave → `estado: 'sem_chave'`. Tela: `/resultados` (F8), uma linha por cliente (investimento, resultados, custo,
   variação, alertas), ordenada por sigla, com o mesmo seletor de período.
 

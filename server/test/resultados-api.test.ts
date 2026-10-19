@@ -431,6 +431,34 @@ describe('carteira (panorama)', () => {
     assert.deepEqual(iccLinha.conectores.map((c) => `${c.conector}:${c.estado}`), ['facebook:sem_dados', 'googleanalytics4:ok'])
   })
 
+  test('a busca da carteira falhou: o cliente com o cache da aba sai com os números da aba; o sem cache, com o erro', async () => {
+    // revisão visual, achado 8: a carteira esvaziava a linha de todos os clientes do conector, inclusive de quem a aba
+    // mostrava normalmente
+    await ligarFixtures()
+    const icc = env.clientes.icc.id
+    await env.como(env.pessoas.am2).post(`/api/clientes/${icc}/resultados/contas`, { conector: 'facebook', contaId: CONTA_SEM_DADOS, nome: 'Parada' })
+    const aba = await resultadosProntos()
+    definirBuscaWindsor({ dados: async () => { throw new FalhaWindsor('fora_do_ar', 500, 'server_error') }, contas: async () => [] })
+    await capturarLog(async () => {
+      await env.como(env.pessoas.design).get('/api/resultados/panorama?periodo=7d')
+      await esperarBuscas(env.db)
+    })
+    const n = dadosDaWindsor().length
+    const p: PanoramaResultados = (await env.como(env.pessoas.design).get('/api/resultados/panorama?periodo=7d')).corpo
+    assert.equal(dadosDaWindsor().length, n, 'a reserva não chama a Windsor')
+    const he = p.linhas.find((l) => l.sigla === 'HE')!
+    assert.deepEqual(he.conectores.map((c) => `${c.conector}:${c.estado}`), ['facebook:ok', 'google_ads:ok', 'googleanalytics4:ok'])
+    for (const [c, kpis] of [[he.conectores[0]!, aba.meta!.kpis], [he.conectores[1]!, aba.googleAds!.kpis], [he.conectores[2]!, aba.ga4!.kpis]] as const) {
+      for (const k of KPIS_PRINCIPAIS[c.conector as 'facebook']) {
+        assert.equal(linhaKpi(c.conector as 'facebook', k, c.atual[k] ?? null, c.anterior[k] ?? null),
+          linhaKpi(c.conector as 'facebook', k, (kpis!.atual as never)[k], (kpis!.anterior as never)[k]), `${c.conector}.${k}`)
+      }
+    }
+    assert.equal(p.buscadoEm, aba.meta!.buscadoEm, 'a hora dos dados é a do cache da aba')
+    const semAba = p.linhas.find((l) => l.sigla === 'ICC')!
+    assert.deepEqual(semAba.conectores.map((c) => `${c.conector}:${c.estado}`), ['facebook:fora_do_ar'])
+  })
+
   test('sem chave → sem_chave; sem nenhuma conta ligada → sem linhas e sem chamar', async () => {
     const vazia: PanoramaResultados = (await env.como(env.pessoas.design).get('/api/resultados/panorama')).corpo
     assert.equal(vazia.estado, 'ok')

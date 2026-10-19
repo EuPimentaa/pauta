@@ -173,11 +173,15 @@ export class Nomes {
     return escolher(`coluna em ${quadro.slug}`, texto, achadas, (c) => c.nome, todas)
   }
 
+  /** Pela sigla; senão o apelido ou o nome igual (sem caixa e sem acento: "Super Mercado" ≠ "Super-Mercado"); senão pela chave. */
   cliente(texto: string): ClienteResumo {
     const k = chave(texto)
     const todos = this.clientes().filter((c) => c.status !== 'ex')
     const porSigla = this.clientes().filter((c) => chave(c.sigla) === k)
     if (porSigla.length === 1) return porSigla[0]!
+    const alvo = normalizarAlias(texto)
+    const exato = todos.filter((c) => c.apelidos.some((a) => normalizarAlias(a) === alvo) || normalizarAlias(c.nome) === alvo)
+    if (exato.length === 1) return exato[0]!
     const porApelido = todos.filter((c) => c.apelidos.some((a) => chave(a) === k))
     const achados = porApelido.length ? porApelido : todos.filter((c) => chave(c.nome) === k)
     return escolher('cliente', texto, achados, (c) => c.sigla, todos)

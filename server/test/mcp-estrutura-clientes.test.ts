@@ -104,3 +104,20 @@ test('criar_cliente: nome com quebra vira uma linha; nome ou apelido com caracte
   assert.equal(rest.status, 400)
   assert.equal(quantos(amb), 3)
 })
+
+test('cliente pelo nome: o apelido igual (sem caixa e sem acento) vem antes da chave ("Super Mercado" ≠ "Super-Mercado")', async () => {
+  const amb = await ambienteMcp()
+  const c = await conectar(amb, amb.pessoas.am)
+  assert.equal((await chamar(amb, c.at, 'criar_cliente', { sigla: 'SUPA', nome: 'Supa', apelidos: ['Super-Mercado'] })).erro, false)
+  assert.equal((await chamar(amb, c.at, 'criar_cliente', { sigla: 'SUPB', nome: 'Supb', apelidos: ['Super Mercado'] })).erro, false)
+  const cliente = async (texto: string) => {
+    const r = await chamar(amb, c.at, 'criar_demanda', { titulo: `Para ${texto}`, quadro: 'criacao', cliente: texto })
+    if (r.erro) return r.texto
+    const numero = Number(/^Criada #([0-9]+)/.exec(r.texto)![1])
+    return um<{ sigla: string }>(amb.db, 'SELECT c.sigla FROM demanda d JOIN cliente c ON c.id = d.cliente_id WHERE d.numero = ?', numero)!.sigla
+  }
+  assert.equal(await cliente('Super Mercado'), 'SUPB')
+  assert.equal(await cliente('super-mercado'), 'SUPA')
+  assert.equal(await cliente('Súper Mercado'), 'SUPB')
+  assert.match(await cliente('supermercado'), /^Mais de um cliente com esse nome: SUPA, SUPB\.$/)
+})

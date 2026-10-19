@@ -36,10 +36,14 @@ export default function TelaEntrar() {
     }
   }
 
+  // vindo da conexão do Claude (/oauth/autorizar sem sessão → /entrar?volta=/autorizar…): a tela diz para quê
+  const doClaude = (voltaSegura(params.get('volta')) ?? '').startsWith('/autorizar')
   return (
     <LayoutAuth
       titulo="Entrar"
-      subtitulo={<>Use o e-mail e a senha da sua conta no {nome}.</>}
+      subtitulo={doClaude
+        ? <>Entre para conectar o Claude ao {nome}. Use o e-mail e a senha da sua conta.</>
+        : <>Use o e-mail e a senha da sua conta no {nome}.</>}
       rodape="Esqueceu a senha? Peça ao admin um link de redefinição. Primeiro acesso: use o link de convite que você recebeu."
     >
       <form className="auth-form" onSubmit={enviar} noValidate>

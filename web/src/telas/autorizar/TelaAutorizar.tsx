@@ -51,7 +51,7 @@ function Par({ destino }: { destino: DestinoConexao }) {
 /** Pedido inválido, vencido, de outro navegador ou já respondido: o texto do servidor e o caminho de volta. */
 function Problema({ titulo, texto }: { titulo: string; texto: string }) {
   return (
-    <Cartao rodape={<>Ninguém ganhou acesso. Se precisar, conecte de novo pelo Claude.</>}>
+    <Cartao rodape={<>Ninguém ganhou acesso. Se precisar, conecte de novo pelo Claude (no Claude Code, rode <code>/mcp</code> de novo).</>}>
       <div className="aut-problema-icone" aria-hidden="true"><AlertCircle /></div>
       <h1 className="aut-titulo" tabIndex={-1}>{titulo}</h1>
       <p className="aut-sub">{texto}</p>
@@ -132,19 +132,12 @@ function Formulario({ pedido }: { pedido: PedidoAutorizacao }) {
         </div>
       </div>
 
-      <div className="aut-listas">
-        <section aria-labelledby="aut-pode">
-          <h2 id="aut-pode" className="aut-rotulo">Com as suas permissões, ele poderá</h2>
-          <ul className="aut-lista">{podeFazer.map((t) => <li key={t}><Check aria-hidden="true" />{t}</li>)}</ul>
-        </section>
-        <section aria-labelledby="aut-nunca">
-          <h2 id="aut-nunca" className="aut-rotulo">Ele nunca vai</h2>
-          <ul className="aut-lista" data-tom="nunca">
-            <li><X aria-hidden="true" />Apagar nada</li>
-            <li><X aria-hidden="true" />Falar com o cliente (enviar link, WhatsApp ou e-mail)</li>
-          </ul>
-        </section>
-      </div>
+      <section aria-labelledby="aut-pode">
+        <h2 id="aut-pode" className="aut-rotulo">Com as suas permissões, ele poderá</h2>
+        <ul className="aut-lista">{podeFazer.map((t) => <li key={t}><Check aria-hidden="true" />{t}</li>)}</ul>
+        {/* numa linha só (o cartão do Claude Code passava da dobra de um notebook) */}
+        <p className="aut-nunca"><X aria-hidden="true" />Nunca apaga nada nem fala com o cliente (link, WhatsApp ou e-mail).</p>
+      </section>
 
       <div className="aut-destino">
         <span className="aut-rotulo">Depois, a autorização vai para</span>
@@ -156,10 +149,13 @@ function Formulario({ pedido }: { pedido: PedidoAutorizacao }) {
         {!loopback && <span className="aut-declarado">Nome informado pelo aplicativo: {pedido.nomeCliente}</span>}
       </div>
 
+      {/* o aviso descreve exatamente o que a pessoa fez: no Claude Code não existe botão Conectar, ela rodou /mcp */}
       <div className="aut-aviso" role="note">
         <Clock3 aria-hidden="true" />
-        <p>Pedido criado às <strong>{horaDe(pedido.criadoEm)}</strong>. Só continue se você acabou de clicar em Conectar no Claude.
-          Se alguém te mandou este link, cancele.</p>
+        <p>Pedido criado às <strong>{horaDe(pedido.criadoEm)}</strong>. {loopback
+          ? <>Só continue se você acabou de rodar <code>/mcp</code> no Claude Code neste computador.</>
+          : pedido.destino === 'claude_ai' ? 'Só continue se você acabou de clicar em Conectar no Claude.'
+            : 'Só continue se você acabou de pedir esta conexão no aplicativo.'} Se alguém te mandou este link, cancele.</p>
       </div>
 
       <div className="aut-caixas">
@@ -170,7 +166,7 @@ function Formulario({ pedido }: { pedido: PedidoAutorizacao }) {
           </Checkbox>
         )}
         {loopback && (
-          <Checkbox checked={fuiEu} onChange={(e) => setFuiEu(e.target.checked)} descricao="Obrigatório para permitir.">
+          <Checkbox checked={fuiEu} onChange={(e) => setFuiEu(e.target.checked)} descricao={<span id="aut-obrigatorio">Obrigatório para permitir.</span>}>
             Fui eu que comecei esta conexão no Claude Code
           </Checkbox>
         )}
@@ -183,11 +179,10 @@ function Formulario({ pedido }: { pedido: PedidoAutorizacao }) {
           Cancelar
         </Botao>
         <Botao variante="primario" tamanho="g" carregando={enviando === 'permitir'} disabled={permitirDesabilitado}
-          onClick={() => void responder(true)} aria-describedby={loopback && !fuiEu ? 'aut-falta' : undefined}>
+          onClick={() => void responder(true)} aria-describedby={loopback && !fuiEu ? 'aut-obrigatorio' : undefined}>
           Permitir
         </Botao>
       </div>
-      {loopback && !fuiEu && <p id="aut-falta" className="aut-falta">Marque “Fui eu que comecei esta conexão” para permitir.</p>}
     </Cartao>
   )
 }
@@ -214,12 +209,12 @@ export default function TelaAutorizar() {
     const e = q.error
     const motivo = (e.detalhes?.motivo as string | undefined) ?? null
     if (e.status === 410 && motivo === 'outro_navegador') {
-      return <Problema titulo="Abra a conexão pelo Claude neste navegador." texto="Este link só abre no navegador em que você clicou em Conectar. Se alguém te mandou o link, não continue." />
+      return <Problema titulo="Abra a conexão pelo Claude neste navegador." texto="Este link só abre no navegador em que a conexão começou (o Conectar do claude.ai ou o /mcp do Claude Code). Se alguém te mandou o link, não continue." />
     }
     if (e.status === 410 && motivo === 'vencido') {
       return <Problema titulo="Este pedido expirou." texto="Volte ao Claude e conecte de novo. O pedido vale por 10 minutos." />
     }
-    if (e.status === 410) return <Problema titulo="Este pedido já foi respondido." texto={e.mensagem} />
+    if (e.status === 410) return <Problema titulo="Este pedido já foi respondido." texto="Ele não vale mais. Se precisar, volte ao Claude e conecte de novo." />
     if (e.status === 404) return <Problema titulo="Este pedido de conexão não existe." texto="Volte ao Claude e conecte de novo." />
     return <Problema titulo="Não foi possível abrir o pedido." texto={e.mensagem} />
   }

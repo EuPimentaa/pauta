@@ -61,7 +61,9 @@ test('PKCE certo → par com Cache-Control e Pragma; a concessão guarda o resou
 test('verificador errado, redirect diferente, código vencido ou de outro cliente → invalid_grant', async () => {
   const amb = await ambienteMcp()
   const p = await codigoPermitido(amb)
-  for (const extra of [{ code_verifier: pkce().verificador }, { code_verifier: 'curto' }, { redirect_uri: 'https://claude.com/api/mcp/auth_callback' }]) {
+  const casos: Record<string, string>[] = [{ code_verifier: pkce().verificador }, { code_verifier: 'curto' },
+    { redirect_uri: 'https://claude.com/api/mcp/auth_callback' }]
+  for (const extra of casos) {
     const r = await req(amb, '/oauth/token', trocar(p, extra))
     assert.equal(r.status, 400)
     assert.equal(r.corpo.error, 'invalid_grant')

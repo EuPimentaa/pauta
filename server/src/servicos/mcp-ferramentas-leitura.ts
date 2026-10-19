@@ -352,13 +352,15 @@ const agenda = ferramenta({
     if (ate < de) throw new ErroMcp('O fim vem antes do começo.')
     if (diasEntre(de, ate) + 1 > 62) throw new ErroMcp('Escolha no máximo 62 dias.')
     const quadro = a.quadro ? n.quadro(a.quadro) : null
-    const ag = montarAgenda(db, { de, ate, soMinhas: !!a.soMinhas, ...(quadro ? { quadroIds: [quadro.id] } : {}),
-      campos: a.campos?.length ? a.campos : ['prazo'] }, ator)
+    const campos = a.campos?.length ? [...new Set(a.campos)] : ['prazo' as const]
+    const umCampo = campos.length === 1
+    const ag = montarAgenda(db, { de, ate, soMinhas: !!a.soMinhas, ...(quadro ? { quadroIds: [quadro.id] } : {}), campos }, ator)
     const mapa = new Map(demandasPorIds(db, [...new Set(ag.itens.map((i) => i.demandaId))]).map((d) => [d.id, d]))
     const ev = a.eventos === false ? null : eventosDaAgenda(db, de, ate)
     const agendas = new Map((ev?.agendas ?? []).map((g) => [g.id, g]))
     const saida: string[] = []
     if (a.eventos !== false && !provedorAgenda()) saida.push('(agenda da Melt ainda não disponível)')
+    if (umCampo) saida.push(`${campos[0] === 'prazo' ? 'Prazos' : campos[0] === 'inicio' ? 'Inícios' : 'Publicações'} das demandas por dia.`)
     if (ev && ev.eventos.length > 0) saida.push(CABECALHO_EVENTOS)
     let total = 0
     for (let dia = de; dia <= ate; dia = somarDias(dia, 1)) {
@@ -367,8 +369,10 @@ const agenda = ferramenta({
       for (const item of ag.itens.filter((i) => i.data === dia)) {
         const d = mapa.get(item.demandaId)
         if (!d) continue
-        const resto = n.linha(d).replace(/^#\d+ /, '').replace(/ · prazo [^·]*?(?= · |$)/, '')
-        linhas.push(`#${d.numero} ${ROTULO_CAMPO[item.campo]}${item.hora ? ` ${item.hora}` : ''} ${resto}`)
+        // enxuta: sem a coluna (o estado diz se está com o cliente ou concluída) e sem o campo quando é um só
+        const resto = n.linha(d).replace(/^#\d+ /, '').replace(/ · prazo [^·]*?(?= · |$)/, '').replace(/ › [^·]*?(?= · |$)/, '')
+        const campo = umCampo ? '' : `${ROTULO_CAMPO[item.campo]} `
+        linhas.push(`#${d.numero} ${campo}${item.hora ? `${item.hora} ` : ''}${resto}`)
       }
       if (ev) for (const e of eventosDoDia(ev, dia)) linhas.push(linhaEvento(e, agendas.get(e.agendaId)))
       if (linhas.length === 0 && !feriado) continue

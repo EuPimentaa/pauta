@@ -90,7 +90,7 @@ test('o trace de outra pessoa não marca (a junção exige o mesmo usuário)', a
   tx(amb.db, () => {
     const ator = { ...atorDe(amb.pessoas.social), traceId: trace }
     amb.db.prepare("INSERT INTO atividade (demanda_id, ator_id, ator_tipo, tipo, dados, trace_id, criado_em) VALUES (?, ?, 'usuario', 'demanda.editada', '{\"campos\":[]}', ?, ?)")
-      .run(d.id, ator.usuario.id, trace, '2026-10-14T13:00:01.000Z')
+      .run(d.id, amb.pessoas.social.id, trace, '2026-10-14T13:00:01.000Z')
   })
   const h = await amb.como(amb.pessoas.am).get(`/api/demandas/${d.id}/historico`)
   const daSocial = h.corpo.itens.find((a: any) => a.atorId === amb.pessoas.social.id)

@@ -63,7 +63,7 @@ test('Origin: evil → 403; sem Origin, claude.ai e o do app → passam; extra p
   assert.equal(evil.status, 403)
   assert.equal((await rpc(amb, null, 'ping', undefined, { Origin: 'https://evil.example' })).status, 403)
   for (const origem of [undefined, 'https://claude.ai', 'https://claude.com', ORIGEM]) {
-    assert.equal((await rpc(amb, c.at, 'ping', undefined, origem ? { Origin: origem } : {})).status, 200, origem)
+    assert.equal((await rpc(amb, c.at, 'ping', undefined, origem ? { Origin: origem } : {})).status, 200, String(origem))
   }
   const antes = configurar({ mcpOrigensExtras: ['https://inspector.exemplo'] })
   try {

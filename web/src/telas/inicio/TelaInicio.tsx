@@ -15,8 +15,12 @@ import { useRegistro } from '../../sessao/registro.ts'
 import { EsqueletoLinhas } from '../../ui/Indicadores.tsx'
 import '../../funcionalidades/paineis/paineis.css'
 
-/** Seções que ficam na coluna da direita no desktop largo (as outras, inclusive as de outras funcionalidades, à esquerda). */
-const LATERAIS = new Set(['paineis-cliente-parado', 'paineis-mencoes'])
+/**
+ * Seções que ficam na coluna da direita no desktop largo (as outras, inclusive as de outras funcionalidades, à
+ * esquerda). "Hoje na agenda" (F9) vai no topo dela: antes ficava depois de toda "Minhas demandas" (y=1581 a 1440 px).
+ * Sem a coluna da direita (abaixo de 1180 px), ela vem logo depois do topo (a ordem do CSS em paineis.css).
+ */
+const LATERAIS = new Set(['agenda-hoje', 'paineis-cliente-parado', 'paineis-mencoes'])
 
 function Secoes({ secoes }: { secoes: ExtensaoSecaoInicio[] }) {
   const reg = useRegistro()

@@ -42,6 +42,8 @@
   .agd-evento-privado svg { width: 15px; height: 15px; flex: none; }
 
   /* ─────────────── Início · Hoje na agenda ─────────────── */
+  /* a seção mede a própria largura: estreita (a coluna da direita do Início, o celular) vira duas linhas por item */
+  .agd-hoje { container-type: inline-size; }
   .agd-hoje-lista { display: flex; flex-direction: column; gap: 6px; }
   .agd-hoje-item {
     display: grid; grid-template-columns: minmax(84px, auto) minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); width: 100%;
@@ -52,6 +54,28 @@
   .agd-hoje-item[data-leve] { background: var(--surface); box-shadow: inset 3px 0 0 var(--cor-ink), inset 0 0 0 1px var(--border); }
   .agd-hoje-hora { font-weight: 600; font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; }
   .agd-hoje-titulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; }
+  .agd-hoje-agora {
+    display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: var(--radius-full); vertical-align: 1px;
+    background: var(--accent-soft); color: var(--accent-ink); font: 700 var(--fs-micro) / var(--lh-micro) var(--font);
+    letter-spacing: var(--tracking-micro); text-transform: uppercase;
+  }
+  .agd-hoje-passados > summary {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; border-radius: 4px;
+    color: var(--text-2); font: 500 var(--fs-meta) / var(--lh-meta) var(--font);
+  }
+  .agd-hoje-passados > summary::-webkit-details-marker { display: none; }
+  .agd-hoje-passados > summary::before {
+    content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg); transition: transform var(--dur-1) var(--ease);
+  }
+  .agd-hoje-passados[open] > summary::before { transform: rotate(45deg); }
+  .agd-hoje-passados > summary:hover { color: var(--text); }
+  .agd-hoje-passados > .agd-hoje-lista { margin-top: var(--space-2); }
+  /* estreita: o horário numa coluna de largura fixa (os títulos começam todos no mesmo x) e a origem embaixo */
+  @container (max-width: 520px) {
+    .agd-hoje-item { grid-template-columns: 6.9em minmax(0, 1fr); row-gap: 2px; column-gap: var(--space-3); }
+    .agd-hoje-origem { grid-column: 2; }
+  }
   .agd-hoje-origem { display: inline-flex; align-items: center; gap: 6px; font: 500 var(--fs-meta) / var(--lh-meta) var(--font); white-space: nowrap; }
   .agd-hoje-ver {
     align-self: flex-start; display: inline-flex; align-items: center; gap: 2px; color: var(--text-2); border-radius: 4px;
@@ -88,8 +112,6 @@
   @media (max-width: 767.98px) {
     .agd-filtro { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 2px 16px; width: calc(100% + 32px); }
     .agd-chip, .agd-filtro-rotulo { flex: none; }
-    .agd-hoje-item { grid-template-columns: auto minmax(0, 1fr); row-gap: 2px; }
-    .agd-hoje-origem { grid-column: 2; }
     .agd-linha { padding: var(--space-3) var(--space-4); }
     .agd-linha-acoes { width: 100%; justify-content: flex-start; padding-left: calc(12px + var(--space-3)); }
     .agd-estado, .agd-edicao { padding-left: 0; margin-left: 0; }
@@ -98,5 +120,6 @@
 }
 
 @layer foco {
-  .agd-chip:focus-visible, .agd-hoje-item:focus-visible, .agd-hoje-ver:focus-visible, .agd-passos > summary:focus-visible { box-shadow: var(--focus-ring); outline: 0; }
+  .agd-chip:focus-visible, .agd-hoje-item:focus-visible, .agd-hoje-ver:focus-visible, .agd-passos > summary:focus-visible,
+  .agd-hoje-passados > summary:focus-visible { box-shadow: var(--focus-ring); outline: 0; }
 }

@@ -78,6 +78,14 @@
   .pnl-inicio-grade { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); align-items: start; }
   .pnl-inicio-principal, .pnl-inicio-lateral { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
   .pnl-inicio-secao:empty { display: none; }
+  /* uma coluna só (abaixo de 1180 px): "Hoje na agenda" logo depois dos primeiros passos, antes de Minhas demandas
+     (como coluna da direita ela viria depois de toda a lista). As colunas viram "contents" e a ordem é das seções. */
+  @media (max-width: 1179.98px) {
+    .pnl-inicio-grade { display: flex; flex-direction: column; align-items: stretch; }
+    .pnl-inicio-principal, .pnl-inicio-lateral { display: contents; }
+    .pnl-inicio-secao[data-secao="cadastros-primeiros-passos"] { order: -2; }
+    .pnl-inicio-secao[data-secao="agenda-hoje"] { order: -1; }
+  }
   @media (min-width: 1180px) {
     .pnl-inicio-grade[data-com-lateral] { grid-template-columns: minmax(0, 1fr) minmax(300px, 340px); }
     .pnl-inicio-lateral { position: sticky; top: calc(var(--topo-h) + var(--space-6)); }

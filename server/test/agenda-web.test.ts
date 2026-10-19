@@ -10,7 +10,8 @@ import type { AgendaExterna, EventoAgendaExterna, EventosAgendaSaida, EventoTemp
 import { diaDoMes, diaPorHorario, rotuloResumo } from '../../web/src/calendario/externos.ts'
 import { tratarAgendaExterna } from '../../web/src/funcionalidades/agenda/cache.ts'
 import {
-  alternarDesligada, chavesAgenda, diasDoEvento, estadoDaAgenda, eventosDeHoje, horarioCurto, horarioDoEvento, itensDoPeriodo,
+  acontecendo, alternarDesligada, chavesAgenda, diasDoEvento, encerrado, estadoDaAgenda, eventosDeHoje, horarioCurto, horarioDoEvento,
+  itensDoPeriodo,
 } from '../../web/src/funcionalidades/agenda/logica.ts'
 
 function agenda(id: string, extra: Partial<AgendaExterna> = {}): AgendaExterna {
@@ -104,6 +105,36 @@ describe('Hoje na agenda e os textos', () => {
     assert.equal(r.todasEscondidas, false)
     const escondidas = eventosDeHoje(saida(eventos), new Set(['a1', 'a2']), hoje)
     assert.deepEqual([escondidas.itens, escondidas.todasEscondidas], [[], true])
+  })
+
+  test('eventos de hoje com o relógio às 13:30: os que já passaram saem da frente; o que está acontecendo é "agora"', () => {
+    // revisão visual, achado 2: à tarde, a seção mostrava o dia inteiro e as reuniões da manhã, já encerradas, e
+    // escondia as próximas (14h, 17h, 18h30) atrás do "mais 4"
+    const hoje = '2026-10-20'
+    const h = (hh: string) => `2026-10-20T${hh}:00.000Z`          // UTC; São Paulo = UTC−3
+    const eventos = [
+      evento('dia1', { diaInteiro: true, inicio: null, fim: null }),
+      evento('dia2', { diaInteiro: true, inicio: null, fim: null }),
+      evento('daily', { inicio: h('11:30'), fim: h('11:45') }),      // 8h30–8h45
+      evento('call', { inicio: h('13:00'), fim: h('13:30') }),       // 10h–10h30
+      evento('reuniao', { inicio: h('13:00'), fim: h('14:00') }),    // 10h–11h
+      evento('almoco', { inicio: h('16:00'), fim: h('17:00') }),     // 13h–14h, acontecendo às 13:30
+      evento('gravacao', { inicio: h('17:00'), fim: h('18:00') }),   // 14h
+      evento('cafe', { inicio: h('20:00'), fim: h('20:30') }),       // 17h
+      evento('ocupado', { inicio: h('21:30'), fim: h('22:00') }),    // 18h30
+    ]
+    const agora = new Date(h('16:30'))                               // 13:30 em São Paulo
+    const r = eventosDeHoje(saida(eventos), new Set(), hoje, 5, agora)
+    assert.deepEqual(r.itens.map((i) => i.titulo), ['dia1', 'dia2', 'almoco', 'gravacao', 'cafe'])
+    assert.equal(r.resto, 1)
+    assert.deepEqual(r.passados.map((i) => i.titulo), ['daily', 'call', 'reuniao'])
+    assert.equal(r.aindaHoje, 4)
+    assert.equal(r.total, 9)
+    assert.deepEqual(r.itens.filter((i) => acontecendo(i, agora)).map((i) => i.titulo), ['almoco'])
+    assert.equal(encerrado(r.itens[0]!, agora), false, 'dia inteiro nunca "já passou" dentro do dia')
+    // às 23h nada mais vem, só os de dia inteiro
+    const noite = eventosDeHoje(saida(eventos), new Set(), hoje, 5, new Date('2026-10-21T02:00:00.000Z'))
+    assert.deepEqual([noite.itens.map((i) => i.titulo), noite.passados.length, noite.aindaHoje], [['dia1', 'dia2'], 7, 0])
   })
 
   test('horário dos detalhes e o curto', () => {

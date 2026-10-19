@@ -131,12 +131,36 @@ export function horarioCurto(i: { hora: HoraLocal | null; horaFim: HoraLocal | n
   return 'Dia inteiro'
 }
 
-/** Os eventos de hoje (Início): das agendas ligadas, dia inteiro primeiro, no máximo `max` e quantos sobraram. */
-export function eventosDeHoje(s: EventosAgendaSaida | undefined, desligadas: ReadonlySet<string>, hoje: DataLocal, max = 5):
-  { itens: ItemExterno[]; resto: number; todasEscondidas: boolean } {
+/** O item tem horário (não é de dia inteiro nem sem fim)? */
+const comHorario = (i: ItemExterno) => !i.evento.diaInteiro && !!i.evento.inicio && !!i.evento.fim
+
+/** Já terminou em `agora`? Dia inteiro (e sem horário) vale o dia todo: nunca "já passou" dentro de hoje. */
+export function encerrado(i: ItemExterno, agora: Date): boolean {
+  return comHorario(i) && Date.parse(i.evento.fim!) <= agora.getTime()
+}
+
+/** Acontecendo agora (começou e não terminou)? */
+export function acontecendo(i: ItemExterno, agora: Date): boolean {
+  return comHorario(i) && Date.parse(i.evento.inicio!) <= agora.getTime() && agora.getTime() < Date.parse(i.evento.fim!)
+}
+
+/**
+ * Os eventos de hoje (Início): das agendas ligadas, dia inteiro primeiro e depois pelo horário. Com `agora`, os que já
+ * terminaram saem da lista principal e vão para `passados` (a seção os mostra recolhidos): a tarde não fica com as
+ * reuniões da manhã na frente e as próximas escondidas no "mais 4" (revisão visual da Fase 2, achado 2). `itens`: até
+ * `max` dos que ainda vêm; `resto`: quantos deles ficaram de fora; `aindaHoje`: os com horário que ainda não terminaram.
+ */
+export function eventosDeHoje(s: EventosAgendaSaida | undefined, desligadas: ReadonlySet<string>, hoje: DataLocal, max = 5, agora?: Date):
+  { itens: ItemExterno[]; resto: number; passados: ItemExterno[]; aindaHoje: number; total: number; todasEscondidas: boolean } {
   const ativas = (s?.agendas ?? []).filter((a) => a.ativa)
-  const itens = itensDoPeriodo(s, desligadas, hoje, hoje).sort(ordenarExternos)
-  return { itens: itens.slice(0, max), resto: Math.max(0, itens.length - max), todasEscondidas: ativas.length > 0 && ativas.every((a) => desligadas.has(a.id)) }
+  const todos = itensDoPeriodo(s, desligadas, hoje, hoje).sort(ordenarExternos)
+  const passados = agora ? todos.filter((i) => encerrado(i, agora)) : []
+  const vindo = agora ? todos.filter((i) => !encerrado(i, agora)) : todos
+  return {
+    itens: vindo.slice(0, max), resto: Math.max(0, vindo.length - max), passados,
+    aindaHoje: vindo.filter(comHorario).length, total: todos.length,
+    todasEscondidas: ativas.length > 0 && ativas.every((a) => desligadas.has(a.id)),
+  }
 }
 
 /** Liga ou desliga uma agenda no filtro (lista de ids desligados, sem repetir). */

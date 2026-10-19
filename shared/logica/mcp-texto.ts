@@ -3,8 +3,9 @@
  * de fora tratado como dado (contra injeção de instrução). Puro: o servidor passa os nomes já resolvidos.
  *
  * - `umaLinha()`: campos de uma linha vindos de pessoas ou de fora (títulos, nomes, evento, campanha, client_name). Quebras
- *   de linha e tabs viram espaço; saem os controles C0/C1, os de largura zero e os de direção (U+202A–U+202E,
- *   U+2066–U+2069): nenhum deles forja uma linha "#999 …" nem inverte o texto. Corta em 200.
+ *   de linha e tabs viram espaço; saem os invisíveis de `semInvisiveis()` (controles, largura zero, direção, tags
+ *   U+E0000–E007F, seletores de variação em fila…): nenhum deles forja uma linha "#999 …", inverte o texto ou esconde
+ *   uma instrução que a pessoa não vê. Corta em 200.
  * - `bloco()`: textos de várias linhas (descrição, comentário, ajustes, descrição de evento) num bloco «««/»»» com a
  *   origem; um «««/»»» de dentro do texto não fecha o bloco.
  */
@@ -12,23 +13,22 @@ import type { DataLocal, HoraLocal } from '../tipos/nucleo.ts'
 import { LIMITES_MCP } from '../tipos/mcp.ts'
 import { diaDaSemana, ehDataLocal } from './datas.ts'
 import { formatarDuracao } from './modal-texto.ts'
+import { semInvisiveis } from './texto.ts'
 
 const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'] as const
 
-/** Controles que nunca saem: C0 (menos \t \n \r, tratados à parte), DEL, C1, largura zero, BOM e direção. */
-const INVISIVEIS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\uFEFF\u202A-\u202E\u2066-\u2069]/g
 /** Quebras que viram espaço numa linha só. */
 const QUEBRAS = /[\r\n\t\u2028\u2029]/g
 
 /** Um campo de uma linha: sem quebras nem controles, espaços juntados, até `max` (200) caracteres. */
 export function umaLinha(texto: string | null | undefined, max = 200): string {
-  const t = (texto ?? '').replace(QUEBRAS, ' ').replace(INVISIVEIS, '').replace(/ {2,}/g, ' ').trim()
+  const t = semInvisiveis((texto ?? '').replace(QUEBRAS, ' ')).replace(/ {2,}/g, ' ').trim()
   return t.length > max ? `${t.slice(0, max - 1)}…` : t
 }
 
 /** Texto de várias linhas sem os controles invisíveis e com «««/»»» de dentro quebrados (não fecham o bloco). */
 export function textoDeBloco(texto: string): string {
-  let t = texto.replace(/\r\n?/g, '\n').replace(/[\u2028\u2029]/g, '\n').replace(INVISIVEIS, '')
+  let t = semInvisiveis(texto.replace(/\r\n?/g, '\n').replace(/[\u2028\u2029]/g, '\n'))
   while (t.includes('«««')) t = t.replaceAll('«««', '«« «')
   while (t.includes('»»»')) t = t.replaceAll('»»»', '»» »')
   return t

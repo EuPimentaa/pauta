@@ -1,0 +1,62 @@
+/*
+ * F7 · Conexões em Configurações e o selo "via Claude" (histórico e comentários do modal). Só tokens do design system,
+ * nos dois temas; o selo usa o texto secundário (AA sobre a superfície do modal) e o ícone no laranja de texto.
+ */
+@layer components {
+  .mcp-endereco {
+    display: flex; align-items: center; gap: var(--space-3); min-width: 0; padding: 10px 10px 10px 14px; border-radius: var(--radius-md);
+    background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .mcp-endereco code {
+    flex: 1; min-width: 0; overflow-wrap: anywhere; font: 600 14px / 1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--text);
+  }
+  .mcp-endereco-comando { margin-top: var(--space-2); }
+  .mcp-endereco-comando code { font-weight: 500; font-size: 13px; }
+  .mcp-ajuda { color: var(--text-2); font-size: var(--fs-meta); line-height: var(--lh-meta); }
+
+  .mcp-passos { display: flex; flex-direction: column; gap: var(--space-4); margin-top: var(--space-2); }
+  .mcp-passo { display: flex; gap: var(--space-3); align-items: flex-start; }
+  .mcp-passo-icone {
+    display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 10px;
+    background: var(--accent-soft); color: var(--accent-ink);
+  }
+  .mcp-passo-icone svg { width: 18px; height: 18px; }
+  .mcp-passo h3 { font: 600 var(--fs-body) / var(--lh-body) var(--font); color: var(--text); }
+  .mcp-passo p { margin-top: 2px; color: var(--text-2); line-height: 1.5; }
+  .mcp-passo em { font-style: normal; color: var(--text); font-weight: 500; }
+  .mcp-passo code { font: 500 13px / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text); }
+
+  .mcp-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+  .mcp-conexoes { display: flex; flex-direction: column; }
+  .mcp-conexao { display: flex; align-items: center; gap: var(--space-3); padding: 12px 0; border-top: 1px solid var(--border); min-width: 0; }
+  .mcp-conexao:first-child { border-top: 0; padding-top: 0; }
+  .mcp-conexao[data-revogada] { opacity: .78; }
+  .mcp-conexao-icone {
+    display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 10px;
+    background: var(--surface-sunken); color: var(--text-2);
+  }
+  .mcp-conexao-icone svg { width: 18px; height: 18px; }
+  .mcp-conexao-texto { flex: 1; min-width: 0; }
+  .mcp-conexao-nome { display: flex; flex-wrap: wrap; gap: 6px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+  .mcp-conexao-pessoa { font-weight: 400; color: var(--text-2); }
+  .mcp-conexao-meta { margin-top: 2px; color: var(--text-2); font-size: var(--fs-meta); line-height: var(--lh-meta); }
+  .mcp-conexao-acoes { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+  .mcp-confirmar { color: var(--text); font-size: var(--fs-meta); }
+  .mcp-vazio { color: var(--text-2); }
+  .mcp-link { color: var(--accent-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+
+  /* selo "via Claude" */
+  .mcp-selo-claude {
+    display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 7px 1px 5px; vertical-align: 1px;
+    border-radius: var(--radius-full); background: var(--surface-sunken); color: var(--text-2);
+    font: 500 var(--fs-micro) / var(--lh-micro) var(--font); white-space: nowrap;
+  }
+  .mcp-selo-claude svg { width: 12px; height: 12px; color: var(--accent-ink); }
+
+  @media (max-width: 767.98px) {
+    .mcp-conexao { flex-wrap: wrap; }
+    .mcp-conexao-acoes { width: 100%; justify-content: flex-end; }
+    .mcp-endereco { flex-direction: column; align-items: stretch; }
+  }
+}

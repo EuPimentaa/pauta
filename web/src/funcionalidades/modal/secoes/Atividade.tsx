@@ -28,6 +28,7 @@ import { Checkbox } from '../../../ui/Checkbox.tsx'
 import { EditorMarkdown } from '../../../ui/EditorMarkdown.tsx'
 import { EsqueletoLinhas } from '../../../ui/Indicadores.tsx'
 import { Kbd } from '../../../ui/Kbd.tsx'
+import { SeloViaClaude } from '../../mcp/SeloViaClaude.tsx'
 import { useAcoesModal, useComentarios, useHistorico } from '../api.ts'
 import { Secao, nomeCurto, quandoPorExtenso, tempoRelativo, useBuscarPessoas, useEscLocal, useNomeDaPessoa, useUsuarios } from '../comum.tsx'
 
@@ -173,7 +174,7 @@ function UmComentario({ c, ctx, responder }: { c: Comentario; ctx: ContextoDeman
       <Avatar pessoa={autor ?? { nome: c.autorExterno ?? '?', cor: 'grafite' }} tamanho={32} />
       <div className="min-w-0">
         <div className="mdl-comentario-cabeca">
-          <span className="mdl-comentario-autor">{nome}</span>
+          <span className="mdl-comentario-autor">{nome}{c.via === 'claude' && <SeloViaClaude />}</span>
           <span className="mdl-comentario-quando" title={quandoPorExtenso(c.criadoEm)}>
             {tempoRelativo(c.criadoEm)}{c.editadoEm && !c.excluidoEm ? ' · editado' : ''}
           </span>
@@ -270,7 +271,7 @@ function ListaAtividade({ ctx }: { ctx: ContextoDemanda }) {
             <li key={a.id} className="mdl-atividade">
               <span className="mdl-atividade-icone" aria-hidden="true"><Icone /></span>
               <p className="mdl-atividade-texto">
-                <strong>{f.ator}</strong> {f.texto}
+                <strong>{f.ator}</strong>{a.via === 'claude' && <SeloViaClaude />} {f.texto}
                 <span className="mdl-atividade-quando" title={quandoPorExtenso(a.criadoEm)}> · {tempoRelativo(a.criadoEm)}</span>
               </p>
             </li>

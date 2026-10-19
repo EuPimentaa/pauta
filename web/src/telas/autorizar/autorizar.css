@@ -1,0 +1,124 @@
+/*
+ * Tela de consentimento do Claude (/autorizar, F7): o mesmo fundo das telas de acesso (papel pontilhado + luz suave das
+ * cores da marca), um cartão com a barra assinatura e o essencial em blocos curtos. Só tokens do design system; nos
+ * dois temas. No celular o cartão ocupa a largura e os botões viram coluna.
+ */
+@layer components {
+  .aut { min-height: 100dvh; background: var(--auth-lado); }
+  .aut-palco { position: relative; isolation: isolate; display: grid; place-items: center; min-height: 100dvh; padding: var(--space-10) var(--space-4); }
+  .aut-palco::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background-image: radial-gradient(circle at 1px 1px, var(--auth-pontos) 1px, transparent 1.5px);
+    background-size: 22px 22px; background-position: center;
+    -webkit-mask-image: radial-gradient(60% 58% at 50% 46%, black 0%, transparent 100%);
+            mask-image: radial-gradient(60% 58% at 50% 46%, black 0%, transparent 100%);
+  }
+  .aut-palco::after {
+    content: ''; position: absolute; inset: 0; z-index: -2; pointer-events: none;
+    background:
+      radial-gradient(32% 28% at 22% 18%, color-mix(in oklab, var(--melt-orange) 14%, transparent), transparent 70%),
+      radial-gradient(30% 26% at 82% 84%, color-mix(in oklab, var(--melt-purple) 14%, transparent), transparent 70%),
+      radial-gradient(46% 40% at 50% 48%, color-mix(in oklab, var(--surface) 70%, transparent), transparent 100%);
+  }
+
+  .aut-cartao {
+    position: relative; width: min(520px, 100%); overflow: hidden; border-radius: var(--radius-xl); background: var(--surface);
+    box-shadow: 0 0 0 1px var(--border), var(--shadow-hover), 0 30px 60px -30px var(--shadow-c2);
+  }
+  .aut-assinatura { position: absolute; inset: 0 0 auto 0; }
+  .aut-corpo { display: flex; flex-direction: column; gap: var(--space-5); padding: 40px 36px 28px; }
+  .aut-rodape {
+    padding: var(--space-4) 36px; border-top: 1px solid var(--border); color: var(--text-2);
+    background: color-mix(in oklab, var(--surface-sunken) 45%, var(--surface)); font-size: var(--fs-meta); line-height: var(--lh-meta);
+  }
+  .aut-rodape strong { color: var(--text); font-weight: 600; }
+
+  /* Pauta ⇄ Claude */
+  .aut-par { display: flex; align-items: center; gap: 12px; }
+  .aut-par-marca, .aut-par-outro {
+    display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px;
+    background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .aut-par-outro svg { width: 24px; height: 24px; color: var(--accent-ink); }
+  .aut-par-outro[data-destino="claude_code"] svg { color: var(--text); }
+  .aut-par-seta { width: 18px; height: 18px; color: var(--text-3); }
+
+  .aut-titulo { font: 600 var(--fs-h2) / var(--lh-h2) var(--font); letter-spacing: -0.015em; color: var(--text); text-wrap: balance; outline: none; }
+  .aut-sub { display: flex; align-items: center; gap: 8px; color: var(--text-2); }
+  .aut-rotulo {
+    display: block; font: 600 var(--fs-micro) / var(--lh-micro) var(--font); letter-spacing: var(--tracking-micro);
+    text-transform: uppercase; color: var(--text-2);
+  }
+
+  /* o nome do aplicativo (loopback): em destaque, como dado declarado */
+  .aut-app {
+    display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: var(--radius-md);
+    background: var(--warning-bg); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--warning) 30%, transparent);
+  }
+  .aut-app .aut-rotulo { color: var(--warning-ink); }
+  .aut-app-nome { font: 600 17px / 1.3 var(--font); color: var(--text); overflow-wrap: anywhere; }
+
+  .aut-pessoa { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-md); background: var(--surface-sunken); }
+  .aut-pessoa strong { display: block; font-weight: 600; color: var(--text); }
+  .aut-pessoa span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: var(--fs-meta); }
+
+  .aut-listas { display: grid; gap: var(--space-4); }
+  .aut-lista { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .aut-lista li { display: flex; align-items: flex-start; gap: 10px; color: var(--text); line-height: 1.45; }
+  .aut-lista svg { width: 16px; height: 16px; flex: none; margin-top: 3px; color: var(--success-ink); }
+  .aut-lista[data-tom="nunca"] svg { color: var(--danger-ink); }
+
+  .aut-destino { display: flex; flex-direction: column; gap: 8px; }
+  .aut-host {
+    display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; max-width: 100%; padding: 8px 12px;
+    border-radius: var(--radius-full); background: var(--accent-soft); color: var(--text);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+  .aut-host svg { width: 16px; height: 16px; flex: none; color: var(--accent-ink); }
+  .aut-host strong { font: 600 15px / 1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+  .aut-host span { color: var(--text-2); font-size: var(--fs-meta); }
+  .aut-declarado { color: var(--text-2); font-size: var(--fs-meta); line-height: var(--lh-meta); overflow-wrap: anywhere; }
+
+  .aut-aviso {
+    display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radius-md);
+    background: var(--info-bg); color: var(--info-ink); font-size: var(--fs-meta); line-height: var(--lh-meta);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--info) 25%, transparent);
+  }
+  .aut-aviso svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+  .aut-aviso strong { font-weight: 700; }
+
+  .aut-caixas { display: flex; flex-direction: column; gap: var(--space-3); }
+  .aut-caixas:empty { display: none; }
+  .aut-erro {
+    display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius-sm);
+    background: var(--danger-bg); color: var(--danger-ink); font: 500 13px / 1.45 var(--font);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--danger) 25%, transparent);
+  }
+  .aut-erro svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+
+  .aut-acoes { display: grid; grid-template-columns: 1fr 1.4fr; gap: var(--space-3); margin-top: var(--space-1); }
+  .aut-acoes-um { grid-template-columns: auto; justify-content: start; }
+  .aut-falta { margin-top: calc(-1 * var(--space-3)); color: var(--text-2); font-size: var(--fs-meta); line-height: var(--lh-meta); }
+
+  .aut-problema-icone { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: var(--danger-bg); color: var(--danger-ink); }
+  .aut-problema-icone svg { width: 24px; height: 24px; }
+
+  .aut-girando { width: 16px; height: 16px; flex: none; animation: aut-gira 1s linear infinite; }
+  @keyframes aut-gira { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .aut-girando { animation: none; } }
+
+  .aut-esqueleto { display: flex; flex-direction: column; gap: 14px; }
+  .aut-esqueleto span { display: block; height: 18px; border-radius: var(--radius-sm); background: var(--surface-sunken); }
+  .aut-esqueleto span:first-child { width: 52px; height: 52px; border-radius: 14px; }
+  .aut-esqueleto span:nth-child(2) { height: 28px; width: 85%; }
+  .aut-esqueleto span:nth-child(4) { height: 120px; }
+
+  @media (max-width: 600px) {
+    .aut-palco { place-items: start center; padding: var(--space-4) 16px var(--space-8); }
+    .aut-corpo { padding: 32px 20px 20px; gap: var(--space-4); }
+    .aut-rodape { padding: var(--space-4) 20px; }
+    .aut-titulo { font-size: 20px; line-height: 26px; }
+    .aut-acoes { grid-template-columns: 1fr; }
+    .aut-acoes > :last-child { order: -1; }
+  }
+}

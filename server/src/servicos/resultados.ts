@@ -17,7 +17,7 @@
 import {
   CONECTORES_WINDSOR, type AlertaResultado, type ConectorWindsor, type ContaLigada, type DataLocal, type ErroWindsor,
   type EstadoResultadosCliente, type Id, type LinhaPanorama, type PanoramaResultados, type PeriodoResultados,
-  type ResultadoConector, type ResultadoGa4, type ResultadoGoogleAds, type ResultadoMeta, type ResultadosCliente,
+  type PodeBuscarResultados, type ResultadoConector, type ResultadoGa4, type ResultadoGoogleAds, type ResultadoMeta, type ResultadosCliente,
 } from '../../../shared/tipos/index.ts'
 import type {
   DadosConector, DadosGa4, DadosGoogleAds, DadosMeta, DadosPanorama, GastoRecente, LinhaWindsor, SomasPorConector,
@@ -34,6 +34,11 @@ import { ErroHttp } from '../erros.ts'
 import { emitirObjeto } from './eventos.ts'
 import { chamarDados, FalhaWindsor, temChave, type PedidoDados } from './resultados-windsor.ts'
 import { descreverErro, registrarFalhaMascarada } from './segredos.ts'
+
+/** `buscar` true/false, ou a função do MCP: chamada só quando ia buscar de verdade (a busca do limite por hora). */
+function vaiBuscar(buscar: PodeBuscarResultados): boolean {
+  return typeof buscar === 'function' ? buscar() : buscar
+}
 
 /** "Atualizar agora": 1 por cliente neste intervalo. */
 export const ATUALIZAR_A_CADA_MS = 5 * 60_000
@@ -309,7 +314,7 @@ function custoDe(r: ResultadoConector): ConectorParaAlertas['custo'] {
  * GET /api/clientes/:id/resultados: o cache na hora; com `buscar`, o que estiver vencido começa a busca em segundo
  * plano (`atualizando: true`). Sem chave → sem_chave; sem contas → sem_contas (os dois sem chamar a Windsor).
  */
-export function lerResultados(db: Db, clienteId: Id, periodo: PeriodoResultados, opcoes: { buscar: boolean }): ResultadosCliente {
+export function lerResultados(db: Db, clienteId: Id, periodo: PeriodoResultados, opcoes: { buscar: PodeBuscarResultados }): ResultadosCliente {
   const hoje = hojeSP(agoraData())
   const d = periodoDe(periodo, hoje)
   const contas = contasLigadas(db, clienteId)
@@ -320,7 +325,10 @@ export function lerResultados(db: Db, clienteId: Id, periodo: PeriodoResultados,
   const linhas = new Map<ConectorWindsor, LinhaCache | undefined>()
   for (const conector of ids.keys()) linhas.set(conector, linhaCache(db, clienteId, conector, d))
   const vencidos = [...ids.keys()].filter((c) => vencido(linhas.get(c), ids.get(c)!, d.ate, hoje))
-  if (opcoes.buscar && vencidos.length > 0) void iniciarBusca(db, clienteId, d, vencidos, null)
+  // a função do MCP só é chamada quando a busca vai mesmo acontecer (cache fresco ou busca já em andamento: não gasta)
+  if (vencidos.length > 0 && !memoria(db).buscas.has(chaveBusca(clienteId, d)) && vaiBuscar(opcoes.buscar)) {
+    void iniciarBusca(db, clienteId, d, vencidos, null)
+  }
   const porConector = new Map<ConectorWindsor, ResultadoConector>()
   for (const [conector, contasIds] of ids) porConector.set(conector, montarConector(conector, contasIds, linhas.get(conector)))
   const alertas = alertasResultados([...porConector.values()].map((r) => ({
@@ -344,7 +352,7 @@ function gastoDoCache(l: LinhaCache | undefined): GastoRecente | null {
 
 /** Os resultados esperando a busca até `esperarMs` (o provedor do MCP). Passou do tempo: o que houver, `atualizando`. */
 export async function resultadosEsperando(db: Db, clienteId: Id, periodo: PeriodoResultados, esperarMs: number,
-  buscar: boolean): Promise<ResultadosCliente> {
+  buscar: PodeBuscarResultados): Promise<ResultadosCliente> {
   const r = lerResultados(db, clienteId, periodo, { buscar })
   if (!r.atualizando) return r
   const p = memoria(db).buscas.get(chaveBusca(clienteId, periodoDe(periodo, hojeSP(agoraData()))))
@@ -454,7 +462,7 @@ const ZEROS: { [C in ConectorWindsor]: SomasPorConector[C] } = {
 }
 
 /** GET /api/resultados/panorama: uma linha por cliente com conta ligada, por sigla. Mesmas regras de cache da aba. */
-export function lerPanorama(db: Db, periodo: PeriodoResultados, opcoes: { buscar: boolean }): PanoramaResultados {
+export function lerPanorama(db: Db, periodo: PeriodoResultados, opcoes: { buscar: PodeBuscarResultados }): PanoramaResultados {
   const hoje = hojeSP(agoraData())
   const d = periodoDe(periodo, hoje)
   const base = { ...d, atualizando: false, buscadoEm: null, linhas: [] as LinhaPanorama[] }
@@ -465,7 +473,9 @@ export function lerPanorama(db: Db, periodo: PeriodoResultados, opcoes: { buscar
   const linhasCache = new Map<ConectorWindsor, LinhaCache | undefined>()
   for (const c of ids.keys()) linhasCache.set(c, linhaPanorama(db, c, d))
   const vencidos = [...ids.keys()].filter((c) => vencido(linhasCache.get(c), ids.get(c)!, d.ate, hoje))
-  if (opcoes.buscar && vencidos.length > 0) void iniciarPanorama(db, d, vencidos, ids)
+  if (vencidos.length > 0 && !memoria(db).panoramas.has(chaveDatas(d)) && vaiBuscar(opcoes.buscar)) {
+    void iniciarPanorama(db, d, vencidos, ids)
+  }
 
   const dadosPor = new Map<ConectorWindsor, { l: LinhaCache | undefined; dados: DadosPanorama | null }>()
   for (const [c, contas] of ids) {
@@ -513,7 +523,8 @@ export function lerPanorama(db: Db, periodo: PeriodoResultados, opcoes: { buscar
 }
 
 /** A carteira esperando a busca até `esperarMs` (o provedor do MCP). */
-export async function panoramaEsperando(db: Db, periodo: PeriodoResultados, esperarMs: number, buscar: boolean): Promise<PanoramaResultados> {
+export async function panoramaEsperando(db: Db, periodo: PeriodoResultados, esperarMs: number,
+  buscar: PodeBuscarResultados): Promise<PanoramaResultados> {
   const r = lerPanorama(db, periodo, { buscar })
   if (!r.atualizando) return r
   const p = memoria(db).panoramas.get(chaveDatas(periodoDe(periodo, hojeSP(agoraData()))))

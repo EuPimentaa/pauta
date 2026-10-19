@@ -312,17 +312,25 @@ export const FERRAMENTAS_MCP_DESTRUTIVAS = ['editar_demanda', 'registrar_retorno
  * (`server/src/servicos/mcp-provedores.ts`; pasta ausente = vazia). Sem provedor, a ferramenta diz "ainda não disponível"
  * e segue com o resto. `Db` é o DatabaseSync do servidor (opaco aqui, porque shared/ não conhece o servidor).
  */
+/**
+ * Se o provedor pode buscar na Windsor: `true`/`false`, ou uma função que ele chama SÓ quando ia buscar de verdade
+ * (algum conector vencido ou sem cache e nenhuma busca em andamento). O MCP passa a função que conta o limite de
+ * LIMITES_MCP.buscasWindsorPorHora: ler do cache fresco não gasta busca (revisão funcional da Fase 2, achado 1).
+ */
+export type PodeBuscarResultados = boolean | (() => boolean)
+
 export interface ProvedorResultadosMcp<Db = unknown> {
   tipo: 'resultados'
   /**
-   * Os resultados do cliente no período (permissão: todo interno vê). Com cache vencido ou ausente e `buscar: true`,
-   * busca na Windsor e espera no máximo `esperarMs` (o MCP usa 20 000); passou disso, devolve o que houver com
-   * `atualizando: true`. `buscar: false` (a pessoa passou de LIMITES_MCP.buscasWindsorPorHora) = só o cache, sem
-   * disparar busca. Nunca lança: erro vira o `estado` do conector.
+   * Os resultados do cliente no período (permissão: todo interno vê). Com cache vencido ou ausente e `buscar` (true, ou
+   * a função devolvendo true), busca na Windsor e espera no máximo `esperarMs` (o MCP usa 20 000); passou disso, devolve
+   * o que houver com `atualizando: true`. `buscar` false (a pessoa passou de LIMITES_MCP.buscasWindsorPorHora) = só o
+   * cache, sem disparar busca (uma busca já em andamento é esperada do mesmo jeito). Nunca lança: erro vira o `estado`
+   * do conector.
    */
-  resultados(db: Db, e: { clienteId: Id; periodo: PeriodoResultados; esperarMs: number; buscar: boolean }): Promise<ResultadosCliente>
+  resultados(db: Db, e: { clienteId: Id; periodo: PeriodoResultados; esperarMs: number; buscar: PodeBuscarResultados }): Promise<ResultadosCliente>
   /** A carteira (GET /api/resultados/panorama): uma linha por cliente com conta ligada. Mesmas regras de espera e busca. */
-  panorama(db: Db, e: { periodo: PeriodoResultados; esperarMs: number; buscar: boolean }): Promise<PanoramaResultados>
+  panorama(db: Db, e: { periodo: PeriodoResultados; esperarMs: number; buscar: PodeBuscarResultados }): Promise<PanoramaResultados>
 }
 
 export interface ProvedorAgendaMcp<Db = unknown> {

@@ -483,7 +483,21 @@ function kpisDoConector(r: ResultadoConector): string {
   return chaves.map((k) => linhaKpi(r.conector, k as ChaveKpi<typeof r.conector>, atual[k] ?? null, anterior[k] ?? null)).join(' · ')
 }
 
-function textoResultados(r: ResultadosCliente): string[] {
+/**
+ * O conector sem número nenhum: nunca "ok" (o modelo leria como "está tudo certo"). Buscando agora, sem busca por causa
+ * do limite da hora (com a hora para perguntar de novo) ou só ainda sem dados.
+ */
+function semNumeros(estado: string, atualizando: boolean, limite: LimiteWindsor): string {
+  if (estado !== 'ok') return rotuloEstadoResultado(estado)
+  if (atualizando) return 'buscando na Windsor'
+  const espera = limite.esperaSeg()
+  if (espera !== null) {
+    return `ainda sem dados (limite de buscas da hora; pergunte de novo às ${horaLocalDe(new Date(agoraData().getTime() + espera * 1000).toISOString())})`
+  }
+  return 'ainda sem dados'
+}
+
+function textoResultados(r: ResultadosCliente, limite: LimiteWindsor): string[] {
   if (r.estado === 'sem_chave') return ['Resultados: a integração com a Windsor não está configurada.']
   if (r.estado === 'sem_contas') return ['Resultados: nenhuma conta de resultados ligada.']
   const saida = [`Resultados (${ROTULO_PERIODO[r.periodo]}: ${r.de} a ${r.ate}, comparado com ${r.deAnterior} a ${r.ateAnterior}):`]
@@ -492,8 +506,10 @@ function textoResultados(r: ResultadosCliente): string[] {
   for (const c of [r.meta, r.googleAds, r.ga4]) {
     if (!c) continue
     const rotulo = ROTULO_CONECTOR[c.conector]
-    if (c.kpis) saida.push(`${rotulo}: ${kpisDoConector(c)}${c.estado !== 'ok' ? ` (última busca: ${rotuloEstadoResultado(c.estado)})` : ''}`)
-    else saida.push(`${rotulo}: ${rotuloEstadoResultado(c.estado)}`)
+    // sem dados no período: a frase só (os KPIs zerados e "(última busca: …)" soavam como falha e gastavam tokens)
+    if (c.estado === 'sem_dados') saida.push(`${rotulo}: sem dados no período`)
+    else if (c.kpis) saida.push(`${rotulo}: ${kpisDoConector(c)}${c.estado !== 'ok' ? ` (última busca: ${rotuloEstadoResultado(c.estado)})` : ''}`)
+    else saida.push(`${rotulo}: ${semNumeros(c.estado, r.atualizando, limite)}`)
     if ('campanhas' in c && c.campanhas.length) {
       // o número como na tabela de campanhas da aba (formatarKpi: "16,9", nunca "16.9"), no singular quando é 1
       const meta = c.conector === 'facebook'
@@ -509,7 +525,7 @@ function textoResultados(r: ResultadosCliente): string[] {
   return saida
 }
 
-function textoPanorama(p: PanoramaResultados): string[] {
+function textoPanorama(p: PanoramaResultados, limite: LimiteWindsor): string[] {
   if (p.estado === 'sem_chave') return ['Resultados: a integração com a Windsor não está configurada.']
   const saida = [`Resultados da carteira (${ROTULO_PERIODO[p.periodo]}: ${p.de} a ${p.ate}, comparado com ${p.deAnterior} a ${p.ateAnterior}):`]
   if (p.linhas.length === 0) saida.push('Nenhum cliente com conta de resultados ligada.')
@@ -517,8 +533,12 @@ function textoPanorama(p: PanoramaResultados): string[] {
     const partes = [l.sigla]
     for (const c of l.conectores) {
       const chaves = (KPIS_PRINCIPAIS[c.conector] as readonly string[]).filter((k) => k !== 'ctr').slice(0, 3)
-      partes.push(`${ROTULO_CONECTOR[c.conector]}: ${c.estado !== 'ok' && Object.keys(c.atual).length === 0 ? rotuloEstadoResultado(c.estado)
-        : chaves.map((k) => linhaKpi(c.conector, k as never, c.atual[k] ?? null, c.anterior[k] ?? null)).join(', ')}`)
+      const vazio = [...Object.values(c.atual), ...Object.values(c.anterior)].every((v) => v === null)
+      const texto = c.estado === 'sem_dados' ? 'sem dados no período'
+        : vazio ? semNumeros(c.estado, p.atualizando, limite)
+          : `${chaves.map((k) => linhaKpi(c.conector, k as never, c.atual[k] ?? null, c.anterior[k] ?? null)).join(', ')}${
+            c.estado !== 'ok' ? ` (última busca: ${rotuloEstadoResultado(c.estado)})` : ''}`
+      partes.push(`${ROTULO_CONECTOR[c.conector]}: ${texto}`)
     }
     if (l.alertas.length) partes.push(`atenção: ${l.alertas.map((x) => umaLinha(x.texto, 160)).join('; ')}`)
     saida.push(partes.join(' · '))
@@ -528,15 +548,30 @@ function textoPanorama(p: PanoramaResultados): string[] {
   return saida
 }
 
-/** Buscas na Windsor disparadas pelo MCP: 10 por pessoa por hora; acima, só o cache. */
-function podeBuscarWindsor(usuarioId: Id): boolean {
-  return usar(`mcp-windsor|${usuarioId}`, LIMITES_MCP.buscasWindsorPorHora, 3600).ok
+/** O limite de buscas na Windsor de uma chamada: `buscar` vai ao provedor; `esperaSeg` diz se ele foi barrado. */
+interface LimiteWindsor { buscar: () => boolean; esperaSeg: () => number | null }
+
+/**
+ * Buscas na Windsor disparadas pelo MCP: 10 por pessoa por hora, contadas só quando o provedor vai mesmo buscar (cache
+ * vencido ou ausente; ler do cache fresco não gasta). Acima, só o cache.
+ */
+function limiteWindsor(usuarioId: Id): LimiteWindsor {
+  let espera: number | null = null
+  return {
+    buscar: () => {
+      const r = usar(`mcp-windsor|${usuarioId}`, LIMITES_MCP.buscasWindsorPorHora, 3600)
+      if (!r.ok) espera = r.esperaSeg
+      return r.ok
+    },
+    esperaSeg: () => espera,
+  }
 }
 
 async function resultadosDoCliente(ctx: ContextoFerramenta, clienteId: Id, periodo: PeriodoResultados): Promise<string[]> {
   const p = provedorResultados()
   if (!p) return ['(resultados ainda não disponíveis)']
-  return textoResultados(await p.resultados(ctx.db, { clienteId, periodo, esperarMs: ESPERA_RESULTADOS_MS, buscar: podeBuscarWindsor(ctx.usuario.id) }))
+  const limite = limiteWindsor(ctx.usuario.id)
+  return textoResultados(await p.resultados(ctx.db, { clienteId, periodo, esperarMs: ESPERA_RESULTADOS_MS, buscar: limite.buscar }), limite)
 }
 
 const resumoCliente = ferramenta({
@@ -566,7 +601,10 @@ const resumoCliente = ferramenta({
       if (partes.has('resultados')) {
         const p = provedorResultados()
         if (!p) saida.push('(resultados ainda não disponíveis)')
-        else saida.push(...textoPanorama(await p.panorama(db, { periodo, esperarMs: ESPERA_RESULTADOS_MS, buscar: podeBuscarWindsor(usuario.id) })))
+        else {
+          const limite = limiteWindsor(usuario.id)
+          saida.push(...textoPanorama(await p.panorama(db, { periodo, esperarMs: ESPERA_RESULTADOS_MS, buscar: limite.buscar }), limite))
+        }
       }
       return saida.join('\n') || 'Nada a mostrar.'
     }

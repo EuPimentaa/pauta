@@ -19,6 +19,7 @@ import { provedor as provedorResultadosF8 } from '../src/provedores/resultados.t
 import { provedor as provedorAgendaF9 } from '../src/provedores/agenda.ts'
 import { provedorAgenda, provedorResultados } from '../src/servicos/mcp-provedores.ts'
 import { esperarBuscas } from '../src/servicos/resultados.ts'
+import { usar } from '../src/servicos/mcp-limites.ts'
 import { definirBuscaWindsor, definirEnderecosWindsor } from '../src/servicos/resultados-windsor.ts'
 import { definirBuscaAgenda, esperarBuscasAgenda } from '../src/servicos/agenda-busca.ts'
 import { zerarPedidosAgenda } from '../src/servicos/agenda.ts'
@@ -141,6 +142,47 @@ describe('integração da Fase 2: o MCP com os provedores reais', () => {
       const inv = linhaKpi(x.conector, k as never, x.atual[k] ?? null, x.anterior[k] ?? null)
       assert.ok(linhaHe.includes(inv), `"${inv}" não está em "${linhaHe}"`)
     }
+  })
+
+  test('o limite de 10 buscas na Windsor por hora conta só a busca de verdade; sem número nunca sai "ok"', async () => {
+    // revisão funcional, achado 1: o limite era gasto em toda chamada, mesmo com o cache fresco, e o 11º cliente saía
+    // "Meta Ads: ok / Google Ads: ok / GA4: ok", sem número nenhum
+    const amb = await ambienteResultados()
+    for (const [conector, contaId] of Object.entries(CONTAS_FIXTURE)) {
+      const r = await amb.como(amb.pessoas.admin).post(`/api/clientes/${amb.clientes.icc.id}/resultados/contas`,
+        { conector, contaId, nome: `Conta ${conector}` })
+      assert.equal(r.status, 201, r.texto)
+    }
+    const c = await conectar(amb, amb.pessoas.design)
+    const resumo = async (cliente: string, periodo = '7d') => {
+      const r = await chamar(amb, c.at, 'resumo_cliente', { cliente, periodo, partes: ['resultados'] })
+      assert.equal(r.erro, false, r.texto)
+      return r.texto
+    }
+    const dadosDaWindsor = () => windsor.pedidos.filter((p) => !p.conector.startsWith('ds-accounts')).length
+    windsor.pedidos.length = 0
+    assert.match(await resumo('HE'), /Meta Ads: Investimento R\$ 246,83/)
+    await esperarBuscas(amb.db)
+    assert.equal(dadosDaWindsor(), 8, 'a 1ª leitura busca (gasta 1 das 10)')
+    for (let i = 0; i < 10; i++) assert.match(await resumo('HE'), /Meta Ads: Investimento R\$ 246,83/)
+    assert.equal(dadosDaWindsor(), 8, 'o cache fresco não chama a Windsor')
+    const icc = await resumo('ICC')
+    await esperarBuscas(amb.db)
+    assert.equal(dadosDaWindsor(), 16, 'outro cliente sem cache busca: as 10 leituras do cache não gastaram o limite')
+    assert.match(icc, /^Meta Ads: Investimento R\$ 246,83/m)
+    assert.doesNotMatch(icc, /: ok$/m)
+
+    // acima do limite: só o cache; o conector sem cache diz por que está sem número e quando perguntar de novo
+    for (let i = 0; i < 10; i++) usar(`mcp-windsor|${amb.pessoas.design.id}`, 10, 3600)
+    const semBusca = await resumo('ICC', '30d')
+    await esperarBuscas(amb.db)
+    assert.equal(dadosDaWindsor(), 16, 'barrado pelo limite: nenhuma chamada')
+    for (const rotulo of ['Meta Ads', 'Google Ads', 'GA4']) {
+      assert.ok(semBusca.includes(`${rotulo}: ainda sem dados (limite de buscas da hora; pergunte de novo às 11:00)`), semBusca)
+    }
+    assert.doesNotMatch(semBusca, /: ok$/m)
+    // o cache fresco continua saindo, com os números, mesmo acima do limite
+    assert.match(await resumo('HE'), /Meta Ads: Investimento R\$ 246,83/)
   })
 
   test('agenda e minhas_demandas: os prazos e os eventos da fixture do iCal pelo provedor do F9', async () => {

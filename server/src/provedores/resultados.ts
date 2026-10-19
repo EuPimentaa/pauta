@@ -4,7 +4,8 @@
  *
  * - `resultados` e `panorama`: as mesmas leituras da aba e da carteira; com cache vencido e `buscar: true`, busca e
  *   espera até `esperarMs` (o MCP passa 20 000); passou disso, devolve o que houver com `atualizando: true`.
- *   `buscar: false` = só o cache, sem disparar busca.
+ *   `buscar: false` = só o cache, sem disparar busca; `buscar` como função (o MCP) só é chamada quando a busca vai mesmo
+ *   acontecer (o limite de 10 por hora conta só busca de verdade).
  * - Nunca lança: o erro de uma conta vira o `estado` do conector; uma exceção inesperada vai ao log mascarado e a
  *   resposta sai do cache, sem buscar (ou, se nem isso der, vazia, com o período certo).
  */

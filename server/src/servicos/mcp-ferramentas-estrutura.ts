@@ -223,7 +223,8 @@ const criarClienteMcp = ferramenta({
   executar({ db, ator, usuario }, a) {
     exigir(ator, 'cliente.criar')
     const n = new Nomes(db, usuario.id)
-    const bruto = { sigla: a.sigla, nome: a.nome, ...(a.apelidos?.length ? { apelidos: a.apelidos } : {}) }
+    // exatamente o corpo do POST: apelidos (mesmo vazio) vai e a lista do papel confere
+    const bruto = { sigla: a.sigla, nome: a.nome, ...(a.apelidos !== undefined ? { apelidos: a.apelidos } : {}) }
     const e = entradaDaApi(ator, bruto, esquemaNucleo.criarCliente, 'cliente')
     const c = criarCliente(db, e, ator)
     const partes = [`Criado o cliente ${c.sigla} · ${umaLinha(c.nome, 80)}`,

@@ -3,7 +3,7 @@
  * do mesmo jeito que o runner do servidor: cada arquivo numa transação, registrado em _migracoes.
  * Depois roda PRAGMA foreign_key_check e integrity_check, confere que as listas fechadas de shared/tipos são as
  * mesmas dos CHECK do banco, confere os seeds de configuração e faz um teste de fumaça dos gatilhos e das
- * restrições dentro de uma transação desfeita no fim.
+ * restrições dentro de uma transação desfeita no fim. Fase 2 (100–103): OAuth, "via Claude", Windsor e agendas externas.
  *
  *   node server/scripts/verificar-migracoes.ts            # :memory:
  *   node server/scripts/verificar-migracoes.ts /tmp/x.db  # arquivo novo, para inspecionar depois
@@ -13,7 +13,8 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  ATORES_ATIVIDADE, CANAIS, CHAVES_CONFIG, CORES, FAIXAS_CONFIG, FINALIDADES_ANEXO, FUNDOS_QUADRO, GATILHOS_AUTOMACAO,
+  ATORES_ATIVIDADE, CANAIS, CHAVES_CONFIG, CONECTORES_WINDSOR, DECISOES_AUTORIZACAO, ERROS_AGENDA_EXTERNA, ERROS_WINDSOR,
+  ESCOPO_MCP, MOTIVOS_REVOGACAO_CONEXAO, PREFIXO_TRACE_MCP, TIPOS_CLIENTE_OAUTH, TIPOS_TOKEN_OAUTH, CORES, FAIXAS_CONFIG, FINALIDADES_ANEXO, FUNDOS_QUADRO, GATILHOS_AUTOMACAO,
   MEMBROS_AO_MOVER, MIMES_PERMITIDOS, MOTIVOS_RODADA, ORIGENS_APONTAMENTO, ORIGENS_DEMANDA, ORIGENS_RODADA, PAPEIS,
   PAPEIS_COLUNA,
   PRIORIDADES, PROVEDORES, PUBLICOS_EVENTO, REPETICOES, STATUS_CLIENTE, TIPOS_FERIADO, TIPOS_LINK_CLIENTE,
@@ -123,6 +124,11 @@ for (const [t, c] of [['demanda', 'retorno_em'], ['coluna', 'responsavel_id'], [
 }
 conferir(todos(db, 'PRAGMA table_info(apontamento)').find((c) => c.name === 'demanda_id')?.notnull === 1,
   'apontamento sempre numa demanda (demanda_id NOT NULL)')
+const TABELAS_FASE2 = ['oauth_cliente', 'oauth_concessao', 'oauth_pedido', 'oauth_token', 'mcp_traco', 'windsor_conta',
+  'cliente_conta_resultados', 'resultado_cache', 'windsor_uso', 'agenda_externa', 'agenda_ocorrencia']
+for (const nova of TABELAS_FASE2) conferir(tabelasBanco.includes(nova), `tabela ${nova} existe (Fase 2)`)
+conferir(!colunasDe('atividade').includes('via') && !colunasDe('sessao').includes('concessao_id'),
+  'Fase 2 não mexe em atividade nem em sessao (via Claude = mcp_traco; conexões fora de sessao)')
 
 // ─────────────────────────── 4. listas fechadas: shared/tipos = CHECK do banco ───────────────────────────
 function listaDoCheck(tabela: string, coluna: string): string[] | null {
@@ -166,10 +172,22 @@ mesmaLista('cliente', 'status', STATUS_CLIENTE)
 mesmaLista('cliente_link', 'tipo', TIPOS_LINK_CLIENTE)
 mesmaLista('feriado', 'tipo', TIPOS_FERIADO)
 mesmaLista('arquivo', 'mime', MIMES_PERMITIDOS)
+// Fase 2
+mesmaLista('oauth_cliente', 'tipo', TIPOS_CLIENTE_OAUTH)
+mesmaLista('oauth_cliente', 'metodo_auth', ['none'])
+mesmaLista('oauth_pedido', 'decisao', DECISOES_AUTORIZACAO)
+mesmaLista('oauth_concessao', 'escopo', [ESCOPO_MCP])
+mesmaLista('oauth_concessao', 'motivo_revogacao', MOTIVOS_REVOGACAO_CONEXAO)
+mesmaLista('oauth_token', 'tipo', TIPOS_TOKEN_OAUTH)
+for (const t of ['windsor_conta', 'cliente_conta_resultados', 'resultado_cache']) mesmaLista(t, 'conector', CONECTORES_WINDSOR)
+mesmaLista('resultado_cache', 'erro', ERROS_WINDSOR)
+mesmaLista('windsor_uso', 'ultimo_erro', ERROS_WINDSOR)
+mesmaLista('agenda_externa', 'cor', CORES)
+mesmaLista('agenda_externa', 'erro', ERROS_AGENDA_EXTERNA)
 
 // ─────────────────────────── 5. seeds de configuração ───────────────────────────
 for (const t of ['usuario', 'cliente', 'demanda', 'sessao', 'quadro', 'coluna', 'etiqueta', 'quadro_usuario',
-  'automacao_quadro', 'cliente_responsavel', 'apontamento']) {
+  'automacao_quadro', 'cliente_responsavel', 'apontamento', ...TABELAS_FASE2]) {
   conferir(um(db, `SELECT count(*) n FROM ${t}`)!.n === 0, `seed não cria ${t} (só configuração)`)
 }
 
@@ -262,7 +280,9 @@ for (const nome of ['demanda_arquivo_ix', 'demanda_arquivo_cli_ix', 'demanda_col
   'demanda_repeticao_uk', 'demanda_movimento_aberto_uk', 'etiqueta_nome_uk', 'apontamento_um_cronometro_uk',
   'token_acesso_pendente_uk', 'aprovacao_idem_uk', 'login_tentativa_email_ix', 'login_tentativa_ip_ix',
   'quadro_usuario_seguidores_ix', 'modelo_demanda_nome_uk', 'demanda_inicio_ix', 'demanda_publicacao_ix',
-  'coluna_responsavel_uk', 'notificacao_atrasada_ix']) conferir(indices.includes(nome), `índice ${nome}`)
+  'coluna_responsavel_uk', 'notificacao_atrasada_ix', 'oauth_concessao_ativa_uk', 'oauth_token_expira_ix',
+  'oauth_pedido_expira_ix', 'mcp_traco_concessao_ix', 'cliente_conta_resultados_conta_ix', 'resultado_cache_tentado_ix',
+  'agenda_ocorrencia_dia_ix']) conferir(indices.includes(nome), `índice ${nome}`)
 const plano = (sql: string) => todos(db, `EXPLAIN QUERY PLAN ${sql}`).map((l) => String(l.detail)).join(' | ')
 const planoArquivo = plano(`SELECT id FROM demanda
   WHERE excluido_em IS NULL AND (arquivado_em IS NOT NULL OR concluida_em IS NOT NULL)
@@ -275,6 +295,12 @@ for (const [campo, indice] of [['inicio', 'demanda_inicio_ix'], ['publicacao_dat
     AND ${campo} IS NOT NULL AND arquivado_em IS NULL AND excluido_em IS NULL`)
   conferir(p.includes(indice), `Agenda por ${campo} usa ${indice} (${p})`)
 }
+
+const planoVia = plano(`SELECT a.id, m.trace_id IS NOT NULL AS via FROM atividade a
+  LEFT JOIN mcp_traco m ON m.trace_id = a.trace_id AND m.usuario_id = a.ator_id WHERE a.demanda_id = 'x' ORDER BY a.id DESC`)
+conferir(planoVia.includes('sqlite_autoindex_mcp_traco_1'), `"via Claude" no histórico acha o traço pela chave (${planoVia})`)
+const planoOcorrencias = plano("SELECT chave FROM agenda_ocorrencia WHERE dia_inicio <= '2026-10-31' AND dia_fim >= '2026-10-01'")
+conferir(planoOcorrencias.includes('agenda_ocorrencia_dia_ix'), `eventos da Agenda por período usam o índice (${planoOcorrencias})`)
 
 // ─────────────────────────── 6. fumaça dos gatilhos e restrições (desfeita no fim) ───────────────────────────
 db.exec('BEGIN')
@@ -717,6 +743,145 @@ for (const p of PUBLICOS_EVENTO) {
 deveFalhar(db, "INSERT INTO evento (entidade, entidade_id, op, patch, publico) VALUES ('demanda','d1','upsert','{}','todos')", [],
   'CHECK', 'público fora de PUBLICOS_EVENTO é recusado')
 conferir((um(db, "SELECT seq FROM sqlite_sequence WHERE name = 'evento'")?.seq as number) >= 1, 'seq do evento em sqlite_sequence')
+
+// ─── Fase 2: OAuth (100) ───
+const CH = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'   // base64url(sha256(verifier)) sem '=': 43 caracteres
+rodar(db, `INSERT INTO oauth_cliente (id, nome, redirect_uris) VALUES ('oc1', 'Claude', '["https://claude.ai/api/mcp/auth_callback"]')`)
+deveFalhar(db, "INSERT INTO oauth_cliente (id, nome, redirect_uris) VALUES ('oc9', 'X', '[]')", [], 'CHECK',
+  'cliente OAuth sem redirect_uri é recusado')
+deveFalhar(db, `INSERT INTO oauth_cliente (id, nome, redirect_uris, metodo_auth) VALUES ('oc9', 'X', '["https://claude.ai/x"]',
+  'client_secret_post')`, [], 'CHECK', 'só cliente público (token_endpoint_auth_method none)')
+const insPedido = `INSERT INTO oauth_pedido (id, cliente_id, redirect_uri, code_challenge, escopo, resource, expira_em)
+  VALUES (?, ?, 'https://claude.ai/api/mcp/auth_callback', ?, 'pauta', 'https://demandas.example/mcp', '2030-01-01')`
+rodar(db, insPedido, 'op1', 'oc1', CH)
+deveFalhar(db, insPedido, ['op9', 'oc1', CH.slice(1)], 'CHECK', 'code_challenge que não tem o tamanho do S256 é recusado')
+deveFalhar(db, insPedido, ['op9', 'oc1', CH.slice(1) + '='], 'CHECK', 'code_challenge fora do base64url é recusado')
+deveFalhar(db, "UPDATE oauth_pedido SET decisao = 'permitido', decidido_em = ? WHERE id = 'op1'", [T0], 'CHECK',
+  'decisão sem quem decidiu é recusada')
+deveFalhar(db, `UPDATE oauth_pedido SET decisao = 'negado', decidido_em = ?, usuario_id = 'u-rafa', codigo_hash = 'cod0',
+  codigo_expira_em = ? WHERE id = 'op1'`, [T0, T1], 'CHECK', 'pedido negado não gera código')
+rodar(db, `UPDATE oauth_pedido SET decisao = 'permitido', decidido_em = ?, usuario_id = 'u-rafa', codigo_hash = 'cod1',
+  codigo_expira_em = ? WHERE id = 'op1'`, T0, T1)
+const insConcessao = `INSERT INTO oauth_concessao (id, usuario_id, cliente_id, redirect_uri)
+  VALUES (?, 'u-rafa', 'oc1', 'https://claude.ai/api/mcp/auth_callback')`
+rodar(db, insConcessao, 'cx1')
+deveFalhar(db, insConcessao, ['cx2'], 'UNIQUE', 'uma conexão ativa por pessoa e cliente (autorizar de novo substitui)')
+deveFalhar(db, "UPDATE oauth_pedido SET concessao_id = 'cx1' WHERE id = 'op1'", [], 'CHECK', 'código não usado não emitiu conexão')
+rodar(db, "UPDATE oauth_pedido SET codigo_usado_em = ?, concessao_id = 'cx1' WHERE id = 'op1'", T0)
+const insTokenOAuth = 'INSERT INTO oauth_token (hash, concessao_id, tipo, criado_em, expira_em) VALUES (?, ?, ?, ?, ?)'
+rodar(db, insTokenOAuth, 'tk-a1', 'cx1', 'acesso', T0, T1)
+rodar(db, insTokenOAuth, 'tk-r1', 'cx1', 'atualizacao', T0, T5)
+deveFalhar(db, insTokenOAuth, ['tk-x', 'cx1', 'sessao', T0, T1], 'CHECK', 'tipo de token fora de TIPOS_TOKEN_OAUTH')
+deveFalhar(db, insTokenOAuth, ['tk-x', 'cx1', 'acesso', T1, T0], 'CHECK', 'token que vence antes de nascer é recusado')
+deveFalhar(db, "UPDATE oauth_token SET trocado_em = ? WHERE hash = 'tk-a1'", [T0], 'CHECK', 'só o refresh é trocado (rotação)')
+rodar(db, "UPDATE oauth_token SET trocado_em = ? WHERE hash = 'tk-r1'", T0)
+deveFalhar(db, "UPDATE oauth_concessao SET usuario_id = 'u-am' WHERE id = 'cx1'", [], 'oauth_concessao_imutavel',
+  'a conexão não muda de dono')
+deveFalhar(db, "UPDATE oauth_concessao SET revogada_em = ? WHERE id = 'cx1'", [T1], 'CHECK', 'revogar exige o motivo')
+
+// ─── Fase 2: via Claude (101) ───
+const traco = `${PREFIXO_TRACE_MCP}0f8fad5b-d9cb-469f-a165-70867728950e`
+const insTraco = 'INSERT INTO mcp_traco (trace_id, concessao_id, usuario_id, ferramenta) VALUES (?, ?, ?, ?)'
+deveFalhar(db, insTraco, ['0f8fad5b-d9cb-469f-a165-70867728950e', 'cx1', 'u-rafa', 'comentar'], 'CHECK',
+  'traço sem o prefixo mcp- é recusado (o navegador só manda uuid puro)')
+deveFalhar(db, insTraco, [traco, 'cx1', 'u-am', 'comentar'], 'mcp_traco_de_outra_pessoa', 'traço de outra pessoa que não a dona da conexão')
+deveFalhar(db, insTraco, [traco, 'cx1', 'u-rafa', 'Comentar'], 'CHECK', 'nome de ferramenta só com minúsculas e _')
+rodar(db, insTraco, traco, 'cx1', 'u-rafa', 'comentar')
+deveFalhar(db, "UPDATE mcp_traco SET ferramenta = 'checklist'", [], 'mcp_traco_imutavel', 'o traço não muda')
+deveFalhar(db, 'DELETE FROM mcp_traco', [], 'mcp_traco_imutavel', 'o traço não se apaga')
+const insAtivTraco = `INSERT INTO atividade (demanda_id, ator_id, ator_tipo, tipo, dados, trace_id)
+  VALUES ('d1', ?, 'usuario', 'comentario.criado', '{}', ?)`
+rodar(db, insAtivTraco, 'u-rafa', traco)
+rodar(db, insAtivTraco, 'u-am', traco)
+const vias = todos(db, `SELECT a.ator_id, m.trace_id IS NOT NULL AS via FROM atividade a
+  LEFT JOIN mcp_traco m ON m.trace_id = a.trace_id AND m.usuario_id = a.ator_id WHERE a.trace_id = ? ORDER BY a.id`, traco)
+conferir(vias.length === 2 && vias[0]!.via === 1 && vias[1]!.via === 0,
+  `"via Claude" só na atividade da dona do traço (${JSON.stringify(vias)})`)
+rodar(db, "UPDATE oauth_concessao SET ultimo_uso_em = ? WHERE id = 'cx1'", T1)
+rodar(db, "UPDATE oauth_concessao SET revogada_em = ?, revogada_por = 'u-rafa', motivo_revogacao = 'usuario' WHERE id = 'cx1'", T2)
+deveFalhar(db, "UPDATE oauth_concessao SET revogada_em = NULL, revogada_por = NULL, motivo_revogacao = NULL WHERE id = 'cx1'", [],
+  'oauth_concessao_imutavel', 'conexão revogada não volta')
+deveFalhar(db, "UPDATE oauth_concessao SET motivo_revogacao = 'admin' WHERE id = 'cx1'", [], 'oauth_concessao_imutavel',
+  'o motivo da revogação não muda')
+deveFalhar(db, "UPDATE oauth_concessao SET ultimo_uso_em = ? WHERE id = 'cx1'", [T3], 'oauth_concessao_imutavel',
+  'conexão revogada não registra uso')
+deveFalhar(db, insTokenOAuth, ['tk-a2', 'cx1', 'acesso', T2, T3], 'concessao_revogada', 'nenhum token nasce numa conexão revogada')
+deveFalhar(db, insTraco, [`${PREFIXO_TRACE_MCP}1f8fad5b-d9cb-469f-a165-70867728950e`, 'cx1', 'u-rafa', 'comentar'],
+  'concessao_revogada', 'nenhuma ferramenta escreve por uma conexão revogada')
+deveFalhar(db, "DELETE FROM oauth_concessao WHERE id = 'cx1'", [], 'oauth_concessao_imutavel', 'conexão não se apaga')
+rodar(db, insConcessao, 'cx2')
+conferir(um(db, "SELECT count(*) n FROM oauth_concessao WHERE usuario_id = 'u-rafa' AND cliente_id = 'oc1'")!.n === 2,
+  'depois de revogar, a pessoa conecta o mesmo cliente de novo')
+deveFalhar(db, "DELETE FROM oauth_cliente WHERE id = 'oc1'", [], 'FOREIGN KEY', 'cliente OAuth com conexão não é podado')
+rodar(db, `INSERT INTO oauth_cliente (id, nome, redirect_uris, tipo) VALUES ('oc2', 'Claude Code', '["http://127.0.0.1/callback"]', 'native')`)
+rodar(db, insPedido, 'op2', 'oc2', CH)
+rodar(db, "DELETE FROM oauth_cliente WHERE id = 'oc2'")
+conferir(um(db, "SELECT count(*) n FROM oauth_pedido WHERE id = 'op2'")!.n === 0, 'podar o cliente sem conexão leva os pedidos dele')
+
+// ─── Fase 2: Windsor (102) ───
+const insLigacao = 'INSERT INTO cliente_conta_resultados (id, cliente_id, conector, conta_id, nome, ligada_por) VALUES (?, ?, ?, ?, ?, ?)'
+rodar(db, insLigacao, 'cl1', 'c-he', 'facebook', '1000000000000001', 'HE Meta', 'u-am')
+rodar(db, insLigacao, 'cl2', 'c-he', 'google_ads', '000-000-0001', 'HE Google', 'u-am')
+rodar(db, insLigacao, 'cl3', 'c-icc', 'googleanalytics4', '100000001', 'Grupo GA4', 'u-am')
+rodar(db, insLigacao, 'cl4', 'c-he', 'googleanalytics4', '100000001', 'Grupo GA4', 'u-am')
+deveFalhar(db, insLigacao, ['cl9', 'c-he', 'facebook', '1000000000000001', 'x', 'u-am'], 'UNIQUE', 'a mesma conta duas vezes no cliente')
+deveFalhar(db, insLigacao, ['cl9', 'c-he', 'tiktok', '1', 'x', 'u-am'], 'CHECK', 'conector fora de CONECTORES_WINDSOR')
+deveFalhar(db, insLigacao, ['cl9', 'c-he', 'facebook', 'act_1', 'x', 'u-am'], 'CHECK', 'id com "act_" é recusado (o serviço tira o prefixo)')
+deveFalhar(db, insLigacao, ['cl9', 'c-he', 'facebook', '1,2', 'x', 'u-am'], 'CHECK', 'id com vírgula é recusado (vai em select_accounts)')
+const insCache = `INSERT INTO resultado_cache (cliente_id, conector, de, ate, de_anterior, ate_anterior, contas, dados, buscado_em,
+  tentado_em, erro) VALUES ('c-he', 'facebook', ?, ?, ?, ?, '["1000000000000001"]', ?, ?, ?, ?)`
+rodar(db, insCache, '2026-10-12', '2026-10-18', '2026-10-05', '2026-10-11', '{}', T0, T0, null)
+deveFalhar(db, insCache, ['2026-10-12', '2026-10-18', '2026-10-06', '2026-10-12', '{}', T0, T0, null], 'CHECK',
+  'período de comparação que encosta no atual é recusado')
+deveFalhar(db, insCache, ['2026-09-12', '2026-09-18', '2026-09-05', '2026-09-11', null, T0, T0, null], 'CHECK',
+  'hora da busca sem os dados é recusada')
+deveFalhar(db, insCache, ['2026-08-12', '2026-08-18', '2026-08-05', '2026-08-11', null, null, T0, 'timeout'], 'CHECK',
+  'erro fora de ERROS_WINDSOR')
+rodar(db, "UPDATE resultado_cache SET erro = 'fora_do_ar', tentado_em = ? WHERE cliente_id = 'c-he'", T1)
+conferir(um(db, "SELECT buscado_em b FROM resultado_cache WHERE cliente_id = 'c-he'")!.b === T0,
+  'erro numa busca mantém os dados e a hora da busca boa de antes')
+deveFalhar(db, "INSERT INTO windsor_uso (dia, chamadas, ultimo_erro) VALUES ('2030-01-02', 1, 'limite')", [], 'CHECK',
+  'último erro da Windsor exige o instante')
+deveFalhar(db, "INSERT INTO windsor_conta (conector, conta_id, nome, vista_em) VALUES ('facebook', 'act_1', 'X', ?)", [T0], 'CHECK',
+  'lista de contas com id fora do formato é recusada')
+
+// ─── Fase 2: agendas externas (103) ───
+const insAgenda = `INSERT INTO agenda_externa (id, nome, cor, url_cifrada, url_dica, url_hash, pos, criada_por)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+rodar(db, insAgenda, 'ag1', 'Melt', 'roxo', 'iv.tag.cifra', 'calendar.google.com · agencia · …a1b2', 'h-ag1', 1024, 'u-adm')
+deveFalhar(db, insAgenda, ['ag9', 'Outra', 'azul', 'x', 'y', 'h-ag1', 2048, 'u-adm'], 'UNIQUE', 'o mesmo endereço não entra duas vezes')
+deveFalhar(db, insAgenda, ['ag9', 'Outra', 'laranja', 'x', 'y', 'h-ag9', 2048, 'u-adm'], 'CHECK', 'laranja nunca é cor de agenda')
+deveFalhar(db, "UPDATE agenda_externa SET erro = 'http_500' WHERE id = 'ag1'", [], 'CHECK', 'erro fora de ERROS_AGENDA_EXTERNA')
+deveFalhar(db, "UPDATE agenda_externa SET ok_em = ? WHERE id = 'ag1'", [T0], 'CHECK', 'busca boa sem tentativa registrada')
+const insOcorrencia = `INSERT INTO agenda_ocorrencia (agenda_id, chave, titulo, dia_inteiro, inicio, fim, dia_inicio, dia_fim, local,
+  link_reuniao, descricao, privado) VALUES ('ag1', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+rodar(db, insOcorrencia, 'b1@google.com', 'Reunião', 0, '2026-10-20T13:00:00.000Z', '2026-10-20T14:00:00.000Z', '2026-10-20',
+  '2026-10-20', 'Sala 2', 'https://meet.google.com/abc-defg-hij', 'Pauta da semana', 0)
+rodar(db, insOcorrencia, 'c2@google.com', 'Congresso', 1, null, null, '2026-11-10', '2026-11-12', null, null, null, 0)
+rodar(db, insOcorrencia, 'g8@google.com', 'Ocupado', 0, '2026-10-30T17:00:00.000Z', '2026-10-30T18:00:00.000Z', '2026-10-30',
+  '2026-10-30', null, null, null, 1)
+rodar(db, insOcorrencia, 'h11@google.com', 'Virada', 0, '2026-10-24T01:00:00.000Z', '2026-10-24T04:00:00.000Z', '2026-10-23',
+  '2026-10-24', null, null, null, 0)
+deveFalhar(db, insOcorrencia, ['x1', 'X', 1, '2026-10-20T13:00:00.000Z', '2026-10-20T14:00:00.000Z', '2026-10-20', '2026-10-20',
+  null, null, null, 0], 'CHECK', 'dia inteiro não guarda instantes')
+deveFalhar(db, insOcorrencia, ['x1', 'X', 0, '2026-10-20T13:00:00.000Z', '2026-10-20T12:00:00.000Z', '2026-10-20', '2026-10-20',
+  null, null, null, 0], 'CHECK', 'fim antes do início é recusado')
+deveFalhar(db, insOcorrencia, ['x1', 'X', 1, null, null, '2026-10-21', '2026-10-20', null, null, null, 0], 'CHECK',
+  'último dia antes do primeiro é recusado')
+deveFalhar(db, insOcorrencia, ['x1', 'X', 1, null, null, '2026-10-21', '2026-10-21', null, 'http://zoom.us/j/1', null, 0], 'CHECK',
+  'link de reunião só https')
+deveFalhar(db, insOcorrencia, ['x1', 'Ocupado', 1, null, null, '2026-10-21', '2026-10-21', 'Sala 2', null, null, 1], 'CHECK',
+  'evento privado não guarda local, descrição nem link')
+deveFalhar(db, insOcorrencia, ['b1@google.com', 'Dup', 1, null, null, '2026-10-21', '2026-10-21', null, null, null, 0], 'UNIQUE',
+  'a mesma chave duas vezes na agenda')
+const noDia24 = todos(db, `SELECT chave FROM agenda_ocorrencia WHERE agenda_id = 'ag1' AND dia_inicio <= ? AND dia_fim >= ?
+  ORDER BY chave`, '2026-10-24', '2026-10-24').map((l) => l.chave)
+conferir(JSON.stringify(noDia24) === JSON.stringify(['h11@google.com']),
+  `evento que atravessa a meia-noite aparece também no dia seguinte (${JSON.stringify(noDia24)})`)
+const no11 = todos(db, "SELECT chave FROM agenda_ocorrencia WHERE dia_inicio <= '2026-11-11' AND dia_fim >= '2026-11-11'")
+conferir(no11.length === 1 && no11[0]!.chave === 'c2@google.com', 'dia inteiro de vários dias cai em cada dia dele')
+rodar(db, "DELETE FROM agenda_externa WHERE id = 'ag1'")
+conferir(um(db, "SELECT count(*) n FROM agenda_ocorrencia WHERE agenda_id = 'ag1'")!.n === 0, 'excluir a agenda leva as ocorrências')
 
 integridade('dentro da fumaça')
 db.exec('ROLLBACK')

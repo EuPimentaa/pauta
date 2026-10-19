@@ -92,16 +92,22 @@ faz 3 perguntas e 1 escrita. Falha no claude.ai mostra um `ofid_…` para o cham
 `node server/scripts/mcp-medir.ts` monta o seed de demonstração em memória e mede (≈ 3,3 caracteres por token). Linha
 de base de 19/10/2026 (300 demandas na Criação; também é o teste `server/test/mcp-orcamento.test.ts`):
 
-| Resposta | Caracteres | ≈ tokens | Teto |
-|---|---:|---:|---:|
-| `tools/list` | 10.735 | 3.253 | 12.000 |
-| `minhas_demandas` (Rafa, equipe) | 1.412 | 428 | 2.500 |
-| `ler_demanda` (a maior de 30) | 1.451 | 440 | 4.000 |
-| `agenda` de 7 dias | 2.453 | 743 | 3.000 |
-| `resumo_cliente` CLA | 499 | 151 | 3.000 |
-| `listar clientes` | 383 | 116 | 1.200 |
+| Resposta | Caracteres (F7 sozinho) | Depois da integração (com a agenda) | ≈ tokens | Teto |
+|---|---:|---:|---:|---:|
+| `tools/list` | 10.735 | 10.735 | 3.253 | 12.000 |
+| `minhas_demandas` (Rafa, equipe) | 1.412 | 1.715 | 520 | 2.500 |
+| `ler_demanda` (a maior de 30) | 1.451 | 1.451 | 440 | 4.000 |
+| `agenda` de 7 dias | 2.453 | 2.824 | 856 | 3.000 |
+| `resumo_cliente` CLA | 499 | 525 | 159 | 3.000 |
+| `listar clientes` | 383 | 383 | 116 | 1.200 |
 
-A `agenda` passa a crescer com os eventos da agenda da Melt (F9): o teto de 8 linhas por dia segura o total.
+Depois do merge do F9 (19/10/2026, `docs/pedidos/INTEGRACAO-F2.md`), a `agenda` e o `minhas_demandas` levam os eventos
+da agenda de demonstração (o seed cria a agenda "Melt" com a fixture do iCal). A `agenda` de 7 dias ficou a 176
+caracteres do teto: o limite de 8 linhas por dia (`agendaLinhasPorDia`) segura o total, mas uma semana cheia na agenda
+real pode passar dos 3.000 (o teto rígido continua o `respostaMaxCaracteres`, 20.000). Se o Claude começar a cortar,
+o caminho é baixar `agendaLinhasPorDia` ou encurtar a linha do evento. O `resumo_cliente` medido aqui é sem a chave da
+Windsor (o seed não tem); com as 3 contas das fixtures ligadas, a parte de resultados soma ~900 caracteres (medido
+na verificação em produção).
 
 ## Quando algo dá errado
 

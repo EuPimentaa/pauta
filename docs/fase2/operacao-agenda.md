@@ -40,7 +40,7 @@ vale de novo antes de cada busca.
 |---|---|---|
 | Atualizada às 14:05 · 312 eventos | última busca deu certo | — |
 | Buscando a agenda… | acabou de ser colada | esperar alguns segundos |
-| O Google não reconhece mais este endereço… | `404` (endereço redefinido ou apagado) | colar o endereço novo em "Trocar o endereço" |
+| O Google não reconhece mais este endereço… | `404` (endereço redefinido ou apagado; também `401`, `403` e `410`) | colar o endereço novo em "Trocar o endereço" |
 | Não deu para ler o endereço guardado… | o `SEGREDO` mudou | colar o endereço de novo |
 | O endereço não devolveu uma agenda… | veio HTML (página de login) | conferir se é o "Endereço secreto no formato iCal" |
 | O Google não respondeu agora / demorou mais de 1 minuto | `429`, `5xx`, rede, 60 s | nada: tenta de novo em 15 min |

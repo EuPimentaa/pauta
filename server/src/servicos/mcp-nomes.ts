@@ -24,8 +24,7 @@ export function chave(s: string): string {
   return normalizarAlias(s.replace(/^@/, '')).replace(/[\s._-]+/g, '')
 }
 
-/** Até 8 nomes, cada um numa linha só (um nome de coluna com "
-#999 …" não forja linha na resposta). */
+/** Até 8 nomes, cada um numa linha só (um nome de coluna com quebra e "#999 …" não forja linha na resposta). */
 function opcoes(lista: string[]): string {
   const unicas = [...new Set(lista.map((x) => umaLinha(x, 60)))]
   return unicas.length > 8 ? `${unicas.slice(0, 8).join(', ')}…` : unicas.join(', ')

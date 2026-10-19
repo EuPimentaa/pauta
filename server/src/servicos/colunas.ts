@@ -10,12 +10,13 @@ import type {
 import { PRIORIDADES } from '../../../shared/tipos/index.ts'
 import type { Ator } from '../auth.ts'
 import { agora, marcadores, novoId, rodar, todos, um, type Db } from '../db.ts'
-import { conflito, estadoInvalido, validacao } from '../erros.ts'
+import { conflito, ErroHttp, estadoInvalido, validacao } from '../erros.ts'
 import { desligarAutomacoesPara } from './automacoes.ts'
 import { concluir } from './concluir.ts'
 import { arquivarDemanda, atualizarLinhaDemanda, carregarDemandas, cardsDaColuna } from './demandas.ts'
 import { emitir, emitirObjeto } from './eventos.ts'
 import { mover } from './mover.ts'
+import { podeAtor } from './permissoes.ts'
 import { exigirAtivos } from './pessoas.ts'
 import { posicaoEntre } from './posicao.ts'
 import { carregarColuna, carregarQuadro } from './quadros.ts'
@@ -81,11 +82,16 @@ export function editarColuna(db: Db, id: Id, e: EditarColunaEntrada, ator: Ator)
 
 /**
  * Arquivar só sem cards (409). Antes, arquiva as concluídas antigas que ainda apontam para ela e desliga as
- * automações que apontam para ela.
+ * automações que apontam para ela; com automação ativa para ela, só quem muda automações ('automacao.editar':
+ * atendimento e admin) arquiva (403: arquivar não é um jeito de a equipe desligar a automação).
  */
 export function arquivarColuna(db: Db, id: Id, ator: Ator): ArquivarColunaSaida {
   const atual = carregarColuna(db, id)
   if (atual.arquivadaEm) throw conflito('Esta coluna já está arquivada.')
+  if (!podeAtor(ator, 'automacao.editar') && um(db, 'SELECT 1 FROM automacao_quadro WHERE destino_coluna_id = ? AND ativa = 1', atual.id)) {
+    throw new ErroHttp(403, 'sem_permissao', 'Uma automação leva cards para esta coluna. Peça ao atendimento ou ao admin para arquivá-la.',
+      { acao: 'automacao.editar' })
+  }
   if (cardsDaColuna(db, atual.id).length > 0) throw conflito('Mova ou arquive os cards antes.')
   const antigas = todos<{ id: string }>(db, `SELECT id FROM demanda WHERE coluna_id = ? AND arquivado_em IS NULL ORDER BY posicao`, atual.id)
   const concluidasArquivadas: Id[] = []

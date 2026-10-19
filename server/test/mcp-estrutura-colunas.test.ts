@@ -87,17 +87,22 @@ test('coluna editar e mover: renomear, cor, papel, pessoa, WIP e a posição; vi
     'Coluna Pronto em criacao: nada mudou')
 })
 
-test('coluna arquivar: só vazia; desliga as automações que apontavam para ela', async () => {
+test('coluna arquivar: só vazia; desliga as automações que apontavam para ela (só quem muda automações)', async () => {
   const amb = await ambienteMcp()
   const c = await conectar(amb, amb.pessoas.design)
+  const am = await conectar(amb, amb.pessoas.am)
   await amb.criarDemanda({ titulo: 'Na fila' })
-  const cheia = await chamar(amb, c.at, 'coluna', { acao: 'arquivar', quadro: 'criacao', coluna: 'Fila' })
+  const cheia = await chamar(amb, am.at, 'coluna', { acao: 'arquivar', quadro: 'criacao', coluna: 'Fila' })
   assert.equal(cheia.erro, true)
   assert.equal(cheia.texto, 'Mova ou arquive os cards antes.')
   assert.equal(linha(amb, 'criacao', 'Fila')!.arquivada_em, null)
 
-  // a automação "aprovado" da Criação leva para Social › Agendar
-  const r = await chamar(amb, c.at, 'coluna', { acao: 'arquivar', quadro: 'social', coluna: 'Agendar' })
+  // a automação "aprovado" da Criação leva para Social › Agendar: a equipe não a desliga arquivando (como na rota)
+  const equipe = await chamar(amb, c.at, 'coluna', { acao: 'arquivar', quadro: 'social', coluna: 'Agendar' })
+  assert.equal(equipe.erro, true)
+  assert.equal(equipe.texto, 'Uma automação leva cards para esta coluna. Peça ao atendimento ou ao admin para arquivá-la.')
+  assert.equal(um<{ ativa: number }>(amb.db, "SELECT ativa FROM automacao_quadro WHERE gatilho = 'aprovado'")!.ativa, 1)
+  const r = await chamar(amb, am.at, 'coluna', { acao: 'arquivar', quadro: 'social', coluna: 'Agendar' })
   assert.equal(r.erro, false, r.texto)
   assert.equal(r.texto, 'Coluna Agendar arquivada em social · automações desligadas: criacao (aprovado)\nOrdem: Fila · Publicado')
   assert.notEqual(linha(amb, 'social', 'Agendar')!.arquivada_em, null)

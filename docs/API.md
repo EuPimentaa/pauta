@@ -367,8 +367,10 @@ reatribui (§5.1, passo 6).
 - Arquivar só sem cards da coluna: com card → `409 conflito` "Mova ou arquive os cards antes". Na mesma transação,
   antes de arquivar, arquiva as concluídas antigas que ainda apontam para ela (`concluidasArquivadas`; o gatilho
   `coluna_arquivar_vazia` conta toda demanda não arquivada). Desliga as automações que apontam para ela
-  (`automacoesDesligadas`). Restaurar em quadro arquivado → `422`; restaurar coluna de pessoa que já tem outra coluna
-  ativa no quadro → restaura sem a pessoa.
+  (`automacoesDesligadas`); por isso, com automação ativa para ela, só atendimento e admin (`automacao.editar`, §4.8)
+  arquivam: a equipe recebe `403 sem_permissao` "Uma automação leva cards para esta coluna. Peça ao atendimento ou ao
+  admin para arquivá-la." (nada muda). Restaurar em quadro arquivado → `422`; restaurar coluna de pessoa que já tem
+  outra coluna ativa no quadro → restaura sem a pessoa.
 - **SSE:** `coluna`, `automacao`, `demanda` (`arquivadoEm`) das concluídas antigas.
 
 #### `POST /api/colunas/:id/mover-cards`

@@ -88,6 +88,22 @@ describe('colunas', () => {
     assert.equal((await eu.post(`/api/colunas/${nova.id}/restaurar`)).status, 409)
   })
 
+  test('arquivar coluna destino de automação: a equipe recebe 403 (arquivar não desliga a automação por ela)', async () => {
+    const a = await ambiente()
+    const agendar = a.coluna('social', 'Agendar') // destino da automação "aprovado" da Criação
+    const r = await a.como(a.pessoas.design).post(`/api/colunas/${agendar.id}/arquivar`)
+    assert.equal(r.status, 403)
+    assert.equal(r.corpo.erro.codigo, 'sem_permissao')
+    assert.equal(r.corpo.erro.mensagem, 'Uma automação leva cards para esta coluna. Peça ao atendimento ou ao admin para arquivá-la.')
+    assert.equal(um<{ ativa: number }>(a.db, "SELECT ativa FROM automacao_quadro WHERE gatilho = 'aprovado'")!.ativa, 1)
+    assert.equal(um<{ arquivada_em: string | null }>(a.db, 'SELECT arquivada_em FROM coluna WHERE id = ?', agendar.id)!.arquivada_em, null)
+    // sem automação ativa para ela, a equipe arquiva como sempre; o atendimento arquiva a de automação e a desliga
+    assert.equal((await a.como(a.pessoas.design).post(`/api/colunas/${a.coluna('social', 'Publicado').id}/arquivar`)).status, 200)
+    const ok = await a.como(a.pessoas.am).post(`/api/colunas/${agendar.id}/arquivar`)
+    assert.equal(ok.status, 200)
+    assert.deepEqual(ok.corpo.automacoesDesligadas, [{ quadroId: a.quadros.criacao.quadro.id, gatilho: 'aprovado' }])
+  })
+
   test('restaurar coluna de pessoa que já tem outra ativa: volta sem a pessoa; em quadro arquivado → 422', async () => {
     const a = await ambiente()
     const eu = a.como(a.pessoas.am)

@@ -50,7 +50,13 @@ CREATE TABLE agenda_ocorrencia (
   dia_inicio   TEXT NOT NULL,                              -- data de São Paulo do início (dia inteiro: a do evento)
   dia_fim      TEXT NOT NULL,                              -- último dia de São Paulo ocupado, inclusive
   local        TEXT CHECK (local IS NULL OR length(local) <= 300),
-  link_reuniao TEXT CHECK (link_reuniao IS NULL OR (link_reuniao LIKE 'https://%' AND length(link_reuniao) <= 500)),
+  link_reuniao TEXT CHECK (link_reuniao IS NULL OR (length(link_reuniao) <= 500 AND link_reuniao GLOB 'https://*/*'
+                 AND substr(link_reuniao, 9, instr(substr(link_reuniao, 9), '/') - 1) NOT GLOB '*[^a-z0-9.-]*'
+                 AND (substr(link_reuniao, 9, instr(substr(link_reuniao, 9), '/') - 1)
+                        IN ('meet.google.com','zoom.us','teams.microsoft.com','teams.live.com')
+                      OR substr(link_reuniao, 9, instr(substr(link_reuniao, 9), '/') - 1) GLOB '*?.zoom.us'))),
+                                                         -- só https em Meet, Zoom e Teams (hostname exato, sem porta
+                                                         -- nem usuário), inclusive o X-GOOGLE-CONFERENCE
   descricao    TEXT CHECK (descricao IS NULL OR length(descricao) <= 2048),   -- texto puro (o HTML do Google vira texto)
   tentativo    INTEGER NOT NULL DEFAULT 0 CHECK (tentativo IN (0,1)),
   livre        INTEGER NOT NULL DEFAULT 0 CHECK (livre IN (0,1)),          -- TRANSP:TRANSPARENT

@@ -5,7 +5,7 @@
  * o resto da API segue camelCase.
  */
 import type { DataLocal, Id, Instante } from './nucleo.ts'
-import type { PeriodoResultados, ResultadosCliente } from './resultados.ts'
+import type { PanoramaResultados, PeriodoResultados, ResultadosCliente } from './resultados.ts'
 import type { EventosAgendaSaida } from './agenda-externa.ts'
 
 // ─────────────────────────────── "via Claude" ───────────────────────────────
@@ -28,9 +28,11 @@ export const ESCOPO_MCP = 'pauta'
 export const ESCOPOS_OAUTH = ['pauta', 'offline_access'] as const
 
 /**
- * redirect_uri aceitos no registro dinâmico (lista fechada: a defesa contra phishing de consentimento). Além destes,
- * loopback do Claude Code: `http://localhost[:porta]/callback` e `http://127.0.0.1[:porta]/callback`, comparados sem a
- * porta (RFC 8252 §7.3), e os de MCP_REDIRECTS_EXTRAS (só https).
+ * redirect_uri aceitos (lista fechada: a defesa contra phishing de consentimento). Além destes, loopback do Claude Code:
+ * `http://localhost[:porta]/callback` e `http://127.0.0.1[:porta]/callback`, comparados sem a porta (RFC 8252 §7.3) e
+ * conferidos pelo `new URL` (protocol 'http:', hostname exato, pathname '/callback', search, hash, username e password
+ * vazios), e os de MCP_REDIRECTS_EXTRAS (só https, igualdade de string). `redirectPermitido(uri)` (F7) aplica a lista
+ * ATUAL no registro, no /oauth/autorizar, na troca do código, no refresh e no /mcp: tirar um extra corta quem já usava.
  */
 export const REDIRECTS_CLAUDE = [
   'https://claude.ai/api/mcp/auth_callback',
@@ -49,51 +51,95 @@ export const TIPOS_TOKEN_OAUTH = ['acesso', 'atualizacao'] as const
 export type TipoTokenOAuth = (typeof TIPOS_TOKEN_OAUTH)[number]
 
 export const MOTIVOS_REVOGACAO_CONEXAO = [
-  'usuario', 'admin', 'desativacao', 'reuso_refresh', 'codigo_reusado', 'pedido_cliente', 'substituida',
+  'usuario', 'admin', 'desativacao', 'credenciais', 'papel', 'reuso_refresh', 'codigo_reusado', 'pedido_cliente',
+  'substituida',
 ] as const
 /**
  * usuario: a própria pessoa em Conexões; admin: o admin em Conexões; desativacao: a pessoa foi desativada;
+ * credenciais: a senha foi trocada ou redefinida; papel: o papel mudou (as conexões seguem as sessões, API §F.4);
  * reuso_refresh: refresh já trocado usado de novo depois da tolerância (roubo provável); codigo_reusado: código de
- * autorização usado duas vezes; pedido_cliente: POST /oauth/revogar; substituida: a pessoa autorizou o mesmo cliente de
- * novo.
+ * autorização usado duas vezes; pedido_cliente: POST /oauth/revogar; substituida: a pessoa autorizou de novo o mesmo
+ * cliente, ou o mesmo destino com "Substituir a conexão anterior" marcado.
  */
 export type MotivoRevogacaoConexao = (typeof MOTIVOS_REVOGACAO_CONEXAO)[number]
 export const ROTULO_MOTIVO_REVOGACAO: Record<MotivoRevogacaoConexao, string> = {
   usuario: 'Revogada por você',
   admin: 'Revogada pelo admin',
   desativacao: 'Pessoa desativada',
+  credenciais: 'Senha trocada',
+  papel: 'Papel alterado',
   reuso_refresh: 'Revogada por segurança (token reutilizado)',
   codigo_reusado: 'Revogada por segurança (código reutilizado)',
   pedido_cliente: 'Desconectada pelo Claude',
   substituida: 'Substituída por uma autorização nova',
 }
 
+/**
+ * Cookie do pedido de autorização (randomBytes(32) base64url; HttpOnly, SameSite=Lax, Path=/, Max-Age = pedidoMin;
+ * Secure e o prefixo __Host- só em produção, como o `sid`). GET /oauth/autorizar grava; a tela e a decisão exigem o
+ * mesmo navegador (oauth_pedido.navegador_hash = sha256 hex).
+ */
+export const COOKIE_PEDIDO_OAUTH = { producao: '__Host-pauta_oauth', desenvolvimento: 'pauta_oauth' } as const
+
+/** Faixa de saída da Anthropic (pesquisa-mcp §7): o registro dinâmico do claude.ai vem dela. */
+export const FAIXA_ANTHROPIC = '160.79.104.0/21'
+
 /** Prazos do OAuth e do MCP. */
 export const PRAZOS_OAUTH = {
   pedidoMin: 10,
   codigoMin: 5,
   acessoSeg: 3600,
-  /** Reuso de um refresh já trocado dentro desta folga troca de novo (duas conversas renovando juntas). */
+  /**
+   * Reuso de um refresh já trocado dentro desta folga devolve O MESMO par emitido na troca (oauth_token.filho_cifrado),
+   * sem emitir outro (duas conversas renovando juntas); depois dela, revoga a concessão ('reuso_refresh').
+   */
   toleranciaRefreshSeg: 60,
   /** ultimo_uso_em da concessão e do cliente: no máximo a cada 10 min. O refresh vale sessaoValidadeDias (config). */
   ultimoUsoMin: 10,
 } as const
 
-/** Limites (por concessão, não por IP: todo o Claude chega pela mesma faixa da Anthropic). */
+/** Limites. No /mcp, por PESSOA (somando as concessões dela), nunca por IP: todo o Claude chega pela mesma faixa. */
 export const LIMITES_MCP = {
   chamadasPorMinuto: 60,
+  /** Buscas na Windsor disparadas pelo MCP por pessoa por hora; acima, `resumo_cliente` responde só do cache. */
+  buscasWindsorPorHora: 10,
   /** Itens por página nas listas das ferramentas (padrão) e o máximo que `limite` aceita. */
   pagina: 20,
   paginaMax: 50,
   /** Teto de uma resposta de ferramenta (o Claude Code corta em 25 mil tokens). */
   respostaMaxCaracteres: 20000,
+  /** ler_demanda corta a descrição aqui; editar_demanda recusa `descricao` quando a atual passa disso. */
   descricaoMaxCaracteres: 4000,
   comentarioMaxCaracteres: 600,
-  /** Registro dinâmico: por IP por hora, e o teto de clientes ainda sem concessão. */
-  registrosPorHoraIp: 30,
+  /** Padrões enxutos (API §F.5): linhas por grupo em minhas_demandas, eventos de hoje, linhas por dia na agenda. */
+  limitePorGrupo: 5,
+  agendaHojeMax: 5,
+  agendaLinhasPorDia: 8,
+  /** criar_demanda com `lote`: até 20 demandas numa transação. */
+  loteMax: 20,
+  /** Registro dinâmico por IP por hora: fora da FAIXA_ANTHROPIC e dentro dela (todo o claude.ai do mundo). */
+  registrosPorHoraIp: 10,
+  registrosPorHoraIpAnthropic: 300,
+  /** Ao chegar aqui, apaga os clientes sem concessão e sem pedido pendente criados há mais de 15 min (nunca 429). */
   clientesSemConcessaoMax: 300,
+  /** GET /oauth/autorizar: pedidos pendentes por client_id (o 6º apaga o mais antigo) e por IP do navegador por hora. */
+  pedidosPendentesPorCliente: 5,
+  autorizacoesPorHoraIp: 60,
   /** POST /oauth/token por client_id por minuto. */
   tokensPorMinutoCliente: 30,
+} as const
+
+/**
+ * Orçamento de caracteres (≈ 3,3 por token) medido por `server/scripts/mcp-medir.ts` no seed de demonstração; passar
+ * de um teto reprova o aceite do F7. A linha de base fica em docs/fase2/operacao-mcp.md.
+ */
+export const ORCAMENTO_MCP = {
+  toolsList: 12000,
+  minhasDemandas: 2500,
+  lerDemanda: 4000,
+  agenda7Dias: 3000,
+  resumoCliente: 3000,
+  listarClientes: 1200,
 } as const
 
 // ─────────────────────────────── OAuth: formatos das RFCs (snake_case) ───────────────────────────────
@@ -169,22 +215,37 @@ export interface ErroOAuth {
 /** Para onde o código vai: claude.ai/claude.com, o Claude Code neste computador (loopback) ou um extra do ambiente. */
 export type DestinoConexao = 'claude_ai' | 'claude_code' | 'outro'
 
-/** GET /api/oauth/pedidos/:id: o que a tela /autorizar mostra. */
+/**
+ * GET /api/oauth/pedidos/:id: o que a tela /autorizar mostra. Só abre no navegador que abriu /oauth/autorizar
+ * (COOKIE_PEDIDO_OAUTH); noutro, `410` "Abra a conexão pelo Claude neste navegador".
+ */
 export interface PedidoAutorizacao {
   id: string
-  /** client_name declarado pelo cliente: dado, não garantia (a tela diz isso). */
+  /** client_name declarado pelo cliente: dado, não garantia (a tela diz isso). Uma linha, até 120. */
   nomeCliente: string
+  /**
+   * claude_ai: "O Claude quer acessar o {APP_NOME} como você"; claude_code (loopback): "Um aplicativo neste computador
+   * quer acessar o {APP_NOME} como você", com o nomeCliente em destaque e a caixa obrigatória "Fui eu que comecei esta
+   * conexão no Claude Code".
+   */
   destino: DestinoConexao
   /** Host do redirect em destaque ("claude.ai", "localhost"). */
   hostRedirect: string
+  /** A tela mostra "pedido criado às HH:MM" e "Só continue se você acabou de clicar em Conectar no Claude". */
+  criadoEm: Instante
   expiraEm: Instante
-  /** A pessoa já tem uma conexão ativa com este cliente (autorizar de novo substitui). */
-  substitui: boolean
+  /**
+   * Conexões ativas da pessoa com o mesmo destino (0 = nenhuma). Com > 0, a tela oferece "Substituir a conexão anterior"
+   * (marcado). O mesmo cliente de novo sempre substitui.
+   */
+  anteriores: number
 }
 
-/** POST /api/oauth/pedidos/:id/decisao */
+/** POST /api/oauth/pedidos/:id/decisao (mesmo navegador do pedido). */
 export interface DecisaoAutorizacaoEntrada {
   permitir: boolean
+  /** Revogar ('substituida') as conexões ativas com o mesmo destino ao trocar o código. Padrão true. */
+  substituir?: boolean
 }
 
 /**
@@ -236,6 +297,8 @@ export const FERRAMENTAS_MCP_ESCRITA = [
   'criar_demanda', 'editar_demanda', 'mover_demanda', 'comentar', 'checklist', 'concluir_demanda',
   'arquivar_demanda', 'lancar_horas', 'registrar_retorno',
 ] as const satisfies readonly FerramentaMcp[]
+/** Escritas com destructiveHint true (trocam texto inteiro ou registram a decisão do cliente): o Claude pede confirmação. */
+export const FERRAMENTAS_MCP_DESTRUTIVAS = ['editar_demanda', 'registrar_retorno'] as const satisfies readonly FerramentaMcp[]
 
 // ─────────────────────────────── ponte F7 ↔ F8/F9 (sem import cruzado) ───────────────────────────────
 
@@ -248,11 +311,14 @@ export const FERRAMENTAS_MCP_ESCRITA = [
 export interface ProvedorResultadosMcp<Db = unknown> {
   tipo: 'resultados'
   /**
-   * Os resultados do cliente no período (permissão: todo interno vê). Com cache vencido ou ausente, busca na Windsor e
-   * espera no máximo `esperarMs` (o MCP usa 45 000, abaixo do corte de 100 s da Cloudflare); passou disso, devolve o
-   * que houver com `atualizando: true`.
+   * Os resultados do cliente no período (permissão: todo interno vê). Com cache vencido ou ausente e `buscar: true`,
+   * busca na Windsor e espera no máximo `esperarMs` (o MCP usa 20 000); passou disso, devolve o que houver com
+   * `atualizando: true`. `buscar: false` (a pessoa passou de LIMITES_MCP.buscasWindsorPorHora) = só o cache, sem
+   * disparar busca. Nunca lança: erro vira o `estado` do conector.
    */
-  resultados(db: Db, e: { clienteId: Id; periodo: PeriodoResultados; esperarMs: number }): Promise<ResultadosCliente>
+  resultados(db: Db, e: { clienteId: Id; periodo: PeriodoResultados; esperarMs: number; buscar: boolean }): Promise<ResultadosCliente>
+  /** A carteira (GET /api/resultados/panorama): uma linha por cliente com conta ligada. Mesmas regras de espera e busca. */
+  panorama(db: Db, e: { periodo: PeriodoResultados; esperarMs: number; buscar: boolean }): Promise<PanoramaResultados>
 }
 
 export interface ProvedorAgendaMcp<Db = unknown> {

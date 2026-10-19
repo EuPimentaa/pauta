@@ -751,20 +751,28 @@ deveFalhar(db, "INSERT INTO oauth_cliente (id, nome, redirect_uris) VALUES ('oc9
   'cliente OAuth sem redirect_uri é recusado')
 deveFalhar(db, `INSERT INTO oauth_cliente (id, nome, redirect_uris, metodo_auth) VALUES ('oc9', 'X', '["https://claude.ai/x"]',
   'client_secret_post')`, [], 'CHECK', 'só cliente público (token_endpoint_auth_method none)')
-const insPedido = `INSERT INTO oauth_pedido (id, cliente_id, redirect_uri, code_challenge, escopo, resource, expira_em)
-  VALUES (?, ?, 'https://claude.ai/api/mcp/auth_callback', ?, 'pauta', 'https://demandas.example/mcp', '2030-01-01')`
-rodar(db, insPedido, 'op1', 'oc1', CH)
-deveFalhar(db, insPedido, ['op9', 'oc1', CH.slice(1)], 'CHECK', 'code_challenge que não tem o tamanho do S256 é recusado')
-deveFalhar(db, insPedido, ['op9', 'oc1', CH.slice(1) + '='], 'CHECK', 'code_challenge fora do base64url é recusado')
+const NAV = 'a'.repeat(64)   // sha256 hex do cookie do pedido
+const insPedido = `INSERT INTO oauth_pedido (id, cliente_id, redirect_uri, code_challenge, escopo, resource, navegador_hash, expira_em)
+  VALUES (?, ?, 'https://claude.ai/api/mcp/auth_callback', ?, 'pauta', 'https://demandas.example/mcp', ?, '2030-01-01')`
+rodar(db, insPedido, 'op1', 'oc1', CH, NAV)
+deveFalhar(db, insPedido, ['op9', 'oc1', CH.slice(1), NAV], 'CHECK', 'code_challenge que não tem o tamanho do S256 é recusado')
+deveFalhar(db, insPedido, ['op9', 'oc1', CH.slice(1) + '=', NAV], 'CHECK', 'code_challenge fora do base64url é recusado')
+deveFalhar(db, insPedido, ['op9', 'oc1', CH, null], 'NOT NULL', 'pedido sem o cookie do navegador é recusado')
+deveFalhar(db, insPedido, ['op9', 'oc1', CH, 'cookie-em-claro'], 'CHECK', 'o pedido guarda só o sha256 hex do cookie')
+deveFalhar(db, "UPDATE oauth_pedido SET substituir = 1 WHERE id = 'op1'", [], 'CHECK', '"substituir" só com o pedido permitido')
 deveFalhar(db, "UPDATE oauth_pedido SET decisao = 'permitido', decidido_em = ? WHERE id = 'op1'", [T0], 'CHECK',
   'decisão sem quem decidiu é recusada')
 deveFalhar(db, `UPDATE oauth_pedido SET decisao = 'negado', decidido_em = ?, usuario_id = 'u-rafa', codigo_hash = 'cod0',
   codigo_expira_em = ? WHERE id = 'op1'`, [T0, T1], 'CHECK', 'pedido negado não gera código')
 rodar(db, `UPDATE oauth_pedido SET decisao = 'permitido', decidido_em = ?, usuario_id = 'u-rafa', codigo_hash = 'cod1',
-  codigo_expira_em = ? WHERE id = 'op1'`, T0, T1)
-const insConcessao = `INSERT INTO oauth_concessao (id, usuario_id, cliente_id, redirect_uri)
-  VALUES (?, 'u-rafa', 'oc1', 'https://claude.ai/api/mcp/auth_callback')`
+  codigo_expira_em = ?, substituir = 1 WHERE id = 'op1'`, T0, T1)
+const insConcessao = `INSERT INTO oauth_concessao (id, usuario_id, cliente_id, redirect_uri, resource)
+  VALUES (?, 'u-rafa', 'oc1', 'https://claude.ai/api/mcp/auth_callback', 'https://demandas.example/mcp')`
+deveFalhar(db, `INSERT INTO oauth_concessao (id, usuario_id, cliente_id, redirect_uri)
+  VALUES ('cx9', 'u-rafa', 'oc1', 'https://claude.ai/api/mcp/auth_callback')`, [], 'NOT NULL', 'conexão sem a audiência (resource)')
 rodar(db, insConcessao, 'cx1')
+deveFalhar(db, "UPDATE oauth_concessao SET resource = 'https://outro.example/mcp' WHERE id = 'cx1'", [], 'oauth_concessao_imutavel',
+  'a audiência da conexão não muda')
 deveFalhar(db, insConcessao, ['cx2'], 'UNIQUE', 'uma conexão ativa por pessoa e cliente (autorizar de novo substitui)')
 deveFalhar(db, "UPDATE oauth_pedido SET concessao_id = 'cx1' WHERE id = 'op1'", [], 'CHECK', 'código não usado não emitiu conexão')
 rodar(db, "UPDATE oauth_pedido SET codigo_usado_em = ?, concessao_id = 'cx1' WHERE id = 'op1'", T0)
@@ -774,7 +782,10 @@ rodar(db, insTokenOAuth, 'tk-r1', 'cx1', 'atualizacao', T0, T5)
 deveFalhar(db, insTokenOAuth, ['tk-x', 'cx1', 'sessao', T0, T1], 'CHECK', 'tipo de token fora de TIPOS_TOKEN_OAUTH')
 deveFalhar(db, insTokenOAuth, ['tk-x', 'cx1', 'acesso', T1, T0], 'CHECK', 'token que vence antes de nascer é recusado')
 deveFalhar(db, "UPDATE oauth_token SET trocado_em = ? WHERE hash = 'tk-a1'", [T0], 'CHECK', 'só o refresh é trocado (rotação)')
-rodar(db, "UPDATE oauth_token SET trocado_em = ? WHERE hash = 'tk-r1'", T0)
+deveFalhar(db, "UPDATE oauth_token SET filho_cifrado = 'iv.tag.cifra' WHERE hash = 'tk-r1'", [], 'CHECK',
+  'o par filho só existe num refresh já trocado')
+rodar(db, "UPDATE oauth_token SET trocado_em = ?, filho_cifrado = 'iv.tag.cifra' WHERE hash = 'tk-r1'", T0)
+rodar(db, "UPDATE oauth_token SET filho_cifrado = NULL WHERE hash = 'tk-r1'")
 deveFalhar(db, "UPDATE oauth_concessao SET usuario_id = 'u-am' WHERE id = 'cx1'", [], 'oauth_concessao_imutavel',
   'a conexão não muda de dono')
 deveFalhar(db, "UPDATE oauth_concessao SET revogada_em = ? WHERE id = 'cx1'", [T1], 'CHECK', 'revogar exige o motivo')
@@ -814,7 +825,7 @@ conferir(um(db, "SELECT count(*) n FROM oauth_concessao WHERE usuario_id = 'u-ra
   'depois de revogar, a pessoa conecta o mesmo cliente de novo')
 deveFalhar(db, "DELETE FROM oauth_cliente WHERE id = 'oc1'", [], 'FOREIGN KEY', 'cliente OAuth com conexão não é podado')
 rodar(db, `INSERT INTO oauth_cliente (id, nome, redirect_uris, tipo) VALUES ('oc2', 'Claude Code', '["http://127.0.0.1/callback"]', 'native')`)
-rodar(db, insPedido, 'op2', 'oc2', CH)
+rodar(db, insPedido, 'op2', 'oc2', CH, NAV)
 rodar(db, "DELETE FROM oauth_cliente WHERE id = 'oc2'")
 conferir(um(db, "SELECT count(*) n FROM oauth_pedido WHERE id = 'op2'")!.n === 0, 'podar o cliente sem conexão leva os pedidos dele')
 
@@ -870,6 +881,15 @@ deveFalhar(db, insOcorrencia, ['x1', 'X', 1, null, null, '2026-10-21', '2026-10-
   'último dia antes do primeiro é recusado')
 deveFalhar(db, insOcorrencia, ['x1', 'X', 1, null, null, '2026-10-21', '2026-10-21', null, 'http://zoom.us/j/1', null, 0], 'CHECK',
   'link de reunião só https')
+for (const ruim of ['https://evil.example/meet.google.com/x', 'https://meet.google.com.evil.example/x', 'https://evilzoom.us/j/1',
+  'https://meet.google.com:8443/x', 'https://u:p@meet.google.com/x', 'https://MEET.google.com/x', 'https://meet.google.com']) {
+  deveFalhar(db, insOcorrencia, ['x1', 'X', 1, null, null, '2026-10-21', '2026-10-21', null, ruim, null, 0], 'CHECK',
+    `link de reunião fora de Meet, Zoom e Teams é recusado (${ruim})`)
+}
+for (const [i, bom] of ['https://us02web.zoom.us/j/1', 'https://teams.microsoft.com/l/meetup-join/x', 'https://zoom.us/j/2',
+  'https://teams.live.com/meet/3'].entries()) {
+  rodar(db, insOcorrencia, `ok${i}`, 'X', 1, null, null, '2026-10-21', '2026-10-21', null, bom, null, 0)
+}
 deveFalhar(db, insOcorrencia, ['x1', 'Ocupado', 1, null, null, '2026-10-21', '2026-10-21', 'Sala 2', null, null, 1], 'CHECK',
   'evento privado não guarda local, descrição nem link')
 deveFalhar(db, insOcorrencia, ['b1@google.com', 'Dup', 1, null, null, '2026-10-21', '2026-10-21', null, null, null, 0], 'UNIQUE',

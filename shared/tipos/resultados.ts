@@ -18,10 +18,13 @@ export const ROTULO_CONECTOR: Record<ConectorWindsor, string> = {
 
 export const PERIODOS_RESULTADOS = ['este_mes', 'mes_passado', '7d', '30d', '90d'] as const
 /**
- * Datas calculadas em São Paulo (`periodoDe(periodo, hoje)`, shared/logica/resultados-periodo.ts):
- * - este_mes: do dia 1 até hoje; comparação = os mesmos dias do mês anterior (dia que não existe vira o último do mês);
+ * Datas calculadas em São Paulo (`periodoDe(periodo, hoje)`, shared/logica/resultados-periodo.ts). Todos terminam
+ * ONTEM (dias fechados; hoje pela metade mostraria queda falsa todo dia):
+ * - este_mes: do dia 1 até ontem; comparação = os mesmos dias do mês anterior (dia que não existe vira o último do mês).
+ *   Em 19/10: 01/10–18/10 × 01/09–18/09. No dia 1 o mês ainda não tem dia fechado: vale `mes_passado` (a resposta
+ *   traz `periodo: 'mes_passado'`; a tela desabilita o chip com a dica "o mês começa a contar amanhã");
  * - mes_passado: o mês anterior inteiro; comparação = o mês retrasado inteiro;
- * - 7d/30d/90d: os N dias que terminam ONTEM (dias fechados); comparação = os N dias logo antes.
+ * - 7d/30d/90d: os N dias que terminam ontem; comparação = os N dias logo antes.
  */
 export type PeriodoResultados = (typeof PERIODOS_RESULTADOS)[number]
 export const ROTULO_PERIODO: Record<PeriodoResultados, string> = {
@@ -174,9 +177,63 @@ export type ResultadoGa4 = ResultadoConectorBase<'googleanalytics4', KpisGa4, Po
 }
 export type ResultadoConector = ResultadoMeta | ResultadoGoogleAds | ResultadoGa4
 
+// ─────────────────────────────── atenção e carteira ───────────────────────────────
+
+export const TIPOS_ALERTA_RESULTADO = ['parou_de_gastar', 'conta_nao_conectada', 'custo_subiu'] as const
+/**
+ * O que o tráfego procura primeiro (calculado no servidor por shared/logica/resultados-alertas.ts, F8; a aba mostra na
+ * faixa "Atenção" e o MCP repete o `texto`):
+ * - parou_de_gastar: investimento zero ontem numa conta que gastou nos 7 dias antes;
+ * - conta_nao_conectada: a Windsor diz que a conta não está conectada;
+ * - custo_subiu: custo por resultado (Meta) ou por conversão (Google Ads) +30% ou mais contra o período anterior.
+ */
+export type TipoAlertaResultado = (typeof TIPOS_ALERTA_RESULTADO)[number]
+export interface AlertaResultado {
+  tipo: TipoAlertaResultado
+  conector: ConectorWindsor
+  /** Uma conta específica (parou_de_gastar, conta_nao_conectada); null = o conector inteiro do cliente. */
+  contaId: string | null
+  /** Frase pronta, a mesma na tela e no MCP: "Meta Ads: a conta HE Leads não gastou ontem (gastou R$ 312,40 nos 7 dias antes)". */
+  texto: string
+}
+
+/** Uma linha da carteira (GET /api/resultados/panorama): um cliente com conta ligada, os KPIS_PRINCIPAIS dos conectores. */
+export interface LinhaPanorama {
+  clienteId: Id
+  sigla: string
+  /** Por conector ligado: os valores dos KPIS_PRINCIPAIS (shared/logica/resultados-formato.ts) nos dois períodos. */
+  conectores: {
+    conector: ConectorWindsor
+    estado: 'ok' | 'sem_dados' | ErroWindsor
+    atual: Record<string, number | null>
+    anterior: Record<string, number | null>
+  }[]
+  alertas: AlertaResultado[]
+}
+
+/**
+ * GET /api/resultados/panorama?periodo=30d (todos os internos): a carteira lado a lado. Uma chamada sem `date` por
+ * conector e período, com todas as contas ligadas em `select_accounts` (pesquisa-windsor: 9 contas numa chamada), cache
+ * de 3 h como o do cliente. Clientes sem conta ligada não entram.
+ */
+export interface PanoramaResultados {
+  periodo: PeriodoResultados
+  de: DataLocal
+  ate: DataLocal
+  deAnterior: DataLocal
+  ateAnterior: DataLocal
+  estado: 'ok' | 'sem_chave'
+  atualizando: boolean
+  /** Hora da busca dos dados mostrados (a mais antiga entre os conectores); null = nunca buscou. */
+  buscadoEm: Instante | null
+  /** Por sigla. */
+  linhas: LinhaPanorama[]
+}
+
 /** GET /api/clientes/:id/resultados?periodo=30d */
 export interface ResultadosCliente {
   clienteId: Id
+  /** O período efetivo (no dia 1, `este_mes` pedido vem como `mes_passado`). */
   periodo: PeriodoResultados
   de: DataLocal
   ate: DataLocal
@@ -191,6 +248,8 @@ export interface ResultadosCliente {
   meta: ResultadoMeta | null
   googleAds: ResultadoGoogleAds | null
   ga4: ResultadoGa4 | null
+  /** A faixa "Atenção" (vazia quando nada chama atenção). */
+  alertas: AlertaResultado[]
 }
 
 /** POST /api/clientes/:id/resultados/atualizar */

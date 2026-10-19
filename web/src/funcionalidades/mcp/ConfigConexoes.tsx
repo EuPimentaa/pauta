@@ -18,7 +18,7 @@ import { Checkbox, Interruptor } from '../../ui/Checkbox.tsx'
 import { EsqueletoLinhas } from '../../ui/Indicadores.tsx'
 import { copiarParaAreaDeTransferencia } from '../../ui/Texto.tsx'
 import { BotaoIcone } from '../../ui/Botao.tsx'
-import { Painel } from '../cadastros/comum.tsx'
+import { Painel, Pilula } from '../cadastros/comum.tsx'
 import '../cadastros/cadastros.css'
 import { diaHoraDe, haQuanto, revogarConexao, useConexoes } from './api.ts'
 import './mcp.css'
@@ -43,7 +43,22 @@ function Copiavel({ texto, rotulo, aviso, className }: { texto: string; rotulo: 
   )
 }
 
-const ROTULO_DESTINO = { claude_ai: 'claude.ai', claude_code: 'Claude Code neste computador', outro: 'Outro aplicativo' } as const
+/**
+ * O destino como quem olha entende: a conexão do Claude Code é do computador de quem conectou, não "deste" (o admin
+ * com "Todas as pessoas" via "Claude Code neste computador" na conexão da Pri).
+ */
+function rotuloDestino(c: ConexaoMcp, minha: boolean): string {
+  if (c.destino === 'claude_ai') return 'claude.ai'
+  if (c.destino === 'claude_code') return minha ? 'Claude Code no seu computador' : 'Claude Code no computador da pessoa'
+  return `Outro aplicativo (${c.hostRedirect})`
+}
+
+/** "Revogada por você" só para a dona; o admin olhando a de outra pessoa lê "Revogada pela pessoa". */
+function rotuloRevogacao(c: ConexaoMcp, minha: boolean): string {
+  if (!c.motivoRevogacao) return 'Revogada'
+  if (c.motivoRevogacao === 'usuario' && !minha) return 'Revogada pela pessoa'
+  return ROTULO_MOTIVO_REVOGACAO[c.motivoRevogacao]
+}
 
 function Passos({ url }: { url: string }) {
   const comando = `claude mcp add --transport http pauta ${url}`
@@ -83,6 +98,7 @@ function Linha({ c, mostrarPessoa }: { c: ConexaoMcp; mostrarPessoa: boolean }) 
   const [confirmar, setConfirmar] = useState(false)
   const [revogando, setRevogando] = useState(false)
   const dona = usuarios.find((u) => u.id === c.usuarioId)
+  const minha = c.usuarioId === eu.usuario.id
   const Icone = c.destino === 'claude_code' ? Laptop : c.destino === 'claude_ai' ? Sparkles : Link2
 
   async function revogar() {
@@ -105,11 +121,12 @@ function Linha({ c, mostrarPessoa }: { c: ConexaoMcp; mostrarPessoa: boolean }) 
         <p className="mcp-conexao-nome">
           <span>{c.nomeCliente}</span>
           {mostrarPessoa && <span className="mcp-conexao-pessoa">· {dona?.nome ?? 'Pessoa removida'}</span>}
+          {c.revogadaEm && <Pilula>Revogada</Pilula>}
         </p>
         <p className="mcp-conexao-meta">
-          {ROTULO_DESTINO[c.destino]}{c.destino === 'outro' ? ` (${c.hostRedirect})` : ''} · conectada em {diaHoraDe(c.criadaEm)}
+          {rotuloDestino(c, minha)} · conectada em {diaHoraDe(c.criadaEm)}
           {' · '}{c.revogadaEm
-            ? `${c.motivoRevogacao ? ROTULO_MOTIVO_REVOGACAO[c.motivoRevogacao] : 'Revogada'} em ${diaHoraDe(c.revogadaEm)}`
+            ? `${rotuloRevogacao(c, minha)} em ${diaHoraDe(c.revogadaEm)}`
             : c.ultimoUsoEm ? `último uso ${haQuanto(c.ultimoUsoEm)}` : 'ainda não usada'}
         </p>
       </div>

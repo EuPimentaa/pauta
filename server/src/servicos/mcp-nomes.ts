@@ -10,7 +10,7 @@ import type {
 import { linhaDemanda, umaLinha } from '../../../shared/logica/mcp-texto.ts'
 import { estadoPrazo } from '../../../shared/logica/prazo.ts'
 import { paradoHa } from '../../../shared/logica/quadro.ts'
-import { normalizarAlias } from '../../../shared/logica/texto.ts'
+import { normalizarAlias, semInvisiveis } from '../../../shared/logica/texto.ts'
 import { agoraData, um, type Db } from '../db.ts'
 import { clientesResumo } from './clientes.ts'
 import { feriados } from './config-app.ts'
@@ -19,9 +19,9 @@ import { ErroMcp } from './mcp-comum.ts'
 import { usuariosResumo } from './pessoas.ts'
 import { colunasDoQuadro, etiquetasDoQuadro, listarQuadros, modelosDemandaAtivos } from './quadros.ts'
 
-/** Sem acento, sem caixa, sem espaço: "@Rafa Lima" → "rafalima". */
+/** Sem acento, sem caixa, sem espaço e sem invisível: "@Rafa Lima" → "rafalima"; "Fila\u200B" → "fila". */
 export function chave(s: string): string {
-  return normalizarAlias(s.replace(/^@/, '')).replace(/[\s._-]+/g, '')
+  return normalizarAlias(semInvisiveis(s).replace(/^@/, '')).replace(/[\s._-]+/g, '')
 }
 
 /** Até 8 nomes, cada um numa linha só (um nome de coluna com quebra e "#999 …" não forja linha na resposta). */
@@ -161,11 +161,14 @@ export class Nomes {
     return escolher('quadro', texto, porSlug.length ? porSlug : todos.filter((q) => chave(q.nome) === k), (q) => q.slug, todos)
   }
 
+  /** Primeiro o nome igual (sem caixa e sem acento: "---" ≠ "...", "Fila" ≠ "Fila\u200B"); depois pela chave. */
   coluna(quadro: Quadro, texto: string): Coluna {
     const k = chave(texto)
     const todas = this.colunas(quadro.id)
-    const porNome = todas.filter((c) => chave(c.nome) === k)
-    const achadas = porNome.length ? porNome
+    const exato = todas.filter((c) => normalizarAlias(c.nome) === normalizarAlias(texto))
+    if (exato.length === 1) return exato[0]!
+    const porNome = exato.length || !k ? exato : todas.filter((c) => chave(c.nome) === k)
+    const achadas = porNome.length || !k ? porNome
       : todas.filter((c) => c.responsavelId && (this.handle(c.responsavelId) === `@${k}` || chave(this.nomeCurto(c.responsavelId) ?? '') === k))
     return escolher(`coluna em ${quadro.slug}`, texto, achadas, (c) => c.nome, todas)
   }

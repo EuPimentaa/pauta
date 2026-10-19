@@ -10,6 +10,7 @@ import { z } from 'zod'
 import type { Coluna, Etiqueta, Id, PosicaoRelativa, Quadro } from '../../../shared/tipos/index.ts'
 import { CORES, PAPEIS_COLUNA } from '../../../shared/tipos/index.ts'
 import { plural, umaLinha } from '../../../shared/logica/mcp-texto.ts'
+import { normalizarAlias } from '../../../shared/logica/texto.ts'
 import { config } from '../config.ts'
 import { ErroHttp } from '../erros.ts'
 import * as esquemaNucleo from '../esquemas.ts'
@@ -57,10 +58,14 @@ function comParametros<T>(fn: () => T, mapa: Record<string, string>): T {
   }
 }
 
-/** O MCP acha a coluna pelo nome: dois nomes iguais no quadro deixariam as duas sem como chamar. */
+/**
+ * O MCP acha a coluna pelo nome: dois nomes iguais no quadro deixariam as duas sem como chamar. Igual = a mesma chave
+ * (sem caixa, acento, espaço, ponto, hífen e invisível); nome só de pontuação ("---", chave vazia): o nome sem caixa.
+ */
 function exigirNomeLivre(n: Nomes, q: Quadro, texto: string, exceto: Id | null): void {
   const k = chave(texto)
-  if (k && n.colunas(q.id).some((c) => c.id !== exceto && chave(c.nome) === k)) {
+  const igual = k ? (x: string) => chave(x) === k : (x: string) => normalizarAlias(umaLinha(x)) === normalizarAlias(umaLinha(texto))
+  if (n.colunas(q.id).some((c) => c.id !== exceto && igual(c.nome))) {
     throw new ErroMcp(`Já existe a coluna "${rot(texto)}" em ${q.slug}. Escolha outro nome.`)
   }
 }
@@ -112,20 +117,18 @@ const coluna = ferramenta({
 
     if (a.acao === 'criar') {
       if (a.nome !== undefined) throw new ErroMcp('Em criar, o nome vai em coluna (nome é para renomear).')
-      exigirNomeLivre(n, q, a.coluna, null)
       const e = comParametros(() => entradaDaApi(ator, { nome: a.coluna, ...bruto }, esquemaNucleo.criarColuna, null),
         { nome: 'coluna', responsavelId: 'responsavel' })
+      exigirNomeLivre(n, q, e.nome, null)
       const c = criarColuna(db, q.id, e, ator)
       return `Criada a coluna ${rot(c.nome)}${marcas(n, c)} em ${q.slug}\n${ordem(n, q)}`
     }
 
     if (a.acao === 'mover' && !posicao) throw new ErroMcp('Para mover, mande depoisDe ou antesDe.')
-    if (a.nome !== undefined) {
-      exigirNomeLivre(n, q, a.nome, atual!.id)
-      bruto.nome = a.nome
-    }
+    if (a.nome !== undefined) bruto.nome = a.nome
     if (Object.keys(bruto).length === 0) throw new ErroMcp('Nada para mudar: mande nome, cor, papel, responsavel, limiteWip, depoisDe ou antesDe.')
     const e = comParametros(() => entradaDaApi(ator, bruto, esquemaNucleo.editarColuna, null), { responsavelId: 'responsavel' })
+    if (e.nome !== undefined) exigirNomeLivre(n, q, e.nome, atual!.id)
     const antes = atual!
     const { coluna: depois, concluidas } = editarColuna(db, antes.id, e, ator)
     const mudou: string[] = []

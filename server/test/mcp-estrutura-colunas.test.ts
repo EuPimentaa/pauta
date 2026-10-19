@@ -224,3 +224,32 @@ test('nome de coluna ao gravar: quebras viram espaço; caractere invisível é r
     assert.ok(linha(amb, 'social', nome), nome)
   }
 })
+
+test('coluna de nome parecido: invisível não burla o nome repetido, pontuação conta, e o nome igual vem primeiro', async () => {
+  const amb = await ambienteMcp()
+  const c = await conectar(amb, amb.pessoas.design)
+  // "Publicado" com U+200B (gravado antes por outro caminho): o MCP a acha por "Publicado" e não deixa outra igual
+  rodar(amb.db, 'UPDATE coluna SET nome = ? WHERE id = ?', 'Publicado\u200B', amb.coluna('social', 'Publicado').id)
+  assert.equal((await chamar(amb, c.at, 'coluna', { acao: 'editar', quadro: 'social', coluna: 'Publicado', limiteWip: 4 })).texto,
+    'Coluna Publicado em social: WIP — → 4')
+  assert.equal((await chamar(amb, c.at, 'coluna', { acao: 'criar', quadro: 'social', coluna: 'publicado' })).texto,
+    'Já existe a coluna "publicado" em social. Escolha outro nome.')
+  // só de pontuação (chave vazia): "---" e "..." são diferentes, mas "---" duas vezes não
+  assert.equal((await chamar(amb, c.at, 'coluna', { acao: 'criar', quadro: 'social', coluna: '---' })).erro, false)
+  assert.equal((await chamar(amb, c.at, 'coluna', { acao: 'criar', quadro: 'social', coluna: '...' })).erro, false)
+  assert.equal((await chamar(amb, c.at, 'coluna', { acao: 'criar', quadro: 'social', coluna: '---' })).texto,
+    'Já existe a coluna "---" em social. Escolha outro nome.')
+  assert.equal((await chamar(amb, c.at, 'coluna', { acao: 'editar', quadro: 'social', coluna: '---', cor: 'azul' })).texto,
+    'Coluna --- em social: cor — → azul')
+  assert.equal((await chamar(amb, c.at, 'coluna', { acao: 'editar', quadro: 'social', coluna: '...', cor: 'verde' })).texto,
+    'Coluna ... em social: cor — → verde')
+  // "Em revisão" e "Em-revisão" pela tela (a rota deixa): cada uma pelo nome igual
+  const http = amb.como(amb.pessoas.design)
+  for (const nome of ['Em revisão', 'Em-revisão']) {
+    assert.equal((await http.post(`/api/quadros/${amb.quadros.social.quadro.id}/colunas`, { nome })).status, 201)
+  }
+  assert.equal((await chamar(amb, c.at, 'coluna', { acao: 'editar', quadro: 'social', coluna: 'em revisao', limiteWip: 2 })).texto,
+    'Coluna Em revisão em social: WIP — → 2')
+  assert.equal((await chamar(amb, c.at, 'coluna', { acao: 'editar', quadro: 'social', coluna: 'Em-revisão', limiteWip: 3 })).texto,
+    'Coluna Em-revisão em social: WIP — → 3')
+})

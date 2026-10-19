@@ -436,6 +436,9 @@ O MCP lê resultados e agenda **sem import cruzado** (API §F.5.1):
 
 ## 6. Ordem de merge e verificação final
 
+Feita em 19/10/2026: `docs/pedidos/INTEGRACAO-F2.md` (merges, pedidos, teste de integração e a verificação final em
+produção local).
+
 **Ordem: F7 → F8 → F9.** O MCP é a prioridade do dono ("faz o MCP depois…") e é o que mais depende de configuração fora
 do código (Cloudflare, conector no claude.ai): entra primeiro para ir a produção cedo. Os provedores tornam a ordem livre
 para o código (F8 e F9 não dependem do F7 nem um do outro, e os arquivos são disjuntos), então um atraso de um não segura

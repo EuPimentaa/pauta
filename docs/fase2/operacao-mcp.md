@@ -91,13 +91,17 @@ Para o Claude recriar um quadro do Trello no Pauta (o quadro em si é do admin, 
 
 São os serviços das rotas (`criarColuna`, `editarColuna`, `arquivarColuna`, `criarEtiqueta`, `editarEtiqueta`,
 `criarCliente`) com os esquemas delas: as mesmas regras, os mesmos eventos ao vivo (o quadro aberto noutra janela vê a
-coluna nascer) e a marca "via Claude" (traço `mcp_traco`; no cliente, a atividade `cliente.criado`). A única regra a
-mais é do MCP: a coluna não pode repetir o nome de outra coluna ativa do quadro (o Claude acha a coluna pelo nome).
+coluna nascer) e a marca "via Claude" (traço `mcp_traco`; no cliente, a atividade `cliente.criado`). As regras a mais
+são do MCP, que acha coluna e etiqueta pelo nome: a coluna não repete o nome de outra coluna ativa do quadro, a
+etiqueta não repete o de outra (sem caixa, acento, espaço, ponto, hífen e invisível) e só uma etiqueta sem nome por cor
+(as 30 cores do Trello caem nas 10 daqui: as outras ganham nome). Nome com caractere invisível é recusado (na rota
+também), e arquivar a coluna para onde uma automação leva cards é só do atendimento e do admin (como mudar a
+automação). A `coluna` é destrutiva no `tools/list` (`destructiveHint`): o Claude pede confirmação.
 Virar uma coluna `concluida` conclui as abertas dela (como na tela) e a resposta lista quais. As cores aceitas estão no
 `enum` do parâmetro `cor` (`ambar`, `amarelo`, `rosa`, `magenta`, `roxo`, `berinjela`, `verde`, `turquesa`, `azul`,
 `grafite`; o laranja da marca não entra). A tela de consentimento passou a dizer "Criar e arrumar colunas e etiquetas
-dos quadros; criar clientes"; as conexões já autorizadas continuam valendo (o papel da pessoa é o mesmo; nenhuma regra
-de permissão mudou).
+dos quadros; criar clientes"; as conexões já autorizadas continuam valendo (o papel da pessoa é o mesmo; nenhuma
+permissão nova).
 
 ## Limites (em memória; um deploy zera)
 

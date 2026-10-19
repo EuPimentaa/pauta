@@ -22,6 +22,7 @@ import { traduzirErroBanco } from '../erros.ts'
 import '../esquemas.ts'
 import { ErroMcp, type ContextoFerramenta, type Ferramenta } from './mcp-comum.ts'
 import { FERRAMENTAS_ESCRITA } from './mcp-ferramentas-escrita.ts'
+import { FERRAMENTAS_ESTRUTURA } from './mcp-ferramentas-estrutura.ts'
 import { FERRAMENTAS_LEITURA } from './mcp-ferramentas-leitura.ts'
 import { usar } from './mcp-limites.ts'
 import { descreverErro } from './segredos.ts'
@@ -29,9 +30,9 @@ import { descreverErro } from './segredos.ts'
 export const VERSOES_PROTOCOLO = ['2025-11-25', '2025-06-18', '2025-03-26'] as const
 const VERSAO_PADRAO = '2025-11-25'
 
-/** As 15, na ordem de FERRAMENTAS_MCP (o teste confere). */
+/** As 16, na ordem de FERRAMENTAS_MCP (o teste confere). */
 export const FERRAMENTAS: Ferramenta[] = (() => {
-  const todas = new Map([...FERRAMENTAS_LEITURA, ...FERRAMENTAS_ESCRITA].map((f) => [f.nome, f]))
+  const todas = new Map([...FERRAMENTAS_LEITURA, ...FERRAMENTAS_ESCRITA, ...FERRAMENTAS_ESTRUTURA].map((f) => [f.nome, f]))
   return FERRAMENTAS_MCP.map((nome) => {
     const f = todas.get(nome)
     if (!f) throw new Error(`ferramenta do MCP sem implementação: ${nome}`)

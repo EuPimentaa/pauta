@@ -298,17 +298,21 @@ export interface ListarConexoesSaida {
 
 // ─────────────────────────────── ferramentas ───────────────────────────────
 
-/** Ordem fixa do tools/list (API.md §F.5). */
+/**
+ * Ordem fixa do tools/list (API.md §F.5). As de estrutura no fim (colunas, para o Claude recriar um quadro do Trello)
+ * vieram depois da Fase 2, com os mesmos serviços e regras das rotas.
+ */
 export const FERRAMENTAS_MCP = [
   'minhas_demandas', 'buscar_demandas', 'ler_demanda', 'agenda', 'listar', 'resumo_cliente',
   'criar_demanda', 'editar_demanda', 'mover_demanda', 'comentar', 'checklist', 'concluir_demanda',
   'arquivar_demanda', 'lancar_horas', 'registrar_retorno',
+  'coluna',
 ] as const
 export type FerramentaMcp = (typeof FERRAMENTAS_MCP)[number]
 /** As que escrevem (readOnlyHint false): gravam mcp_traco e marcam o histórico "via Claude". */
 export const FERRAMENTAS_MCP_ESCRITA = [
   'criar_demanda', 'editar_demanda', 'mover_demanda', 'comentar', 'checklist', 'concluir_demanda',
-  'arquivar_demanda', 'lancar_horas', 'registrar_retorno',
+  'arquivar_demanda', 'lancar_horas', 'registrar_retorno', 'coluna',
 ] as const satisfies readonly FerramentaMcp[]
 /** Escritas com destructiveHint true (trocam texto inteiro ou registram a decisão do cliente): o Claude pede confirmação. */
 export const FERRAMENTAS_MCP_DESTRUTIVAS = ['editar_demanda', 'registrar_retorno'] as const satisfies readonly FerramentaMcp[]

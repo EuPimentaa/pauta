@@ -104,7 +104,7 @@ test('initialize, ping, notificações (202), método desconhecido (-32601), ver
   assert.equal((await rpc(amb, c.at, 'tools/call', { name: 'apagar_tudo', arguments: {} })).corpo.error.code, -32602)
 })
 
-test('tools/list: as 15 na ordem, título, anotações e esquemas que recusam campo desconhecido', async () => {
+test('tools/list: as 16 na ordem, título, anotações e esquemas que recusam campo desconhecido', async () => {
   const amb = await ambienteMcp()
   const c = await conectar(amb, amb.pessoas.design)
   const r = await rpc(amb, c.at, 'tools/list')
@@ -123,11 +123,14 @@ test('tools/list: as 15 na ordem, título, anotações e esquemas que recusam ca
   const idem = Object.fromEntries(tools.filter((t) => !t.annotations.readOnlyHint).map((t) => [t.name, t.annotations.idempotentHint]))
   assert.deepEqual(idem, {
     criar_demanda: false, editar_demanda: true, mover_demanda: true, comentar: false, checklist: false, concluir_demanda: true,
-    arquivar_demanda: true, lancar_horas: false, registrar_retorno: false,
+    arquivar_demanda: true, lancar_horas: false, registrar_retorno: false, coluna: false,
   })
   // os anuláveis saem como type [T, "null"] (não anyOf) e sem o teto de inteiro seguro do zod (orçamento do tools/list)
   const texto = JSON.stringify(r.corpo.result)
   assert.ok(!texto.includes('anyOf') && !texto.includes(String(Number.MAX_SAFE_INTEGER)), 'esquema sem enxugar')
+  const coluna = tools.find((t) => t.name === 'coluna').inputSchema.properties
+  assert.deepEqual(coluna.cor.type, ['string', 'null'])
+  assert.deepEqual(coluna.cor.enum, ['ambar', 'amarelo', 'rosa', 'magenta', 'roxo', 'berinjela', 'verde', 'turquesa', 'azul', 'grafite', null])
   assert.deepEqual(tools.find((t) => t.name === 'editar_demanda').inputSchema.properties.prazo, { type: ['string', 'null'], format: 'date' })
   const extra = await chamar(amb, c.at, 'listar', { tipo: 'quadros', apagar: true })
   assert.equal(extra.erro, true)

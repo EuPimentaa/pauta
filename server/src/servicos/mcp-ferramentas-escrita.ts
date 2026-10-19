@@ -34,11 +34,13 @@ import { exigirCamposPermitidos, podeAtor } from './permissoes.ts'
 
 /**
  * A entrada da API pelas mesmas portas da rota: os campos que o papel não pode mandar (403 campo_nao_permitido) e o
- * esquema zod da rota (400 validacao com o campo). O zod da ferramenta só traduziu nomes em ids.
+ * esquema zod da rota (400 validacao com o campo). O zod da ferramenta só traduziu nomes em ids. `campos`: a lista que a
+ * rota confere (`demanda`, `cliente`) ou null quando a rota não confere campo por papel (colunas, etiquetas).
  */
-export function entradaDaApi<T>(ator: Ator, entrada: Record<string, unknown>, esquema: z.ZodType<T>): T {
+export function entradaDaApi<T>(ator: Ator, entrada: Record<string, unknown>, esquema: z.ZodType<T>,
+  campos: 'demanda' | 'cliente' | null = 'demanda'): T {
   observador?.(entrada, esquema)
-  exigirCamposPermitidos(ator, entrada, 'demanda')
+  if (campos) exigirCamposPermitidos(ator, entrada, campos)
   return validar(esquema, entrada)
 }
 

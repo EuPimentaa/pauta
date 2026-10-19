@@ -189,6 +189,8 @@ describe('front em produção (web/dist)', () => {
     assert.equal(caminhoParaLog('/api/auth/redefinicao'), '/api/auth/redefinicao***')
     assert.equal(caminhoParaLog('/api/auth/login'), '/api/auth/login')
     assert.equal(caminhoParaLog('/api/demandas/12'), '/api/demandas/12')
+    assert.equal(caminhoParaLog('/api/oauth/pedidos/0b6f0c1e-1d2a-4b8e-9f3a-5c6d7e8f9a0b'), '/api/oauth/pedidos/***')
+    assert.equal(caminhoParaLog('/api/oauth/pedidos/0b6f0c1e/decisao'), '/api/oauth/pedidos/***/decisao')
 
     const a = await ambiente()
     restaurar = configurar({ log: true })

@@ -47,13 +47,15 @@ export const TRACE_UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-
 
 /**
  * Caminho para o log (API.md §1): sem query; /a/*, /api/publico/*, /api/auth/convite* e /api/auth/redefinicao* saem
- * mascarados (token de link público e de acesso nunca vai ao log).
+ * mascarados (token de link público e de acesso nunca vai ao log), e o id de /api/oauth/pedidos/:id também (Fase 2,
+ * pedido 1 do F7: sozinho não abre nada, mas fica fora do log).
  */
 export function caminhoParaLog(caminho: string): string {
   return caminho
     .replace(/^\/a\/.*/, '/a/***')
     .replace(/^\/api\/publico\/.*/, '/api/publico/***')
     .replace(/^\/api\/auth\/(convite|redefinicao).*/, '/api/auth/$1***')
+    .replace(/^\/api\/oauth\/pedidos\/[^/]+/, '/api/oauth/pedidos/***')
 }
 
 /** Páginas e rotas com Referrer-Policy no-referrer (os tokens não podem vazar pelo Referer). */

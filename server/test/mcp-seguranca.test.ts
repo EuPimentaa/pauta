@@ -99,8 +99,8 @@ test('o log do fluxo inteiro não tem token, código, code_verifier nem state', 
     const { log } = await capturarLog(async () => {
       const p = await abrirPedido(amb)
       // o id do pedido vai no caminho de /api/oauth/pedidos/:id (sozinho não abre nada: exige a sessão e o cookie do
-      // pedido); mascarar no log é pedido ao integrador (docs/pedidos/fase2-mcp.md, app.ts não é do F7)
-      segredos.push(p.state, p.verificador, p.cookie)
+      // pedido); o caminhoParaLog do app.ts o mascara (pedido 1 do F7, aplicado na integração)
+      segredos.push(p.state, p.verificador, p.cookie, p.pedidoId)
       const d = await decidir(amb, p, amb.pessoas.design)
       const codigo = new URL(d.corpo.redirecionar).searchParams.get('code')!
       segredos.push(codigo)
@@ -117,6 +117,7 @@ test('o log do fluxo inteiro não tem token, código, code_verifier nem state', 
     })
     assert.match(log, /POST \/oauth\/token 200/)
     assert.match(log, /GET \/oauth\/autorizar 302/)
+    assert.match(log, /POST \/api\/oauth\/pedidos\/\*\*\*\/decisao 200/)
     assert.match(log, /mcp origem recusada: https:\/\/evil\.example\/\?state=\*\*\*&code=\*\*\*/)
     assert.doesNotMatch(log, /pauta_(at|rt)_/)
     assert.doesNotMatch(log, /code_verifier/)

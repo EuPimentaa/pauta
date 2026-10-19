@@ -1,0 +1,20 @@
+[
+  {
+    "datasource": "facebook",
+    "account_name": "Cliente Exemplo",
+    "account_id": "1000000000000001",
+    "status": "active"
+  },
+  {
+    "datasource": "google_ads",
+    "account_name": "Cliente Exemplo - Google",
+    "account_id": "000-000-0001",
+    "status": "active"
+  },
+  {
+    "datasource": "googleanalytics4",
+    "account_name": "exemplo.com.br – GA4",
+    "account_id": "100000001",
+    "status": "active"
+  }
+]

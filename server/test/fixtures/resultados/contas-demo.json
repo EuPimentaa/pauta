@@ -1,0 +1,10 @@
+[
+  { "datasource": "facebook", "account_name": "Padaria Trigo Bom", "account_id": "1000000000000002", "status": "active" },
+  { "datasource": "facebook", "account_name": "Construtora Horizonte - Leads", "account_id": "1000000000000003", "status": "active" },
+  { "datasource": "facebook", "account_name": "Academia Movimento", "account_id": "1000000000000004", "status": "active" },
+  { "datasource": "facebook", "account_name": "Café Serra Verde", "account_id": "1000000000000005", "status": "paused" },
+  { "datasource": "google_ads", "account_name": "Construtora Horizonte - Google", "account_id": "000-000-0002", "status": "active" },
+  { "datasource": "google_ads", "account_name": "Ótica Visão Clara", "account_id": "000-000-0003", "status": "active" },
+  { "datasource": "googleanalytics4", "account_name": "trigobom.com.br – GA4", "account_id": "100000002", "status": "active" },
+  { "datasource": "googleanalytics4", "account_name": "horizonte.com.br – GA4", "account_id": "100000003", "status": "active" }
+]

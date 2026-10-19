@@ -1,0 +1,14 @@
+{
+  "data": [
+    {
+      "account_id": "1000000000000001",
+      "spend": 246.81,
+      "impressions": 101246,
+      "reach": 62268,
+      "frequency": 1.626,
+      "clicks": 758,
+      "ctr": 0.0075,
+      "cpc": 0.3256
+    }
+  ]
+}

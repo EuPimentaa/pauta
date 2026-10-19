@@ -7,7 +7,7 @@
 import type {
   ClienteResumo, Coluna, Demanda, Etiqueta, Id, ModeloDemanda, Quadro, UsuarioResumo,
 } from '../../../shared/tipos/index.ts'
-import { linhaDemanda } from '../../../shared/logica/mcp-texto.ts'
+import { linhaDemanda, umaLinha } from '../../../shared/logica/mcp-texto.ts'
 import { estadoPrazo } from '../../../shared/logica/prazo.ts'
 import { paradoHa } from '../../../shared/logica/quadro.ts'
 import { normalizarAlias } from '../../../shared/logica/texto.ts'
@@ -24,8 +24,10 @@ export function chave(s: string): string {
   return normalizarAlias(s.replace(/^@/, '')).replace(/[\s._-]+/g, '')
 }
 
+/** Até 8 nomes, cada um numa linha só (um nome de coluna com "
+#999 …" não forja linha na resposta). */
 function opcoes(lista: string[]): string {
-  const unicas = [...new Set(lista)]
+  const unicas = [...new Set(lista.map((x) => umaLinha(x, 60)))]
   return unicas.length > 8 ? `${unicas.slice(0, 8).join(', ')}…` : unicas.join(', ')
 }
 
@@ -35,7 +37,7 @@ function escolher<T>(tipo: string, texto: string, achados: T[], rotulo: (x: T) =
   if (achados.length > 1) throw new ErroMcp(`Mais de um ${tipo} com esse nome: ${opcoes(achados.map(rotulo))}.`)
   const parecidos = todos.filter((x) => chave(rotulo(x)).includes(chave(texto)))
   const lista = (parecidos.length ? parecidos : todos).map(rotulo)
-  throw new ErroMcp(`Nenhum ${tipo} "${texto.slice(0, 60)}".${lista.length ? ` Opções: ${opcoes(lista)}.` : ''} Use listar.`)
+  throw new ErroMcp(`Nenhum ${tipo} "${umaLinha(texto, 60)}".${lista.length ? ` Opções: ${opcoes(lista)}.` : ''} Use listar.`)
 }
 
 /**
@@ -249,8 +251,8 @@ export class Nomes {
     })
   }
 
-  /** "Criação › Fila" (nome do quadro e da coluna). */
+  /** "Criação › Fila" (nome do quadro e da coluna, cada um numa linha só). */
   lugar(d: Pick<Demanda, 'quadroId' | 'colunaId'>): string {
-    return `${this.quadroPorId(d.quadroId)?.nome ?? '?'} › ${this.colunaPorId(d.colunaId)?.nome ?? '?'}`
+    return `${umaLinha(this.quadroPorId(d.quadroId)?.nome, 80) || '?'} › ${umaLinha(this.colunaPorId(d.colunaId)?.nome, 60) || '?'}`
   }
 }

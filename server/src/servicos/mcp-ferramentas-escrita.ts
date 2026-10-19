@@ -71,7 +71,7 @@ const link = (n: number) => `${config.appUrl}/d/${n}`
 function avisosTexto(avisos: readonly string[], d?: Demanda, n?: Nomes): string[] {
   const saida: string[] = []
   if (avisos.includes('senha_detectada')) saida.push('Atenção: parece haver uma senha no texto; prefira o cofre da agência.')
-  if (avisos.includes('limite_wip') && d && n) saida.push(`Atenção: a coluna ${n.colunaPorId(d.colunaId)?.nome ?? ''} passou do limite de cards.`)
+  if (avisos.includes('limite_wip') && d && n) saida.push(`Atenção: a coluna ${umaLinha(n.colunaPorId(d.colunaId)?.nome, 60)} passou do limite de cards.`)
   return saida
 }
 
@@ -293,7 +293,7 @@ const moverDemanda = ferramenta({
     const r = mover(db, { ...e, demandaId: d.id, ator, via: 'manual' })
     const depois = carregarDemanda(db, d.id)
     const partes = [`#${depois.numero} movida para ${n.lugar(depois)}`]
-    if (r.etiquetasDeixadas.length) partes.push(`ficaram na ${n.quadroPorId(deQuadro)?.nome ?? 'origem'}: ${r.etiquetasDeixadas.map((x) => umaLinha(x, 40)).join(', ')}`)
+    if (r.etiquetasDeixadas.length) partes.push(`ficaram na ${umaLinha(n.quadroPorId(deQuadro)?.nome, 80) || 'origem'}: ${r.etiquetasDeixadas.map((x) => umaLinha(x, 40)).join(', ')}`)
     if (depois.concluidaEm && !d.concluidaEm) partes.push('concluída')
     if (r.proxima) partes.push(`próxima: #${r.proxima.numero}`)
     return [partes.join(' · '), ...avisosTexto(r.avisos, depois, n)].join('\n')
